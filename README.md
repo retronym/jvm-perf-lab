@@ -4,7 +4,7 @@ JMH profilers and a Java agent for benchmarking JVM programs:
 
 - default profilers for allocation and JIT activity
 - variants compared within one fork, by iteration
-- Apple Silicon PMU counters per thread, via `xctrace`
+- Apple Silicon PMU counters per thread, via `xctrace`, and flame graphs of PMU events via async-profiler ([doc/pmu-counters.md](doc/pmu-counters.md): which to use when)
 - an agent that counts the callers reaching a method
 
 Requires Java 17. Design and plan: [doc/design.md](doc/design.md).

@@ -1,7 +1,8 @@
 # Sample project
 
-A JMH project that uses perflab: `WordCountBenchmark` counts the words of a generated text in a `HashMap`,
-`LinkedHashMap` or `TreeMap`. `target/benchmarks.jar` has perflab's JMH driver as its main class; `perflab.toml` tells
+A JMH project that uses perflab. `WordCountBenchmark` counts the words of a generated text in a `HashMap`,
+`LinkedHashMap` or `TreeMap`. `MemoryBenchmark` walks an int array in order or as a pointer chase through a random
+cycle. `BranchBenchmark` sums the bytes above a threshold, over sorted or random data. `target/benchmarks.jar` has perflab's JMH driver as its main class; `perflab.toml` tells
 `perflab` how to run it.
 
 Build it with the rest of the repository (`mise run build`, from the root), then from this directory:
@@ -15,4 +16,12 @@ perflab ab run campaigns/maps.json && perflab ab report campaigns/maps.json
 perflab index
 ```
 
-On Apple Silicon with Xcode, `--profile xctrace:ipc` adds PMU counters for the benchmark thread.
+On Apple Silicon, PMU counters ([doc/pmu-counters.md](../../doc/pmu-counters.md)): counts per op for the benchmark thread through `xctrace` (needs Xcode), and flame graphs per event through async-profiler's kperf events (needs `mise run tools:async-profiler` and its helper running as root):
+
+```bash
+perflab run --profile xctrace:ipc -- -p size=100000 WordCountBenchmark
+perflab ab run campaigns/memory-paired.json
+perflab run --profile async:cycles+instructions+cache-misses+branch-misses --kperf /tmp/asprof-kperf.sock -- -p size=100000 WordCountBenchmark
+```
+
+`site.sh` (`mise run site`) runs every benchmark under each profile and builds the static site.

@@ -103,9 +103,28 @@ def text_page(path, dest, title):
     return os.path.relpath(page, dest)
 
 
+DOC = "https://github.com/retronym/jvm-perf-lab/blob/main/doc/pmu-counters.md"
+
+
+def about(name, profile, names):
+    """What a PMU-counter run shows, with links to the same benchmark's runs under the other integration."""
+    esc = html.escape
+    kind = profile.partition(":")[0]
+    base = re.sub(r"-(xctrace-.*|kperf)$", "", name)
+    if kind == "xctrace":
+        what, others = "XctraceProfiler: counts per op on the benchmark thread, beside JIT, GC and other threads; methods by leaf only, no stacks.", [f"{base}-kperf"]
+    elif kind == "async" and "+" in profile:
+        what, others = "async-profiler kperf events: where each PMU event is spent, as flame graphs.", sorted(n for n in names if n.startswith(f"{base}-xctrace-"))
+    else:
+        return ""
+    links = " · ".join(f'<a href="#{esc(o)}">{esc(o)}</a>' for o in others if o in names)
+    return f"<p>{esc(what)} {'Same benchmark: ' + links + '. ' if links else ''}<a href=\"{DOC}\">Which to use when</a>.</p>"
+
+
 def landing(dest, title, runs):
     esc = html.escape
     items = []
+    names = {os.path.basename(r) for r in runs}
     for run in runs:
         name = os.path.basename(run)
         profile = open(os.path.join(run, "profile.txt")).read().strip() if os.path.exists(os.path.join(run, "profile.txt")) else ""
@@ -145,7 +164,7 @@ def landing(dest, title, runs):
                 + "</td></tr>" for e, gs in events.items())
             parts.append(f"<table class='g'><tr><th>flame graphs</th><td class='k'>bench: benchmark threads · reverse: by leaf · "
                          f"threads: all threads · classify: by category</td></tr>{rows}</table>")
-        items.append(f"<section id='{esc(name)}'><h2>{esc(name)}</h2><p class='k'>{esc(profile)}</p>{''.join(parts)}</section>")
+        items.append(f"<section id='{esc(name)}'><h2>{esc(name)}</h2><p class='k'>{esc(profile)}</p>{about(name, profile, names)}{''.join(parts)}</section>")
     campaigns = '<p><a href="campaigns/index.html"><b>Campaigns</b></a>: every campaign, its cells and summaries, flame graphs per cell, differential flame graphs, and fork timelines.</p>' \
         if os.path.exists(os.path.join(dest, "campaigns", "index.html")) else ""
     with open(os.path.join(dest, "index.html"), "w") as f:
