@@ -71,11 +71,11 @@ The custom sbt commands go away.
 ## Plan
 
 - DONE 0. Repository skeleton: `mise.toml`, the Maven wrapper and two modules, `pyproject.toml`, CI building both, Apache-2.0 licence (JMH is GPLv2 with the classpath exception, which covers profilers built against it).
-- DONE 1 (unit tests; the integration benchmark is still to do). Move the Java code, renamed to `io.github.retronym.perflab`:
+- DONE 1. Move the Java code, renamed to `io.github.retronym.perflab`:
   - **What moves:** the driver (with `@file` and `&`), JitProfiler, PairedProfiler, IterationLog and Variants, XctraceProfiler with PerfMap and its templates, and the audit agent.
   - **Unit tests:** the Williams order, spec parsing, assigning samples to iterations, the XML filter, the driver's argument handling.
   - **Integration test:** a tiny JMH benchmark in the repo, run with each profiler.
-- TODO 2. Move the Python into a `perflab` package with one CLI:
+- DONE 2. Move the Python into a `perflab` package with one CLI, and a sample project (`examples/sample`) that runs every command:
   - **Commands:** `run`, `ab`, `abtrees`, `loadgate`, `regraph`, `profdiff`, `frameweight`, `subtree`, `index`, `timeline`, `auditfold`, `analyze`.
   - **Configuration:** `perflab.toml` replaces the hard-coded benchmark, parameter, variant-flag and phase assumptions.
 - TODO 3. scala3 bench-lab depends on jvm-perf-lab (JitPack tag; `~/.m2` while iterating) and deletes the moved code and the sbt commands.

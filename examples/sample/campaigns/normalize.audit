@@ -1,0 +1,3 @@
+# who calls WordCount.normalize, and from where
+count normalize        at=sample.WordCount#normalize  onStack=count:sample.WordCount#count,lookup:sample.WordCount#contains
+sites normalize-sites  at=sample.WordCount#normalize  depth=2  sample=100

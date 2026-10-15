@@ -4,13 +4,48 @@ python = "3.12"
 uv = "latest"
 
 [tasks.build]
-description = "Compile, test and package the Java modules"
+description = "Compile, test and package the Java modules and the sample (examples/sample/target/benchmarks.jar)"
 run = "./mvnw -q -B verify"
 
 [tasks.test]
-description = "Run the Java unit tests"
-run = "./mvnw -q -B test"
+description = "Run the Java and Python unit tests"
+run = ["./mvnw -q -B test", "python3 -m unittest discover -s python/tests"]
 
 [tasks.install]
 description = "Install a snapshot into ~/.m2, for a benchmark build that reads mavenLocal while iterating"
 run = "./mvnw -q -B install -DskipTests"
+
+[tasks.cli]
+description = "Install the perflab command (uv tool), from this checkout"
+run = "uv tool install --force --editable ./python"
+
+[tasks.site]
+description = "Run the sample's campaigns and runs, then build its static site in examples/sample/out/site"
+dir = "examples/sample"
+run = """
+set -euo pipefail
+export PYTHONPATH="$MISE_PROJECT_ROOT/python/src"
+p() { python3 -m perflab "$@"; }
+p run --out out/runs/plain -- -p size=10000 -wi 2 -i 3 -w 1 -r 1 WordCountBenchmark
+p run --out out/runs/async --profile async:cpu,alloc -- -p size=10000 -wi 2 -i 3 -w 1 -r 1 WordCountBenchmark
+p run --out out/runs/audit --profile audit:campaigns/normalize.audit -- -wi 1 -i 1 -w 1 -r 1 WordCountBenchmark
+p ab run campaigns/gc.json
+p ab run campaigns/maps.json
+if command -v xcrun >/dev/null && xcrun -f xctrace >/dev/null 2>&1; then p ab run campaigns/maps-counters.json; fi
+p site out/site --title "jvm-perf-lab sample"
+"""
+
+[tasks.publish-site]
+description = "Force-push examples/sample/out/site to the gh-pages branch. Run `mise run site` first."
+run = """
+set -euo pipefail
+test -f examples/sample/out/site/index.html || { echo "no site: run 'mise run site' first"; exit 1; }
+tmp=$(mktemp -d)
+cp -R examples/sample/out/site/. "$tmp/"
+git -C "$tmp" init -q -b gh-pages
+git -C "$tmp" add -A
+git -C "$tmp" -c user.name="$(git config user.name)" -c user.email="$(git config user.email)" commit -q -m "Sample results"
+git -C "$tmp" push -q -f "$(git remote get-url origin)" gh-pages
+rm -rf "$tmp"
+echo "pushed gh-pages"
+"""

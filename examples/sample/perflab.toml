@@ -1,0 +1,16 @@
+[build]
+# perflab passes the run's arguments as @<file> to perflab's JMH driver, the jar's main class
+jmh = "java -jar target/benchmarks.jar {args}"
+server = "self"
+
+[benchmark]
+default = "WordCountBenchmark"
+corpus = "size"
+jvmArgs = "-Xms1G -Xmx1G"
+
+[paths]
+runs = "out/runs"
+campaigns = "out/campaigns"
+
+[agent]
+jar = "../../perflab-agent/target/perflab-agent-0.1.0-SNAPSHOT.jar"

@@ -1,0 +1,7 @@
+{
+  "name": "maps",
+  "rounds": 2,
+  "corpora": {"10000": "-wi 6 -i 6 -w 1 -r 1"},
+  "paired": {"hash": "hash", "linked": "linked", "tree": "tree"},
+  "gcLog": true
+}

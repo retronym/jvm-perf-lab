@@ -24,9 +24,9 @@ One probe per line, `<kind> <name> key=value…`; `#` starts a comment.
 | `entry` / `exit` | at the method's entry (default) or before each return; constructors need `exit` |
 | `from=Class#method` | only when the probed method's immediate caller is this method |
 | `when=Class#staticMethod` | only when `static boolean m(Object)` holds for the receiver; the method is loaded from the receiver's class loader, so it can use the program's types |
-| `depth=N` | frames per site (default 3), counted after dropping frames whose `Class.method` the regex `skip` finds |
+| `depth=N` | caller frames per site (default 3), counted after dropping frames whose `Class.method` the regex `skip` finds |
 | `qualify=class,tag` | adds the receiver's class, and its tag, to the site |
-| `onStack=label:classPrefix,…` | classifies a hit by the first label whose class prefix is on the stack, else `other` |
+| `onStack=label:where,…` | classifies a hit by the first label whose `where` is on the stack, else `other`; `where` is a class name prefix or `Class#method` |
 | `sample=N` | records the site of one hit in `N`; the hit count stays exact |
 
 Example, from the Scala 3 compiler: how often `Positioned.envelope` fills in a child's span, and which code created the children it fills.
@@ -39,7 +39,7 @@ sites filled-by at=dotty.tools.dotc.ast.Positioned#envelope  from=dotty.tools.do
 
 ## Report
 
-JSON, written at exit: `{"counters": {name: n}, "probes": {name: {"kind", "hits", "sample", "sites": {site: n}}}}`. A site is `Class.method:line <- …`, followed by `  [qualifiers]` when the probe has any.
+JSON, written at exit: `{"counters": {name: n}, "probes": {name: {"kind", "hits", "sample", "sites": {site: n}}}}`. A site is the probed method's callers, `Class.method:line <- …`, followed by `  [qualifiers]` when the probe has any.
 
 ## Cost
 

@@ -20,9 +20,10 @@ import java.util.*;
  * Keys: `at=Class#method` (every overload, or `Class#method(desc-prefix` for some), woven at `entry` (default) or `exit`
  * (before each return; required for constructors, whose receiver is not usable before `super()`); `from=Class#method`,
  * only when called from there; `when=Class#staticMethod`, a `static boolean m(Object)` on the receiver, only when it
- * holds; `depth=N` frames per site (default 3) after dropping frames whose `Class.method` the regex `skip` finds;
- * `qualify=class,tag` adds the receiver's class and its tag to the site; `onStack=label:classPrefix,...` classifies
- * a hit by the first label whose class prefix is on the stack (else `other`); `sample=N` records one site in N.
+ * holds; `depth=N` caller frames per site (default 3) after dropping frames whose `Class.method` the regex `skip`
+ * finds; `qualify=class,tag` adds the receiver's class and its tag to the site; `onStack=label:where,...` classifies a
+ * hit by the first label whose `where` (a class name prefix, or `Class#method`) is on the stack (else `other`);
+ * `sample=N` records one site in N.
  */
 record Spec(List<Line> lines) {
     enum Kind { COUNT, SITES, TAG }

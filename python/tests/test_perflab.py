@@ -1,0 +1,115 @@
+import json, os, sys, tempfile, unittest
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+from perflab import analyze, auditfold, config, jmh, regraph, timeline  # noqa: E402
+
+
+class Project:
+    """A temporary project with a perflab.toml, as the current configuration."""
+    def __init__(self, toml):
+        self.dir = tempfile.mkdtemp()
+        with open(os.path.join(self.dir, "perflab.toml"), "w") as f:
+            f.write(toml)
+        config._config = config.find(self.dir)
+
+
+class ConfigTest(unittest.TestCase):
+    def test_found_upward_with_defaults(self):
+        p = Project('[build]\njmh = "java -jar b.jar {args}"\n[benchmark]\ncorpus = "size"\n')
+        sub = os.path.join(p.dir, "a", "b")
+        os.makedirs(sub)
+        c = config.find(sub)
+        self.assertEqual(c.root, p.dir)
+        self.assertEqual(c.get("benchmark", "corpus"), "size")
+        self.assertEqual(c.get("benchmark", "variants"), "variants")
+        self.assertEqual(c.campaigns, os.path.join(p.dir, "out/perflab/ab"))
+
+
+class RunTest(unittest.TestCase):
+    def setUp(self):
+        self.p = Project('[build]\njmh = "java -jar b.jar {args}"\n[agent]\njar = "agent.jar"\n')
+        open(os.path.join(self.p.dir, "agent.jar"), "w").close()
+
+    def args(self, out):
+        return open(os.path.join(out, "jmh.args")).read().splitlines()
+
+    def test_arguments_go_through_a_file(self):
+        out = os.path.join(self.p.dir, "run")
+        cmd = jmh.prepare(out, "xctrace:ipc", ["-p", "size=10", "B"], jvm_append="-Xmx1G")
+        self.assertEqual(cmd, f"java -jar b.jar @{out}/jmh.args")
+        a = self.args(out)
+        self.assertIn(f"io.github.retronym.perflab.xctrace.XctraceProfiler:template=ipc;dir={out}", a)
+        self.assertEqual(a[a.index("-jvmArgsAppend") + 1], "-Xmx1G")
+        self.assertEqual(a[-3:], ["-p", "size=10", "B"])
+
+    def test_async_events_and_kperf(self):
+        out = os.path.join(self.p.dir, "run")
+        jmh.prepare(out, "async:cycles+cache-misses@10000", ["B"], kperf="/tmp/k.sock", lib="/x/lib.dylib")
+        a = self.args(out)
+        prof = a[a.index("-prof") + 1]
+        self.assertIn("event=cycles+cache-misses@10000", prof)
+        self.assertIn("rawCommand=kperf=/tmp/k.sock", prof)
+        self.assertIn("-XX:+PreserveFramePointer", a[a.index("-jvmArgsPrepend") + 1])
+        self.assertEqual(regraph.events_of(out), [("hw-cycles", ["--hw", "cycles"]), ("hw-cache-misses", ["--hw", "cache-misses"])])
+        self.assertEqual([l for l, _ in regraph.events_of("async:cpu,alloc")], ["cpu", "alloc"])
+
+    def test_audit_puts_the_agent_on_the_fork(self):
+        out = os.path.join(self.p.dir, "run")
+        jmh.prepare(out, "audit:x.audit", ["B"])
+        a = self.args(out)
+        self.assertTrue(a[a.index("-jvmArgsPrepend") + 1].startswith(f"-javaagent:{self.p.dir}/agent.jar=spec="))
+
+    def test_stale_outputs_are_cleared(self):
+        out = os.path.join(self.p.dir, "run")
+        os.makedirs(out)
+        for f in ("audit-1.json", "result.json", "notes.txt"):
+            open(os.path.join(out, f), "w").close()
+        jmh.prepare(out, "none", ["B"])
+        self.assertEqual(sorted(os.listdir(out)), ["jmh.args", "notes.txt", "profile.txt"])
+
+
+class AnalyzeTest(unittest.TestCase):
+    def test_phases_named_parts_and_fallbacks(self):
+        d = tempfile.mkdtemp()
+        f = os.path.join(d, "phases.toml")
+        with open(f, "w") as fh:
+            fh.write('[[phase]]\nlabel = "typer"\npattern = "Typer\\\\."\n'
+                     '[[phase]]\nlabel = "mega"\npattern = "MegaPhase\\\\."\nsub = "transform/([A-Za-z]+)\\\\."\nsubExclude = ["MegaPhase"]\n'
+                     '[[phase]]\nlabel = "other"\npattern = "Phase\\\\.runOn"\nfallback = true\n')
+        p = analyze.Phases(f)
+        self.assertEqual(p.of(["Run", "Phase.runOn", "Typer.typed"]), "typer")
+        self.assertEqual(p.of(["Phase.runOn", "transform/MegaPhase.go", "transform/Erasure.x"]), "mega:Erasure")
+        self.assertEqual(p.of(["Phase.runOn", "x"]), "other")
+        self.assertEqual(p.of(["main"]), "outside phases")
+
+
+class AuditFoldTest(unittest.TestCase):
+    def test_merges_and_folds(self):
+        d = tempfile.mkdtemp()
+        reports = []
+        for i, n in enumerate((3, 5)):
+            r = {"counters": {"fill.copier": n, "fill.other": 1}, "probes": {"filler": {"kind": "sites", "hits": n, "sample": 1, "sites": {
+                f"a.B.m:{10 + i} <- c.D.n:3  [from x.Y.z:1 <- p.Q.r:2, Ident]": n}}}}
+            reports.append(os.path.join(d, f"audit-{i}.json"))
+            json.dump(r, open(reports[-1], "w"))
+        import io
+        out = io.StringIO()
+        auditfold.main(["--by", "method", *reports], out=out)
+        text = out.getvalue()
+        self.assertIn("| 3 | 5 | 80.0% | `fill.copier` |", text)
+        self.assertIn("`a.B.m <- c.D.n  [from x.Y.z <- p.Q.r, Ident]`", text)
+        self.assertIn("1 distinct by method", text)
+
+
+class TimelineTest(unittest.TestCase):
+    def test_page_embeds_the_cell(self):
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "iterations.tsv"), "w") as f:
+            f.write("index\tkind\tvariant\tstart_ms\tend_ms\tscore\tops\tgc_ms\n0\twarmup\ta\t1000\t2000\t1.5\t10\t3\n")
+        page = open(timeline.write(d)).read()
+        self.assertIn("BenchTimeline.parse", page)
+        self.assertIn("0\\twarmup\\ta", page)
+
+
+if __name__ == "__main__":
+    unittest.main()

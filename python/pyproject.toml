@@ -1,0 +1,18 @@
+[project]
+name = "perflab"
+version = "0.1.0"
+description = "JMH runs under profiles, campaigns of variants within and across forks, and analysis of their results"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+perflab = "perflab.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/perflab"]

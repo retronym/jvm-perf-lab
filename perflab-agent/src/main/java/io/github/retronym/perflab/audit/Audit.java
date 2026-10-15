@@ -113,19 +113,25 @@ public final class Audit {
         }
     }
 
-    // `onStack=label:prefix,...`: the first label whose class prefix is on the stack, as ".label", else ".other"
+    // `onStack=label:where,...`: the first label whose `where` is on the stack, as ".label", else ".other"; `where` is a
+    // class name prefix, or `Class#method` for one method
     private static String classify(Probe p) {
         if (p.spec.onStack().isEmpty()) return "";
         for (Map.Entry<String, String> e : p.spec.onStack().entrySet()) {
-            String prefix = e.getValue();
-            if (WALKER.walk(s -> s.anyMatch(f -> f.getClassName().startsWith(prefix)))) return "." + e.getKey();
+            String where = e.getValue();
+            int hash = where.indexOf('#');
+            String cls = hash < 0 ? where : where.substring(0, hash), method = hash < 0 ? null : where.substring(hash + 1);
+            if (WALKER.walk(s -> s.anyMatch(f -> method == null ? f.getClassName().startsWith(cls)
+                    : f.getClassName().equals(cls) && f.getMethodName().equals(method)))) return "." + e.getKey();
         }
         return ".other";
     }
 
+    // the callers of the probed method: its own frame (always the same, and at the probe, before its first line) is left out
     private static String site(Probe p) {
         return WALKER.walk(s -> s
             .filter(f -> !f.getClassName().equals(SELF))
+            .skip(1)
             .filter(f -> p.skip == null || !p.skip.matcher(f.getClassName() + "." + f.getMethodName()).find())
             .limit(p.spec.depth())
             .map(f -> f.getClassName() + "." + f.getMethodName() + ":" + f.getLineNumber())
