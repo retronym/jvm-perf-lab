@@ -203,6 +203,13 @@ def run(spec, dry):
         shutil.copy(spec.path, os.path.join(spec.out, "spec.json"))
     todo = [c for c in cells if not os.path.exists(os.path.join(spec.cell_dir(c[1], c[3], c[0]), "result.json"))]
     log(f"{spec.name}: {len(cells)} cells, {len(todo)} to run")
+    if not dry:
+        # the index first: it lists the campaign's cells before any has run, and updates itself as they finish
+        from . import serve
+        try:
+            log(f"index (updates as cells finish): {serve.ensure()}")
+        except Exception as e:  # the index is a convenience; never let it stop a campaign
+            log(f"index not served: {e}")
     for r, corpus, iters, variant, flags in todo:
         dest = spec.cell_dir(corpus, variant, r)
         cmd = spec.command(corpus, iters, variant, flags, dest)

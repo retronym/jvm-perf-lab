@@ -22,6 +22,8 @@ def copy_tree(src, dest, with_raw):
             dirnames[:] = []
             continue
         for f in files:
+            if f.startswith("."):  # .serve.json and the like: local state
+                continue
             path = os.path.join(rel, f)
             if not with_raw and RAW.search(path):
                 continue

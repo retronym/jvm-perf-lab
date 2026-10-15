@@ -4,6 +4,7 @@
   ab         campaigns: run and report variants over corpora, interleaved and checked
   trees      campaigns across checkouts (builds) instead of flags
   index      the campaigns' index.html, with a live timeline of the running fork
+  serve      serve the index on 127.0.0.1 and print its URL (idempotent; `ab run` does it too)
   timeline   timeline.html for one campaign cell
   regraph    flame graphs of async-profiler runs
   profdiff   two async-profiler runs compared per op
@@ -19,7 +20,7 @@ import importlib, sys
 
 COMMANDS = {"run": "jmh", "ab": "ab", "trees": "trees", "index": "index", "timeline": "timeline", "regraph": "regraph",
             "profdiff": "profdiff", "frameweight": "frameweight", "subtree": "subtree", "analyze": "analyze",
-            "auditfold": "auditfold", "loadgate": "loadgate", "site": "site"}
+            "auditfold": "auditfold", "loadgate": "loadgate", "site": "site", "serve": "serve"}
 
 
 def main(argv=None):

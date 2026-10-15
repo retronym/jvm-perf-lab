@@ -45,6 +45,7 @@ java -javaagent:perflab-agent.jar=spec=envelope.audit,out=audit-{pid}.json ...
 | `perflab ab run\|report <spec>` | campaigns: variants over corpora, interleaved by round or paired within forks, each run checked |
 | `perflab trees <spec>` | campaigns across checkouts |
 | `perflab index` | `index.html` over all campaigns, with a live timeline of the running fork |
+| `perflab serve` | serve the index on 127.0.0.1 and print its URL; the page updates itself as cells finish (`ab run` does this first) |
 | `perflab regraph`, `profdiff`, `frameweight`, `subtree`, `analyze` | flame graphs and analysis of async-profiler runs |
 | `perflab auditfold` | merging and folding audit reports |
 | `perflab loadgate` | waiting for a quiet machine; sampling competing load |

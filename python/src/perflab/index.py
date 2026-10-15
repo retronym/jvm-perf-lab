@@ -113,6 +113,32 @@ def notes(path):
     return f'<div class="notes">{md(open(path).read())}</div>' if os.path.exists(path) else ""
 
 
+def progress(spec_dir):
+  """(cells with results, cells planned) from the campaign's spec.json; None without one."""
+  try:
+    s = json.load(open(os.path.join(spec_dir, "spec.json")))
+    variants = 1 if s.get("paired") else len(s["variants"])
+    planned = s.get("rounds", 2) * len(s["corpora"]) * variants
+  except (OSError, ValueError, KeyError, TypeError):
+    return None
+  done = len(glob.glob(os.path.join(spec_dir, "*", "*", "*", "result.json")))
+  return done, planned
+
+
+def progress_badge(prog, name):
+  if not prog:
+    return ""
+  done, planned = prog
+  running = ""
+  try:
+    r = json.load(open(os.path.join(root, "running.json")))
+    running = " · running" if r.get("campaign") == name else ""
+  except (OSError, ValueError):
+    pass
+  cls = "done" if done >= planned else "partial"
+  return f' <span class="prog {cls}">{done} of {planned} cells{running}</span>'
+
+
 def build(campaigns):
   global root
   root = campaigns
@@ -139,7 +165,8 @@ def build(campaigns):
                           rows.append(row[0]); whens.append(row[1]); corpora.add(row[2])
                           cells.setdefault(corpus, {}).setdefault(row[3][0], []).append(row[3])
       diffs = sorted(glob.glob(os.path.join(spec_dir, "diff-*", "*.html")))
-      if not rows and not diffs:
+      prog = progress(spec_dir)
+      if not rows and not diffs and not prog:
           continue
       diff_html = ("<p>Differential flame graphs (a → b): " + " · ".join(link(d, os.path.basename(os.path.dirname(d)).removeprefix("diff-"))
                                                                  for d in diffs) + "</p>") if diffs else ""
@@ -147,7 +174,7 @@ def build(campaigns):
       last = max(whens) if whens else os.path.getmtime(spec_dir)
       span = f"{stamp(min(whens))} – {stamp(last)}" if whens else stamp(last)
       has_notes = os.path.exists(os.path.join(spec_dir, "NOTES.md"))
-      sections.append((last, f"""<section data-last="{last:.0f}" data-notes="{1 if has_notes else 0}"><h2>{esc(name)} <span class="when">{span}</span></h2>{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{summary(name, cells)}
+      sections.append((last, f"""<section data-last="{last:.0f}" data-notes="{1 if has_notes else 0}"><h2>{esc(name)} <span class="when">{span}</span>{progress_badge(prog, name)}</h2>{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{summary(name, cells)}
   <table><tr><th>corpus</th><th>variant</th><th>ms/op</th><th>cycles/op (xctrace)</th><th>instructions/op</th><th>flags</th><th>finished</th><th>flame graphs</th></tr>{''.join(rows)}</table></section>"""))
   sections = [h for _, h in sorted(sections, key=lambda x: -x[0])]
   options = "".join(f'<option value="{esc(v)}">{esc(l)}</option>' for _, v, l in sorted(timeline_cells, reverse=True))
@@ -159,7 +186,7 @@ def build(campaigns):
   body{{background:var(--bg);color:var(--fg);font:13px/1.5 -apple-system,system-ui,sans-serif;margin:20px}} a{{color:var(--link)}}
   section{{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin:0 0 16px}}
   table{{border-collapse:collapse}} td,th{{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}}
-  .pending{{color:var(--muted)}} code{{font-size:11px}}
+  .pending{{color:var(--muted)}} .prog{{font-size:12px;font-weight:normal;border-radius:999px;padding:1px 8px;margin-left:6px}} .prog.partial{{background:#fdf0d5;color:#7a5200}} .prog.done{{background:#e3f1e7;color:#22663a}} code{{font-size:11px}}
   .notes{{border-left:3px solid var(--link);padding:2px 12px;margin:8px 0 12px}} .notes h3{{margin:6px 0}}
   .when{{color:var(--muted);font-weight:normal;font-size:12px;white-space:nowrap}}
   .bar{{position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;border-bottom:1px solid var(--line);margin-bottom:12px}}
@@ -243,7 +270,7 @@ def build(campaigns):
       apply();
     }} catch (e) {{}}
   }}
-  tick(); setInterval(tick, 5000); setInterval(refreshTables, 20000);
+  tick(); setInterval(tick, 5000); setInterval(refreshTables, 10000);
   </script>"""
   out = os.path.join(root, "index.html")
   open(out, "w").write(page)
