@@ -10,32 +10,36 @@ run() { local out=$2; [ -s "$out/result.json" ] && { echo "have $out"; return; }
 short="-wi 3 -i 5 -w 1 -r 1"
 xctrace=false; DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}" xcrun -f xctrace >/dev/null 2>&1 && xctrace=true
 kperf=""; [ -S /tmp/asprof-kperf.sock ] && kperf=/tmp/asprof-kperf.sock
-hw="cycles+instructions+cache-misses+branch-misses"
 
-# runs: one benchmark and setting per run, under each profile
+# runs: one benchmark and setting per run, under each profile; kperf records cycles and the miss event the benchmark is about
 declare -a benches=(
-  "wordcount|-p size=100000 -p map=hash WordCountBenchmark"
-  "wordcount-tree|-p size=100000 -p map=tree WordCountBenchmark"
-  "memory-chase|-p layout=shuffled MemoryBenchmark"
-  "memory-sequential|-p layout=sequential MemoryBenchmark"
-  "branch-random|-p data=random BranchBenchmark"
-  "branch-sorted|-p data=sorted BranchBenchmark"
+  "wordcount|cache-misses|-p size=100000 -p map=hash WordCountBenchmark"
+  "wordcount-tree|cache-misses|-p size=100000 -p map=tree WordCountBenchmark"
+  "memory-chase|cache-misses|-p layout=shuffled MemoryBenchmark"
+  "memory-sequential|cache-misses|-p layout=sequential MemoryBenchmark"
+  "branch-random|branch-misses|-p data=random BranchBenchmark"
+  "branch-sorted|branch-misses|-p data=sorted BranchBenchmark"
 )
 for b in "${benches[@]}"; do
-  name=${b%%|*}; args=${b#*|}
+  IFS='|' read -r name miss args <<< "$b"
   run --out "out/runs/$name-async" --profile async:cpu,alloc -- $short $args
-  run --out "out/runs/$name-wall" --profile async:wall -- $short $args
   if $xctrace; then
-    for t in ipc frontend mem-l1d; do run --out "out/runs/$name-xctrace-$t" --profile "xctrace:$t" -- $short $args; done
-    run --out "out/runs/$name-xctrace-cpu-counters" --profile "xctrace:CPU Counters" -- $short $args
+    run --out "out/runs/$name-xctrace-ipc" --profile xctrace:ipc -- $short $args
   fi
   if [ -n "$kperf" ]; then
-    run --out "out/runs/$name-kperf" --profile "async:$hw" --kperf "$kperf" -- $short $args
+    run --out "out/runs/$name-kperf" --profile "async:cycles+$miss" --kperf "$kperf" -- $short $args
   fi
 done
+# wall clock (for CPU-bound benchmarks it matches cpu, so one is enough)
+run --out out/runs/wordcount-wall --profile async:wall -- $short -p size=100000 -p map=hash WordCountBenchmark
+# several forks: the timeline shows each JVM from start to exit
+run --out out/runs/wordcount-3-forks --profile none -- -f 3 $short -p size=100000 -p map=hash WordCountBenchmark
+if $xctrace; then
+  run --out out/runs/wordcount-2-forks-xctrace-ipc --profile xctrace:ipc -- -f 2 $short -p size=100000 -p map=hash WordCountBenchmark
+fi
 if [ -n "$kperf" ]; then
-  run --out out/runs/memory-paired-kperf --profile "async:$hw" --kperf "$kperf" -- -p "variants=sequential=sequential|shuffled=shuffled" -wi 4 -i 6 -w 1 -r 1 MemoryBenchmark
-  run --out out/runs/branch-paired-kperf --profile "async:$hw" --kperf "$kperf" -- -p "variants=sorted=sorted|random=random" -wi 4 -i 6 -w 1 -r 1 BranchBenchmark
+  run --out out/runs/memory-paired-kperf --profile "async:cycles+cache-misses" --kperf "$kperf" -- -p "variants=sequential=sequential|shuffled=shuffled" -wi 4 -i 6 -w 1 -r 1 MemoryBenchmark
+  run --out out/runs/branch-paired-kperf --profile "async:cycles+branch-misses" --kperf "$kperf" -- -p "variants=sorted=sorted|random=random" -wi 4 -i 6 -w 1 -r 1 BranchBenchmark
 fi
 run --out out/runs/audit-normalize --profile audit:campaigns/normalize.audit -- -wi 1 -i 1 -w 1 -r 1 WordCountBenchmark
 

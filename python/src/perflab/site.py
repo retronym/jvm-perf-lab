@@ -91,8 +91,7 @@ def overview(dest, runs):
     body = "".join(f"<tr data-benchmark='{esc(fb)}' data-tool='{esc(ft)}'><th><a href='#{esc(n)}'>{esc(n)}</a></th><td>{esc(sc)}</td>"
                    + "".join(f"<td>{c.get(h, '')}</td>" for h in heads) + "</tr>"
                    for n, sc, c, (fb, ft) in rows)
-    return (f"<div class='overview'><h2>PMU counters by run</h2><p class='k'>Benchmark thread only (xctrace). Misses per 1,000 instructions; top-down "
-            f"shares of issue slots (CPU Counters template).</p><div class='scroll'><table class='o'><tr><th>run</th><th>score</th>"
+    return (f"<div class='overview'><h2>PMU counters by run</h2><p class='k'>Benchmark thread only (xctrace). Misses per 1,000 instructions; top-down shares of issue slots when a run used the CPU Counters template.</p><div class='scroll'><table class='o'><tr><th>run</th><th>score</th>"
             + "".join(f"<th>{esc(h)}</th>" for h in heads) + f"</tr>{body}</table></div></div>")
 
 
@@ -258,7 +257,7 @@ def landing(dest, title, runs):
             parts.append("<p>" + " · ".join(links) + "</p>")
         # flame graphs, <jfr stem>-<event>[-<kind>].html, as a row per event
         graphs = sorted(g for g in glob.glob(os.path.join(run, "**", "*.html"), recursive=True)
-                        if not g.endswith((".txt.html", "report.html")))
+                        if not g.endswith((".txt.html", "report.html", "timeline.html")))
         events = {}
         for g in graphs:
             base, kind = os.path.basename(g)[:-5], "bench"

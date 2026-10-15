@@ -4,7 +4,8 @@ beside the async-profiler library). Multi-event kperf recordings need a jfrconv 
   perflab regraph [--jfrconv <jfrconv>] [-j <jobs>] <run-dir>...
 
 A run directory is one `perflab run` or a campaign cell wrote with an async profile. For each JFR under it, each event and
-each graph kind below, writes `<jfr stem>-<label>[-<kind>].html`.
+each graph kind (KINDS below; `[async] graphs = [...]` in perflab.toml or --kinds picks some), writes
+`<jfr stem>-<label>[-<kind>].html`.
 """
 import argparse, concurrent.futures, glob, os, re, shutil, subprocess, sys
 
@@ -19,6 +20,16 @@ KINDS = {
     "bench-classify": (BENCH + ["--classify"], False),
     "reverse-classify": (BENCH + ["--classify"], True),
 }
+
+
+def kinds(explicit=None):
+    """The graph kinds to render: `explicit`, else [async] graphs in perflab.toml, else all of KINDS."""
+    from . import config
+    ks = explicit or config.get().get("async", "graphs") or list(KINDS)
+    unknown = [k for k in ks if k not in KINDS]
+    if unknown:
+        sys.exit(f"unknown graph kinds {unknown}; known: {', '.join(KINDS)}")
+    return ks
 
 
 def events_of(profile):
@@ -69,7 +80,7 @@ def render_one(jfrconv, jfr, label, select, kind, title):
     return f"{out}: jfrconv failed: {r.stderr.strip()[:300]}" if r.returncode else None
 
 
-def regraph(dirs, jfrconv=None, jobs=4, title_of=None):
+def regraph(dirs, jfrconv=None, jobs=4, title_of=None, kinds_=None):
     if not jfrconv:
         from . import jmh
         jfrconv = jmh.jfrconv(jmh.async_lib())
@@ -78,7 +89,7 @@ def regraph(dirs, jfrconv=None, jobs=4, title_of=None):
         for jfr in sorted(glob.glob(os.path.join(d, "**", "*.jfr"), recursive=True)):
             name = title_of(d) if title_of else os.path.basename(d.rstrip("/"))
             for label, select in events_of(d):
-                for kind in KINDS:
+                for kind in kinds(kinds_):
                     tasks.append((jfrconv, jfr, label, select, kind, f"{name}: {label.removeprefix('hw-')}, {kind}"))
     # reverse graphs one at a time (each may take HEAP), the rest in parallel
     reverse = [t for t in tasks if KINDS[t[4]][1]]
@@ -103,9 +114,10 @@ def main(argv):
     ap.add_argument("--heap", default=HEAP, help="jfrconv heap for reverse graphs")
     ap.add_argument("--force", action="store_true", help="redo graphs that are already up to date")
     ap.add_argument("--minwidth", default=MINWIDTH, help="jfrconv --minwidth, in percent (default %(default)s)")
+    ap.add_argument("--kinds", help=f"comma-separated graph kinds (default: [async] graphs in perflab.toml, else all: {','.join(KINDS)})")
     ap.add_argument("dirs", nargs="+")
     a = ap.parse_args(argv)
     FORCE, HEAP, MINWIDTH = a.force, a.heap, a.minwidth
-    ok, problems = regraph(a.dirs, a.jfrconv, a.jobs)
+    ok, problems = regraph(a.dirs, a.jfrconv, a.jobs, kinds_=a.kinds.split(",") if a.kinds else None)
     print(f"{ok} graphs written, {len(problems)} problems")
     return 1 if problems else 0

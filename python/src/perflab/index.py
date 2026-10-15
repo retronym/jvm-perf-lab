@@ -37,7 +37,7 @@ def cell_row(spec, corpus, variant, cell):
         if jfr:
             parts = []
             for label, _ in regraph.events_of(prof):
-                ks = " · ".join(link(regraph.graph_path(jfr, label, k), k) for k in regraph.KINDS)
+                ks = " · ".join(link(regraph.graph_path(jfr, label, k), k) for k in regraph.kinds())
                 parts.append(f"<b>{esc(label.removeprefix('hw-'))}</b>: {ks}")
             graphs = "<br>".join(parts)
     tl = os.path.join(cell, "timeline.html")

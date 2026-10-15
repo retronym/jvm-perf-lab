@@ -19,3 +19,5 @@ jar = "../../perflab-agent/target/perflab-agent-0.1.0-SNAPSHOT.jar"
 # built by `mise run tools:async-profiler` (kperf events, jfrconv --hw); without it, an installed async-profiler
 lib = "../../tools/build/async-profiler/build/lib/libasyncProfiler.dylib"
 jfrconv = "../../tools/build/async-profiler/build/bin/jfrconv"
+# flame graphs per event: by call path, by leaf, and every thread by category (perflab regraph lists the kinds)
+graphs = ["bench", "reverse", "classify"]

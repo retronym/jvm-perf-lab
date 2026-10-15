@@ -20,7 +20,7 @@ Requires Java 17. Design and plan: [doc/design.md](doc/design.md).
 | [![Flame graph](doc/screenshots/flamegraph.png)](https://retronym.github.io/jvm-perf-lab/) | [![Audit report](doc/screenshots/audit.png)](https://retronym.github.io/jvm-perf-lab/runs/audit/report.html) |
 | async-profiler, benchmark threads | A caller audit: calls to `normalize`, by caller |
 | [![PMU counters by run](doc/screenshots/counters.png)](https://retronym.github.io/jvm-perf-lab/) | [![Paired memory benchmark timeline](doc/screenshots/memory-timeline.png)](https://retronym.github.io/jvm-perf-lab/campaigns/memory-paired/4194304/paired/1/timeline.html) |
-| PMU counters by run (xctrace): IPC, L1D and branch misses per 1000 instructions, top-down split | Pointer chase over a sequential vs shuffled array in one fork: IPC drops from about 4.5 to 0.1 in the shuffled iterations |
+| PMU counters by run (xctrace): IPC, branch mispredicts per 1000 instructions, instructions and cycles per op | Pointer chase over a sequential vs shuffled array in one fork: IPC drops from about 4.5 to 0.1 in the shuffled iterations |
 
 ## Modules
 

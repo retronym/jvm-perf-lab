@@ -17,7 +17,7 @@ Use `XctraceProfiler` to measure. Instructions and cycles per op on the benchmar
 
 Use kperf events to locate. Once the counts show that a change moved cycles or misses, a kperf flame graph of that event shows which methods are responsible. `cache-misses` and `branch-misses` are charged to the load or branch that caused them.
 
-The sample site has both for each benchmark: `<benchmark>-xctrace-<template>` runs and `<benchmark>-kperf` runs.
+The sample site has both for each benchmark: a `<benchmark>-xctrace-ipc` run, and a `<benchmark>-kperf` run of cycles and the miss event the benchmark is about (`cache-misses` or `branch-misses`). The paired campaigns `memory-paired` (`mem-l1d`) and `branch-paired` (`ipc`) compare both settings of a benchmark within one fork.
 
 ## XctraceProfiler
 
