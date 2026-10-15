@@ -14,7 +14,8 @@ Profiles:
 Options for async: --kperf <socket> (macOS PMU events through a running asprof-kperf helper), --lib <libasyncProfiler>.
 
 The arguments go to the build in a file, as `@file`, so no profiler option is ever typed into a tool that splits a
-command at `;`. Output: <out>/jmh.log, result.json and the profile's files; afterwards flame graphs for async, a merged
+command at `;`. Output: <out>/jmh.log, result.json, the profile's files, and timeline.html (every fork's JVM start, iterations, GC
+pauses and exit on one wall-clock axis, plus PMU counter lanes with xctrace); afterwards flame graphs for async, a merged
 report for audits.
 """
 import argparse, glob, os, shlex, subprocess, sys, time
@@ -105,7 +106,8 @@ def write_args(path, args):
 
 
 # what a run writes into its directory: cleared before the next run there, so nothing stale is merged into its results
-OUTPUTS = ["jmh.log", "result.json", "report.md", "audit-*.json", "**/*.jfr", "**/*.html", "**/*.regraph", "*.trace", "*.trace.*"]
+OUTPUTS = ["jmh.log", "result.json", "report.md", "audit-*.json", "**/*.jfr", "**/*.html", "**/*.regraph", "*.trace", "*.trace.*",
+           "iterations.tsv", "timeline.tsv", "gc.log", "gc-*.log"]
 
 
 def prepare(out, profile, jmh_args, kperf=None, lib=None, jvm_append=None):
@@ -132,6 +134,9 @@ def prepare(out, profile, jmh_args, kperf=None, lib=None, jvm_append=None):
 def finish(out, profile, lib=None):
     """Post-processing: flame graphs for async, the merged report for audits."""
     kind, _, arg = profile.partition(":")
+    from . import timeline
+    if os.path.exists(os.path.join(out, "iterations.tsv")):
+        timeline.write(out)
     if kind == "async":
         from . import regraph
         regraph.regraph([out], jfrconv(async_lib(lib)))
@@ -161,8 +166,10 @@ def main(argv):
     jmh_args = x.jmh[1:] if x.jmh[:1] == ["--"] else x.jmh
     name = x.profile.replace(":", "-").replace("/", "_").replace(",", "-")
     out = os.path.abspath(x.out or os.path.join(config.get().runs, f"{time.strftime('%Y%m%d-%H%M%S')}-{name}"))
-    jvm_args = config.get().get("benchmark", "jvmArgs")
-    cmd = prepare(out, x.profile, jmh_args, x.kperf, x.lib, jvm_args or None)
+    # every fork appends its iterations to <out>/iterations.tsv (PairedProfiler) and logs GC to <out>/gc-<pid>.log: the timeline
+    timeline_args = f"-Dperflab.cell={out} -Xlog:gc:file={out}/gc-%p.log:time,uptime"
+    jvm_args = " ".join(a for a in [config.get().get("benchmark", "jvmArgs"), timeline_args] if a)
+    cmd = prepare(out, x.profile, jmh_args, x.kperf, x.lib, jvm_args)
     if x.dry_run:
         print(cmd)
         print(open(os.path.join(out, "jmh.args")).read(), end="")

@@ -9,6 +9,7 @@ import org.openjdk.jmh.results.Result;
 import org.openjdk.jmh.results.ScalarResult;
 import org.openjdk.jmh.runner.IterationType;
 
+import java.lang.management.ManagementFactory;
 import java.util.*;
 
 /**
@@ -38,30 +39,51 @@ public class PairedProfiler implements InternalProfiler {
         return "Time per variant, and paired differences, when variants alternate by iteration within the fork";
     }
 
-    // -Dperflab.cell=<dir> (ab.py gives it): each iteration is appended to <dir>/iterations.tsv as it finishes, warmup
-    // included, for the live timeline in ab.py's index.html (scripts/timeline.js)
+    // -Dperflab.cell=<dir> (`perflab run` and `perflab ab` give it): each iteration is appended to <dir>/iterations.tsv
+    // as it finishes, warmup included, for the timeline (timeline.js). Every fork appends to the same file, with its pid;
+    // a fork also adds a "startup" row (JVM start to its first iteration: JVM boot, benchmark setup) and, from a
+    // shutdown hook, an "exit" row (its last iteration to JVM exit).
     private static final String CELL = System.getProperty("perflab.cell");
+    static final String HEADER = "index\tkind\tvariant\tstart_ms\tend_ms\tscore\tops\tgc_ms\tpid\tunit\n";
+    private static final long PID = ProcessHandle.current().pid();
     private long iterationStart;
     private int iterations;
+    private volatile long lastEnd;
 
     @Override
     public void beforeIteration(BenchmarkParams bp, IterationParams ip) { iterationStart = System.currentTimeMillis(); }
 
-    private void logIteration(IterationParams ip, IterationResult ir) {
-        if (CELL == null) return;
+    private static void append(String row) {
+        java.nio.file.Path f = java.nio.file.Path.of(CELL, "iterations.tsv");
         try {
-            java.nio.file.Path f = java.nio.file.Path.of(CELL, "iterations.tsv");
             java.nio.file.Files.createDirectories(f.getParent());
-            if (iterations == 0) java.nio.file.Files.writeString(f, "index\tkind\tvariant\tstart_ms\tend_ms\tscore\tops\tgc_ms\n");
-            IterationLog.Entry e = IterationLog.paired() ? IterationLog.last() : null;
-            String row = String.join("\t", Integer.toString(iterations), ip.getType() == IterationType.MEASUREMENT ? "measure" : "warmup",
-                e == null ? "" : e.variant(), Long.toString(iterationStart), Long.toString(System.currentTimeMillis()),
-                String.format(Locale.ROOT, "%.4f", ir.getPrimaryResult().getScore()), Long.toString(ir.getMetadata().getMeasuredOps()),
-                e == null ? "" : Long.toString(e.gcMillis())) + "\n";
-            java.nio.file.Files.writeString(f, row, java.nio.file.StandardOpenOption.APPEND);
+            synchronized (PairedProfiler.class) {
+                if (!java.nio.file.Files.exists(f)) java.nio.file.Files.writeString(f, HEADER);
+                java.nio.file.Files.writeString(f, row, java.nio.file.StandardOpenOption.APPEND);
+            }
         } catch (java.io.IOException ex) {
             System.err.println("[perflab] cannot write iterations.tsv: " + ex);
         }
+    }
+
+    static String row(int index, String kind, String variant, long start, long end, String score, String ops, String gc, String unit) {
+        return String.join("\t", Integer.toString(index), kind, variant, Long.toString(start), Long.toString(end), score, ops, gc,
+            Long.toString(PID), unit) + "\n";
+    }
+
+    private void logIteration(IterationParams ip, IterationResult ir) {
+        if (CELL == null) return;
+        String unit = ir.getPrimaryResult().getScoreUnit();
+        if (iterations == 0) {
+            append(row(-1, "startup", "", ManagementFactory.getRuntimeMXBean().getStartTime(), iterationStart, "", "", "", unit));
+            Runtime.getRuntime().addShutdownHook(new Thread(() ->
+                append(row(-1, "exit", "", lastEnd, System.currentTimeMillis(), "", "", "", unit)), "perflab-exit"));
+        }
+        IterationLog.Entry e = IterationLog.paired() ? IterationLog.last() : null;
+        lastEnd = System.currentTimeMillis();
+        append(row(iterations, ip.getType() == IterationType.MEASUREMENT ? "measure" : "warmup", e == null ? "" : e.variant(),
+            iterationStart, lastEnd, String.format(Locale.ROOT, "%.4f", ir.getPrimaryResult().getScore()),
+            Long.toString(ir.getMetadata().getMeasuredOps()), e == null ? "" : Long.toString(e.gcMillis()), unit));
         iterations++;
     }
 

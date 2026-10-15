@@ -248,6 +248,8 @@ def landing(dest, title, runs):
                 f.write(f"<!doctype html><meta charset='utf-8'><title>{esc(name)}</title>{STYLE}<main><h1>{esc(name)}</h1>"
                         f"<p class='k'>{esc(profile)}</p>{md_tables(open(report).read())}</main>")
             links.append(f'<a href="{esc(os.path.relpath(page, dest))}">audit report</a>')
+        if os.path.exists(os.path.join(run, "timeline.html")):
+            links.append(f'<a href="{esc(os.path.relpath(os.path.join(run, "timeline.html"), dest))}">timeline</a>')
         for f in sorted(glob.glob(os.path.join(run, "**", "*.methods.txt"), recursive=True)):
             links.append(f'<a href="{esc(text_page(f, dest, name + ": hot methods by counter"))}">hot methods by counter</a>')
         for f in sorted(glob.glob(os.path.join(run, "**", "*.threads.txt"), recursive=True)):

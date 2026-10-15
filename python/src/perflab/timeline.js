@@ -1,9 +1,11 @@
 // A benchmark fork's timeline: its iterations (coloured by variant when variants alternate within the fork) and, on the
 // same wall-clock axis, what the machine did meanwhile. Reads a cell's files as written by the fork and `perflab ab`:
-//   iterations.tsv  every iteration as it finishes: index, kind, variant, start_ms, end_ms, score, ops, gc_ms
+//   iterations.tsv  every iteration as it finishes: index, kind, variant, start_ms, end_ms, score, ops, gc_ms, pid, unit;
+//                   all forks of a run append to it; kind "startup" (JVM start to the first iteration) and "exit"
+//                   (the last iteration to JVM exit) give each fork's lifetime
 //   timeline.tsv    per 50 ms: cycles and instructions of the benchmark thread, JIT, GC, other threads of the fork and
 //                   other processes (from xctrace, so only once the fork has finished)
-//   gc.log          -Xlog:gc with wall-clock `time` decorations (the campaign's "gcLog"): pauses
+//   gc.log          -Xlog:gc with wall-clock `time` decorations: pauses (a run's forks' logs concatenated)
 //   load.tsv        the load gate's 5 s samples of other processes' CPU, in cores
 // Used by timeline.py (a page per cell) and index.py (a live panel in index.html).
 const BenchTimeline = (() => {
@@ -20,7 +22,10 @@ const BenchTimeline = (() => {
 
   function parse(f) {
     const iters = tsv(f.iterations).map(r => ({i: +r.index, kind: r.kind, variant: r.variant, s: +r.start_ms, e: +r.end_ms,
-      score: +r.score, gc: r.gc_ms === '' || r.gc_ms == null ? null : +r.gc_ms}));
+      score: +r.score, gc: r.gc_ms === '' || r.gc_ms == null ? null : +r.gc_ms, pid: r.pid || '', unit: r.unit || 'ms/op'}));
+    // forks in the order they ran, numbered from 1
+    const pids = [...new Set(iters.slice().sort((a, b) => a.s - b.s).map(i => i.pid))];
+    for (const it of iters) it.fork = pids.indexOf(it.pid) + 1;
     const series = tsv(f.timeline).map(b => ({t: +b.bin_ms, bench_c: +b.bench_cycles, bench_i: +b.bench_inst, jit_c: +b.jit_cycles,
       gc_c: +b.gc_cycles, other_c: +b.other_cycles, processes_c: +b.processes_cycles}));
     const pauses = [];
@@ -44,7 +49,7 @@ const BenchTimeline = (() => {
   function mount(svg, legend, tip) {
     let D = {iters: [], series: [], pauses: [], load: []}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
     const L = 150, R = 16;
-    const rows = [
+    const counterRows = [
       {name: 'iterations', h: 46},
       {name: 'benchmark thread', h: 80, key: 'bench_c', unit: 'G cycles/s'},
       {name: 'IPC (benchmark)', h: 56, ipc: true},
@@ -53,8 +58,13 @@ const BenchTimeline = (() => {
       {name: 'other in fork', h: 46, key: 'other_c', unit: 'G cycles/s'},
       {name: 'other processes', h: 86, key: 'processes_c', unit: 'G cycles/s', load: true},
     ];
-    const height = rows.reduce((a, r) => a + r.h + 8, 8) + 24;
-    svg.setAttribute('height', height);
+    // without counters (no xctrace): iterations and GC pauses only, plus the load gate's samples when there are any
+    const plainRows = [{name: 'iterations', h: 46}, {name: 'GC pauses', h: 34, pauses: true}];
+    let rows = counterRows, height = 0;
+    const layout = () => {
+      rows = D.series.length ? counterRows : plainRows.concat(D.load.length ? [{name: 'other processes', h: 60, load: true}] : []);
+      height = rows.reduce((a, r) => a + r.h + 8, 8) + 24;
+    };
     let variants = [];
     const color = v => v ? `var(--v${variants.indexOf(v) % 6})` : 'var(--v0)';
     function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; }
@@ -67,6 +77,7 @@ const BenchTimeline = (() => {
         el('text', {x: 12, y: 24, class: 'lab'}).textContent = 'No iterations yet.';
         return;
       }
+      layout();
       svg.setAttribute('height', height);
       let y = 8;
       const span = x1 - x0, step = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 60000].find(s => span / s < 12) || 120000;
@@ -79,16 +90,28 @@ const BenchTimeline = (() => {
         if (r.unit) el('text', {x: 6, y: y + 28, class: 'lab'}).textContent = r.unit;
         el('line', {x1: L, x2: W - R, y1: y + r.h, y2: y + r.h, class: 'grid'});
         if (r.name === 'iterations') {
+          const forks = Math.max(0, ...D.iters.map(i => i.fork));
           for (const it of D.iters) {
             if (it.e < x0 || it.s > x1) continue;
             const a = Math.max(X(it.s), L), b = Math.min(X(it.e), W - R);
-            const rect = el('rect', {x: a, y: y + 6, width: Math.max(1, b - a - 1), height: r.h - 12, rx: 2,
-              fill: it.kind === 'warmup' ? 'var(--grey)' : color(it.variant)});
-            rect.dataset.tip = `#${it.i} ${it.kind} ${it.variant || ''}: ${it.score.toFixed(1)} ms/op` + (it.gc != null ? `, GC pauses ${it.gc} ms` : '');
-            if (b - a > 46) el('text', {x: a + 4, y: y + r.h / 2 + 4}).textContent = it.score.toFixed(1);
+            const life = it.kind === 'startup' || it.kind === 'exit';
+            const fork = forks > 1 ? `fork ${it.fork}: ` : '';
+            const rect = el('rect', {x: a, y: y + (life ? 14 : 6), width: Math.max(1, b - a - 1), height: life ? r.h - 28 : r.h - 12, rx: 2,
+              fill: life ? 'var(--life)' : it.kind === 'warmup' ? 'var(--grey)' : color(it.variant)});
+            rect.dataset.tip = life
+              ? `${fork}${it.kind === 'startup' ? 'JVM start to first iteration (JVM boot, benchmark setup)' : 'last iteration to JVM exit'}: ${((it.e - it.s) / 1000).toFixed(2)} s`
+              : `${fork}#${it.i} ${it.kind} ${it.variant || ''}: ${it.score.toFixed(1)} ${it.unit}` + (it.gc != null ? `, GC pauses ${it.gc} ms` : '');
+            if (!life && b - a > 46) el('text', {x: a + 4, y: y + r.h / 2 + 4}).textContent = it.score.toFixed(1);
           }
-        } else if (!D.series.length) {
-          if (r.name === 'benchmark thread') el('text', {x: L + 6, y: y + 20, class: 'lab'}).textContent = 'counters appear when the fork has finished (xctrace export)';
+          // each fork's start, labelled when there are several
+          if (forks > 1) for (let f = 1; f <= forks; f++) {
+            const s = Math.min(...D.iters.filter(i => i.fork === f).map(i => i.s));
+            if (s < x0 || s > x1) continue;
+            el('line', {x1: X(s), x2: X(s), y1: 0, y2: height - 22, stroke: 'var(--fg)', 'stroke-width': 1, opacity: 0.35});
+            el('text', {x: X(s) + 2, y: y + r.h + 1, class: 'lab'}).textContent = `fork ${f}`;
+          }
+        } else if (!r.key && !r.ipc) {
+          // pauses / load only
         } else {
           const pts = r.ipc ? D.series.map(s => ({t: s.t, v: s.bench_c ? s.bench_i / s.bench_c : null}))
                             : D.series.map(s => ({t: s.t, v: s[r.key] / (BIN_MS / 1000) / 1e9}));
@@ -96,8 +119,9 @@ const BenchTimeline = (() => {
           const max = r.ipc ? Math.max(4, ...vis.map(p => p.v)) : Math.max(0.5, ...vis.map(p => p.v));
           const Y = v => y + r.h - 4 - v / max * (r.h - 10);
           el('text', {x: L - 4, y: y + 12, 'text-anchor': 'end', class: 'lab'}).textContent = max.toFixed(1);
-          let d = '';
-          for (const p of vis) d += (d ? 'L' : 'M') + X(p.t + BIN_MS / 2).toFixed(1) + ',' + Y(p.v).toFixed(1);
+          let d = '', prev = null;
+          // a new segment after a gap (between forks, or between xctrace's recordings)
+          for (const p of vis) { d += (prev == null || p.t - prev > 2 * BIN_MS ? 'M' : 'L') + X(p.t + BIN_MS / 2).toFixed(1) + ',' + Y(p.v).toFixed(1); prev = p.t; }
           if (d) el('path', {d, fill: 'none', stroke: r.ipc ? 'var(--v2)' : 'var(--v0)', 'stroke-width': 1.2});
         }
         if (r.pauses) for (const p of D.pauses) {
@@ -130,7 +154,8 @@ const BenchTimeline = (() => {
       if (!zoomed) { x0 = n0; x1 = Math.max(n1, n0 + 1); }
       t0 = n0; t1 = Math.max(n1, n0 + 1);
       if (legend) legend.innerHTML = variants.map(v => `<span><i style="background:${color(v)}"></i>${v}</span>`).join('')
-        + '<span><i style="background:var(--grey)"></i>warmup</span>' + (D.pauses.length ? '<span><i style="background:var(--pause)"></i>GC pause</span>' : '');
+        + '<span><i style="background:var(--grey)"></i>warmup</span>'
+        + (D.iters.some(i => i.kind === 'startup') ? '<span><i style="background:var(--life)"></i>JVM start / exit</span>' : '') + (D.pauses.length ? '<span><i style="background:var(--pause)"></i>GC pause</span>' : '');
       draw();
     }
 
