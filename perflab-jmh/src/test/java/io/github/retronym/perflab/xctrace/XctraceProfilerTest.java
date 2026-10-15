@@ -21,6 +21,21 @@ class XctraceProfilerTest {
     }
 
     @Test
+    void benchmarkThreadWhoseNameMacOsTruncated() {
+        String bench = "dotty.tools.benchlab.PicklerBenchmark.pickleAndCompactify";
+        String worker = XctraceProfiler.nativeName(bench + "-jmh-worker-");
+        assertEquals(63, worker.length());
+        assertFalse(worker.contains("jmh-worker"));
+        XctraceProfiler.benchThread = worker;
+        try {
+            assertEquals("bench", XctraceProfiler.group(worker + " (java, pid: 1)"));
+            assertEquals("other", XctraceProfiler.group("Java: dotty.tools.benchlab.Other (java, pid: 1)"));
+        } finally {
+            XctraceProfiler.benchThread = null;
+        }
+    }
+
+    @Test
     void samplesFallInTheIterationWhoseSpanHoldsThem() {
         List<IterationLog.Entry> measured = List.of(
             new IterationLog.Entry(4, "a", true, 1000, 1999, 0),
