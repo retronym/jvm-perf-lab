@@ -59,4 +59,5 @@ for c in campaigns/*.json; do
   [ -d "$d" ] && p ab report "$c" > "$d/report.md"
 done
 
-p site out/site --title "jvm-perf-lab sample" --intro 'Results of <a href="https://github.com/retronym/jvm-perf-lab/tree/main/examples/sample">examples/sample</a>, built with <code>mise run site</code>: three JMH benchmarks (word counting in different maps, an array walk in order and as a pointer chase, a branch on sorted and random data) under async-profiler (cpu, alloc, wall) and a caller audit, and Apple PMU counters two ways: <code>-xctrace-</code> runs give counts per op on the benchmark thread (perflab&#39;s XctraceProfiler), <code>-kperf</code> runs give flame graphs per PMU event (async-profiler kperf events). <a href="https://github.com/retronym/jvm-perf-lab/blob/main/doc/pmu-counters.md">Which to use when</a>.'
+p site out/site --title "jvm-perf-lab sample results" --intro-file site-intro.html \
+  --footer 'Built from <a href="https://github.com/retronym/jvm-perf-lab/tree/main/examples/sample">examples/sample</a> by <code>mise run site</code> on an Apple Silicon Mac.'

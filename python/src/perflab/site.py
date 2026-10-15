@@ -274,12 +274,12 @@ def landing(dest, title, runs):
             parts.append(f"<table class='g'><tr><th colspan='2'>flame graphs <span class='k'>(each graph's total: samples, or event counts for PMU events; hover for what each shows)</span></th></tr>{rows}</table>")
         bench, tool = facets(run)
         items.append(f"<section id='{esc(name)}' data-benchmark='{esc(bench)}' data-tool='{esc(tool)}'><h2>{esc(name)}</h2><p class='k'>{esc(profile)}</p>{about(name, profile, names)}{''.join(parts)}</section>")
-    campaigns = '<p><a href="campaigns/index.html"><b>Campaigns</b></a>: every campaign, its cells and summaries, flame graphs per cell, differential flame graphs, and fork timelines.</p>' \
+    campaigns = '<p><a href="campaigns/index.html"><b>Campaigns</b></a>: each campaign&#39;s report, its cells, flame graphs per cell, differential flame graphs, and timelines.</p>' \
         if os.path.exists(os.path.join(dest, "campaigns", "index.html")) else ""
     with open(os.path.join(dest, "index.html"), "w") as f:
         f.write(f"<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
                 f"<title>{esc(title)}</title>{STYLE}<main><h1>{esc(title)}</h1>{INTRO}{campaigns}{chips(runs)}{overview(dest, runs)}"
-                f"<h2>Runs</h2>{''.join(items) or '<p>none</p>'}</main>")
+                f"<h2 id='runs'>Runs</h2>{''.join(items) or '<p>none</p>'}{FOOTER}</main>")
 
 
 def md_tables(text):
@@ -312,10 +312,11 @@ body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,system-ui,
 a{color:var(--link)} h1{font-size:20px} h2{font-size:15px;margin:16px 0 4px} .k{color:var(--muted);font-size:12px;margin:0}
 section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:10px 0}
 table{border-collapse:collapse;font-size:12px;margin:6px 0} details{margin:6px 0} summary{cursor:pointer}
-pre{font-size:12px;overflow-x:auto} .scroll{overflow-x:auto} table.o td{text-align:right;white-space:nowrap} table.m th{font-weight:normal;color:var(--muted)} table.g th{width:120px} a.empty{color:var(--muted)} .filters{position:sticky;top:0;z-index:1;background:var(--bg);padding:6px 0;margin:8px 0} .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0} .chips .k{width:80px} .chips button{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:999px;padding:2px 10px;cursor:pointer} .chips button[aria-pressed=true]{background:var(--link);border-color:var(--link);color:#fff} [hidden]{display:none!important} th[title]{cursor:help} td,th{border:1px solid var(--line);padding:3px 8px;text-align:left;overflow-wrap:anywhere}</style>"""
+pre{font-size:12px;overflow-x:auto} .scroll{overflow-x:auto} table.o td{text-align:right;white-space:nowrap} table.m th{font-weight:normal;color:var(--muted)} table.g th{width:120px} a.empty{color:var(--muted)} dt{font-weight:600;margin-top:6px} dd{margin:0 0 0 18px} main>p,main>ul,main>ol,main>dl{max-width:900px} li{margin:3px 0} .filters{position:sticky;top:0;z-index:1;background:var(--bg);padding:6px 0;margin:8px 0} .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0} .chips .k{width:80px} .chips button{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:999px;padding:2px 10px;cursor:pointer} .chips button[aria-pressed=true]{background:var(--link);border-color:var(--link);color:#fff} [hidden]{display:none!important} th[title]{cursor:help} td,th{border:1px solid var(--line);padding:3px 8px;text-align:left;overflow-wrap:anywhere}</style>"""
 
 
 INTRO = ""
+FOOTER = ""
 
 
 def main(argv):
@@ -324,9 +325,13 @@ def main(argv):
     ap.add_argument("--title", default="perflab results")
     ap.add_argument("--with-raw", action="store_true")
     ap.add_argument("--intro", help="a Markdown-free HTML paragraph for the top of the landing page")
+    ap.add_argument("--intro-file", help="an HTML fragment for the top of the landing page")
+    ap.add_argument("--footer", help="an HTML paragraph for the bottom of the landing page")
     x = ap.parse_args(argv)
     global INTRO
-    INTRO = f"<p>{x.intro}</p>" if x.intro else ""
+    INTRO = open(x.intro_file).read() if x.intro_file else f"<p>{x.intro}</p>" if x.intro else ""
+    global FOOTER
+    FOOTER = f"<p class='k'>{x.footer}</p>" if x.footer else ""
     cfg = config.get()
     dest = os.path.abspath(x.dest)
     shutil.rmtree(dest, ignore_errors=True)
