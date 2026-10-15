@@ -1,6 +1,13 @@
 # jvm-perf-lab
 
-Tools for answering "what did my change do to the machine, and where?" about a JVM program, with JMH: profilers that run in the benchmark's forks, a way to compare variants within one fork, hardware counters per thread on Apple Silicon, and an agent that counts which callers reach a method. It grew in the Scala 3 compiler's benchmark lab and is being split out of it; the design and plan are in [doc/design.md](doc/design.md).
+JMH profilers and a Java agent for benchmarking JVM programs:
+
+- default profilers for allocation and JIT activity
+- variants compared within one fork, by iteration
+- Apple Silicon PMU counters per thread, via `xctrace`
+- an agent that counts the callers reaching a method
+
+Split out of the Scala 3 compiler's bench-lab. Design and plan: [doc/design.md](doc/design.md).
 
 Java 17 or later, no Scala.
 

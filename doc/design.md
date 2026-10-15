@@ -2,7 +2,7 @@
 
 ## Problem
 
-bench-lab grew inside scala3 to answer "what did my change do to the machine, and where?" for the compiler. About two thirds of it has nothing to do with the compiler:
+bench-lab was written inside scala3 to benchmark the compiler. About two thirds of it has nothing to do with the compiler:
 - the JMH profilers (JIT stability, paired variants within a fork, xctrace counters per thread group);
 - the caller-audit agent;
 - the campaign runner (`ab.py`, `abtrees.py`, `loadgate.py`) and profile analysis (`regraph`, `profdiff`, `frameweight`, `subtree`);
