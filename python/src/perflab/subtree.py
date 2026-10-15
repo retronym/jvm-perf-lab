@@ -27,6 +27,9 @@ def main(argv):
     ap.add_argument("--top", type=int, default=12)
     ap.add_argument("runs", nargs="+")
     x = ap.parse_args(argv)
+    if not x.jfrconv:
+        from . import jmh
+        x.jfrconv = jmh.jfrconv(jmh.async_lib())
     pat = re.compile(x.frame)
     categories = [tuple(c.split("=", 1)) for c in x.category] if x.category else CATEGORIES
     tmp = os.environ.get("TMPDIR", "/tmp")

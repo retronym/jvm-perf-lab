@@ -48,6 +48,9 @@ def main(argv):
     ap.add_argument("--top", type=int, default=25)
     ap.add_argument("a"); ap.add_argument("b"); ap.add_argument("out")
     x = ap.parse_args(argv)
+    if not x.jfrconv:
+        from . import jmh
+        x.jfrconv = jmh.jfrconv(jmh.async_lib())
     os.makedirs(x.out, exist_ok=True)
     A = load(x.a, x.event, x.jfrconv, x.out, "a")
     B = load(x.b, x.event, x.jfrconv, x.out, "b")

@@ -20,20 +20,9 @@ description = "Install the perflab command (uv tool), from this checkout"
 run = "uv tool install --force --editable ./python"
 
 [tasks.site]
-description = "Run the sample's campaigns and runs, then build its static site in examples/sample/out/site"
-dir = "examples/sample"
-run = """
-set -euo pipefail
-export PYTHONPATH="$MISE_PROJECT_ROOT/python/src"
-p() { python3 -m perflab "$@"; }
-p run --out out/runs/plain -- -p size=10000 -wi 2 -i 3 -w 1 -r 1 WordCountBenchmark
-p run --out out/runs/async --profile async:cpu,alloc -- -p size=10000 -wi 2 -i 3 -w 1 -r 1 WordCountBenchmark
-p run --out out/runs/audit --profile audit:campaigns/normalize.audit -- -wi 1 -i 1 -w 1 -r 1 WordCountBenchmark
-p ab run campaigns/gc.json
-p ab run campaigns/maps.json
-if command -v xcrun >/dev/null && xcrun -f xctrace >/dev/null 2>&1; then p ab run campaigns/maps-counters.json; fi
-p site out/site --title "jvm-perf-lab sample"
-"""
+description = "Run the sample under every profile this machine supports, its campaigns, and build its site in examples/sample/out/site"
+env = { PYTHONPATH = "{{config_root}}/python/src" }
+run = "examples/sample/site.sh"
 
 [tasks.publish-site]
 description = "Force-push examples/sample/out/site to the gh-pages branch. Run `mise run site` first."
@@ -48,4 +37,20 @@ git -C "$tmp" -c user.name="$(git config user.name)" -c user.email="$(git config
 git -C "$tmp" push -q -f "$(git remote get-url origin)" gh-pages
 rm -rf "$tmp"
 echo "pushed gh-pages"
+"""
+
+[tasks."tools:async-profiler"]
+description = "Check out and build retronym/async-profiler's integration branch (kperf events, jfrconv --hw) into tools/build/async-profiler"
+run = """
+set -euo pipefail
+dir=tools/build/async-profiler
+repo="${ASYNC_PROFILER_REPO:-https://github.com/retronym/async-profiler.git}"   # or a local checkout
+ref="${ASYNC_PROFILER_REF:-integration-kperf-flamegraph}"
+if [ ! -d "$dir/.git" ]; then git clone -q "$repo" "$dir"; fi
+git -C "$dir" remote set-url origin "$repo"
+git -C "$dir" fetch -q origin "$ref"
+git -C "$dir" checkout -q --detach FETCH_HEAD
+make -C "$dir" -j"$(sysctl -n hw.ncpu 2>/dev/null || nproc)" >/dev/null
+git -C "$dir" rev-parse HEAD > "$dir/BUILT_COMMIT"
+echo "async-profiler $(cut -c1-10 "$dir/BUILT_COMMIT") ($ref): $dir/build/lib, $dir/build/bin"
 """

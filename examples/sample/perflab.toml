@@ -14,3 +14,8 @@ campaigns = "out/campaigns"
 
 [agent]
 jar = "../../perflab-agent/target/perflab-agent-0.1.0-SNAPSHOT.jar"
+
+[async]
+# built by `mise run tools:async-profiler` (kperf events, jfrconv --hw); without it, an installed async-profiler
+lib = "../../tools/build/async-profiler/build/lib/libasyncProfiler.dylib"
+jfrconv = "../../tools/build/async-profiler/build/bin/jfrconv"

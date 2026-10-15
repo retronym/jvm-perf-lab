@@ -51,6 +51,9 @@ def main(argv):
                                     "(e.g. the bodies it calls), counted from its outermost occurrence on the stack")
     ap.add_argument("runs", nargs="+")
     x = ap.parse_args(argv)
+    if not x.jfrconv:
+        from . import jmh
+        x.jfrconv = jmh.jfrconv(jmh.async_lib())
     patterns = [re.compile(f) for f in x.frame]
     tmp = os.environ.get("TMPDIR", "/tmp")
     until = re.compile(x.until) if x.until else None

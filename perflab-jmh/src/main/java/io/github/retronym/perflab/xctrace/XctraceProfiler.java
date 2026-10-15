@@ -177,7 +177,11 @@ public class XctraceProfiler implements InternalProfiler {
         if (top > 0) perfMap = PerfMap.dump();
         // xctrace saves the trace on SIGINT (as for Ctrl-C); Process.destroy would send SIGTERM.
         run(List.of("kill", "-INT", Long.toString(proc.pid())));
-        if (!proc.waitFor(30, TimeUnit.MINUTES)) throw new IllegalStateException("xctrace did not finish saving");
+        // xctrace occasionally hangs after "Stopping recording..." (seen with the CPU Counters template)
+        if (!proc.waitFor(5, TimeUnit.MINUTES)) {
+            proc.destroyForcibly();
+            throw new IllegalStateException("xctrace did not finish saving the trace within 5 minutes; killed it");
+        }
     }
 
     private Collection<? extends Result> analyze() throws Exception {
