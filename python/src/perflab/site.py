@@ -84,15 +84,16 @@ def overview(dest, runs):
                     cells[head] = fmt.format(m[key]["score"])
                     used.add(head)
             p = r["primaryMetric"]
-            rows.append((os.path.basename(run), f"{p['score']:.4g} {p['scoreUnit']}", cells))
+            rows.append((os.path.basename(run), f"{p['score']:.4g} {p['scoreUnit']}", cells, facets(run)))
     if not rows:
         return ""
     heads = [h for h, _, _ in OVERVIEW if h in used]
-    body = "".join(f"<tr><th><a href='#{esc(n)}'>{esc(n)}</a></th><td>{esc(sc)}</td>" + "".join(f"<td>{c.get(h, '')}</td>" for h in heads) + "</tr>"
-                   for n, sc, c in rows)
-    return (f"<h2>PMU counters by run</h2><p class='k'>Benchmark thread only (xctrace). Misses per 1,000 instructions; top-down "
+    body = "".join(f"<tr data-benchmark='{esc(fb)}' data-tool='{esc(ft)}'><th><a href='#{esc(n)}'>{esc(n)}</a></th><td>{esc(sc)}</td>"
+                   + "".join(f"<td>{c.get(h, '')}</td>" for h in heads) + "</tr>"
+                   for n, sc, c, (fb, ft) in rows)
+    return (f"<div class='overview'><h2>PMU counters by run</h2><p class='k'>Benchmark thread only (xctrace). Misses per 1,000 instructions; top-down "
             f"shares of issue slots (CPU Counters template).</p><div class='scroll'><table class='o'><tr><th>run</th><th>score</th>"
-            + "".join(f"<th>{esc(h)}</th>" for h in heads) + f"</tr>{body}</table></div>")
+            + "".join(f"<th>{esc(h)}</th>" for h in heads) + f"</tr>{body}</table></div></div>")
 
 
 def text_page(path, dest, title):
@@ -119,6 +120,113 @@ def about(name, profile, names):
         return ""
     links = " · ".join(f'<a href="#{esc(o)}">{esc(o)}</a>' for o in others if o in names)
     return f"<p>{esc(what)} {'Same benchmark: ' + links + '. ' if links else ''}<a href=\"{DOC}\">Which to use when</a>.</p>"
+
+
+KIND_ORDER = ["bench", "reverse", "bench-classify", "reverse-classify", "threads", "classify"]
+KIND_HELP = {
+    "bench": "Benchmark threads (JMH workers) only. Root at the bottom, callees above: where the benchmark spends this event, by call path.",
+    "reverse": "Benchmark threads only, stacks reversed: the methods where the event lands (leaves) at the top level, their callers beneath. Self cost by method.",
+    "bench-classify": "Benchmark threads only, each sample put under a category frame at the root by what it was doing: [c2_comp], [c1_comp], [Interpreter], [native], [vm], [gc], [jit], [class_load], ...",
+    "reverse-classify": "Benchmark threads only, by category as in bench-classify, with stacks reversed (leaves at the top level).",
+    "threads": "Every thread of the JVM, one tower per thread: JIT compiler, GC, JMH and JFR threads beside the benchmark.",
+    "classify": "Every thread of the JVM, by category: [gc], [jit], [vm], [c2_comp], [Interpreter], [class_load], ... Shows how much goes to the JVM's own work.",
+}
+EVENT_HELP = {
+    "cpu": "CPU time: a sample per 1 ms of CPU time on a thread (async-profiler cpu).",
+    "wall": "Wall-clock time: samples of every thread at a fixed interval, running or not; shows waiting as well as running.",
+    "alloc": "Allocations: a sample about every 512 KB allocated on a thread, from TLAB refills and allocations outside TLABs. A benchmark that does not allocate has none on its threads.",
+    "lock": "Lock contention: samples of threads blocked entering a monitor or ReentrantLock.",
+    "cycles": "PMU core cycles (user mode), sampled via kperf: where the CPU's time goes, independent of frequency.",
+    "instructions": "PMU retired instructions (user mode), sampled via kperf: where the work is.",
+    "cache-misses": "PMU L1D load misses (L1D_CACHE_MISS_LD_NONSPEC, user mode), sampled via kperf, charged to the load that missed.",
+    "branch-misses": "PMU branch mispredictions (BRANCH_MISPRED_NONSPEC, user mode), sampled via kperf, charged to the branch.",
+}
+
+
+def event_help(event):
+    return EVENT_HELP.get(event, event)
+
+
+def graph_samples(path):
+    """The flame graph's total: the root frame's width, the first n(key, width) / f(...) in the page's data."""
+    try:
+        with open(path, errors="replace") as f:
+            for line in f:
+                m = re.match(r"^n\((\d+)(?:,(\d+))?", line)
+                if m:
+                    return int(m.group(2) or 0)
+    except OSError:
+        pass
+    return None
+
+
+def graph_link(path, kind, dest):
+    esc = html.escape
+    n = graph_samples(path)
+    count = "" if n is None else f" <span class='k'>({n:,})</span>"
+    empty = " class='empty'" if n == 0 else ""
+    return f"<a{empty} href='{esc(os.path.relpath(path, dest))}' title='{esc(KIND_HELP.get(kind, kind))}'>{esc(kind)}</a>{count}"
+
+
+def tool_of(profile):
+    kind, _, arg = profile.partition(":")
+    if kind == "async":
+        return "kperf" if "+" in arg else "async-profiler"
+    return kind or "none"
+
+
+def benchmarks_of(run):
+    """The benchmark classes a run measured (from result.json), e.g. ["WordCountBenchmark"]."""
+    import json
+    f = os.path.join(run, "result.json")
+    try:
+        return sorted({r["benchmark"].split(".")[-2] for r in json.load(open(f))})
+    except (OSError, ValueError, KeyError, IndexError):
+        return []
+
+
+def facets(run):
+    profile = open(os.path.join(run, "profile.txt")).read().strip() if os.path.exists(os.path.join(run, "profile.txt")) else ""
+    return " ".join(benchmarks_of(run)), tool_of(profile)
+
+
+def chips(runs):
+    """Filter chips over the runs: by benchmark and by tool. Within a group chips are alternatives; groups combine."""
+    esc = html.escape
+    benches = sorted({b for r in runs for b in facets(r)[0].split()})
+    tools = sorted({facets(r)[1] for r in runs})
+    def group(name, values):
+        return (f"<div class='chips' data-facet='{name}'><span class='k'>{name}</span>"
+                + "".join(f"<button type='button' data-v='{esc(v)}'>{esc(v)}</button>" for v in values) + "</div>")
+    return f"<div class='filters'>{group('benchmark', benches)}{group('tool', tools)}</div>" + FILTER_JS
+
+
+FILTER_JS = """<script>
+(function () {
+  const sel = {benchmark: new Set(), tool: new Set()};
+  function shown(el) {
+    for (const f in sel) {
+      if (!sel[f].size) continue;
+      const vs = (el.dataset[f] || '').split(' ');
+      if (!vs.some(v => sel[f].has(v))) return false;
+    }
+    return true;
+  }
+  function apply() {
+    document.querySelectorAll('[data-tool]').forEach(el => { el.hidden = !shown(el); });
+    document.querySelectorAll('.overview').forEach(o => { o.hidden = !o.querySelector('tr[data-tool]:not([hidden])'); });
+    document.querySelectorAll('.chips button').forEach(b => {
+      b.setAttribute('aria-pressed', sel[b.parentNode.dataset.facet].has(b.dataset.v));
+    });
+  }
+  document.querySelectorAll('.chips button').forEach(b => b.addEventListener('click', () => {
+    const s = sel[b.parentNode.dataset.facet];
+    s.has(b.dataset.v) ? s.delete(b.dataset.v) : s.add(b.dataset.v);
+    apply();
+  }));
+  apply();
+})();
+</script>"""
 
 
 def landing(dest, title, runs):
@@ -159,17 +267,17 @@ def landing(dest, title, runs):
             event = base[base.index("-hw-") + 4:] if "-hw-" in base else base.rsplit("-", 1)[-1]
             events.setdefault(event, []).append((kind, g))
         if events:
-            rows = "".join(f"<tr><th>{esc(e)}</th><td>" + " · ".join(
-                f'<a href="{esc(os.path.relpath(g, dest))}">{esc(k)}</a>' for k, g in sorted(gs, key=lambda kg: (kg[0] != "bench", kg[0])))
+            rows = "".join(f"<tr><th title='{esc(event_help(e))}'>{esc(e)}</th><td>" + " · ".join(
+                graph_link(g, k, dest) for k, g in sorted(gs, key=lambda kg: KIND_ORDER.index(kg[0]) if kg[0] in KIND_ORDER else 99))
                 + "</td></tr>" for e, gs in events.items())
-            parts.append(f"<table class='g'><tr><th>flame graphs</th><td class='k'>bench: benchmark threads · reverse: by leaf · "
-                         f"threads: all threads · classify: by category</td></tr>{rows}</table>")
-        items.append(f"<section id='{esc(name)}'><h2>{esc(name)}</h2><p class='k'>{esc(profile)}</p>{about(name, profile, names)}{''.join(parts)}</section>")
+            parts.append(f"<table class='g'><tr><th colspan='2'>flame graphs <span class='k'>(each graph's total: samples, or event counts for PMU events; hover for what each shows)</span></th></tr>{rows}</table>")
+        bench, tool = facets(run)
+        items.append(f"<section id='{esc(name)}' data-benchmark='{esc(bench)}' data-tool='{esc(tool)}'><h2>{esc(name)}</h2><p class='k'>{esc(profile)}</p>{about(name, profile, names)}{''.join(parts)}</section>")
     campaigns = '<p><a href="campaigns/index.html"><b>Campaigns</b></a>: every campaign, its cells and summaries, flame graphs per cell, differential flame graphs, and fork timelines.</p>' \
         if os.path.exists(os.path.join(dest, "campaigns", "index.html")) else ""
     with open(os.path.join(dest, "index.html"), "w") as f:
         f.write(f"<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-                f"<title>{esc(title)}</title>{STYLE}<main><h1>{esc(title)}</h1>{INTRO}{campaigns}{overview(dest, runs)}"
+                f"<title>{esc(title)}</title>{STYLE}<main><h1>{esc(title)}</h1>{INTRO}{campaigns}{chips(runs)}{overview(dest, runs)}"
                 f"<h2>Runs</h2>{''.join(items) or '<p>none</p>'}</main>")
 
 
@@ -203,7 +311,7 @@ body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,system-ui,
 a{color:var(--link)} h1{font-size:20px} h2{font-size:15px;margin:16px 0 4px} .k{color:var(--muted);font-size:12px;margin:0}
 section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:10px 0}
 table{border-collapse:collapse;font-size:12px;margin:6px 0} details{margin:6px 0} summary{cursor:pointer}
-pre{font-size:12px;overflow-x:auto} .scroll{overflow-x:auto} table.o td{text-align:right;white-space:nowrap} table.m th{font-weight:normal;color:var(--muted)} table.g th{width:120px} td,th{border:1px solid var(--line);padding:3px 8px;text-align:left;overflow-wrap:anywhere}</style>"""
+pre{font-size:12px;overflow-x:auto} .scroll{overflow-x:auto} table.o td{text-align:right;white-space:nowrap} table.m th{font-weight:normal;color:var(--muted)} table.g th{width:120px} a.empty{color:var(--muted)} .filters{position:sticky;top:0;z-index:1;background:var(--bg);padding:6px 0;margin:8px 0} .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0} .chips .k{width:80px} .chips button{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:999px;padding:2px 10px;cursor:pointer} .chips button[aria-pressed=true]{background:var(--link);border-color:var(--link);color:#fff} [hidden]{display:none!important} th[title]{cursor:help} td,th{border:1px solid var(--line);padding:3px 8px;text-align:left;overflow-wrap:anywhere}</style>"""
 
 
 INTRO = ""

@@ -16,8 +16,8 @@ KINDS = {
     "reverse": (BENCH, True),
     "threads": (["--threads"], False),
     "classify": (["--classify"], False),
-    "bench-classify": (["-I", ".*jmh-worker.*", "--classify"], False),
-    "reverse-classify": (["-I", ".*jmh-worker.*", "--classify"], True),
+    "bench-classify": (BENCH + ["--classify"], False),
+    "reverse-classify": (BENCH + ["--classify"], True),
 }
 
 
