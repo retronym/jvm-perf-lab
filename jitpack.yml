@@ -1,0 +1,5 @@
+# JitPack builds a tag or commit on request: com.github.retronym.jvm-perf-lab:perflab-jmh:<tag>
+jdk:
+  - openjdk17
+install:
+  - ./mvnw -B install -DskipTests

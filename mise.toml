@@ -1,0 +1,16 @@
+[tools]
+java = "temurin-21"   # builds the Java 17 release; the profilers run in whatever JDK the benchmark forks use
+python = "3.12"
+uv = "latest"
+
+[tasks.build]
+description = "Compile, test and package the Java modules"
+run = "./mvnw -q -B verify"
+
+[tasks.test]
+description = "Run the Java unit tests"
+run = "./mvnw -q -B test"
+
+[tasks.install]
+description = "Install a snapshot into ~/.m2, for a benchmark build that reads mavenLocal while iterating"
+run = "./mvnw -q -B install -DskipTests"
