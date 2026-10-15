@@ -1,0 +1,50 @@
+
+== INST_ALL (bench threads)
+   85.8%  java.util.TreeMap.merge
+   12.8%  sample.WordCount.count
+    0.6%  java.util.TreeMap.rotateRight
+    0.5%  java.util.TreeMap.rotateLeft
+    0.2%  java.util.TreeMap.containsKey
+    0.0%  pthread_jit_write_protect_np
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  GenericWaitBarrier::Cell::wait(int)
+
+== INST_BRANCH (bench threads)
+   85.9%  java.util.TreeMap.merge
+   12.8%  sample.WordCount.count
+    0.6%  java.util.TreeMap.rotateRight
+    0.5%  java.util.TreeMap.rotateLeft
+    0.2%  java.util.TreeMap.containsKey
+    0.0%  pthread_jit_write_protect_np
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  GenericWaitBarrier::Cell::wait(int)
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   86.1%  java.util.TreeMap.merge
+   12.6%  sample.WordCount.count
+    0.6%  java.util.TreeMap.rotateRight
+    0.5%  java.util.TreeMap.rotateLeft
+    0.2%  java.util.TreeMap.containsKey
+    0.0%  pthread_jit_write_protect_np
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  GenericWaitBarrier::Cell::wait(int)
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   85.9%  java.util.TreeMap.merge
+   12.7%  sample.WordCount.count
+    0.6%  java.util.TreeMap.rotateRight
+    0.6%  java.util.TreeMap.rotateLeft
+    0.1%  java.util.TreeMap.containsKey
+    0.0%  pthread_jit_write_protect_np
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  GenericWaitBarrier::Cell::wait(int)
+
+== samples (bench threads)
+   86.3%  java.util.TreeMap.merge
+   12.3%  sample.WordCount.count
+    0.6%  java.util.TreeMap.rotateRight
+    0.5%  java.util.TreeMap.rotateLeft
+    0.2%  java.util.TreeMap.containsKey
+    0.0%  pthread_jit_write_protect_np
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  GenericWaitBarrier::Cell::wait(int)

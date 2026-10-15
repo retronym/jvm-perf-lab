@@ -1,0 +1,19 @@
+-o
+~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/gc/100000/parallel/1/jmh.log
+-rf
+json
+-rff
+~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/gc/100000/parallel/1/result.json
+-jvmArgsAppend
+-Xms1G -Xmx1G -XX:+UseParallelGC -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/gc/100000/parallel/1
+-p
+size=100000
+-wi
+5
+-i
+5
+-w
+1
+-r
+1
+WordCountBenchmark

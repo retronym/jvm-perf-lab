@@ -1,0 +1,639 @@
+# JMH version: 1.37
+# VM version: JDK 21.0.12.1, OpenJDK 64-Bit Server VM, 21.0.12.1+1-LTS
+# VM invoker: ~/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java
+# VM options: -Xms1G -Xmx1G -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps-counters/100000/paired/1/gc.log:time,uptime -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps-counters/100000/paired/1
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 6 iterations, 1 s each
+# Measurement: 9 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: sample.WordCountBenchmark.countAndLookUp
+# Parameters: (map = hash, size = 100000, variants = hash=hash|linked=linked|tree=tree)
+
+# Run progress: 0.00% complete, ETA 00:00:15
+# Fork: 1 of 1
+# Warmup Iteration   1: 3278.308 us/op
+# Warmup Iteration   2: 3272.629 us/op
+# Warmup Iteration   3: 11170.746 us/op
+# Warmup Iteration   4: 3189.002 us/op
+# Warmup Iteration   5: 11313.099 us/op
+# Warmup Iteration   6: 3182.619 us/op
+Iteration   1: 11268.209 us/op
+                 gc.alloc.rate:      278.618 MB/sec
+                 gc.alloc.rate.norm: 3295631.281 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 3114.700 us/op
+                 gc.alloc.rate:      1033.688 MB/sec
+                 gc.alloc.rate.norm: 3378664.396 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   3: 3281.644 us/op
+                 gc.alloc.rate:      1033.006 MB/sec
+                 gc.alloc.rate.norm: 3557378.510 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   4: 11316.337 us/op
+                 gc.alloc.rate:      277.510 MB/sec
+                 gc.alloc.rate.norm: 3295382.742 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 3228.787 us/op
+                 gc.alloc.rate:      1049.909 MB/sec
+                 gc.alloc.rate.norm: 3557364.256 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   6: 3138.808 us/op
+                 gc.alloc.rate:      1025.792 MB/sec
+                 gc.alloc.rate.norm: 3378713.919 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   7: 3214.944 us/op
+                 gc.alloc.rate:      1001.505 MB/sec
+                 gc.alloc.rate.norm: 3378621.597 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   8: 11192.059 us/op
+                 gc.alloc.rate:      280.585 MB/sec
+                 gc.alloc.rate.norm: 3295307.200 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   9: 3215.272 us/op
+                 gc.alloc.rate:                                       419.773 MB/sec
+                 gc.alloc.rate.norm:                                  3561214.256 B/op
+                 gc.count:                                            2.000 counts
+                 gc.time:                                             1.000 ms
+                 jit.compilations:                                    82.000 #
+                 jit.compileTime:                                     12.739 ms
+                 jit.deopts:                                          1.000 #
+                 jit.lastWarmup.compilations:                         18.000 #
+                 jit.lastWarmup.deopts:                               ≈ 0 #
+                 paired.gcFree.hash:                                  3149.905 us/op
+                 paired.gcFree.linked:                                3236.518 us/op
+                 paired.gcFree.linked.delta%:                         2.780 %
+                 paired.gcFree.linked.delta%.median:                  2.969 %
+                 paired.gcFree.linked.delta%.sd:                      2.680 %
+                 paired.gcFree.tree:                                  11255.163 us/op
+                 paired.gcFree.tree.delta%:                           257.410 %
+                 paired.gcFree.tree.delta%.median:                    261.607 %
+                 paired.gcFree.tree.delta%.sd:                        8.052 %
+                 paired.hash:                                         3156.151 us/op
+                 paired.linked:                                       3241.901 us/op
+                 paired.linked.delta%:                                2.746 %
+                 paired.linked.delta%.median:                         2.867 %
+                 paired.linked.delta%.sd:                             2.677 %
+                 paired.tree:                                         11258.868 us/op
+                 paired.tree.delta%:                                  256.810 %
+                 paired.tree.delta%.median:                           260.530 %
+                 paired.tree.delta%.sd:                               7.547 %
+                 xctrace.BRANCH_MISPRED_NONSPEC:                      247810.351 #/op
+                 xctrace.BRANCH_MISPRED_NONSPEC.hash:                 172173.253 #/op
+                 xctrace.BRANCH_MISPRED_NONSPEC.linked:               173327.930 #/op
+                 xctrace.BRANCH_MISPRED_NONSPEC.linked.delta%:        0.672 %
+                 xctrace.BRANCH_MISPRED_NONSPEC.linked.delta%.median: 0.234 %
+                 xctrace.BRANCH_MISPRED_NONSPEC.linked.delta%.sd:     0.825 %
+                 xctrace.BRANCH_MISPRED_NONSPEC.tree:                 776434.100 #/op
+                 xctrace.BRANCH_MISPRED_NONSPEC.tree.delta%:          350.963 %
+                 xctrace.BRANCH_MISPRED_NONSPEC.tree.delta%.median:   351.474 %
+                 xctrace.BRANCH_MISPRED_NONSPEC.tree.delta%.sd:       5.651 %
+                 xctrace.BRANCH_MISPRED_NONSPEC/kinst:                4.927 #/kinst
+                 xctrace.CORE_ACTIVE_CYCLE:                           17893175.084 #/op
+                 xctrace.CORE_ACTIVE_CYCLE.hash:                      13413582.999 #/op
+                 xctrace.CORE_ACTIVE_CYCLE.linked:                    13761179.324 #/op
+                 xctrace.CORE_ACTIVE_CYCLE.linked.delta%:             2.593 %
+                 xctrace.CORE_ACTIVE_CYCLE.linked.delta%.median:      2.753 %
+                 xctrace.CORE_ACTIVE_CYCLE.linked.delta%.sd:          0.468 %
+                 xctrace.CORE_ACTIVE_CYCLE.tree:                      48228807.502 #/op
+                 xctrace.CORE_ACTIVE_CYCLE.tree.delta%:               259.546 %
+                 xctrace.CORE_ACTIVE_CYCLE.tree.delta%.median:        259.922 %
+                 xctrace.CORE_ACTIVE_CYCLE.tree.delta%.sd:            1.867 %
+                 xctrace.INST_ALL:                                    50296071.141 #/op
+                 xctrace.INST_ALL.hash:                               42119419.504 #/op
+                 xctrace.INST_ALL.linked:                             44828789.431 #/op
+                 xctrace.INST_ALL.linked.delta%:                      6.441 %
+                 xctrace.INST_ALL.linked.delta%.median:               6.029 %
+                 xctrace.INST_ALL.linked.delta%.sd:                   1.112 %
+                 xctrace.INST_ALL.tree:                               98454015.112 #/op
+                 xctrace.INST_ALL.tree.delta%:                        133.754 %
+                 xctrace.INST_ALL.tree.delta%.median:                 134.013 %
+                 xctrace.INST_ALL.tree.delta%.sd:                     0.783 %
+                 xctrace.INST_BRANCH:                                 10855439.760 #/op
+                 xctrace.INST_BRANCH.hash:                            8290215.723 #/op
+                 xctrace.INST_BRANCH.linked:                          9015392.863 #/op
+                 xctrace.INST_BRANCH.linked.delta%:                   8.756 %
+                 xctrace.INST_BRANCH.linked.delta%.median:            8.320 %
+                 xctrace.INST_BRANCH.linked.delta%.sd:                1.144 %
+                 xctrace.INST_BRANCH.tree:                            26398634.327 #/op
+                 xctrace.INST_BRANCH.tree.delta%:                     218.437 %
+                 xctrace.INST_BRANCH.tree.delta%.median:              218.775 %
+                 xctrace.INST_BRANCH.tree.delta%.sd:                  1.085 %
+                 xctrace.INST_BRANCH/kinst:                           215.831 #/kinst
+                 xctrace.IPC.bench:                                   2.811 insts/clk
+                 xctrace.IPC.gc:                                      1.792 insts/clk
+                 xctrace.IPC.jit:                                     2.454 insts/clk
+                 xctrace.IPC.other:                                   3.167 insts/clk
+                 xctrace.bench.oncpu:                                 9.037 s
+                 xctrace.cycles%.bench:                               98.525 %
+                 xctrace.cycles%.gc:                                  0.354 %
+                 xctrace.cycles%.jit:                                 0.769 %
+                 xctrace.cycles%.other:                               0.352 %
+
+
+
+Result "sample.WordCountBenchmark.countAndLookUp":
+  5885.640 ±(99.9%) 6772.720 us/op [Average]
+  (min, avg, max) = (3114.700, 5885.640, 11316.337), stdev = 4030.337
+  CI (99.9%): [≈ 0, 12658.360] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.alloc.rate":
+  711.154 ±(99.9%) 637.431 MB/sec [Average]
+  (min, avg, max) = (277.510, 711.154, 1049.909), stdev = 379.325
+  CI (99.9%): [73.723, 1348.585] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.alloc.rate.norm":
+  3410919.795 ±(99.9%) 195801.242 B/op [Average]
+  (min, avg, max) = (3295307.200, 3410919.795, 3561214.256), stdev = 116518.179
+  CI (99.9%): [3215118.553, 3606721.038] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.count":
+  12.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (≈ 0, 1.333, 2.000), stdev = 0.866
+  CI (99.9%): [12.000, 12.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.time":
+  12.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (≈ 0, 1.333, 3.000), stdev = 1.000
+  CI (99.9%): [12.000, 12.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.compilations":
+  82.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 9.111, 82.000), stdev = 27.333
+  CI (99.9%): [82.000, 82.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.compileTime":
+  12.739 ±(99.9%) 0.001 ms [Maximum]
+  (min, avg, max) = (≈ 0, 1.415, 12.739), stdev = 4.246
+  CI (99.9%): [12.739, 12.739] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.deopts":
+  1.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 0.111, 1.000), stdev = 0.333
+  CI (99.9%): [1.000, 1.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.lastWarmup.compilations":
+  18.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 2.000, 18.000), stdev = 6.000
+  CI (99.9%): [18.000, 18.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.lastWarmup.deopts":
+  ≈ 0 #
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.hash":
+  3149.905 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 349.989, 3149.905), stdev = 1049.968
+  CI (99.9%): [3149.905, 3149.905] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.linked":
+  3236.518 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 359.613, 3236.518), stdev = 1078.839
+  CI (99.9%): [3236.518, 3236.518] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.linked.delta%":
+  2.780 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.309, 2.780), stdev = 0.927
+  CI (99.9%): [2.780, 2.780] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.linked.delta%.median":
+  2.969 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.330, 2.969), stdev = 0.990
+  CI (99.9%): [2.969, 2.969] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.linked.delta%.sd":
+  2.680 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.298, 2.680), stdev = 0.893
+  CI (99.9%): [2.680, 2.680] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.tree":
+  11255.163 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 1250.574, 11255.163), stdev = 3751.721
+  CI (99.9%): [11255.163, 11255.163] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.tree.delta%":
+  257.410 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 28.601, 257.410), stdev = 85.803
+  CI (99.9%): [257.410, 257.410] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.tree.delta%.median":
+  261.607 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 29.067, 261.607), stdev = 87.202
+  CI (99.9%): [261.607, 261.607] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.tree.delta%.sd":
+  8.052 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.895, 8.052), stdev = 2.684
+  CI (99.9%): [8.052, 8.052] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.hash":
+  3156.151 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 350.683, 3156.151), stdev = 1052.050
+  CI (99.9%): [3156.151, 3156.151] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.linked":
+  3241.901 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 360.211, 3241.901), stdev = 1080.634
+  CI (99.9%): [3241.901, 3241.901] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.linked.delta%":
+  2.746 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.305, 2.746), stdev = 0.915
+  CI (99.9%): [2.746, 2.746] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.linked.delta%.median":
+  2.867 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.319, 2.867), stdev = 0.956
+  CI (99.9%): [2.867, 2.867] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.linked.delta%.sd":
+  2.677 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.297, 2.677), stdev = 0.892
+  CI (99.9%): [2.677, 2.677] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.tree":
+  11258.868 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 1250.985, 11258.868), stdev = 3752.956
+  CI (99.9%): [11258.868, 11258.868] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.tree.delta%":
+  256.810 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 28.534, 256.810), stdev = 85.603
+  CI (99.9%): [256.810, 256.810] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.tree.delta%.median":
+  260.530 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 28.948, 260.530), stdev = 86.843
+  CI (99.9%): [260.530, 260.530] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.tree.delta%.sd":
+  7.547 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.839, 7.547), stdev = 2.516
+  CI (99.9%): [7.547, 7.547] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC":
+  247810.351 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 27534.483, 247810.351), stdev = 82603.450
+  CI (99.9%): [247810.351, 247810.351] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.hash":
+  172173.253 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 19130.361, 172173.253), stdev = 57391.084
+  CI (99.9%): [172173.253, 172173.253] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.linked":
+  173327.930 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 19258.659, 173327.930), stdev = 57775.977
+  CI (99.9%): [173327.930, 173327.930] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.linked.delta%":
+  0.672 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.075, 0.672), stdev = 0.224
+  CI (99.9%): [0.672, 0.672] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.linked.delta%.median":
+  0.234 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.026, 0.234), stdev = 0.078
+  CI (99.9%): [0.234, 0.234] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.linked.delta%.sd":
+  0.825 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.092, 0.825), stdev = 0.275
+  CI (99.9%): [0.825, 0.825] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.tree":
+  776434.100 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 86270.456, 776434.100), stdev = 258811.367
+  CI (99.9%): [776434.100, 776434.100] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.tree.delta%":
+  350.963 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 38.996, 350.963), stdev = 116.988
+  CI (99.9%): [350.963, 350.963] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.tree.delta%.median":
+  351.474 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 39.053, 351.474), stdev = 117.158
+  CI (99.9%): [351.474, 351.474] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.tree.delta%.sd":
+  5.651 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.628, 5.651), stdev = 1.884
+  CI (99.9%): [5.651, 5.651] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC/kinst":
+  4.927 ±(99.9%) 0.001 #/kinst [Maximum]
+  (min, avg, max) = (≈ 0, 0.547, 4.927), stdev = 1.642
+  CI (99.9%): [4.927, 4.927] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE":
+  17893175.084 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 1988130.565, 17893175.084), stdev = 5964391.695
+  CI (99.9%): [17893175.084, 17893175.084] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.hash":
+  13413582.999 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 1490398.111, 13413582.999), stdev = 4471194.333
+  CI (99.9%): [13413582.999, 13413582.999] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.linked":
+  13761179.324 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 1529019.925, 13761179.324), stdev = 4587059.775
+  CI (99.9%): [13761179.324, 13761179.324] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.linked.delta%":
+  2.593 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.288, 2.593), stdev = 0.864
+  CI (99.9%): [2.593, 2.593] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.linked.delta%.median":
+  2.753 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.306, 2.753), stdev = 0.918
+  CI (99.9%): [2.753, 2.753] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.linked.delta%.sd":
+  0.468 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.052, 0.468), stdev = 0.156
+  CI (99.9%): [0.468, 0.468] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.tree":
+  48228807.502 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 5358756.389, 48228807.502), stdev = 16076269.167
+  CI (99.9%): [48228807.502, 48228807.502] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.tree.delta%":
+  259.546 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 28.838, 259.546), stdev = 86.515
+  CI (99.9%): [259.546, 259.546] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.tree.delta%.median":
+  259.922 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 28.880, 259.922), stdev = 86.641
+  CI (99.9%): [259.922, 259.922] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.tree.delta%.sd":
+  1.867 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.207, 1.867), stdev = 0.622
+  CI (99.9%): [1.867, 1.867] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_ALL":
+  50296071.141 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 5588452.349, 50296071.141), stdev = 16765357.047
+  CI (99.9%): [50296071.141, 50296071.141] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.hash":
+  42119419.504 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 4679935.500, 42119419.504), stdev = 14039806.501
+  CI (99.9%): [42119419.504, 42119419.504] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.linked":
+  44828789.431 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 4980976.603, 44828789.431), stdev = 14942929.810
+  CI (99.9%): [44828789.431, 44828789.431] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.linked.delta%":
+  6.441 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.716, 6.441), stdev = 2.147
+  CI (99.9%): [6.441, 6.441] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.linked.delta%.median":
+  6.029 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.670, 6.029), stdev = 2.010
+  CI (99.9%): [6.029, 6.029] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.linked.delta%.sd":
+  1.112 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.124, 1.112), stdev = 0.371
+  CI (99.9%): [1.112, 1.112] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.tree":
+  98454015.112 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 10939335.012, 98454015.112), stdev = 32818005.037
+  CI (99.9%): [98454015.112, 98454015.112] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.tree.delta%":
+  133.754 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 14.862, 133.754), stdev = 44.585
+  CI (99.9%): [133.754, 133.754] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.tree.delta%.median":
+  134.013 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 14.890, 134.013), stdev = 44.671
+  CI (99.9%): [134.013, 134.013] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.tree.delta%.sd":
+  0.783 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.087, 0.783), stdev = 0.261
+  CI (99.9%): [0.783, 0.783] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH":
+  10855439.760 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 1206159.973, 10855439.760), stdev = 3618479.920
+  CI (99.9%): [10855439.760, 10855439.760] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.hash":
+  8290215.723 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 921135.080, 8290215.723), stdev = 2763405.241
+  CI (99.9%): [8290215.723, 8290215.723] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.linked":
+  9015392.863 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 1001710.318, 9015392.863), stdev = 3005130.954
+  CI (99.9%): [9015392.863, 9015392.863] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.linked.delta%":
+  8.756 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.973, 8.756), stdev = 2.919
+  CI (99.9%): [8.756, 8.756] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.linked.delta%.median":
+  8.320 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.924, 8.320), stdev = 2.773
+  CI (99.9%): [8.320, 8.320] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.linked.delta%.sd":
+  1.144 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.127, 1.144), stdev = 0.381
+  CI (99.9%): [1.144, 1.144] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.tree":
+  26398634.327 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 2933181.592, 26398634.327), stdev = 8799544.776
+  CI (99.9%): [26398634.327, 26398634.327] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.tree.delta%":
+  218.437 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 24.271, 218.437), stdev = 72.812
+  CI (99.9%): [218.437, 218.437] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.tree.delta%.median":
+  218.775 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 24.308, 218.775), stdev = 72.925
+  CI (99.9%): [218.775, 218.775] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.tree.delta%.sd":
+  1.085 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.121, 1.085), stdev = 0.362
+  CI (99.9%): [1.085, 1.085] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH/kinst":
+  215.831 ±(99.9%) 0.001 #/kinst [Maximum]
+  (min, avg, max) = (≈ 0, 23.981, 215.831), stdev = 71.944
+  CI (99.9%): [215.831, 215.831] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.IPC.bench":
+  2.811 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.312, 2.811), stdev = 0.937
+  CI (99.9%): [2.811, 2.811] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.IPC.gc":
+  1.792 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.199, 1.792), stdev = 0.597
+  CI (99.9%): [1.792, 1.792] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.IPC.jit":
+  2.454 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.273, 2.454), stdev = 0.818
+  CI (99.9%): [2.454, 2.454] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.IPC.other":
+  3.167 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.352, 3.167), stdev = 1.056
+  CI (99.9%): [3.167, 3.167] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.bench.oncpu":
+  9.037 ±(99.9%) 0.001 s [Maximum]
+  (min, avg, max) = (≈ 0, 1.004, 9.037), stdev = 3.012
+  CI (99.9%): [9.037, 9.037] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.cycles%.bench":
+  98.525 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 10.947, 98.525), stdev = 32.842
+  CI (99.9%): [98.525, 98.525] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.cycles%.gc":
+  0.354 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.039, 0.354), stdev = 0.118
+  CI (99.9%): [0.354, 0.354] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.cycles%.jit":
+  0.769 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.085, 0.769), stdev = 0.256
+  CI (99.9%): [0.769, 0.769] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.cycles%.other":
+  0.352 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.039, 0.352), stdev = 0.117
+  CI (99.9%): [0.352, 0.352] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:24
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                                              (map)  (size)                         (variants)  Mode  Cnt         Score        Error      Units
+WordCountBenchmark.countAndLookUp                                                       hash  100000  hash=hash|linked=linked|tree=tree  avgt    9      5885.640 ±   6772.720      us/op
+WordCountBenchmark.countAndLookUp:gc.alloc.rate                                         hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       711.154 ±    637.431     MB/sec
+WordCountBenchmark.countAndLookUp:gc.alloc.rate.norm                                    hash  100000  hash=hash|linked=linked|tree=tree  avgt    9   3410919.795 ± 195801.242       B/op
+WordCountBenchmark.countAndLookUp:gc.count                                              hash  100000  hash=hash|linked=linked|tree=tree  avgt    9        12.000                  counts
+WordCountBenchmark.countAndLookUp:gc.time                                               hash  100000  hash=hash|linked=linked|tree=tree  avgt    9        12.000                      ms
+WordCountBenchmark.countAndLookUp:jit.compilations                                      hash  100000  hash=hash|linked=linked|tree=tree  avgt    9        82.000                       #
+WordCountBenchmark.countAndLookUp:jit.compileTime                                       hash  100000  hash=hash|linked=linked|tree=tree  avgt    9        12.739                      ms
+WordCountBenchmark.countAndLookUp:jit.deopts                                            hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         1.000                       #
+WordCountBenchmark.countAndLookUp:jit.lastWarmup.compilations                           hash  100000  hash=hash|linked=linked|tree=tree  avgt    9        18.000                       #
+WordCountBenchmark.countAndLookUp:jit.lastWarmup.deopts                                 hash  100000  hash=hash|linked=linked|tree=tree  avgt    9           ≈ 0                       #
+WordCountBenchmark.countAndLookUp:paired.gcFree.hash                                    hash  100000  hash=hash|linked=linked|tree=tree  avgt    9      3149.905                   us/op
+WordCountBenchmark.countAndLookUp:paired.gcFree.linked                                  hash  100000  hash=hash|linked=linked|tree=tree  avgt    9      3236.518                   us/op
+WordCountBenchmark.countAndLookUp:paired.gcFree.linked.delta%                           hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         2.780                       %
+WordCountBenchmark.countAndLookUp:paired.gcFree.linked.delta%.median                    hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         2.969                       %
+WordCountBenchmark.countAndLookUp:paired.gcFree.linked.delta%.sd                        hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         2.680                       %
+WordCountBenchmark.countAndLookUp:paired.gcFree.tree                                    hash  100000  hash=hash|linked=linked|tree=tree  avgt    9     11255.163                   us/op
+WordCountBenchmark.countAndLookUp:paired.gcFree.tree.delta%                             hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       257.410                       %
+WordCountBenchmark.countAndLookUp:paired.gcFree.tree.delta%.median                      hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       261.607                       %
+WordCountBenchmark.countAndLookUp:paired.gcFree.tree.delta%.sd                          hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         8.052                       %
+WordCountBenchmark.countAndLookUp:paired.hash                                           hash  100000  hash=hash|linked=linked|tree=tree  avgt    9      3156.151                   us/op
+WordCountBenchmark.countAndLookUp:paired.linked                                         hash  100000  hash=hash|linked=linked|tree=tree  avgt    9      3241.901                   us/op
+WordCountBenchmark.countAndLookUp:paired.linked.delta%                                  hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         2.746                       %
+WordCountBenchmark.countAndLookUp:paired.linked.delta%.median                           hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         2.867                       %
+WordCountBenchmark.countAndLookUp:paired.linked.delta%.sd                               hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         2.677                       %
+WordCountBenchmark.countAndLookUp:paired.tree                                           hash  100000  hash=hash|linked=linked|tree=tree  avgt    9     11258.868                   us/op
+WordCountBenchmark.countAndLookUp:paired.tree.delta%                                    hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       256.810                       %
+WordCountBenchmark.countAndLookUp:paired.tree.delta%.median                             hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       260.530                       %
+WordCountBenchmark.countAndLookUp:paired.tree.delta%.sd                                 hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         7.547                       %
+WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC                        hash  100000  hash=hash|linked=linked|tree=tree  avgt    9    247810.351                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.hash                   hash  100000  hash=hash|linked=linked|tree=tree  avgt    9    172173.253                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.linked                 hash  100000  hash=hash|linked=linked|tree=tree  avgt    9    173327.930                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.linked.delta%          hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         0.672                       %
+WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.linked.delta%.median   hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         0.234                       %
+WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.linked.delta%.sd       hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         0.825                       %
+WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.tree                   hash  100000  hash=hash|linked=linked|tree=tree  avgt    9    776434.100                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.tree.delta%            hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       350.963                       %
+WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.tree.delta%.median     hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       351.474                       %
+WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC.tree.delta%.sd         hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         5.651                       %
+WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC/kinst                  hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         4.927                 #/kinst
+WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE                             hash  100000  hash=hash|linked=linked|tree=tree  avgt    9  17893175.084                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.hash                        hash  100000  hash=hash|linked=linked|tree=tree  avgt    9  13413582.999                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.linked                      hash  100000  hash=hash|linked=linked|tree=tree  avgt    9  13761179.324                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.linked.delta%               hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         2.593                       %
+WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.linked.delta%.median        hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         2.753                       %
+WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.linked.delta%.sd            hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         0.468                       %
+WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.tree                        hash  100000  hash=hash|linked=linked|tree=tree  avgt    9  48228807.502                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.tree.delta%                 hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       259.546                       %
+WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.tree.delta%.median          hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       259.922                       %
+WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE.tree.delta%.sd              hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         1.867                       %
+WordCountBenchmark.countAndLookUp:xctrace.INST_ALL                                      hash  100000  hash=hash|linked=linked|tree=tree  avgt    9  50296071.141                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.hash                                 hash  100000  hash=hash|linked=linked|tree=tree  avgt    9  42119419.504                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.linked                               hash  100000  hash=hash|linked=linked|tree=tree  avgt    9  44828789.431                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.linked.delta%                        hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         6.441                       %
+WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.linked.delta%.median                 hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         6.029                       %
+WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.linked.delta%.sd                     hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         1.112                       %
+WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.tree                                 hash  100000  hash=hash|linked=linked|tree=tree  avgt    9  98454015.112                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.tree.delta%                          hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       133.754                       %
+WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.tree.delta%.median                   hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       134.013                       %
+WordCountBenchmark.countAndLookUp:xctrace.INST_ALL.tree.delta%.sd                       hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         0.783                       %
+WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH                                   hash  100000  hash=hash|linked=linked|tree=tree  avgt    9  10855439.760                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.hash                              hash  100000  hash=hash|linked=linked|tree=tree  avgt    9   8290215.723                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.linked                            hash  100000  hash=hash|linked=linked|tree=tree  avgt    9   9015392.863                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.linked.delta%                     hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         8.756                       %
+WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.linked.delta%.median              hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         8.320                       %
+WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.linked.delta%.sd                  hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         1.144                       %
+WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.tree                              hash  100000  hash=hash|linked=linked|tree=tree  avgt    9  26398634.327                    #/op
+WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.tree.delta%                       hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       218.437                       %
+WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.tree.delta%.median                hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       218.775                       %
+WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH.tree.delta%.sd                    hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         1.085                       %
+WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH/kinst                             hash  100000  hash=hash|linked=linked|tree=tree  avgt    9       215.831                 #/kinst
+WordCountBenchmark.countAndLookUp:xctrace.IPC.bench                                     hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         2.811               insts/clk
+WordCountBenchmark.countAndLookUp:xctrace.IPC.gc                                        hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         1.792               insts/clk
+WordCountBenchmark.countAndLookUp:xctrace.IPC.jit                                       hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         2.454               insts/clk
+WordCountBenchmark.countAndLookUp:xctrace.IPC.other                                     hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         3.167               insts/clk
+WordCountBenchmark.countAndLookUp:xctrace.bench.oncpu                                   hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         9.037                       s
+WordCountBenchmark.countAndLookUp:xctrace.cycles%.bench                                 hash  100000  hash=hash|linked=linked|tree=tree  avgt    9        98.525                       %
+WordCountBenchmark.countAndLookUp:xctrace.cycles%.gc                                    hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         0.354                       %
+WordCountBenchmark.countAndLookUp:xctrace.cycles%.jit                                   hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         0.769                       %
+WordCountBenchmark.countAndLookUp:xctrace.cycles%.other                                 hash  100000  hash=hash|linked=linked|tree=tree  avgt    9         0.352                       %
+
+Benchmark result is saved to ~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps-counters/100000/paired/1/result.json

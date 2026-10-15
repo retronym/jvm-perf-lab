@@ -1,0 +1,70 @@
+
+== INST_ALL (bench threads)
+   46.8%  java.util.HashMap.merge
+   41.5%  sample.WordCountBenchmark.countAndLookUp
+    5.2%  java.util.HashMap.resize
+    3.4%  java.lang.String.hashCode
+    2.7%  java.lang.StringLatin1.hashCode
+    0.1%  sample.WordCount.contains
+    0.1%  <unknown 0x120e10b01>
+    0.0%  pthread_jit_write_protect_np
+    0.0%  frame::sender_raw(RegisterMap*) const
+    0.0%  <unknown 0x120de2665>
+    0.0%  G1Allocator::unsafe_max_tlab_alloc()
+    0.0%  <unknown 0x120e1368d>
+
+== INST_BRANCH (bench threads)
+   46.8%  java.util.HashMap.merge
+   41.6%  sample.WordCountBenchmark.countAndLookUp
+    5.1%  java.util.HashMap.resize
+    3.4%  java.lang.String.hashCode
+    2.7%  java.lang.StringLatin1.hashCode
+    0.1%  sample.WordCount.contains
+    0.1%  <unknown 0x120e10b01>
+    0.0%  pthread_jit_write_protect_np
+    0.0%  <unknown 0x120de2665>
+    0.0%  G1Allocator::unsafe_max_tlab_alloc()
+    0.0%  frame::sender_raw(RegisterMap*) const
+    0.0%  <unknown 0x120e1368d>
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   47.6%  java.util.HashMap.merge
+   41.0%  sample.WordCountBenchmark.countAndLookUp
+    4.9%  java.util.HashMap.resize
+    3.2%  java.lang.String.hashCode
+    2.9%  java.lang.StringLatin1.hashCode
+    0.2%  sample.WordCount.contains
+    0.1%  <unknown 0x120e10b01>
+    0.1%  <unknown 0x120de2665>
+    0.0%  pthread_jit_write_protect_np
+    0.0%  <unknown 0x120e1368d>
+    0.0%  ImmutableOopMapSet::find_map_at_offset(int) const
+    0.0%  G1Allocator::unsafe_max_tlab_alloc()
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   45.9%  java.util.HashMap.merge
+   41.2%  sample.WordCountBenchmark.countAndLookUp
+    6.4%  java.util.HashMap.resize
+    3.4%  java.lang.String.hashCode
+    2.7%  java.lang.StringLatin1.hashCode
+    0.1%  sample.WordCount.contains
+    0.1%  <unknown 0x120e10b01>
+    0.1%  frame::sender_raw(RegisterMap*) const
+    0.0%  pthread_jit_write_protect_np
+    0.0%  <unknown 0x120e1368d>
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  <unknown 0x120de2665>
+
+== samples (bench threads)
+   50.2%  java.util.HashMap.merge
+   38.5%  sample.WordCountBenchmark.countAndLookUp
+    4.8%  java.util.HashMap.resize
+    3.3%  java.lang.String.hashCode
+    2.7%  java.lang.StringLatin1.hashCode
+    0.2%  sample.WordCount.contains
+    0.0%  pthread_jit_write_protect_np
+    0.0%  <unknown 0x120de2665>
+    0.0%  <unknown 0x120e10b01>
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  <unknown 0x120e1368d>
+    0.0%  frame::sender_raw(RegisterMap*) const

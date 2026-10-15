@@ -1,0 +1,48 @@
+[xctrace] Starting recording with the perflab-ipc-17795018869699561424.template template. Attaching to: java (10389). 
+[xctrace] Ctrl-C to stop the recording
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   543 /   130.6 /    8
+  WARMUP        2:    85 /    91.5 /    2
+  WARMUP        3:    10 /     8.3 /    1
+  MEASUREMENT   4:     1 /     0.1 /    0
+  MEASUREMENT   5:     8 /     1.6 /    0
+  MEASUREMENT   6:    25 /     3.1 /    0
+  MEASUREMENT   7:     6 /     0.6 /    0
+  MEASUREMENT   8:    10 /     1.7 /    0
+[jit] compiled while measuring:
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.String.<init> (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.String.getBytesNoRepl1 (tier 3)
+     1  java.lang.String.isASCII (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+     1  java.lang.System$2.getBytesNoRepl (tier 3)
+     1  java.lang.System$2.getCarrierThreadLocal (tier 3)
+     1  java.lang.ThreadLocal.get (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-sumAbove-10389.txt
+[xctrace] code map: 3308 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: sumAbove-10389.trace
+
+== INST_ALL (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+
+== INST_BRANCH (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+
+== samples (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove

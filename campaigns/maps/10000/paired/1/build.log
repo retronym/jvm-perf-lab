@@ -1,0 +1,38 @@
+
+[perflab] WordCountBenchmark(10000) in pid 67078, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps/10000/paired/1/gc.log:time,uptime, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps/10000/paired/1, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh16647278486826768055compilecommand]
+[perflab] paired paired. (us/op): hash 176.2 linked 196.0 (+11.26% ± 3.11, median +11.26%, 2 pairs) tree 411.6 (+133.68% ± 3.61, median +133.68%, 2 pairs)
+[perflab] paired paired.gcFree. (us/op): hash 175.7 linked 195.6 (+11.31% ± 3.20, median +11.31%, 2 pairs) tree 411.2 (+134.03% ± 3.78, median +134.03%, 2 pairs)
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   709 /   260.7 /   13
+  WARMUP        2:    62 /    54.6 /   19
+  WARMUP        3:    64 /    50.2 /   12
+  WARMUP        4:    10 /     5.4 /    1
+  WARMUP        5:    17 /     3.4 /    0
+  WARMUP        6:    16 /     1.3 /    0
+  MEASUREMENT   7:    11 /     1.6 /    0
+  MEASUREMENT   8:     3 /     1.6 /    0
+  MEASUREMENT   9:     4 /     4.4 /    0
+  MEASUREMENT  10:     5 /     0.3 /    0
+  MEASUREMENT  11:    13 /     1.9 /    0
+  MEASUREMENT  12:    24 /     3.5 /    3
+[jit] compiled while measuring:
+     2  java.lang.invoke.MethodHandleImpl.makePairwiseConvert (tier 3)
+     1  java.io.ObjectOutputStream$HandleTable.assign (tier 3)
+     1  java.io.ObjectOutputStream.writeClassDesc (tier 3)
+     1  java.io.ObjectOutputStream.writeSerialData (tier 3)
+     1  java.io.ObjectStreamClass.checkSerialize (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.Math.min (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.String.getBytesNoRepl1 (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+     1  java.lang.StringBuilder.charAt (tier 3)
+     1  java.lang.System$2.getBytesNoRepl (tier 3)
+     1  java.lang.System$2.getCarrierThreadLocal (tier 3)
+     1  java.lang.ThreadLocal.get (tier 3)
+[jit] deoptimized while measuring:
+     2  java.util.TreeMap.compare (c2: class_check, maybe_recompile)
+     1  java.util.TreeMap.rotateLeft (c2: unstable_if, reinterpret)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-67078.txt

@@ -1,0 +1,20 @@
+
+== INST_ALL (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x120610b01>
+
+== L1D_CACHE_MISS_LD_NONSPEC (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x120610b01>
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x120610b01>
+
+== LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x120610b01>
+
+== samples (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x120610b01>

@@ -1,0 +1,21 @@
+-o
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-random-xctrace-ipc/jmh.log
+-rf
+json
+-rff
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-random-xctrace-ipc/result.json
+-prof
+io.github.retronym.perflab.xctrace.XctraceProfiler:template=ipc;dir=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-random-xctrace-ipc
+-jvmArgsAppend
+-Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-random-xctrace-ipc -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-random-xctrace-ipc/gc-%p.log:time,uptime
+-wi
+3
+-i
+5
+-w
+1
+-r
+1
+-p
+data=random
+BranchBenchmark

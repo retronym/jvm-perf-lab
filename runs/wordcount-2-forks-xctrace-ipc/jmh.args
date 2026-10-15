@@ -1,0 +1,25 @@
+-o
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-2-forks-xctrace-ipc/jmh.log
+-rf
+json
+-rff
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-2-forks-xctrace-ipc/result.json
+-prof
+io.github.retronym.perflab.xctrace.XctraceProfiler:template=ipc;dir=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-2-forks-xctrace-ipc
+-jvmArgsAppend
+-Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-2-forks-xctrace-ipc -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-2-forks-xctrace-ipc/gc-%p.log:time,uptime
+-f
+2
+-wi
+3
+-i
+5
+-w
+1
+-r
+1
+-p
+size=100000
+-p
+map=hash
+WordCountBenchmark

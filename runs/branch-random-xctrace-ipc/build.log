@@ -1,0 +1,56 @@
+[xctrace] Starting recording with the perflab-ipc-1143599003235082726.template template. Attaching to: java (10027). 
+[xctrace] Ctrl-C to stop the recording
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   531 /   147.7 /    8
+  WARMUP        2:    81 /    92.8 /    2
+  WARMUP        3:    10 /     3.0 /    1
+  MEASUREMENT   4:     4 /     0.2 /    0
+  MEASUREMENT   5:    11 /     1.6 /    0
+  MEASUREMENT   6:    16 /     2.6 /    0
+  MEASUREMENT   7:     6 /     1.4 /    0
+  MEASUREMENT   8:    12 /     3.2 /    0
+[jit] compiled while measuring:
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.String.<init> (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.String.getBytesNoRepl1 (tier 3)
+     1  java.lang.StringBuilder.charAt (tier 3)
+     1  java.lang.System$2.getBytesNoRepl (tier 3)
+     1  java.lang.System$2.getCarrierThreadLocal (tier 3)
+     1  java.lang.ThreadLocal.get (tier 3)
+     1  java.lang.ThreadLocal.getCarrierThreadLocal (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-sumAbove-10027.txt
+[xctrace] code map: 3296 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Run issues were detected (trace is still ready to be viewed):
+[xctrace] * [Warning] Lost events were detected. Data rate might be too high. Trying with another recording mode might solve this issue.
+[xctrace] 
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: sumAbove-10027.trace
+
+== INST_ALL (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x124dddf11>
+
+== INST_BRANCH (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x124dddf11>
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x124dddf11>
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x124dddf11>
+
+== samples (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x124dddf11>

@@ -1,0 +1,27 @@
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   527 /   163.3 /   12
+  WARMUP        2:    98 /   107.9 /    3
+  WARMUP        3:    13 /     1.6 /    1
+  MEASUREMENT   4:     1 /     0.1 /    0
+  MEASUREMENT   5:     8 /     0.3 /    0
+  MEASUREMENT   6:    17 /     3.1 /    0
+  MEASUREMENT   7:     3 /     0.6 /    0
+  MEASUREMENT   8:     6 /     1.6 /    0
+[jit] compiled while measuring:
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+     1  java.nio.Buffer.position (tier 1)
+     1  java.nio.ByteBuffer.limit (tier 3)
+     1  java.nio.ByteBuffer.position (tier 3)
+     1  java.util.BitSet.set (tier 4)
+     1  java.util.Collection.stream (tier 3)
+     1  java.util.Collections$1.hasNext (tier 1)
+     1  java.util.concurrent.locks.AbstractOwnableSynchronizer.getExclusiveOwnerThread (tier 1)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-chase-9487.txt

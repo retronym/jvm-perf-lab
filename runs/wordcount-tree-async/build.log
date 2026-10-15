@@ -1,0 +1,29 @@
+
+[perflab] WordCountBenchmark(100000) in pid 8553, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-tree-async, -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-tree-async/gc-%p.log:time,uptime, -XX:+UnlockDiagnosticVMOptions, -XX:+DebugNonSafepoints, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh4215894791350010563compilecommand]
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   769 /   308.0 /   14
+  WARMUP        2:    21 /    25.3 /    7
+  WARMUP        3:    12 /     3.8 /    1
+  MEASUREMENT   4:     8 /     0.9 /    0
+  MEASUREMENT   5:    11 /     1.9 /    0
+  MEASUREMENT   6:     7 /     0.5 /    0
+  MEASUREMENT   7:    11 /     2.5 /    0
+  MEASUREMENT   8:     6 /     0.6 /    0
+[jit] compiled while measuring:
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.Byte.valueOf (tier 3)
+     1  java.lang.Long.stringSize (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.String.isASCII (tier 3)
+     1  java.lang.System$2.getBytesNoRepl (tier 3)
+     1  java.lang.invoke.Invokers$Holder.linkToTargetMethod (tier 4)
+     1  java.nio.Buffer.limit (tier 3)
+     1  java.nio.Buffer.position (tier 1)
+     1  java.nio.ByteBuffer.limit (tier 3)
+     1  java.nio.ByteBuffer.position (tier 3)
+     1  java.util.Collection.stream (tier 3)
+     1  java.util.Collections$1.hasNext (tier 1)
+     1  java.util.Collections$SingletonSet.contains (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-8553.txt

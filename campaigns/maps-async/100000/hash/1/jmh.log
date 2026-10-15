@@ -1,0 +1,146 @@
+# JMH version: 1.37
+# VM version: JDK 21.0.12.1, OpenJDK 64-Bit Server VM, 21.0.12.1+1-LTS
+# VM invoker: ~/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java
+# VM options: -Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps-async/100000/hash/1
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 4 iterations, 1 s each
+# Measurement: 6 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: sample.WordCountBenchmark.countAndLookUp
+# Parameters: (map = hash, size = 100000, variants = )
+
+# Run progress: 0.00% complete, ETA 00:00:10
+# Fork: 1 of 1
+# Preparing profilers: AsyncProfiler 
+# Warmup Iteration   1: 3356.718 us/op
+# Warmup Iteration   2: 3191.451 us/op
+# Warmup Iteration   3: 3160.528 us/op
+# Warmup Iteration   4: 3119.571 us/op
+Iteration   1: 3179.196 us/op
+                 gc.alloc.rate:      1012.861 MB/sec
+                 gc.alloc.rate.norm: 3378629.968 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   2: 3138.930 us/op
+                 gc.alloc.rate:      1025.910 MB/sec
+                 gc.alloc.rate.norm: 3378627.675 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   3: 3102.618 us/op
+                 gc.alloc.rate:      1037.872 MB/sec
+                 gc.alloc.rate.norm: 3378609.852 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   4: 3110.718 us/op
+                 gc.alloc.rate:      1035.196 MB/sec
+                 gc.alloc.rate.norm: 3378621.424 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 3135.338 us/op
+                 gc.alloc.rate:      1027.003 MB/sec
+                 gc.alloc.rate.norm: 3378612.785 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   6: 3201.604 us/op
+                 async:                       (text only)
+                 gc.alloc.rate:               400.401 MB/sec
+                 gc.alloc.rate.norm:          3381687.490 B/op
+                 gc.count:                    2.000 counts
+                 gc.time:                     2.000 ms
+                 jit.compilations:            67.000 #
+                 jit.compileTime:             14.731 ms
+                 jit.deopts:                  ≈ 0 #
+                 jit.lastWarmup.compilations: 15.000 #
+                 jit.lastWarmup.deopts:       1.000 #
+
+# Processing profiler results: AsyncProfiler 
+
+
+Result "sample.WordCountBenchmark.countAndLookUp":
+  3144.734 ±(99.9%) 108.422 us/op [Average]
+  (min, avg, max) = (3102.618, 3144.734, 3201.604), stdev = 38.664
+  CI (99.9%): [3036.312, 3253.156] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:async":
+Async profiler results:
+  ~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps-async/100000/hash/1/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-hash-size-100000-variants-/jfr-cpu.jfr
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.alloc.rate":
+  923.207 ±(99.9%) 718.633 MB/sec [Average]
+  (min, avg, max) = (400.401, 923.207, 1037.872), stdev = 256.272
+  CI (99.9%): [204.574, 1641.840] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.alloc.rate.norm":
+  3379131.532 ±(99.9%) 3511.357 B/op [Average]
+  (min, avg, max) = (3378609.852, 3379131.532, 3381687.490), stdev = 1252.184
+  CI (99.9%): [3375620.176, 3382642.889] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.count":
+  10.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (1.000, 1.667, 2.000), stdev = 0.516
+  CI (99.9%): [10.000, 10.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.time":
+  10.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (1.000, 1.667, 2.000), stdev = 0.516
+  CI (99.9%): [10.000, 10.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.compilations":
+  67.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 11.167, 67.000), stdev = 27.353
+  CI (99.9%): [67.000, 67.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.compileTime":
+  14.731 ±(99.9%) 0.001 ms [Maximum]
+  (min, avg, max) = (≈ 0, 2.455, 14.731), stdev = 6.014
+  CI (99.9%): [14.731, 14.731] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.deopts":
+  ≈ 0 #
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.lastWarmup.compilations":
+  15.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 2.500, 15.000), stdev = 6.124
+  CI (99.9%): [15.000, 15.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.lastWarmup.deopts":
+  1.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 0.167, 1.000), stdev = 0.408
+  CI (99.9%): [1.000, 1.000] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:12
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                      (map)  (size)  (variants)  Mode  Cnt        Score      Error   Units
+WordCountBenchmark.countAndLookUp                               hash  100000              avgt    6     3144.734 ±  108.422   us/op
+WordCountBenchmark.countAndLookUp:async                         hash  100000              avgt               NaN                ---
+WordCountBenchmark.countAndLookUp:gc.alloc.rate                 hash  100000              avgt    6      923.207 ±  718.633  MB/sec
+WordCountBenchmark.countAndLookUp:gc.alloc.rate.norm            hash  100000              avgt    6  3379131.532 ± 3511.357    B/op
+WordCountBenchmark.countAndLookUp:gc.count                      hash  100000              avgt    6       10.000             counts
+WordCountBenchmark.countAndLookUp:gc.time                       hash  100000              avgt    6       10.000                 ms
+WordCountBenchmark.countAndLookUp:jit.compilations              hash  100000              avgt    6       67.000                  #
+WordCountBenchmark.countAndLookUp:jit.compileTime               hash  100000              avgt    6       14.731                 ms
+WordCountBenchmark.countAndLookUp:jit.deopts                    hash  100000              avgt    6          ≈ 0                  #
+WordCountBenchmark.countAndLookUp:jit.lastWarmup.compilations   hash  100000              avgt    6       15.000                  #
+WordCountBenchmark.countAndLookUp:jit.lastWarmup.deopts         hash  100000              avgt    6        1.000                  #
+
+Benchmark result is saved to ~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps-async/100000/hash/1/result.json

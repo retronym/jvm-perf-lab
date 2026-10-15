@@ -1,0 +1,73 @@
+[xctrace] Starting recording with the perflab-ipc-12841415373322650743.template template. Attaching to: java (80306). 
+[xctrace] Ctrl-C to stop the recording
+[perflab] paired paired. (us/op): sorted 257.4 random 2143 (+732.29% ± 13.14, median +729.35%, 4 pairs)
+[perflab] paired paired.gcFree. (us/op): sorted 257.4 random 2143 (+732.29% ± 13.14, median +729.35%, 4 pairs)
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   538 /   138.7 /    8
+  WARMUP        2:    83 /    91.6 /    2
+  WARMUP        3:    16 /     8.8 /    1
+  WARMUP        4:    12 /     1.2 /    1
+  MEASUREMENT   5:    17 /     3.2 /    0
+  MEASUREMENT   6:    20 /     1.4 /    0
+  MEASUREMENT   7:     7 /     0.4 /    0
+  MEASUREMENT   8:     8 /     1.5 /    0
+  MEASUREMENT   9:     9 /     1.5 /    0
+  MEASUREMENT  10:     6 /     0.3 /    0
+  MEASUREMENT  11:    20 /     4.1 /    0
+  MEASUREMENT  12:    14 /     1.6 /    0
+[jit] compiled while measuring:
+     2  java.nio.ByteBuffer.wrap (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$HandleTable.assign (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeClassDesc (tier 3)
+     1  java.io.ObjectOutputStream.writeHandle (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectOutputStream.writeOrdinaryObject (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.getClassDataLayout (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.io.ObjectStreamClass.isExternalizable (tier 3)
+     1  java.io.ObjectStreamClass.isRecord (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.Long.stringSize (tier 4)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-sumAbove-80306.txt
+[xctrace] code map: 3401 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: sumAbove-80306.trace
+
+== INST_ALL (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x1225d519d>
+    0.0%  javax.management.ObjectName.construct
+    0.0%  <unknown 0x1225d504d>
+
+== INST_BRANCH (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x1225d519d>
+    0.0%  javax.management.ObjectName.construct
+    0.0%  <unknown 0x1225d504d>
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x1225d519d>
+    0.0%  javax.management.ObjectName.construct
+    0.0%  <unknown 0x1225d504d>
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x1225d504d>
+    0.0%  javax.management.ObjectName.construct
+    0.0%  <unknown 0x1225d519d>
+
+== samples (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x1225d519d>
+    0.0%  javax.management.ObjectName.construct
+    0.0%  <unknown 0x1225d504d>
+[perflab] paired xctrace.INST_ALL. (#/op): sorted 6.495e+06 random 6.449e+06 (-0.69% ± 1.33, median -0.37%, 4 pairs)
+[perflab] paired xctrace.INST_BRANCH. (#/op): sorted 1.748e+06 random 1.736e+06 (-0.69% ± 1.33, median -0.37%, 4 pairs)
+[perflab] paired xctrace.CORE_ACTIVE_CYCLE. (#/op): sorted 1.102e+06 random 9.127e+06 (+728.08% ± 4.63, median +728.57%, 4 pairs)
+[perflab] paired xctrace.BRANCH_MISPRED_NONSPEC. (#/op): sorted 256.6 random 4.572e+05 (+178051.97% ± 1119.72, median +178068.67%, 4 pairs)

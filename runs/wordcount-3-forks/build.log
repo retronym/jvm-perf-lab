@@ -1,0 +1,87 @@
+
+[perflab] WordCountBenchmark(100000) in pid 11037, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-3-forks, -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-3-forks/gc-%p.log:time,uptime, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh7720947364131169997compilecommand]
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   832 /   250.7 /    8
+  WARMUP        2:    39 /    87.6 /    3
+  WARMUP        3:    14 /    11.5 /    2
+  MEASUREMENT   4:    11 /     2.4 /    0
+  MEASUREMENT   5:     7 /     1.6 /    0
+  MEASUREMENT   6:     8 /     0.9 /    0
+  MEASUREMENT   7:     8 /     0.5 /    0
+  MEASUREMENT   8:     7 /     0.7 /    0
+[jit] compiled while measuring:
+     2  jdk.internal.misc.Unsafe.putIntUnaligned (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.forClass (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.lang.Byte.valueOf (tier 3)
+     1  java.lang.Integer.stringSize (tier 3)
+     1  java.lang.Math.min (tier 3)
+     1  java.lang.invoke.Invokers$Holder.linkToTargetMethod (tier 4)
+     1  java.nio.Buffer.capacity (tier 1)
+     1  java.nio.Buffer.position (tier 1)
+     1  java.nio.ByteBuffer.limit (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-11037.txt
+
+[perflab] WordCountBenchmark(100000) in pid 11238, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-3-forks, -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-3-forks/gc-%p.log:time,uptime, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh7720947364131169997compilecommand]
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   842 /   292.2 /    9
+  WARMUP        2:    26 /    22.4 /    3
+  WARMUP        3:    17 /    12.7 /    1
+  MEASUREMENT   4:     7 /     0.6 /    0
+  MEASUREMENT   5:     8 /     1.5 /    0
+  MEASUREMENT   6:     5 /     0.3 /    0
+  MEASUREMENT   7:     8 /     0.5 /    0
+  MEASUREMENT   8:     7 /     0.8 /    0
+[jit] compiled while measuring:
+     2  jdk.internal.misc.Unsafe.putIntUnaligned (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.forClass (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.lang.Byte.valueOf (tier 3)
+     1  java.lang.invoke.Invokers$Holder.linkToTargetMethod (tier 4)
+     1  java.nio.Buffer.capacity (tier 1)
+     1  java.nio.Buffer.position (tier 1)
+     1  java.nio.ByteBuffer.position (tier 3)
+     1  java.util.ArrayList.addAll (tier 3)
+     1  java.util.Collection.stream (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-11238.txt
+
+[perflab] WordCountBenchmark(100000) in pid 11274, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-3-forks, -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-3-forks/gc-%p.log:time,uptime, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh7720947364131169997compilecommand]
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   831 /   270.7 /    9
+  WARMUP        2:    30 /    19.7 /    3
+  WARMUP        3:    17 /    12.7 /    2
+  MEASUREMENT   4:     6 /     0.3 /    0
+  MEASUREMENT   5:     9 /     1.7 /    0
+  MEASUREMENT   6:     5 /     0.4 /    0
+  MEASUREMENT   7:    10 /     1.1 /    0
+  MEASUREMENT   8:     7 /     0.9 /    0
+[jit] compiled while measuring:
+     2  jdk.internal.misc.Unsafe.putIntUnaligned (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.forClass (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.lang.Byte.valueOf (tier 3)
+     1  java.lang.invoke.DirectMethodHandle$Holder.invokeSpecial (tier 3)
+     1  java.lang.invoke.Invokers$Holder.linkToTargetMethod (tier 4)
+     1  java.nio.Buffer.capacity (tier 1)
+     1  java.nio.Buffer.position (tier 1)
+     1  java.nio.ByteBuffer.limit (tier 3)
+     1  java.nio.ByteBuffer.position (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-11274.txt

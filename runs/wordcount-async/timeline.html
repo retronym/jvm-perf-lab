@@ -1,0 +1,209 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Timeline</title>
+<style>
+:root { --bg:#f6f7f9; --panel:#fff; --fg:#1d232b; --muted:#5d6875; --line:#dde2e8; }
+@media (prefers-color-scheme: dark) { :root { --bg:#14181d; --panel:#1b2027; --fg:#e3e8ee; --muted:#94a0ad; --line:#2c333c; color-scheme:dark; } }
+body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.45 -apple-system,system-ui,sans-serif; }
+main { padding:16px; } h1 { font-size:16px; margin:0 0 4px; overflow-wrap:anywhere; } .k { color:var(--muted); font-size:12px; }
+
+:root { --life:#9aa5b1; --v0:#2f6fb2; --v1:#c2571a; --v2:#2e8a57; --v3:#8a4fbf; --v4:#b8860b; --v5:#3a9aa6; --pause:#d33; --grey:#c3c9d1; }
+@media (prefers-color-scheme: dark) { :root { --v0:#6ea8e6; --v1:#e58a4e; --v2:#5cc08a; --v3:#b58ae6; --v4:#e0b84a; --v5:#6cc6d1;
+  --pause:#ff6b6b; --grey:#46505c; --life:#5f6b78; } }
+svg.timeline { background:var(--panel); border:1px solid var(--line); border-radius:8px; width:100%; touch-action:none; cursor:grab; display:block; }
+svg.timeline text { fill:var(--fg); font-size:11px; } svg.timeline .lab { fill:var(--muted); } svg.timeline .grid { stroke:var(--line); }
+.tl-legend span { display:inline-block; margin-right:12px; font-size:12px; }
+.tl-legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+.tl-tip { position:fixed; pointer-events:none; background:var(--panel); border:1px solid var(--line); border-radius:6px;
+  padding:4px 8px; font-size:12px; display:none; max-width:360px; z-index:5; }
+
+</style>
+<main><h1>out/runs/wordcount-async</h1>
+<p class="k">Each fork from JVM start to exit, on the wall clock: startup (JVM boot and benchmark setup), iterations,
+exit, and GC pauses. Wheel or pinch to zoom, drag to pan, double-click to reset. With xctrace, counter lanes cover the
+measurement iterations (xctrace records those); cycles are per second, so one busy performance core is about 4–4.5 G.</p>
+<div class="tl-legend" id="legend"></div><svg class="timeline" id="chart"></svg></main><div class="tl-tip" id="tip"></div>
+<script>// A benchmark fork's timeline: its iterations (coloured by variant when variants alternate within the fork) and, on the
+// same wall-clock axis, what the machine did meanwhile. Reads a cell's files as written by the fork and `perflab ab`:
+//   iterations.tsv  every iteration as it finishes: index, kind, variant, start_ms, end_ms, score, ops, gc_ms, pid, unit;
+//                   all forks of a run append to it; kind "startup" (JVM start to the first iteration) and "exit"
+//                   (the last iteration to JVM exit) give each fork's lifetime
+//   timeline.tsv    per 50 ms: cycles and instructions of the benchmark thread, JIT, GC, other threads of the fork and
+//                   other processes (from xctrace, so only once the fork has finished)
+//   gc.log          -Xlog:gc with wall-clock `time` decorations: pauses (a run's forks' logs concatenated)
+//   load.tsv        the load gate's 5 s samples of other processes' CPU, in cores
+// Used by timeline.py (a page per cell) and index.py (a live panel in index.html).
+const BenchTimeline = (() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const BIN_MS = 50;
+
+  function tsv(text) {
+    if (!text) return [];
+    const lines = text.split('\n').filter(l => l.trim());
+    if (!lines.length) return [];
+    const head = lines[0].split('\t');
+    return lines.slice(1).map(l => Object.fromEntries(l.split('\t').map((v, i) => [head[i], v])));
+  }
+
+  function parse(f) {
+    const iters = tsv(f.iterations).map(r => ({i: +r.index, kind: r.kind, variant: r.variant, s: +r.start_ms, e: +r.end_ms,
+      score: +r.score, gc: r.gc_ms === '' || r.gc_ms == null ? null : +r.gc_ms, pid: r.pid || '', unit: r.unit || 'ms/op'}));
+    // forks in the order they ran, numbered from 1
+    const pids = [...new Set(iters.slice().sort((a, b) => a.s - b.s).map(i => i.pid))];
+    for (const it of iters) it.fork = pids.indexOf(it.pid) + 1;
+    const series = tsv(f.timeline).map(b => ({t: +b.bin_ms, bench_c: +b.bench_cycles, bench_i: +b.bench_inst, jit_c: +b.jit_cycles,
+      gc_c: +b.gc_cycles, other_c: +b.other_cycles, processes_c: +b.processes_cycles}));
+    const pauses = [];
+    for (const line of (f.gc || '').split('\n')) {
+      const m = line.match(/^\[([^\]]+)\]\[[^\]]+\].*?(Pause[^(]*(?:\([^)]*\))*).*?([\d.]+)ms\s*$/);
+      if (!m) continue;
+      const end = Date.parse(m[1].replace(/([+-]\d\d)(\d\d)$/, '$1:$2'));
+      if (!isNaN(end)) pauses.push({s: end - +m[3], e: end, what: m[2].trim()});
+    }
+    const load = (f.load || '').split('\n').map(l => l.split('\t')).filter(p => p.length >= 2 && p[0])
+      .map(p => ({t: +p[0] * 1000, cores: +p[1], top: p[2] || ''}));
+    return {iters, series, pauses, load};
+  }
+
+  async function fetchCell(base) {
+    const get = async n => { try { const r = await fetch(base + n, {cache: 'no-store'}); return r.ok ? await r.text() : ''; } catch (e) { return ''; } };
+    const [iterations, timeline, gc, load] = await Promise.all(['iterations.tsv', 'timeline.tsv', 'gc.log', 'load.tsv'].map(get));
+    return parse({iterations, timeline, gc, load});
+  }
+
+  function mount(svg, legend, tip) {
+    let D = {iters: [], series: [], pauses: [], load: []}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
+    const L = 150, R = 16;
+    const counterRows = [
+      {name: 'iterations', h: 46},
+      {name: 'benchmark thread', h: 80, key: 'bench_c', unit: 'G cycles/s'},
+      {name: 'IPC (benchmark)', h: 56, ipc: true},
+      {name: 'GC threads', h: 70, key: 'gc_c', unit: 'G cycles/s', pauses: true},
+      {name: 'JIT threads', h: 56, key: 'jit_c', unit: 'G cycles/s'},
+      {name: 'other in fork', h: 46, key: 'other_c', unit: 'G cycles/s'},
+      {name: 'other processes', h: 86, key: 'processes_c', unit: 'G cycles/s', load: true},
+    ];
+    // without counters (no xctrace): iterations and GC pauses only, plus the load gate's samples when there are any
+    const plainRows = [{name: 'iterations', h: 46}, {name: 'GC pauses', h: 34, pauses: true}];
+    let rows = counterRows, height = 0;
+    const layout = () => {
+      rows = D.series.length ? counterRows : plainRows.concat(D.load.length ? [{name: 'other processes', h: 60, load: true}] : []);
+      height = rows.reduce((a, r) => a + r.h + 8, 8) + 24;
+    };
+    let variants = [];
+    const color = v => v ? `var(--v${variants.indexOf(v) % 6})` : 'var(--v0)';
+    function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; }
+
+    function draw() {
+      svg.innerHTML = '';
+      const W = svg.clientWidth || 900, X = t => L + (t - x0) / (x1 - x0) * (W - L - R);
+      if (!D.iters.length && !D.series.length) {
+        svg.setAttribute('height', 40);
+        el('text', {x: 12, y: 24, class: 'lab'}).textContent = 'No iterations yet.';
+        return;
+      }
+      layout();
+      svg.setAttribute('height', height);
+      let y = 8;
+      const span = x1 - x0, step = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 60000].find(s => span / s < 12) || 120000;
+      for (let t = Math.ceil((x0 - t0) / step) * step; t0 + t <= x1; t += step) {
+        el('line', {x1: X(t0 + t), x2: X(t0 + t), y1: 0, y2: height - 22, class: 'grid'});
+        el('text', {x: X(t0 + t) + 2, y: height - 8, class: 'lab'}).textContent = (t / 1000).toFixed(step < 1000 ? 1 : 0) + ' s';
+      }
+      for (const r of rows) {
+        el('text', {x: 6, y: y + 14}).textContent = r.name;
+        if (r.unit) el('text', {x: 6, y: y + 28, class: 'lab'}).textContent = r.unit;
+        el('line', {x1: L, x2: W - R, y1: y + r.h, y2: y + r.h, class: 'grid'});
+        if (r.name === 'iterations') {
+          const forks = Math.max(0, ...D.iters.map(i => i.fork));
+          for (const it of D.iters) {
+            if (it.e < x0 || it.s > x1) continue;
+            const a = Math.max(X(it.s), L), b = Math.min(X(it.e), W - R);
+            const life = it.kind === 'startup' || it.kind === 'exit';
+            const fork = forks > 1 ? `fork ${it.fork}: ` : '';
+            const rect = el('rect', {x: a, y: y + (life ? 14 : 6), width: Math.max(1, b - a - 1), height: life ? r.h - 28 : r.h - 12, rx: 2,
+              fill: life ? 'var(--life)' : it.kind === 'warmup' ? 'var(--grey)' : color(it.variant)});
+            rect.dataset.tip = life
+              ? `${fork}${it.kind === 'startup' ? 'JVM start to first iteration (JVM boot, benchmark setup)' : 'last iteration to JVM exit'}: ${((it.e - it.s) / 1000).toFixed(2)} s`
+              : `${fork}#${it.i} ${it.kind} ${it.variant || ''}: ${it.score.toFixed(1)} ${it.unit}` + (it.gc != null ? `, GC pauses ${it.gc} ms` : '');
+            if (!life && b - a > 46) el('text', {x: a + 4, y: y + r.h / 2 + 4}).textContent = it.score.toFixed(1);
+          }
+          // each fork's start, labelled when there are several
+          if (forks > 1) for (let f = 1; f <= forks; f++) {
+            const s = Math.min(...D.iters.filter(i => i.fork === f).map(i => i.s));
+            if (s < x0 || s > x1) continue;
+            el('line', {x1: X(s), x2: X(s), y1: 0, y2: height - 22, stroke: 'var(--fg)', 'stroke-width': 1, opacity: 0.35});
+            el('text', {x: X(s) + 2, y: y + r.h + 1, class: 'lab'}).textContent = `fork ${f}`;
+          }
+        } else if (!r.key && !r.ipc) {
+          // pauses / load only
+        } else {
+          const pts = r.ipc ? D.series.map(s => ({t: s.t, v: s.bench_c ? s.bench_i / s.bench_c : null}))
+                            : D.series.map(s => ({t: s.t, v: s[r.key] / (BIN_MS / 1000) / 1e9}));
+          const vis = pts.filter(p => p.t >= x0 - BIN_MS && p.t <= x1 && p.v != null);
+          const max = r.ipc ? Math.max(4, ...vis.map(p => p.v)) : Math.max(0.5, ...vis.map(p => p.v));
+          const Y = v => y + r.h - 4 - v / max * (r.h - 10);
+          el('text', {x: L - 4, y: y + 12, 'text-anchor': 'end', class: 'lab'}).textContent = max.toFixed(1);
+          let d = '', prev = null;
+          // a new segment after a gap (between forks, or between xctrace's recordings)
+          for (const p of vis) { d += (prev == null || p.t - prev > 2 * BIN_MS ? 'M' : 'L') + X(p.t + BIN_MS / 2).toFixed(1) + ',' + Y(p.v).toFixed(1); prev = p.t; }
+          if (d) el('path', {d, fill: 'none', stroke: r.ipc ? 'var(--v2)' : 'var(--v0)', 'stroke-width': 1.2});
+        }
+        if (r.pauses) for (const p of D.pauses) {
+          if (p.e < x0 || p.s > x1) continue;
+          const m = el('rect', {x: X(p.s), y: y + 2, width: Math.max(2, X(p.e) - X(p.s)), height: r.h - 4, fill: 'var(--pause)', opacity: 0.55});
+          m.dataset.tip = `${p.what}: ${(p.e - p.s).toFixed(1)} ms`;
+        }
+        if (r.load && D.load.length) {
+          const lmax = Math.max(2, ...D.load.map(l => l.cores));
+          el('text', {x: W - R - 2, y: y + 12, 'text-anchor': 'end', class: 'lab'}).textContent = `load.tsv: other processes, cores (max ${lmax.toFixed(1)})`;
+          let ld = '';
+          for (const l of D.load) {
+            if (l.t < x0 - 5000 || l.t > x1 + 5000) continue;
+            const yy = y + r.h - 4 - l.cores / lmax * (r.h - 10);
+            const clamp = x => Math.min(Math.max(x, L), W - R);
+            ld += (ld ? 'L' : 'M') + clamp(X(l.t - 5000)).toFixed(1) + ',' + yy.toFixed(1) + 'L' + clamp(X(l.t)).toFixed(1) + ',' + yy.toFixed(1);
+          }
+          if (ld) el('path', {d: ld, fill: 'none', stroke: 'var(--v1)', 'stroke-width': 1.2, 'stroke-dasharray': '4 3'});
+        }
+        y += r.h + 8;
+      }
+    }
+
+    function set(data) {
+      D = data;
+      variants = [...new Set(D.iters.map(i => i.variant).filter(v => v))];
+      const ts = [...D.iters.flatMap(i => [i.s, i.e]), ...D.series.map(s => s.t), ...D.series.map(s => s.t + BIN_MS)];
+      const n0 = ts.length ? Math.min(...ts) : 0, n1 = ts.length ? Math.max(...ts) : 1;
+      // keep a zoomed view where it is as data arrives; otherwise follow the whole range
+      if (!zoomed) { x0 = n0; x1 = Math.max(n1, n0 + 1); }
+      t0 = n0; t1 = Math.max(n1, n0 + 1);
+      if (legend) legend.innerHTML = variants.map(v => `<span><i style="background:${color(v)}"></i>${v}</span>`).join('')
+        + '<span><i style="background:var(--grey)"></i>warmup</span>'
+        + (D.iters.some(i => i.kind === 'startup') ? '<span><i style="background:var(--life)"></i>JVM start / exit</span>' : '') + (D.pauses.length ? '<span><i style="background:var(--pause)"></i>GC pause</span>' : '');
+      draw();
+    }
+
+    svg.addEventListener('wheel', e => { e.preventDefault(); const W = svg.clientWidth, f = Math.exp(e.deltaY * 0.002);
+      const at = x0 + (e.offsetX - L) / (W - L - R) * (x1 - x0); x0 = Math.max(t0, at - (at - x0) * f); x1 = Math.min(t1, at + (x1 - at) * f); zoomed = true; draw(); }, {passive: false});
+    let drag = null;
+    svg.addEventListener('pointerdown', e => { drag = {x: e.clientX, x0, x1}; svg.setPointerCapture(e.pointerId); });
+    svg.addEventListener('pointermove', e => {
+      const t = e.target.dataset && e.target.dataset.tip;
+      if (tip && t && !drag) { tip.textContent = t; tip.style.display = 'block'; tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 12) + 'px'; }
+      else if (tip && !drag) tip.style.display = 'none';
+      if (!drag) return;
+      const W = svg.clientWidth, dt = (e.clientX - drag.x) / (W - L - R) * (drag.x1 - drag.x0), w = drag.x1 - drag.x0;
+      x0 = Math.min(Math.max(t0, drag.x0 - dt), t1 - w); x1 = x0 + w; zoomed = true; draw();
+    });
+    svg.addEventListener('pointerup', () => drag = null);
+    svg.addEventListener('dblclick', () => { zoomed = false; x0 = t0; x1 = t1; draw(); });
+    window.addEventListener('resize', draw);
+    return {set, reset() { zoomed = false; }};
+  }
+
+  return {parse, fetchCell, mount};
+})();
+
+BenchTimeline.mount(document.getElementById('chart'), document.getElementById('legend'), document.getElementById('tip'))
+  .set(BenchTimeline.parse({"iterations": "index\tkind\tvariant\tstart_ms\tend_ms\tscore\tops\tgc_ms\tpid\tunit\n-1\tstartup\t\t1792039317208\t1792039317613\t\t\t\t8093\tus/op\n0\twarmup\t\t1792039317613\t1792039318656\t3861.1700\t261\t\t8093\tus/op\n1\twarmup\t\t1792039318665\t1792039319672\t4125.9484\t244\t\t8093\tus/op\n2\twarmup\t\t1792039319674\t1792039320679\t4151.9563\t242\t\t8093\tus/op\n3\tmeasure\t\t1792039320687\t1792039321691\t4082.6641\t246\t\t8093\tus/op\n4\tmeasure\t\t1792039321693\t1792039322698\t4134.4938\t243\t\t8093\tus/op\n5\tmeasure\t\t1792039322699\t1792039323705\t4007.5903\t251\t\t8093\tus/op\n6\tmeasure\t\t1792039323706\t1792039324717\t3948.6058\t256\t\t8093\tus/op\n7\tmeasure\t\t1792039324718\t1792039325729\t5156.1579\t196\t\t8093\tus/op\n-1\texit\t\t1792039325729\t1792039327247\t\t\t\t8093\tus/op\n", "timeline": "", "gc": "[2026-10-15T14:41:57.197+1000][0.005s] Using G1\n[2026-10-15T14:41:57.671+1000][0.480s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 52M->10M(1024M) 1.979ms\n[2026-10-15T14:41:57.728+1000][0.537s] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 60M->11M(1024M) 1.293ms\n[2026-10-15T14:41:57.815+1000][0.624s] GC(2) Pause Young (Normal) (G1 Evacuation Pause) 91M->10M(1024M) 0.771ms\n[2026-10-15T14:41:58.543+1000][1.352s] GC(3) Pause Young (Normal) (G1 Evacuation Pause) 623M->11M(1024M) 0.914ms\n[2026-10-15T14:41:59.325+1000][2.134s] GC(4) Pause Young (Normal) (G1 Evacuation Pause) 623M->14M(1024M) 1.025ms\n[2026-10-15T14:42:00.068+1000][2.877s] GC(5) Pause Young (Normal) (G1 Evacuation Pause) 623M->14M(1024M) 1.196ms\n[2026-10-15T14:42:00.915+1000][3.724s] GC(6) Pause Young (Normal) (G1 Evacuation Pause) 623M->13M(1024M) 1.095ms\n[2026-10-15T14:42:01.669+1000][4.478s] GC(7) Pause Young (Normal) (G1 Evacuation Pause) 623M->14M(1024M) 0.955ms\n[2026-10-15T14:42:02.444+1000][5.253s] GC(8) Pause Young (Normal) (G1 Evacuation Pause) 623M->13M(1024M) 1.356ms\n[2026-10-15T14:42:03.210+1000][6.018s] GC(9) Pause Young (Normal) (G1 Evacuation Pause) 623M->14M(1024M) 1.424ms\n[2026-10-15T14:42:03.962+1000][6.771s] GC(10) Pause Young (Normal) (G1 Evacuation Pause) 623M->15M(1024M) 0.977ms\n[2026-10-15T14:42:04.696+1000][7.504s] GC(11) Pause Young (Normal) (G1 Evacuation Pause) 624M->14M(1024M) 1.230ms\n[2026-10-15T14:42:05.667+1000][8.476s] GC(12) Pause Young (Normal) (G1 Evacuation Pause) 623M->14M(1024M) 1.227ms\n", "load": ""}));
+</script>

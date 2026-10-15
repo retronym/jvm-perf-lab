@@ -1,0 +1,21 @@
+-o
+~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps/10000/paired/2/jmh.log
+-rf
+json
+-rff
+~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps/10000/paired/2/result.json
+-jvmArgsAppend
+-Xms1G -Xmx1G -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps/10000/paired/2/gc.log:time,uptime -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps/10000/paired/2
+-p
+size=10000
+-wi
+6
+-i
+6
+-w
+1
+-r
+1
+-p
+variants=hash=hash|linked=linked|tree=tree
+WordCountBenchmark

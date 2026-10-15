@@ -1,0 +1,88 @@
+
+[perflab] WordCountBenchmark(100000) in pid 8621, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-tree-xctrace-ipc, -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-tree-xctrace-ipc/gc-%p.log:time,uptime, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh18100816143161408049compilecommand]
+[xctrace] Starting recording with the perflab-ipc-6374873820043833582.template template. Attaching to: java (8621). 
+[xctrace] Ctrl-C to stop the recording
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   719 /   264.1 /   15
+  WARMUP        2:    52 /    55.0 /    2
+  WARMUP        3:    11 /     4.9 /    2
+  MEASUREMENT   4:    12 /     1.6 /    0
+  MEASUREMENT   5:    14 /     2.6 /    0
+  MEASUREMENT   6:    10 /     2.2 /    0
+  MEASUREMENT   7:     8 /     2.4 /    0
+  MEASUREMENT   8:     5 /     2.1 /    0
+[jit] compiled while measuring:
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.String.<init> (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.String.isASCII (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+     1  java.lang.StringBuilder.charAt (tier 3)
+     1  java.lang.System$2.getBytesNoRepl (tier 3)
+     1  java.lang.ThreadLocal$ThreadLocalMap.getEntry (tier 3)
+     1  java.lang.invoke.DirectMethodHandle$Holder.invokeSpecial (tier 3)
+     1  java.lang.invoke.Invokers$Holder.linkToTargetMethod (tier 4)
+     1  java.nio.ByteBuffer.limit (tier 3)
+     1  java.util.ArrayList.addAll (tier 3)
+     1  java.util.Collection.stream (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-8621.txt
+[xctrace] code map: 3421 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Run issues were detected (trace is still ready to be viewed):
+[xctrace] * [Warning] Lost events were detected. Data rate might be too high. Trying with another recording mode might solve this issue.
+[xctrace] 
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: countAndLookUp-8621.trace
+
+== INST_ALL (bench threads)
+   85.8%  java.util.TreeMap.merge
+   12.8%  sample.WordCount.count
+    0.6%  java.util.TreeMap.rotateRight
+    0.5%  java.util.TreeMap.rotateLeft
+    0.2%  java.util.TreeMap.containsKey
+    0.0%  pthread_jit_write_protect_np
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  GenericWaitBarrier::Cell::wait(int)
+
+== INST_BRANCH (bench threads)
+   85.9%  java.util.TreeMap.merge
+   12.8%  sample.WordCount.count
+    0.6%  java.util.TreeMap.rotateRight
+    0.5%  java.util.TreeMap.rotateLeft
+    0.2%  java.util.TreeMap.containsKey
+    0.0%  pthread_jit_write_protect_np
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  GenericWaitBarrier::Cell::wait(int)
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   86.1%  java.util.TreeMap.merge
+   12.6%  sample.WordCount.count
+    0.6%  java.util.TreeMap.rotateRight
+    0.5%  java.util.TreeMap.rotateLeft
+    0.2%  java.util.TreeMap.containsKey
+    0.0%  pthread_jit_write_protect_np
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  GenericWaitBarrier::Cell::wait(int)
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   85.9%  java.util.TreeMap.merge
+   12.7%  sample.WordCount.count
+    0.6%  java.util.TreeMap.rotateRight
+    0.6%  java.util.TreeMap.rotateLeft
+    0.1%  java.util.TreeMap.containsKey
+    0.0%  pthread_jit_write_protect_np
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  GenericWaitBarrier::Cell::wait(int)
+
+== samples (bench threads)
+   86.3%  java.util.TreeMap.merge
+   12.3%  sample.WordCount.count
+    0.6%  java.util.TreeMap.rotateRight
+    0.5%  java.util.TreeMap.rotateLeft
+    0.2%  java.util.TreeMap.containsKey
+    0.0%  pthread_jit_write_protect_np
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  GenericWaitBarrier::Cell::wait(int)

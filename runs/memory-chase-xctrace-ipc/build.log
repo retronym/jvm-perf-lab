@@ -1,0 +1,61 @@
+[xctrace] Starting recording with the perflab-ipc-2865945222984797724.template template. Attaching to: java (9294). 
+[xctrace] Ctrl-C to stop the recording
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   597 /   226.3 /    8
+  WARMUP        2:    95 /    80.9 /    1
+  WARMUP        3:    15 /     9.7 /    1
+  MEASUREMENT   4:     0 /     0.0 /    0
+  MEASUREMENT   5:     5 /     3.8 /    0
+  MEASUREMENT   6:    13 /     2.1 /    0
+  MEASUREMENT   7:     6 /     0.6 /    0
+  MEASUREMENT   8:    11 /     1.1 /    0
+[jit] compiled while measuring:
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+     1  java.lang.StringBuilder.charAt (tier 3)
+     1  java.lang.StringBuilder.toString (tier 4)
+     1  java.lang.System$2.getBytesNoRepl (tier 3)
+     1  java.lang.System$2.getCarrierThreadLocal (tier 3)
+     1  java.lang.ThreadLocal.get (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-chase-9294.txt
+[xctrace] code map: 3354 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Run issues were detected (trace is still ready to be viewed):
+[xctrace] * [Warning] Lost events were detected. Data rate might be too high. Trying with another recording mode might solve this issue.
+[xctrace] 
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: chase-9294.trace
+
+== INST_ALL (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  _sigtramp
+    0.0%  <unknown 0x128a67cbd>
+
+== INST_BRANCH (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  _sigtramp
+    0.0%  <unknown 0x128a67cbd>
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x128a67cbd>
+    0.0%  _sigtramp
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x128a67cbd>
+    0.0%  _sigtramp
+
+== samples (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  _sigtramp
+    0.0%  <unknown 0x128a67cbd>

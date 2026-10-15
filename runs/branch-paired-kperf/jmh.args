@@ -1,0 +1,23 @@
+-o
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-paired-kperf/jmh.log
+-rf
+json
+-rff
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-paired-kperf/result.json
+-prof
+async:output=jfr;dir=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-paired-kperf;libPath=~/code/retronym/jvm-perf-lab/examples/sample/../../tools/build/async-profiler/build/lib/libasyncProfiler.dylib;rawCommand=kperf=/tmp/asprof-kperf.sock;event=cycles+branch-misses
+-jvmArgsPrepend
+-XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -XX:+PreserveFramePointer
+-jvmArgsAppend
+-Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-paired-kperf -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-paired-kperf/gc-%p.log:time,uptime
+-p
+variants=sorted=sorted|random=random
+-wi
+4
+-i
+6
+-w
+1
+-r
+1
+BranchBenchmark

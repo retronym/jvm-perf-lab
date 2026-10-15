@@ -1,0 +1,19 @@
+-o
+~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/gc/10000/g1/2/jmh.log
+-rf
+json
+-rff
+~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/gc/10000/g1/2/result.json
+-jvmArgsAppend
+-Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/gc/10000/g1/2
+-p
+size=10000
+-wi
+5
+-i
+5
+-w
+1
+-r
+1
+WordCountBenchmark

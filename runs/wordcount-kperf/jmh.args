@@ -1,0 +1,25 @@
+-o
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-kperf/jmh.log
+-rf
+json
+-rff
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-kperf/result.json
+-prof
+async:output=jfr;dir=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-kperf;libPath=~/code/retronym/jvm-perf-lab/examples/sample/../../tools/build/async-profiler/build/lib/libasyncProfiler.dylib;rawCommand=kperf=/tmp/asprof-kperf.sock;event=cycles+cache-misses
+-jvmArgsPrepend
+-XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -XX:+PreserveFramePointer
+-jvmArgsAppend
+-Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-kperf -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-kperf/gc-%p.log:time,uptime
+-wi
+3
+-i
+5
+-w
+1
+-r
+1
+-p
+size=100000
+-p
+map=hash
+WordCountBenchmark

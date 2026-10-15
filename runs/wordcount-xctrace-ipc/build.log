@@ -1,0 +1,105 @@
+
+[perflab] WordCountBenchmark(100000) in pid 8357, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-xctrace-ipc, -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-xctrace-ipc/gc-%p.log:time,uptime, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh2442749673530113575compilecommand]
+[xctrace] Starting recording with the perflab-ipc-12499290057202573749.template template. Attaching to: java (8357). 
+[xctrace] Ctrl-C to stop the recording
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   720 /   260.8 /   15
+  WARMUP        2:    48 /    26.0 /    2
+  WARMUP        3:    16 /    15.6 /    1
+  MEASUREMENT   4:     4 /     0.2 /    0
+  MEASUREMENT   5:    17 /     2.7 /    0
+  MEASUREMENT   6:    11 /     2.0 /    0
+  MEASUREMENT   7:     2 /     0.1 /    0
+  MEASUREMENT   8:    13 /     5.8 /    0
+[jit] compiled while measuring:
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.Math.min (tier 3)
+     1  java.lang.String.<init> (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.String.getBytesNoRepl1 (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-8357.txt
+[xctrace] code map: 3406 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: countAndLookUp-8357.trace
+
+== INST_ALL (bench threads)
+   49.5%  java.util.HashMap.merge
+   41.2%  sample.WordCountBenchmark.countAndLookUp
+    5.7%  java.util.HashMap.resize
+    3.3%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.0%  __bzero
+    0.0%  OptoRuntime::new_array_nozero_C(Klass*, int, JavaThread*)
+    0.0%  <unknown 0x123dd9dd9>
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  G1Allocator::unsafe_max_tlab_alloc()
+    0.0%  <unknown 0x123e13689>
+    0.0%  G1NUMA::index_of_current_thread() const
+
+== INST_BRANCH (bench threads)
+   49.5%  java.util.HashMap.merge
+   41.2%  sample.WordCountBenchmark.countAndLookUp
+    5.6%  java.util.HashMap.resize
+    3.3%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.0%  __bzero
+    0.0%  OptoRuntime::new_array_nozero_C(Klass*, int, JavaThread*)
+    0.0%  <unknown 0x123dd9dd9>
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  G1Allocator::unsafe_max_tlab_alloc()
+    0.0%  <unknown 0x123e13689>
+    0.0%  G1NUMA::index_of_current_thread() const
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   49.4%  java.util.HashMap.merge
+   41.1%  sample.WordCountBenchmark.countAndLookUp
+    5.9%  java.util.HashMap.resize
+    3.3%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.0%  __bzero
+    0.0%  <unknown 0x123dd9dd9>
+    0.0%  OptoRuntime::new_array_nozero_C(Klass*, int, JavaThread*)
+    0.0%  JavaThread::pd_last_frame()
+    0.0%  G1NUMA::index_of_current_thread() const
+    0.0%  <unknown 0x123dddef9>
+    0.0%  G1Allocator::unsafe_max_tlab_alloc()
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   48.9%  java.util.HashMap.merge
+   40.9%  sample.WordCountBenchmark.countAndLookUp
+    6.7%  java.util.HashMap.resize
+    3.2%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.1%  __bzero
+    0.0%  <unknown 0x123e1368d>
+    0.0%  JavaThread::pd_last_frame()
+    0.0%  G1NUMA::index_of_current_thread() const
+    0.0%  CodeHeap::find_blob(void*) const
+    0.0%  <unknown 0x123dd9dd9>
+    0.0%  OptoRuntime::new_array_nozero_C(Klass*, int, JavaThread*)
+
+== samples (bench threads)
+   49.6%  java.util.HashMap.merge
+   41.0%  sample.WordCountBenchmark.countAndLookUp
+    5.8%  java.util.HashMap.resize
+    3.2%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.0%  __bzero
+    0.0%  HandleMark::~HandleMark()
+    0.0%  G1NUMA::index_of_current_thread() const
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  <unknown 0x123dddef9>
+    0.0%  <unknown 0x123e1368d>
+    0.0%  pthread_jit_write_protect_np

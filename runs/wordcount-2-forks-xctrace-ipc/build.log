@@ -1,0 +1,213 @@
+
+[perflab] WordCountBenchmark(100000) in pid 11369, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-2-forks-xctrace-ipc, -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-2-forks-xctrace-ipc/gc-%p.log:time,uptime, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh17377176894964812114compilecommand]
+[xctrace] Starting recording with the perflab-ipc-1473274353442051783.template template. Attaching to: java (11369). 
+[xctrace] Ctrl-C to stop the recording
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   843 /   213.8 /    7
+  WARMUP        2:    48 /    46.2 /    1
+  WARMUP        3:    16 /    12.3 /    0
+  MEASUREMENT   4:     4 /     0.4 /    0
+  MEASUREMENT   5:    16 /     2.8 /    0
+  MEASUREMENT   6:     6 /     0.3 /    0
+  MEASUREMENT   7:     4 /     1.3 /    0
+  MEASUREMENT   8:    12 /     2.4 /    0
+[jit] compiled while measuring:
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.Integer.stringSize (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+     1  java.lang.StringBuilder.charAt (tier 3)
+     1  java.lang.ThreadLocal$ThreadLocalMap.getEntry (tier 3)
+     1  java.nio.ByteBuffer.limit (tier 3)
+     1  java.util.ArrayList.addAll (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-11369.txt
+[xctrace] code map: 3431 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Run issues were detected (trace is still ready to be viewed):
+[xctrace] * [Warning] Lost events were detected. Data rate might be too high. Trying with another recording mode might solve this issue.
+[xctrace] 
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: countAndLookUp-11369.trace
+
+== INST_ALL (bench threads)
+   46.8%  java.util.HashMap.merge
+   41.5%  sample.WordCountBenchmark.countAndLookUp
+    5.2%  java.util.HashMap.resize
+    3.4%  java.lang.String.hashCode
+    2.7%  java.lang.StringLatin1.hashCode
+    0.1%  sample.WordCount.contains
+    0.1%  <unknown 0x120e10b01>
+    0.0%  pthread_jit_write_protect_np
+    0.0%  frame::sender_raw(RegisterMap*) const
+    0.0%  <unknown 0x120de2665>
+    0.0%  G1Allocator::unsafe_max_tlab_alloc()
+    0.0%  <unknown 0x120e1368d>
+
+== INST_BRANCH (bench threads)
+   46.8%  java.util.HashMap.merge
+   41.6%  sample.WordCountBenchmark.countAndLookUp
+    5.1%  java.util.HashMap.resize
+    3.4%  java.lang.String.hashCode
+    2.7%  java.lang.StringLatin1.hashCode
+    0.1%  sample.WordCount.contains
+    0.1%  <unknown 0x120e10b01>
+    0.0%  pthread_jit_write_protect_np
+    0.0%  <unknown 0x120de2665>
+    0.0%  G1Allocator::unsafe_max_tlab_alloc()
+    0.0%  frame::sender_raw(RegisterMap*) const
+    0.0%  <unknown 0x120e1368d>
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   47.6%  java.util.HashMap.merge
+   41.0%  sample.WordCountBenchmark.countAndLookUp
+    4.9%  java.util.HashMap.resize
+    3.2%  java.lang.String.hashCode
+    2.9%  java.lang.StringLatin1.hashCode
+    0.2%  sample.WordCount.contains
+    0.1%  <unknown 0x120e10b01>
+    0.1%  <unknown 0x120de2665>
+    0.0%  pthread_jit_write_protect_np
+    0.0%  <unknown 0x120e1368d>
+    0.0%  ImmutableOopMapSet::find_map_at_offset(int) const
+    0.0%  G1Allocator::unsafe_max_tlab_alloc()
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   45.9%  java.util.HashMap.merge
+   41.2%  sample.WordCountBenchmark.countAndLookUp
+    6.4%  java.util.HashMap.resize
+    3.4%  java.lang.String.hashCode
+    2.7%  java.lang.StringLatin1.hashCode
+    0.1%  sample.WordCount.contains
+    0.1%  <unknown 0x120e10b01>
+    0.1%  frame::sender_raw(RegisterMap*) const
+    0.0%  pthread_jit_write_protect_np
+    0.0%  <unknown 0x120e1368d>
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  <unknown 0x120de2665>
+
+== samples (bench threads)
+   50.2%  java.util.HashMap.merge
+   38.5%  sample.WordCountBenchmark.countAndLookUp
+    4.8%  java.util.HashMap.resize
+    3.3%  java.lang.String.hashCode
+    2.7%  java.lang.StringLatin1.hashCode
+    0.2%  sample.WordCount.contains
+    0.0%  pthread_jit_write_protect_np
+    0.0%  <unknown 0x120de2665>
+    0.0%  <unknown 0x120e10b01>
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  <unknown 0x120e1368d>
+    0.0%  frame::sender_raw(RegisterMap*) const
+
+[perflab] WordCountBenchmark(100000) in pid 11835, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-2-forks-xctrace-ipc, -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-2-forks-xctrace-ipc/gc-%p.log:time,uptime, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh17377176894964812114compilecommand]
+[xctrace] Starting recording with the perflab-ipc-3423971303655704130.template template. Attaching to: java (11835). 
+[xctrace] Ctrl-C to stop the recording
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   732 /   376.7 /   14
+  WARMUP        2:    32 /    24.8 /    3
+  WARMUP        3:    14 /    10.5 /    1
+  MEASUREMENT   4:     5 /     0.3 /    0
+  MEASUREMENT   5:    17 /     3.1 /    0
+  MEASUREMENT   6:    13 /     9.5 /    0
+  MEASUREMENT   7:     5 /     1.2 /    0
+  MEASUREMENT   8:    11 /     1.8 /    0
+[jit] compiled while measuring:
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.String.getBytesNoRepl1 (tier 3)
+     1  java.lang.String.isASCII (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-11835.txt
+[xctrace] code map: 3370 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: countAndLookUp-11835.trace
+
+== INST_ALL (bench threads)
+   50.2%  java.util.HashMap.merge
+   40.1%  sample.WordCountBenchmark.countAndLookUp
+    5.1%  java.util.HashMap.resize
+    4.2%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.0%  pthread_jit_write_protect_np
+    0.0%  <unknown 0x1245e2665>
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  _tlv_get_addr
+    0.0%  __bzero
+    0.0%  MemAllocator::Allocation::check_out_of_memory()
+    0.0%  OptoRuntime::new_instance_C(Klass*, JavaThread*)
+
+== INST_BRANCH (bench threads)
+   50.2%  java.util.HashMap.merge
+   40.1%  sample.WordCountBenchmark.countAndLookUp
+    5.0%  java.util.HashMap.resize
+    4.2%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.0%  pthread_jit_write_protect_np
+    0.0%  <unknown 0x1245e2665>
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  _tlv_get_addr
+    0.0%  MemAllocator::Allocation::check_out_of_memory()
+    0.0%  __bzero
+    0.0%  Klass::check_array_allocation_length(int, int, JavaThread*)
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   50.6%  java.util.HashMap.merge
+   39.6%  sample.WordCountBenchmark.countAndLookUp
+    5.0%  java.util.HashMap.resize
+    4.4%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  <unknown 0x1245e2665>
+    0.0%  pthread_jit_write_protect_np
+    0.0%  Klass::check_array_allocation_length(int, int, JavaThread*)
+    0.0%  MemAllocator::Allocation::check_out_of_memory()
+    0.0%  __bzero
+    0.0%  G1AllocRegion::new_alloc_region_and_allocate(unsigned long, bool)
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   49.4%  java.util.HashMap.merge
+   39.8%  sample.WordCountBenchmark.countAndLookUp
+    6.1%  java.util.HashMap.resize
+    4.2%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.1%  G1FromCardCache::clear(unsigned int)
+    0.0%  pthread_jit_write_protect_np
+    0.0%  <unknown 0x1245e2665>
+    0.0%  OptoRuntime::new_instance_C(Klass*, JavaThread*)
+    0.0%  __bzero
+    0.0%  MemAllocator::Allocation::check_out_of_memory()
+    0.0%  G1AllocRegion::new_alloc_region_and_allocate(unsigned long, bool)
+
+== samples (bench threads)
+   50.9%  java.util.HashMap.merge
+   39.3%  sample.WordCountBenchmark.countAndLookUp
+    5.0%  java.util.HashMap.resize
+    4.4%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.0%  <unknown 0x1245e2665>
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  pthread_jit_write_protect_np
+    0.0%  __bzero
+    0.0%  MemAllocator::mem_allocate_inside_tlab_slow(MemAllocator::Allocation&) const
+    0.0%  __psynch_cvwait
+    0.0%  <unknown 0x124610b01>

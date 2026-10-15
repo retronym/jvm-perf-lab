@@ -1,0 +1,183 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fork timeline</title>
+<style>
+:root { --bg:#f6f7f9; --panel:#fff; --fg:#1d232b; --muted:#5d6875; --line:#dde2e8; }
+@media (prefers-color-scheme: dark) { :root { --bg:#14181d; --panel:#1b2027; --fg:#e3e8ee; --muted:#94a0ad; --line:#2c333c; color-scheme:dark; } }
+body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.45 -apple-system,system-ui,sans-serif; }
+main { padding:16px; } h1 { font-size:16px; margin:0 0 4px; overflow-wrap:anywhere; } .k { color:var(--muted); font-size:12px; }
+
+:root { --v0:#2f6fb2; --v1:#c2571a; --v2:#2e8a57; --v3:#8a4fbf; --v4:#b8860b; --v5:#3a9aa6; --pause:#d33; --grey:#c3c9d1; }
+@media (prefers-color-scheme: dark) { :root { --v0:#6ea8e6; --v1:#e58a4e; --v2:#5cc08a; --v3:#b58ae6; --v4:#e0b84a; --v5:#6cc6d1;
+  --pause:#ff6b6b; --grey:#46505c; } }
+svg.timeline { background:var(--panel); border:1px solid var(--line); border-radius:8px; width:100%; touch-action:none; cursor:grab; display:block; }
+svg.timeline text { fill:var(--fg); font-size:11px; } svg.timeline .lab { fill:var(--muted); } svg.timeline .grid { stroke:var(--line); }
+.tl-legend span { display:inline-block; margin-right:12px; font-size:12px; }
+.tl-legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+.tl-tip { position:fixed; pointer-events:none; background:var(--panel); border:1px solid var(--line); border-radius:6px;
+  padding:4px 8px; font-size:12px; display:none; max-width:360px; z-index:5; }
+
+</style>
+<main><h1>out/campaigns/memory-paired/4194304/paired/2</h1>
+<p class="k">Wheel or pinch to zoom, drag to pan, double-click to reset. Counter lanes cover the measurement iterations
+only (xctrace records those); cycles are per second, so one busy performance core is about 4–4.5 G.</p>
+<div class="tl-legend" id="legend"></div><svg class="timeline" id="chart"></svg></main><div class="tl-tip" id="tip"></div>
+<script>// A benchmark fork's timeline: its iterations (coloured by variant when variants alternate within the fork) and, on the
+// same wall-clock axis, what the machine did meanwhile. Reads a cell's files as written by the fork and `perflab ab`:
+//   iterations.tsv  every iteration as it finishes: index, kind, variant, start_ms, end_ms, score, ops, gc_ms
+//   timeline.tsv    per 50 ms: cycles and instructions of the benchmark thread, JIT, GC, other threads of the fork and
+//                   other processes (from xctrace, so only once the fork has finished)
+//   gc.log          -Xlog:gc with wall-clock `time` decorations (the campaign's "gcLog"): pauses
+//   load.tsv        the load gate's 5 s samples of other processes' CPU, in cores
+// Used by timeline.py (a page per cell) and index.py (a live panel in index.html).
+const BenchTimeline = (() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const BIN_MS = 50;
+
+  function tsv(text) {
+    if (!text) return [];
+    const lines = text.split('\n').filter(l => l.trim());
+    if (!lines.length) return [];
+    const head = lines[0].split('\t');
+    return lines.slice(1).map(l => Object.fromEntries(l.split('\t').map((v, i) => [head[i], v])));
+  }
+
+  function parse(f) {
+    const iters = tsv(f.iterations).map(r => ({i: +r.index, kind: r.kind, variant: r.variant, s: +r.start_ms, e: +r.end_ms,
+      score: +r.score, gc: r.gc_ms === '' || r.gc_ms == null ? null : +r.gc_ms}));
+    const series = tsv(f.timeline).map(b => ({t: +b.bin_ms, bench_c: +b.bench_cycles, bench_i: +b.bench_inst, jit_c: +b.jit_cycles,
+      gc_c: +b.gc_cycles, other_c: +b.other_cycles, processes_c: +b.processes_cycles}));
+    const pauses = [];
+    for (const line of (f.gc || '').split('\n')) {
+      const m = line.match(/^\[([^\]]+)\]\[[^\]]+\].*?(Pause[^(]*(?:\([^)]*\))*).*?([\d.]+)ms\s*$/);
+      if (!m) continue;
+      const end = Date.parse(m[1].replace(/([+-]\d\d)(\d\d)$/, '$1:$2'));
+      if (!isNaN(end)) pauses.push({s: end - +m[3], e: end, what: m[2].trim()});
+    }
+    const load = (f.load || '').split('\n').map(l => l.split('\t')).filter(p => p.length >= 2 && p[0])
+      .map(p => ({t: +p[0] * 1000, cores: +p[1], top: p[2] || ''}));
+    return {iters, series, pauses, load};
+  }
+
+  async function fetchCell(base) {
+    const get = async n => { try { const r = await fetch(base + n, {cache: 'no-store'}); return r.ok ? await r.text() : ''; } catch (e) { return ''; } };
+    const [iterations, timeline, gc, load] = await Promise.all(['iterations.tsv', 'timeline.tsv', 'gc.log', 'load.tsv'].map(get));
+    return parse({iterations, timeline, gc, load});
+  }
+
+  function mount(svg, legend, tip) {
+    let D = {iters: [], series: [], pauses: [], load: []}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
+    const L = 150, R = 16;
+    const rows = [
+      {name: 'iterations', h: 46},
+      {name: 'benchmark thread', h: 80, key: 'bench_c', unit: 'G cycles/s'},
+      {name: 'IPC (benchmark)', h: 56, ipc: true},
+      {name: 'GC threads', h: 70, key: 'gc_c', unit: 'G cycles/s', pauses: true},
+      {name: 'JIT threads', h: 56, key: 'jit_c', unit: 'G cycles/s'},
+      {name: 'other in fork', h: 46, key: 'other_c', unit: 'G cycles/s'},
+      {name: 'other processes', h: 86, key: 'processes_c', unit: 'G cycles/s', load: true},
+    ];
+    const height = rows.reduce((a, r) => a + r.h + 8, 8) + 24;
+    svg.setAttribute('height', height);
+    let variants = [];
+    const color = v => v ? `var(--v${variants.indexOf(v) % 6})` : 'var(--v0)';
+    function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; }
+
+    function draw() {
+      svg.innerHTML = '';
+      const W = svg.clientWidth || 900, X = t => L + (t - x0) / (x1 - x0) * (W - L - R);
+      if (!D.iters.length && !D.series.length) {
+        svg.setAttribute('height', 40);
+        el('text', {x: 12, y: 24, class: 'lab'}).textContent = 'No iterations yet.';
+        return;
+      }
+      svg.setAttribute('height', height);
+      let y = 8;
+      const span = x1 - x0, step = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 60000].find(s => span / s < 12) || 120000;
+      for (let t = Math.ceil((x0 - t0) / step) * step; t0 + t <= x1; t += step) {
+        el('line', {x1: X(t0 + t), x2: X(t0 + t), y1: 0, y2: height - 22, class: 'grid'});
+        el('text', {x: X(t0 + t) + 2, y: height - 8, class: 'lab'}).textContent = (t / 1000).toFixed(step < 1000 ? 1 : 0) + ' s';
+      }
+      for (const r of rows) {
+        el('text', {x: 6, y: y + 14}).textContent = r.name;
+        if (r.unit) el('text', {x: 6, y: y + 28, class: 'lab'}).textContent = r.unit;
+        el('line', {x1: L, x2: W - R, y1: y + r.h, y2: y + r.h, class: 'grid'});
+        if (r.name === 'iterations') {
+          for (const it of D.iters) {
+            if (it.e < x0 || it.s > x1) continue;
+            const a = Math.max(X(it.s), L), b = Math.min(X(it.e), W - R);
+            const rect = el('rect', {x: a, y: y + 6, width: Math.max(1, b - a - 1), height: r.h - 12, rx: 2,
+              fill: it.kind === 'warmup' ? 'var(--grey)' : color(it.variant)});
+            rect.dataset.tip = `#${it.i} ${it.kind} ${it.variant || ''}: ${it.score.toFixed(1)} ms/op` + (it.gc != null ? `, GC pauses ${it.gc} ms` : '');
+            if (b - a > 46) el('text', {x: a + 4, y: y + r.h / 2 + 4}).textContent = it.score.toFixed(1);
+          }
+        } else if (!D.series.length) {
+          if (r.name === 'benchmark thread') el('text', {x: L + 6, y: y + 20, class: 'lab'}).textContent = 'counters appear when the fork has finished (xctrace export)';
+        } else {
+          const pts = r.ipc ? D.series.map(s => ({t: s.t, v: s.bench_c ? s.bench_i / s.bench_c : null}))
+                            : D.series.map(s => ({t: s.t, v: s[r.key] / (BIN_MS / 1000) / 1e9}));
+          const vis = pts.filter(p => p.t >= x0 - BIN_MS && p.t <= x1 && p.v != null);
+          const max = r.ipc ? Math.max(4, ...vis.map(p => p.v)) : Math.max(0.5, ...vis.map(p => p.v));
+          const Y = v => y + r.h - 4 - v / max * (r.h - 10);
+          el('text', {x: L - 4, y: y + 12, 'text-anchor': 'end', class: 'lab'}).textContent = max.toFixed(1);
+          let d = '';
+          for (const p of vis) d += (d ? 'L' : 'M') + X(p.t + BIN_MS / 2).toFixed(1) + ',' + Y(p.v).toFixed(1);
+          if (d) el('path', {d, fill: 'none', stroke: r.ipc ? 'var(--v2)' : 'var(--v0)', 'stroke-width': 1.2});
+        }
+        if (r.pauses) for (const p of D.pauses) {
+          if (p.e < x0 || p.s > x1) continue;
+          const m = el('rect', {x: X(p.s), y: y + 2, width: Math.max(2, X(p.e) - X(p.s)), height: r.h - 4, fill: 'var(--pause)', opacity: 0.55});
+          m.dataset.tip = `${p.what}: ${(p.e - p.s).toFixed(1)} ms`;
+        }
+        if (r.load && D.load.length) {
+          const lmax = Math.max(2, ...D.load.map(l => l.cores));
+          el('text', {x: W - R - 2, y: y + 12, 'text-anchor': 'end', class: 'lab'}).textContent = `load.tsv: other processes, cores (max ${lmax.toFixed(1)})`;
+          let ld = '';
+          for (const l of D.load) {
+            if (l.t < x0 - 5000 || l.t > x1 + 5000) continue;
+            const yy = y + r.h - 4 - l.cores / lmax * (r.h - 10);
+            const clamp = x => Math.min(Math.max(x, L), W - R);
+            ld += (ld ? 'L' : 'M') + clamp(X(l.t - 5000)).toFixed(1) + ',' + yy.toFixed(1) + 'L' + clamp(X(l.t)).toFixed(1) + ',' + yy.toFixed(1);
+          }
+          if (ld) el('path', {d: ld, fill: 'none', stroke: 'var(--v1)', 'stroke-width': 1.2, 'stroke-dasharray': '4 3'});
+        }
+        y += r.h + 8;
+      }
+    }
+
+    function set(data) {
+      D = data;
+      variants = [...new Set(D.iters.map(i => i.variant).filter(v => v))];
+      const ts = [...D.iters.flatMap(i => [i.s, i.e]), ...D.series.map(s => s.t), ...D.series.map(s => s.t + BIN_MS)];
+      const n0 = ts.length ? Math.min(...ts) : 0, n1 = ts.length ? Math.max(...ts) : 1;
+      // keep a zoomed view where it is as data arrives; otherwise follow the whole range
+      if (!zoomed) { x0 = n0; x1 = Math.max(n1, n0 + 1); }
+      t0 = n0; t1 = Math.max(n1, n0 + 1);
+      if (legend) legend.innerHTML = variants.map(v => `<span><i style="background:${color(v)}"></i>${v}</span>`).join('')
+        + '<span><i style="background:var(--grey)"></i>warmup</span>' + (D.pauses.length ? '<span><i style="background:var(--pause)"></i>GC pause</span>' : '');
+      draw();
+    }
+
+    svg.addEventListener('wheel', e => { e.preventDefault(); const W = svg.clientWidth, f = Math.exp(e.deltaY * 0.002);
+      const at = x0 + (e.offsetX - L) / (W - L - R) * (x1 - x0); x0 = Math.max(t0, at - (at - x0) * f); x1 = Math.min(t1, at + (x1 - at) * f); zoomed = true; draw(); }, {passive: false});
+    let drag = null;
+    svg.addEventListener('pointerdown', e => { drag = {x: e.clientX, x0, x1}; svg.setPointerCapture(e.pointerId); });
+    svg.addEventListener('pointermove', e => {
+      const t = e.target.dataset && e.target.dataset.tip;
+      if (tip && t && !drag) { tip.textContent = t; tip.style.display = 'block'; tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 12) + 'px'; }
+      else if (tip && !drag) tip.style.display = 'none';
+      if (!drag) return;
+      const W = svg.clientWidth, dt = (e.clientX - drag.x) / (W - L - R) * (drag.x1 - drag.x0), w = drag.x1 - drag.x0;
+      x0 = Math.min(Math.max(t0, drag.x0 - dt), t1 - w); x1 = x0 + w; zoomed = true; draw();
+    });
+    svg.addEventListener('pointerup', () => drag = null);
+    svg.addEventListener('dblclick', () => { zoomed = false; x0 = t0; x1 = t1; draw(); });
+    window.addEventListener('resize', draw);
+    return {set, reset() { zoomed = false; }};
+  }
+
+  return {parse, fetchCell, mount};
+})();
+
+BenchTimeline.mount(document.getElementById('chart'), document.getElementById('legend'), document.getElementById('tip'))
+  .set(BenchTimeline.parse({"iterations": "index\tkind\tvariant\tstart_ms\tend_ms\tscore\tops\tgc_ms\n0\twarmup\tsequential\t1792036592239\t1792036593317\t1196.0236\t840\t0\n1\twarmup\tshuffled\t1792036593325\t1792036594359\t60783.4215\t17\t0\n2\twarmup\tshuffled\t1792036594360\t1792036595383\t56798.2801\t18\t0\n3\twarmup\tsequential\t1792036595383\t1792036596394\t1180.9148\t855\t0\n4\tmeasure\tsequential\t1792036598110\t1792036599114\t1204.9608\t833\t0\n5\tmeasure\tshuffled\t1792036599116\t1792036600143\t60418.1936\t17\t0\n6\tmeasure\tshuffled\t1792036600144\t1792036601165\t63743.1406\t16\t0\n7\tmeasure\tsequential\t1792036601165\t1792036602175\t1187.2917\t850\t0\n8\tmeasure\tsequential\t1792036602176\t1792036603180\t1156.7949\t868\t0\n9\tmeasure\tshuffled\t1792036603181\t1792036604191\t67325.0667\t15\t0\n10\tmeasure\tshuffled\t1792036604192\t1792036605200\t62973.9844\t16\t0\n11\tmeasure\tsequential\t1792036605201\t1792036606207\t1152.1167\t873\t0\n", "timeline": "bin_ms\tbench_cycles\tbench_inst\tjit_cycles\tjit_inst\tgc_cycles\tgc_inst\tother_cycles\tother_inst\tprocesses_cycles\tprocesses_inst\n1792036598050\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\n1792036598100\t151814555\t715352882\t2944603\t7206960\t0\t0\t116685\t13023\t47243896\t155728331\n1792036598150\t213562784\t1114820032\t0\t0\t0\t0\t0\t0\t12466065\t17816000\n1792036598200\t211700561\t1099892428\t0\t0\t0\t0\t266560\t117225\t24047688\t113364985\n1792036598250\t210381881\t1092637780\t0\t0\t0\t0\t0\t0\t10235907\t40885958\n1792036598300\t207133488\t1084845626\t0\t0\t0\t0\t0\t0\t43998161\t127030002\n1792036598350\t207037914\t1087285745\t0\t0\t0\t0\t0\t0\t23329324\t106919539\n1792036598400\t211576355\t1096853507\t0\t0\t0\t0\t34008\t7675\t18846492\t90549073\n1792036598450\t211694405\t1025894951\t0\t0\t0\t0\t0\t0\t22401924\t106525510\n1792036598500\t208642414\t1086535703\t0\t0\t0\t0\t0\t0\t17339652\t59111522\n1792036598550\t208412007\t1085966194\t0\t0\t0\t0\t0\t0\t30067768\t108285516\n1792036598600\t206067346\t1070528310\t0\t0\t0\t0\t0\t0\t25283895\t109584366\n1792036598650\t213791995\t1115550666\t0\t0\t0\t0\t0\t0\t24260306\t111267254\n1792036598700\t226022336\t1101979214\t0\t0\t0\t0\t0\t0\t44000348\t87146835\n1792036598750\t225309515\t1050178876\t0\t0\t0\t0\t0\t0\t3795296\t6832444\n1792036598800\t224077318\t982706234\t0\t0\t0\t0\t0\t0\t3193083\t11189150\n1792036598850\t221416792\t1050097647\t0\t0\t0\t0\t0\t0\t26542178\t34128235\n1792036598900\t201219104\t1037261398\t0\t0\t0\t0\t0\t0\t22432238\t46647941\n1792036598950\t207119280\t1076216523\t0\t0\t0\t0\t0\t0\t29116960\t52820658\n1792036599000\t193746806\t1005729348\t0\t0\t0\t0\t0\t0\t39473786\t79515056\n1792036599050\t211217367\t913620137\t0\t0\t0\t0\t0\t0\t35087175\t73037694\n1792036599100\t203772647\t190948441\t6004136\t11537442\t0\t0\t537330\t396676\t35663257\t85694367\n1792036599150\t215298436\t21407494\t0\t0\t0\t0\t0\t0\t13810495\t9975126\n1792036599200\t217076922\t20207603\t6598298\t13838398\t0\t0\t277928\t121452\t49759651\t48988506\n1792036599250\t213903614\t19888271\t0\t0\t0\t0\t0\t0\t16142078\t19453372\n1792036599300\t213568843\t22222070\t0\t0\t0\t0\t0\t0\t36577878\t40326360\n1792036599350\t211735800\t22397349\t0\t0\t0\t0\t0\t0\t31785235\t13430364\n1792036599400\t208091692\t19103809\t0\t0\t0\t0\t0\t0\t56824945\t57973678\n1792036599450\t212819274\t18509049\t0\t0\t0\t0\t0\t0\t10267230\t12085874\n1792036599500\t205008062\t20746791\t0\t0\t0\t0\t0\t0\t163242262\t489465907\n1792036599550\t217603227\t22373621\t0\t0\t0\t0\t0\t0\t24971285\t4448332\n1792036599600\t224177448\t19850276\t0\t0\t0\t0\t0\t0\t20671528\t12494727\n1792036599650\t225342856\t24303517\t0\t0\t0\t0\t0\t0\t18776663\t24733937\n1792036599700\t220041418\t20792560\t0\t0\t0\t0\t0\t0\t28489770\t21191298\n1792036599750\t221132648\t23986469\t0\t0\t0\t0\t0\t0\t25761266\t26722608\n1792036599800\t218417059\t23171143\t0\t0\t0\t0\t0\t0\t9629357\t2790030\n1792036599850\t202323844\t17174158\t0\t0\t0\t0\t0\t0\t33468281\t40982787\n1792036599900\t210765908\t19120686\t0\t0\t0\t0\t0\t0\t53854485\t110372320\n1792036599950\t213708358\t22669685\t0\t0\t0\t0\t0\t0\t27627182\t46427039\n1792036600000\t210739173\t21325906\t0\t0\t0\t0\t0\t0\t21165199\t6037830\n1792036600050\t210469065\t23012222\t0\t0\t0\t0\t0\t0\t12741892\t3376745\n1792036600100\t204211368\t21330496\t5011\t878\t0\t0\t817674\t449335\t67442348\t26090770\n1792036600150\t207445765\t17893716\t0\t0\t0\t0\t0\t0\t15362541\t18741994\n1792036600200\t200295746\t11999551\t0\t0\t0\t0\t348632\t93838\t105106677\t180602394\n1792036600250\t210660551\t11672231\t0\t0\t0\t0\t0\t0\t25606740\t75877355\n1792036600300\t214568854\t23087655\t0\t0\t0\t0\t0\t0\t62092377\t149657137\n1792036600350\t212342376\t13376991\t0\t0\t0\t0\t0\t0\t416562262\t1182304197\n1792036600400\t217936308\t16087988\t0\t0\t0\t0\t48527\t13704\t112940926\t391746893\n1792036600450\t219402183\t16496484\t0\t0\t0\t0\t0\t0\t57665030\t101038645\n1792036600500\t217054661\t16009847\t0\t0\t0\t0\t0\t0\t137894523\t302890780\n1792036600550\t216288390\t19566676\t0\t0\t0\t0\t0\t0\t223925629\t961971932\n1792036600600\t221840776\t24053861\t0\t0\t0\t0\t0\t0\t192061395\t943776273\n1792036600650\t220091137\t23453298\t0\t0\t0\t0\t0\t0\t8402565\t2855399\n1792036600700\t218313379\t22976843\t0\t0\t0\t0\t0\t0\t14928134\t10735906\n1792036600750\t217339620\t23453351\t0\t0\t0\t0\t0\t0\t12305638\t4086450\n1792036600800\t215303741\t23427862\t0\t0\t0\t0\t0\t0\t9882597\t1960530\n1792036600850\t213170438\t23216566\t0\t0\t0\t0\t0\t0\t16354744\t4689149\n1792036600900\t211201869\t22595371\t0\t0\t0\t0\t0\t0\t19224452\t9452129\n1792036600950\t210222887\t23023352\t0\t0\t0\t0\t0\t0\t18806453\t5553401\n1792036601000\t207709638\t22631133\t0\t0\t0\t0\t0\t0\t25733394\t6860361\n1792036601050\t206374384\t22370985\t0\t0\t0\t0\t0\t0\t17934674\t3346089\n1792036601100\t217798888\t21697986\t0\t0\t0\t0\t0\t0\t66195254\t24624458\n1792036601150\t207948557\t558397850\t4299823\t8313251\t0\t0\t165419\t132772\t20920175\t15374029\n1792036601200\t211689456\t1104196572\t0\t0\t0\t0\t0\t0\t18714178\t49324815\n1792036601250\t209716931\t934171979\t2113606\t3378064\t0\t0\t300267\t98299\t69288189\t152350244\n1792036601300\t209491088\t1098687820\t0\t0\t0\t0\t0\t0\t14963894\t34741381\n1792036601350\t225860646\t1176260928\t0\t0\t0\t0\t0\t0\t36517588\t117755628\n1792036601400\t224849764\t1177085172\t0\t0\t0\t0\t0\t0\t7659038\t11745791\n1792036601450\t223390367\t1168057110\t0\t0\t0\t0\t0\t0\t10401234\t23840673\n1792036601500\t221512059\t1159212864\t0\t0\t0\t0\t0\t0\t6552513\t24159064\n1792036601550\t220638636\t971242163\t0\t0\t0\t0\t0\t0\t9147067\t34849207\n1792036601600\t216451115\t1131724494\t0\t0\t0\t0\t0\t0\t9226727\t33184257\n1792036601650\t216566520\t1021788195\t0\t0\t0\t0\t0\t0\t21724380\t65551651\n1792036601700\t214531156\t1121750820\t0\t0\t0\t0\t0\t0\t26725032\t71209678\n1792036601750\t207152346\t1075014259\t0\t0\t0\t0\t0\t0\t51123686\t145111314\n1792036601800\t209513766\t1092786601\t0\t0\t0\t0\t0\t0\t26340662\t73892836\n1792036601850\t208684940\t1086563259\t0\t0\t0\t0\t0\t0\t24198543\t83189362\n1792036601900\t209054585\t1089351309\t0\t0\t0\t0\t0\t0\t44579942\t146073616\n1792036601950\t210663704\t1093304874\t0\t0\t0\t0\t0\t0\t21645868\t55191142\n1792036602000\t210601140\t1096261968\t0\t0\t0\t0\t0\t0\t27433269\t98605225\n1792036602050\t226257136\t1174896120\t0\t0\t0\t0\t0\t0\t32043224\t96277101\n1792036602100\t225589631\t849568278\t0\t0\t0\t0\t0\t0\t42059019\t48357597\n1792036602150\t219520774\t1017330645\t0\t0\t0\t0\t1148049\t955364\t15404323\t26169170\n1792036602200\t223596435\t1161667430\t0\t0\t0\t0\t0\t0\t11335594\t23640172\n1792036602250\t222061404\t1158196033\t3312012\t5652444\t0\t0\t245985\t66807\t10387435\t33569705\n1792036602300\t220612391\t1152302176\t0\t0\t0\t0\t0\t0\t9276467\t35560641\n1792036602350\t217609107\t1136054072\t0\t0\t0\t0\t0\t0\t13086127\t48357392\n1792036602400\t220833719\t1095506846\t0\t0\t0\t0\t37598\t9609\t34904779\t69237768\n1792036602450\t224076327\t1152692729\t0\t0\t0\t0\t0\t0\t5303677\t17184264\n1792036602500\t222761187\t1154051245\t0\t0\t0\t0\t0\t0\t7652722\t24638807\n1792036602550\t219681752\t1142727543\t0\t0\t0\t0\t0\t0\t15114780\t41769009\n1792036602600\t218833965\t1137616548\t0\t0\t0\t0\t0\t0\t7930530\t33306093\n1792036602650\t217870677\t1131393077\t0\t0\t0\t0\t0\t0\t13878152\t61789161\n1792036602700\t213810183\t1111703296\t0\t0\t0\t0\t0\t0\t25240531\t78487067\n1792036602750\t212377883\t864568168\t0\t0\t0\t0\t0\t0\t28312370\t64910701\n1792036602800\t208146655\t1045255978\t0\t0\t0\t0\t0\t0\t255450694\t570628154\n1792036602850\t206830817\t1079598900\t0\t0\t0\t0\t6746\t1118\t40217105\t105217181\n1792036602900\t208156308\t1085598131\t0\t0\t0\t0\t0\t0\t27957572\t119704514\n1792036602950\t207061904\t1083412498\t0\t0\t0\t0\t0\t0\t19802751\t86423004\n1792036603000\t209734336\t1071757658\t0\t0\t0\t0\t0\t0\t23585180\t113405793\n1792036603050\t226802349\t1101261204\t0\t0\t0\t0\t0\t0\t20891916\t75952993\n1792036603100\t226086718\t1121219578\t0\t0\t0\t0\t0\t0\t2126269\t6349197\n1792036603150\t218378048\t726740807\t3640\t1145\t0\t0\t461728\t319597\t13846048\t29876737\n1792036603200\t218054906\t21743557\t0\t0\t0\t0\t0\t0\t16570752\t23390303\n1792036603250\t211397635\t12281229\t0\t0\t0\t0\t242243\t65643\t22625180\t24828496\n1792036603300\t210766700\t9331233\t0\t0\t0\t0\t0\t0\t110738452\t247235693\n1792036603350\t216067130\t14912930\t0\t0\t0\t0\t0\t0\t47116628\t89081336\n1792036603400\t216138198\t22173215\t0\t0\t0\t0\t0\t0\t75398061\t124153322\n1792036603450\t215955819\t22908124\t0\t0\t0\t0\t0\t0\t14760554\t8655466\n1792036603500\t199920946\t18993589\t0\t0\t0\t0\t0\t0\t585402839\t1334672295\n1792036603550\t181623511\t2940865\t0\t0\t0\t0\t0\t0\t1854956936\t3134696155\n1792036603600\t200954255\t10898316\t0\t0\t0\t0\t0\t0\t323260008\t445708381\n1792036603650\t208310131\t18885756\t0\t0\t0\t0\t0\t0\t93889555\t198286019\n1792036603700\t214792683\t15984536\t0\t0\t0\t0\t0\t0\t16831182\t21334304\n1792036603750\t214292386\t23124585\t0\t0\t0\t0\t0\t0\t116550538\t133480629\n1792036603800\t225885186\t24341083\t0\t0\t0\t0\t0\t0\t9307030\t4192654\n1792036603850\t224363419\t23418278\t0\t0\t0\t0\t0\t0\t11589179\t7583964\n1792036603900\t222163988\t23850862\t0\t0\t0\t0\t0\t0\t9022094\t3577282\n1792036603950\t221409068\t24103592\t0\t0\t0\t0\t0\t0\t7037686\t5147148\n1792036604000\t220850002\t23917814\t0\t0\t0\t0\t0\t0\t13713586\t7960499\n1792036604050\t217272067\t23079331\t0\t0\t0\t0\t0\t0\t14798612\t6410938\n1792036604100\t216604917\t23267732\t0\t0\t0\t0\t0\t0\t11939198\t3554797\n1792036604150\t213653329\t22888055\t4114269\t9380715\t0\t0\t441750\t174206\t22835632\t6387699\n1792036604200\t213027041\t21521585\t0\t0\t0\t0\t0\t0\t94059536\t150275598\n1792036604250\t191961739\t15309418\t0\t0\t0\t0\t0\t0\t39071374\t32507444\n1792036604300\t208629365\t13256285\t0\t0\t0\t0\t0\t0\t23999133\t40063999\n1792036604350\t192395805\t10501180\t0\t0\t0\t0\t0\t0\t313038471\t759585326\n1792036604400\t208328842\t19314277\t0\t0\t0\t0\t0\t0\t261492905\t1493357890\n1792036604450\t213433008\t22614630\t0\t0\t0\t0\t0\t0\t20556148\t29898173\n1792036604500\t209195527\t18019433\t0\t0\t0\t0\t0\t0\t30965677\t13482490\n1792036604550\t208919175\t19503218\t0\t0\t0\t0\t0\t0\t57350102\t47418994\n1792036604600\t206227087\t22040323\t0\t0\t0\t0\t0\t0\t53088066\t36776715\n1792036604650\t220726823\t21417813\t0\t0\t0\t0\t0\t0\t52208781\t39291204\n1792036604700\t225666640\t22907364\t0\t0\t0\t0\t0\t0\t16839413\t11951152\n1792036604750\t223503021\t23055486\t0\t0\t0\t0\t0\t0\t9878264\t6215561\n1792036604800\t222517482\t22755691\t0\t0\t0\t0\t0\t0\t5130624\t1456046\n1792036604850\t219451360\t21080189\t0\t0\t0\t0\t0\t0\t18582873\t11917276\n1792036604900\t218733518\t23225118\t0\t0\t0\t0\t0\t0\t66233245\t47063548\n1792036604950\t216692208\t22744791\t0\t0\t0\t0\t0\t0\t10938705\t5750534\n1792036605000\t213815835\t21144199\t0\t0\t0\t0\t0\t0\t22616314\t12993484\n1792036605050\t213880247\t23073322\t0\t0\t0\t0\t0\t0\t33719788\t28469424\n1792036605100\t206247320\t19652909\t0\t0\t0\t0\t0\t0\t28304415\t17158454\n1792036605150\t208718893\t20828349\t0\t0\t0\t0\t113079\t7631\t48944900\t42926944\n1792036605200\t213074979\t1091362980\t48751\t101036\t0\t0\t892785\t590789\t33350264\t37161341\n1792036605250\t218960480\t1138456426\t0\t0\t0\t0\t261641\t72184\t10921570\t30071102\n1792036605300\t215651047\t1123450065\t0\t0\t0\t0\t0\t0\t112118992\t208927105\n1792036605350\t214903479\t1116421584\t0\t0\t0\t0\t0\t0\t12598925\t49559305\n1792036605400\t211927685\t1050301867\t0\t0\t0\t0\t40617\t13915\t19269758\t86646176\n1792036605450\t213153933\t1038017788\t0\t0\t0\t0\t0\t0\t14446564\t59810184\n1792036605500\t211127435\t1080316229\t0\t0\t0\t0\t0\t0\t17274830\t67786741\n1792036605550\t209190156\t1082606519\t0\t0\t0\t0\t0\t0\t24401968\t92409639\n1792036605600\t208201905\t1093601065\t0\t0\t0\t0\t0\t0\t22756395\t98857185\n1792036605650\t206514795\t958149385\t0\t0\t0\t0\t0\t0\t25656522\t110465541\n1792036605700\t214535720\t1120442498\t0\t0\t0\t0\t0\t0\t29257648\t118308040\n1792036605750\t225674715\t1180472387\t0\t0\t0\t0\t0\t0\t11322128\t50391058\n1792036605800\t224012322\t1156089110\t0\t0\t0\t0\t0\t0\t3679332\t11302529\n1792036605850\t222488526\t1063193027\t0\t0\t0\t0\t0\t0\t3598110\t14075110\n1792036605900\t220703516\t1155292321\t0\t0\t0\t0\t0\t0\t10326947\t36044612\n1792036605950\t219007136\t1138362479\t0\t0\t0\t0\t0\t0\t9810073\t40819356\n1792036606000\t214782384\t1118285143\t0\t0\t0\t0\t0\t0\t9010943\t39952949\n1792036606050\t216271299\t1127550614\t0\t0\t0\t0\t0\t0\t68669368\t79511911\n1792036606100\t214063239\t1116674730\t0\t0\t0\t0\t0\t0\t18654557\t70788465\n1792036606150\t213230481\t1069338100\t0\t0\t0\t0\t0\t0\t18050968\t83933773\n1792036606200\t33538575\t175463473\t1525266\t3182870\t0\t0\t5320623\t6213936\t18868663\t61314699\n1792036606250\t0\t0\t0\t0\t0\t0\t325734\t194390\t18156146\t42782753\n1792036606300\t0\t0\t0\t0\t0\t0\t0\t0\t448348\t1134188\n1792036606350\t0\t0\t0\t0\t0\t0\t0\t0\t8774131\t21962074\n1792036606400\t0\t0\t0\t0\t0\t0\t0\t0\t3689559\t8287067\n1792036606450\t0\t0\t0\t0\t0\t0\t0\t0\t681995\t515784\n1792036606500\t0\t0\t0\t0\t0\t0\t0\t0\t261731168\t587121253\n1792036606600\t0\t0\t0\t0\t0\t0\t0\t0\t195091592\t433873152\n1792036606650\t0\t0\t0\t0\t0\t0\t0\t0\t8859178\t10159327\n1792036606700\t0\t0\t0\t0\t0\t0\t0\t0\t93240212\t190387236\n1792036606750\t0\t0\t0\t0\t0\t0\t0\t0\t8983283\t11144474\n1792036606800\t0\t0\t0\t0\t0\t0\t0\t0\t2553959\t4302703\n1792036606850\t0\t0\t0\t0\t0\t0\t0\t0\t4427868\t7259663\n1792036606900\t0\t0\t0\t0\t0\t0\t0\t0\t7049209\t13790857\n1792036606950\t0\t0\t0\t0\t0\t0\t0\t0\t82267641\t145283152\n1792036607000\t0\t0\t0\t0\t0\t0\t0\t0\t111947726\t311216540\n1792036607050\t0\t0\t0\t0\t0\t0\t0\t0\t30399748\t66706796\n1792036607100\t0\t0\t0\t0\t0\t0\t0\t0\t14210924\t22313339\n1792036607150\t0\t0\t0\t0\t0\t0\t0\t0\t126689682\t239941168\n1792036607200\t0\t0\t0\t0\t0\t0\t0\t0\t44016589\t55679559\n1792036607250\t0\t0\t0\t0\t0\t0\t165917\t16659\t11078325\t13392750\n1792036607300\t0\t0\t0\t0\t0\t0\t22\t1\t5854760\t4956978\n1792036607350\t0\t0\t0\t0\t0\t0\t0\t0\t59134666\t78732772\n1792036607400\t0\t0\t0\t0\t0\t0\t0\t0\t61428556\t68973927\n1792036607450\t0\t0\t0\t0\t0\t0\t0\t0\t45254173\t45721040\n1792036607500\t0\t0\t0\t0\t0\t0\t0\t0\t1227306\t980467\n1792036607550\t0\t0\t0\t0\t0\t0\t0\t0\t837192\t441467\n1792036607600\t0\t0\t0\t0\t0\t0\t0\t0\t34355052\t36973071\n1792036607650\t0\t0\t0\t0\t0\t0\t0\t0\t12417476\t17584335\n1792036607700\t0\t0\t78082719\t193410175\t0\t0\t53392837\t116677448\t249920575\t364951860\n1792036607750\t0\t0\t238527964\t607995348\t10766547\t18489464\t67573016\t260132322\t614991616\t1408948641\n1792036607800\t0\t0\t0\t0\t0\t0\t0\t0\t3912483\t4681862\n1792036607850\t0\t0\t0\t0\t0\t0\t0\t0\t3338917\t4253247\n1792036607900\t0\t0\t0\t0\t0\t0\t0\t0\t437508\t619373\n1792036607950\t0\t0\t0\t0\t0\t0\t0\t0\t18115834\t28204658\n1792036608000\t0\t0\t0\t0\t0\t0\t0\t0\t32055298\t55144351\n", "gc": "[2026-10-15T13:56:32.000+1000][0.005s] Using G1\n[2026-10-15T13:56:47.783+1000][15.788s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 103M->8M(1024M) 1.971ms\n[2026-10-15T13:56:53.174+1000][21.179s] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 57M->11M(1024M) 1.424ms\n[2026-10-15T13:56:53.201+1000][21.206s] GC(2) Pause Young (Normal) (G1 Evacuation Pause) 85M->14M(1024M) 0.976ms\n", "load": ""}));
+</script>

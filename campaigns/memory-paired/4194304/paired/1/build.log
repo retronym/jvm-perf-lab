@@ -1,0 +1,63 @@
+[xctrace] Starting recording with the perflab-mem-l1d-5561468488101111930.template template. Attaching to: java (80124). 
+[xctrace] Ctrl-C to stop the recording
+[perflab] paired paired. (us/op): sequential 1211 shuffled 5.937e+04 (+4805.60% ± 170.35, median +4855.89%, 4 pairs)
+[perflab] paired paired.gcFree. (us/op): sequential 1211 shuffled 5.937e+04 (+4805.60% ± 170.35, median +4855.89%, 4 pairs)
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   550 /   194.6 /   11
+  WARMUP        2:    85 /    27.6 /    2
+  WARMUP        3:    16 /     8.7 /    1
+  WARMUP        4:    13 /     0.8 /    1
+  MEASUREMENT   5:    21 /     2.4 /    0
+  MEASUREMENT   6:    19 /     2.7 /    0
+  MEASUREMENT   7:     9 /     0.8 /    0
+  MEASUREMENT   8:     7 /     2.3 /    0
+  MEASUREMENT   9:    10 /     0.7 /    0
+  MEASUREMENT  10:     5 /     1.0 /    0
+  MEASUREMENT  11:    15 /     1.9 /    0
+  MEASUREMENT  12:    14 /     1.4 /    0
+[jit] compiled while measuring:
+     2  java.nio.ByteBuffer.wrap (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$HandleTable.assign (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeClassDesc (tier 3)
+     1  java.io.ObjectOutputStream.writeHandle (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectOutputStream.writeOrdinaryObject (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.getClassDataLayout (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.io.ObjectStreamClass.isExternalizable (tier 3)
+     1  java.io.ObjectStreamClass.isRecord (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-chase-80124.txt
+[xctrace] code map: 3401 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: chase-80124.trace
+
+== INST_ALL (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  __psynch_cvwait
+
+== L1D_CACHE_MISS_LD_NONSPEC (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  __psynch_cvwait
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  __psynch_cvwait
+
+== LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  __psynch_cvwait
+
+== samples (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  __psynch_cvwait
+[perflab] paired xctrace.INST_ALL. (#/op): sequential 2.565e+07 shuffled 2.552e+07 (-0.51% ± 0.24, median -0.56%, 4 pairs)
+[perflab] paired xctrace.L1D_CACHE_MISS_LD_NONSPEC. (#/op): sequential 3919 shuffled 3.971e+06 (+101251.83% ± 1889.06, median +101069.91%, 4 pairs)
+[perflab] paired xctrace.CORE_ACTIVE_CYCLE. (#/op): sequential 5.244e+06 shuffled 2.540e+08 (+4745.61% ± 131.07, median +4789.00%, 4 pairs)
+[perflab] paired xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS. (#/op): sequential 4.207e+04 shuffled 1.807e+08 (+430008.59% ± 20615.62, median +434999.84%, 4 pairs)

@@ -1,0 +1,441 @@
+# JMH version: 1.37
+# VM version: JDK 21.0.12.1, OpenJDK 64-Bit Server VM, 21.0.12.1+1-LTS
+# VM invoker: ~/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java
+# VM options: -Xms1G -Xmx1G -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/branch-paired/1048576/paired/1/gc.log:time,uptime -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/branch-paired/1048576/paired/1
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 4 iterations, 1 s each
+# Measurement: 8 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: sample.BranchBenchmark.sumAbove
+# Parameters: (data = random, size = 1048576, variants = sorted=sorted|random=random)
+
+# Run progress: 0.00% complete, ETA 00:00:12
+# Fork: 1 of 1
+# Warmup Iteration   1: 276.239 us/op
+# Warmup Iteration   2: 2145.818 us/op
+# Warmup Iteration   3: 2101.985 us/op
+# Warmup Iteration   4: 254.005 us/op
+Iteration   1: 259.660 us/op
+                 gc.alloc.rate:      0.058 MB/sec
+                 gc.alloc.rate.norm: 15.936 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 2133.481 us/op
+                 gc.alloc.rate:      0.063 MB/sec
+                 gc.alloc.rate.norm: 141.492 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 2094.232 us/op
+                 gc.alloc.rate:      0.040 MB/sec
+                 gc.alloc.rate.norm: 87.766 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 254.828 us/op
+                 gc.alloc.rate:      0.036 MB/sec
+                 gc.alloc.rate.norm: 9.544 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 257.470 us/op
+                 gc.alloc.rate:      0.032 MB/sec
+                 gc.alloc.rate.norm: 8.656 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   6: 2154.722 us/op
+                 gc.alloc.rate:      0.033 MB/sec
+                 gc.alloc.rate.norm: 74.609 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   7: 2188.232 us/op
+                 gc.alloc.rate:      0.034 MB/sec
+                 gc.alloc.rate.norm: 78.800 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   8: 257.793 us/op
+                 gc.alloc.rate:                                       0.401 MB/sec
+                 gc.alloc.rate.norm:                                  273.219 B/op
+                 gc.count:                                            ≈ 0 counts
+                 jit.compilations:                                    101.000 #
+                 jit.compileTime:                                     14.064 ms
+                 jit.deopts:                                          ≈ 0 #
+                 jit.lastWarmup.compilations:                         12.000 #
+                 jit.lastWarmup.deopts:                               1.000 #
+                 paired.gcFree.random:                                2142.667 us/op
+                 paired.gcFree.random.delta%:                         732.295 %
+                 paired.gcFree.random.delta%.median:                  729.352 %
+                 paired.gcFree.random.delta%.sd:                      13.137 %
+                 paired.gcFree.sorted:                                257.438 us/op
+                 paired.random:                                       2142.667 us/op
+                 paired.random.delta%:                                732.295 %
+                 paired.random.delta%.median:                         729.352 %
+                 paired.random.delta%.sd:                             13.137 %
+                 paired.sorted:                                       257.438 us/op
+                 xctrace.BRANCH_MISPRED_NONSPEC:                      49331.281 #/op
+                 xctrace.BRANCH_MISPRED_NONSPEC.random:               457154.011 #/op
+                 xctrace.BRANCH_MISPRED_NONSPEC.random.delta%:        178051.969 %
+                 xctrace.BRANCH_MISPRED_NONSPEC.random.delta%.median: 178068.669 %
+                 xctrace.BRANCH_MISPRED_NONSPEC.random.delta%.sd:     1119.722 %
+                 xctrace.BRANCH_MISPRED_NONSPEC.sorted:               256.609 #/op
+                 xctrace.BRANCH_MISPRED_NONSPEC/kinst:                7.602 #/kinst
+                 xctrace.CORE_ACTIVE_CYCLE:                           1964183.847 #/op
+                 xctrace.CORE_ACTIVE_CYCLE.random:                    9127082.874 #/op
+                 xctrace.CORE_ACTIVE_CYCLE.random.delta%:             728.080 %
+                 xctrace.CORE_ACTIVE_CYCLE.random.delta%.median:      728.568 %
+                 xctrace.CORE_ACTIVE_CYCLE.random.delta%.sd:          4.631 %
+                 xctrace.CORE_ACTIVE_CYCLE.sorted:                    1102214.604 #/op
+                 xctrace.INST_ALL:                                    6489597.883 #/op
+                 xctrace.INST_ALL.random:                             6449365.883 #/op
+                 xctrace.INST_ALL.random.delta%:                      ≈ 0 %
+                 xctrace.INST_ALL.random.delta%.median:               ≈ 0 %
+                 xctrace.INST_ALL.random.delta%.sd:                   1.328 %
+                 xctrace.INST_ALL.sorted:                             6494586.055 #/op
+                 xctrace.INST_BRANCH:                                 1746790.091 #/op
+                 xctrace.INST_BRANCH.random:                          1735915.148 #/op
+                 xctrace.INST_BRANCH.random.delta%:                   ≈ 0 %
+                 xctrace.INST_BRANCH.random.delta%.median:            ≈ 0 %
+                 xctrace.INST_BRANCH.random.delta%.sd:                1.329 %
+                 xctrace.INST_BRANCH.sorted:                          1748138.649 #/op
+                 xctrace.INST_BRANCH/kinst:                           269.168 #/kinst
+                 xctrace.IPC.bench:                                   3.304 insts/clk
+                 xctrace.IPC.gc:                                      1.769 insts/clk
+                 xctrace.IPC.jit:                                     2.581 insts/clk
+                 xctrace.IPC.other:                                   3.123 insts/clk
+                 xctrace.bench.oncpu:                                 8.031 s
+                 xctrace.cycles%.bench:                               98.368 %
+                 xctrace.cycles%.gc:                                  0.107 %
+                 xctrace.cycles%.jit:                                 1.134 %
+                 xctrace.cycles%.other:                               0.392 %
+
+
+
+Result "sample.BranchBenchmark.sumAbove":
+  1200.052 ±(99.9%) 1927.324 us/op [Average]
+  (min, avg, max) = (254.828, 1200.052, 2188.232), stdev = 1008.028
+  CI (99.9%): [≈ 0, 3127.376] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:gc.alloc.rate":
+  0.087 ±(99.9%) 0.243 MB/sec [Average]
+  (min, avg, max) = (0.032, 0.087, 0.401), stdev = 0.127
+  CI (99.9%): [≈ 0, 0.331] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:gc.alloc.rate.norm":
+  86.253 ±(99.9%) 169.557 B/op [Average]
+  (min, avg, max) = (8.656, 86.253, 273.219), stdev = 88.682
+  CI (99.9%): [≈ 0, 255.810] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:gc.count":
+  ≈ 0 counts
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.compilations":
+  101.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 12.625, 101.000), stdev = 35.709
+  CI (99.9%): [101.000, 101.000] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.compileTime":
+  14.064 ±(99.9%) 0.001 ms [Maximum]
+  (min, avg, max) = (≈ 0, 1.758, 14.064), stdev = 4.972
+  CI (99.9%): [14.064, 14.064] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.deopts":
+  ≈ 0 #
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.lastWarmup.compilations":
+  12.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 1.500, 12.000), stdev = 4.243
+  CI (99.9%): [12.000, 12.000] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.lastWarmup.deopts":
+  1.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 0.125, 1.000), stdev = 0.354
+  CI (99.9%): [1.000, 1.000] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.gcFree.random":
+  2142.667 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 267.833, 2142.667), stdev = 757.547
+  CI (99.9%): [2142.667, 2142.667] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.gcFree.random.delta%":
+  732.295 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 91.537, 732.295), stdev = 258.905
+  CI (99.9%): [732.295, 732.295] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.gcFree.random.delta%.median":
+  729.352 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 91.169, 729.352), stdev = 257.865
+  CI (99.9%): [729.352, 729.352] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.gcFree.random.delta%.sd":
+  13.137 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 1.642, 13.137), stdev = 4.644
+  CI (99.9%): [13.137, 13.137] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.gcFree.sorted":
+  257.438 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 32.180, 257.438), stdev = 91.018
+  CI (99.9%): [257.438, 257.438] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.random":
+  2142.667 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 267.833, 2142.667), stdev = 757.547
+  CI (99.9%): [2142.667, 2142.667] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.random.delta%":
+  732.295 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 91.537, 732.295), stdev = 258.905
+  CI (99.9%): [732.295, 732.295] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.random.delta%.median":
+  729.352 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 91.169, 729.352), stdev = 257.865
+  CI (99.9%): [729.352, 729.352] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.random.delta%.sd":
+  13.137 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 1.642, 13.137), stdev = 4.644
+  CI (99.9%): [13.137, 13.137] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.sorted":
+  257.438 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 32.180, 257.438), stdev = 91.018
+  CI (99.9%): [257.438, 257.438] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC":
+  49331.281 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 6166.410, 49331.281), stdev = 17441.242
+  CI (99.9%): [49331.281, 49331.281] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC.random":
+  457154.011 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 57144.251, 457154.011), stdev = 161628.351
+  CI (99.9%): [457154.011, 457154.011] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC.random.delta%":
+  178051.969 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 22256.496, 178051.969), stdev = 62950.877
+  CI (99.9%): [178051.969, 178051.969] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC.random.delta%.median":
+  178068.669 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 22258.584, 178068.669), stdev = 62956.782
+  CI (99.9%): [178068.669, 178068.669] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC.random.delta%.sd":
+  1119.722 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 139.965, 1119.722), stdev = 395.881
+  CI (99.9%): [1119.722, 1119.722] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC.sorted":
+  256.609 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 32.076, 256.609), stdev = 90.725
+  CI (99.9%): [256.609, 256.609] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC/kinst":
+  7.602 ±(99.9%) 0.001 #/kinst [Maximum]
+  (min, avg, max) = (≈ 0, 0.950, 7.602), stdev = 2.688
+  CI (99.9%): [7.602, 7.602] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE":
+  1964183.847 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 245522.981, 1964183.847), stdev = 694443.859
+  CI (99.9%): [1964183.847, 1964183.847] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE.random":
+  9127082.874 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 1140885.359, 9127082.874), stdev = 3226911.096
+  CI (99.9%): [9127082.874, 9127082.874] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE.random.delta%":
+  728.080 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 91.010, 728.080), stdev = 257.415
+  CI (99.9%): [728.080, 728.080] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE.random.delta%.median":
+  728.568 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 91.071, 728.568), stdev = 257.588
+  CI (99.9%): [728.568, 728.568] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE.random.delta%.sd":
+  4.631 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.579, 4.631), stdev = 1.637
+  CI (99.9%): [4.631, 4.631] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE.sorted":
+  1102214.604 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 137776.825, 1102214.604), stdev = 389691.710
+  CI (99.9%): [1102214.604, 1102214.604] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_ALL":
+  6489597.883 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 811199.735, 6489597.883), stdev = 2294419.335
+  CI (99.9%): [6489597.883, 6489597.883] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_ALL.random":
+  6449365.883 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 806170.735, 6449365.883), stdev = 2280195.175
+  CI (99.9%): [6449365.883, 6449365.883] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_ALL.random.delta%":
+  ≈ 0 %
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_ALL.random.delta%.median":
+  ≈ 0 %
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_ALL.random.delta%.sd":
+  1.328 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.166, 1.328), stdev = 0.469
+  CI (99.9%): [1.328, 1.328] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_ALL.sorted":
+  6494586.055 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 811823.257, 6494586.055), stdev = 2296182.920
+  CI (99.9%): [6494586.055, 6494586.055] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_BRANCH":
+  1746790.091 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 218348.761, 1746790.091), stdev = 617583.559
+  CI (99.9%): [1746790.091, 1746790.091] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_BRANCH.random":
+  1735915.148 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 216989.393, 1735915.148), stdev = 613738.686
+  CI (99.9%): [1735915.148, 1735915.148] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_BRANCH.random.delta%":
+  ≈ 0 %
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_BRANCH.random.delta%.median":
+  ≈ 0 %
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_BRANCH.random.delta%.sd":
+  1.329 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.166, 1.329), stdev = 0.470
+  CI (99.9%): [1.329, 1.329] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_BRANCH.sorted":
+  1748138.649 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 218517.331, 1748138.649), stdev = 618060.347
+  CI (99.9%): [1748138.649, 1748138.649] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_BRANCH/kinst":
+  269.168 ±(99.9%) 0.001 #/kinst [Maximum]
+  (min, avg, max) = (≈ 0, 33.646, 269.168), stdev = 95.165
+  CI (99.9%): [269.168, 269.168] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.IPC.bench":
+  3.304 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.413, 3.304), stdev = 1.168
+  CI (99.9%): [3.304, 3.304] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.IPC.gc":
+  1.769 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.221, 1.769), stdev = 0.626
+  CI (99.9%): [1.769, 1.769] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.IPC.jit":
+  2.581 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.323, 2.581), stdev = 0.912
+  CI (99.9%): [2.581, 2.581] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.IPC.other":
+  3.123 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.390, 3.123), stdev = 1.104
+  CI (99.9%): [3.123, 3.123] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.bench.oncpu":
+  8.031 ±(99.9%) 0.001 s [Maximum]
+  (min, avg, max) = (≈ 0, 1.004, 8.031), stdev = 2.839
+  CI (99.9%): [8.031, 8.031] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.cycles%.bench":
+  98.368 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 12.296, 98.368), stdev = 34.778
+  CI (99.9%): [98.368, 98.368] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.cycles%.gc":
+  0.107 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.013, 0.107), stdev = 0.038
+  CI (99.9%): [0.107, 0.107] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.cycles%.jit":
+  1.134 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.142, 1.134), stdev = 0.401
+  CI (99.9%): [1.134, 1.134] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.cycles%.other":
+  0.392 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.049, 0.392), stdev = 0.138
+  CI (99.9%): [0.392, 0.392] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:20
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                                     (data)   (size)                   (variants)  Mode  Cnt        Score      Error      Units
+BranchBenchmark.sumAbove                                                      random  1048576  sorted=sorted|random=random  avgt    8     1200.052 ± 1927.324      us/op
+BranchBenchmark.sumAbove:gc.alloc.rate                                        random  1048576  sorted=sorted|random=random  avgt    8        0.087 ±    0.243     MB/sec
+BranchBenchmark.sumAbove:gc.alloc.rate.norm                                   random  1048576  sorted=sorted|random=random  avgt    8       86.253 ±  169.557       B/op
+BranchBenchmark.sumAbove:gc.count                                             random  1048576  sorted=sorted|random=random  avgt    8          ≈ 0                counts
+BranchBenchmark.sumAbove:jit.compilations                                     random  1048576  sorted=sorted|random=random  avgt    8      101.000                     #
+BranchBenchmark.sumAbove:jit.compileTime                                      random  1048576  sorted=sorted|random=random  avgt    8       14.064                    ms
+BranchBenchmark.sumAbove:jit.deopts                                           random  1048576  sorted=sorted|random=random  avgt    8          ≈ 0                     #
+BranchBenchmark.sumAbove:jit.lastWarmup.compilations                          random  1048576  sorted=sorted|random=random  avgt    8       12.000                     #
+BranchBenchmark.sumAbove:jit.lastWarmup.deopts                                random  1048576  sorted=sorted|random=random  avgt    8        1.000                     #
+BranchBenchmark.sumAbove:paired.gcFree.random                                 random  1048576  sorted=sorted|random=random  avgt    8     2142.667                 us/op
+BranchBenchmark.sumAbove:paired.gcFree.random.delta%                          random  1048576  sorted=sorted|random=random  avgt    8      732.295                     %
+BranchBenchmark.sumAbove:paired.gcFree.random.delta%.median                   random  1048576  sorted=sorted|random=random  avgt    8      729.352                     %
+BranchBenchmark.sumAbove:paired.gcFree.random.delta%.sd                       random  1048576  sorted=sorted|random=random  avgt    8       13.137                     %
+BranchBenchmark.sumAbove:paired.gcFree.sorted                                 random  1048576  sorted=sorted|random=random  avgt    8      257.438                 us/op
+BranchBenchmark.sumAbove:paired.random                                        random  1048576  sorted=sorted|random=random  avgt    8     2142.667                 us/op
+BranchBenchmark.sumAbove:paired.random.delta%                                 random  1048576  sorted=sorted|random=random  avgt    8      732.295                     %
+BranchBenchmark.sumAbove:paired.random.delta%.median                          random  1048576  sorted=sorted|random=random  avgt    8      729.352                     %
+BranchBenchmark.sumAbove:paired.random.delta%.sd                              random  1048576  sorted=sorted|random=random  avgt    8       13.137                     %
+BranchBenchmark.sumAbove:paired.sorted                                        random  1048576  sorted=sorted|random=random  avgt    8      257.438                 us/op
+BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC                       random  1048576  sorted=sorted|random=random  avgt    8    49331.281                  #/op
+BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC.random                random  1048576  sorted=sorted|random=random  avgt    8   457154.011                  #/op
+BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC.random.delta%         random  1048576  sorted=sorted|random=random  avgt    8   178051.969                     %
+BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC.random.delta%.median  random  1048576  sorted=sorted|random=random  avgt    8   178068.669                     %
+BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC.random.delta%.sd      random  1048576  sorted=sorted|random=random  avgt    8     1119.722                     %
+BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC.sorted                random  1048576  sorted=sorted|random=random  avgt    8      256.609                  #/op
+BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC/kinst                 random  1048576  sorted=sorted|random=random  avgt    8        7.602               #/kinst
+BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE                            random  1048576  sorted=sorted|random=random  avgt    8  1964183.847                  #/op
+BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE.random                     random  1048576  sorted=sorted|random=random  avgt    8  9127082.874                  #/op
+BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE.random.delta%              random  1048576  sorted=sorted|random=random  avgt    8      728.080                     %
+BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE.random.delta%.median       random  1048576  sorted=sorted|random=random  avgt    8      728.568                     %
+BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE.random.delta%.sd           random  1048576  sorted=sorted|random=random  avgt    8        4.631                     %
+BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE.sorted                     random  1048576  sorted=sorted|random=random  avgt    8  1102214.604                  #/op
+BranchBenchmark.sumAbove:xctrace.INST_ALL                                     random  1048576  sorted=sorted|random=random  avgt    8  6489597.883                  #/op
+BranchBenchmark.sumAbove:xctrace.INST_ALL.random                              random  1048576  sorted=sorted|random=random  avgt    8  6449365.883                  #/op
+BranchBenchmark.sumAbove:xctrace.INST_ALL.random.delta%                       random  1048576  sorted=sorted|random=random  avgt    8          ≈ 0                     %
+BranchBenchmark.sumAbove:xctrace.INST_ALL.random.delta%.median                random  1048576  sorted=sorted|random=random  avgt    8          ≈ 0                     %
+BranchBenchmark.sumAbove:xctrace.INST_ALL.random.delta%.sd                    random  1048576  sorted=sorted|random=random  avgt    8        1.328                     %
+BranchBenchmark.sumAbove:xctrace.INST_ALL.sorted                              random  1048576  sorted=sorted|random=random  avgt    8  6494586.055                  #/op
+BranchBenchmark.sumAbove:xctrace.INST_BRANCH                                  random  1048576  sorted=sorted|random=random  avgt    8  1746790.091                  #/op
+BranchBenchmark.sumAbove:xctrace.INST_BRANCH.random                           random  1048576  sorted=sorted|random=random  avgt    8  1735915.148                  #/op
+BranchBenchmark.sumAbove:xctrace.INST_BRANCH.random.delta%                    random  1048576  sorted=sorted|random=random  avgt    8          ≈ 0                     %
+BranchBenchmark.sumAbove:xctrace.INST_BRANCH.random.delta%.median             random  1048576  sorted=sorted|random=random  avgt    8          ≈ 0                     %
+BranchBenchmark.sumAbove:xctrace.INST_BRANCH.random.delta%.sd                 random  1048576  sorted=sorted|random=random  avgt    8        1.329                     %
+BranchBenchmark.sumAbove:xctrace.INST_BRANCH.sorted                           random  1048576  sorted=sorted|random=random  avgt    8  1748138.649                  #/op
+BranchBenchmark.sumAbove:xctrace.INST_BRANCH/kinst                            random  1048576  sorted=sorted|random=random  avgt    8      269.168               #/kinst
+BranchBenchmark.sumAbove:xctrace.IPC.bench                                    random  1048576  sorted=sorted|random=random  avgt    8        3.304             insts/clk
+BranchBenchmark.sumAbove:xctrace.IPC.gc                                       random  1048576  sorted=sorted|random=random  avgt    8        1.769             insts/clk
+BranchBenchmark.sumAbove:xctrace.IPC.jit                                      random  1048576  sorted=sorted|random=random  avgt    8        2.581             insts/clk
+BranchBenchmark.sumAbove:xctrace.IPC.other                                    random  1048576  sorted=sorted|random=random  avgt    8        3.123             insts/clk
+BranchBenchmark.sumAbove:xctrace.bench.oncpu                                  random  1048576  sorted=sorted|random=random  avgt    8        8.031                     s
+BranchBenchmark.sumAbove:xctrace.cycles%.bench                                random  1048576  sorted=sorted|random=random  avgt    8       98.368                     %
+BranchBenchmark.sumAbove:xctrace.cycles%.gc                                   random  1048576  sorted=sorted|random=random  avgt    8        0.107                     %
+BranchBenchmark.sumAbove:xctrace.cycles%.jit                                  random  1048576  sorted=sorted|random=random  avgt    8        1.134                     %
+BranchBenchmark.sumAbove:xctrace.cycles%.other                                random  1048576  sorted=sorted|random=random  avgt    8        0.392                     %
+
+Benchmark result is saved to ~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/branch-paired/1048576/paired/1/result.json

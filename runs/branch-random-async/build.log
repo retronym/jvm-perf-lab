@@ -1,0 +1,27 @@
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   533 /   149.4 /    6
+  WARMUP        2:    83 /   110.9 /    6
+  WARMUP        3:    16 /     4.9 /    1
+  MEASUREMENT   4:     5 /     6.3 /    0
+  MEASUREMENT   5:     4 /     0.3 /    0
+  MEASUREMENT   6:     9 /     2.8 /    0
+  MEASUREMENT   7:     9 /     0.5 /    0
+  MEASUREMENT   8:     1 /     0.0 /    0
+[jit] compiled while measuring:
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.Byte.valueOf (tier 3)
+     1  java.lang.StringLatin1.compareTo (tier 3)
+     1  java.lang.invoke.DirectMethodHandle$Holder.invokeSpecial (tier 3)
+     1  java.lang.invoke.Invokers$Holder.linkToTargetMethod (tier 4)
+     1  java.lang.invoke.LambdaForm$MH.0x0000008001008000.invoke (tier 3)
+     1  java.nio.Buffer.position (tier 1)
+     1  java.util.Collections$1.hasNext (tier 1)
+     1  java.util.stream.FindOps$FindSink.cancellationRequested (tier 1)
+     1  java.util.stream.StreamSupport.stream (tier 3)
+     1  jdk.jfr.consumer.RecordedObject.getValue (tier 4)
+     1  jdk.jfr.internal.Logger.log (tier 3)
+     1  jdk.jfr.internal.consumer.ChunkParser$$Lambda.0x00000080010a8608.accept (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-sumAbove-9959.txt

@@ -1,0 +1,19 @@
+-o
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/audit-normalize/jmh.log
+-rf
+json
+-rff
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/audit-normalize/result.json
+-jvmArgsPrepend
+-javaagent:~/code/retronym/jvm-perf-lab/examples/sample/../../perflab-agent/target/perflab-agent-0.1.0-SNAPSHOT.jar=spec=~/code/retronym/jvm-perf-lab/examples/sample/campaigns/normalize.audit,out=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/audit-normalize/audit-{pid}.json
+-jvmArgsAppend
+-Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/audit-normalize -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/audit-normalize/gc-%p.log:time,uptime
+-wi
+1
+-i
+1
+-w
+1
+-r
+1
+WordCountBenchmark

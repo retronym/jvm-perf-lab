@@ -1,0 +1,77 @@
+<!doctype html><meta charset='utf-8'><title>wordcount-2-forks-xctrace-ipc: hot methods by counter</title><style>:root{--bg:#f6f7f9;--fg:#1d232b;--muted:#5d6875;--line:#dde2e8;--link:#2f6fb2;--panel:#fff}
+@media (prefers-color-scheme: dark){:root{--bg:#14181d;--fg:#e3e8ee;--muted:#94a0ad;--line:#2c333c;--link:#6ea8e6;--panel:#1b2027;color-scheme:dark}}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 -apple-system,system-ui,sans-serif;margin:0} main{max-width:1100px;margin:0 auto;padding:20px 16px}
+a{color:var(--link)} h1{font-size:20px} h2{font-size:15px;margin:16px 0 4px} .k{color:var(--muted);font-size:12px;margin:0}
+section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:10px 0}
+table{border-collapse:collapse;font-size:12px;margin:6px 0} details{margin:6px 0} summary{cursor:pointer}
+pre{font-size:12px;overflow-x:auto} .scroll{overflow-x:auto} table.o td{text-align:right;white-space:nowrap} table.m th{font-weight:normal;color:var(--muted)} table.g th{width:120px} a.empty{color:var(--muted)} dt{font-weight:600;margin-top:6px} dd{margin:0 0 0 18px} main>p,main>ul,main>ol,main>dl{max-width:900px} li{margin:3px 0} .filters{position:sticky;top:0;z-index:1;background:var(--bg);padding:6px 0;margin:8px 0} .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0} .chips .k{width:80px} .chips button{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:999px;padding:2px 10px;cursor:pointer} .chips button[aria-pressed=true]{background:var(--link);border-color:var(--link);color:#fff} [hidden]{display:none!important} th[title]{cursor:help} td,th{border:1px solid var(--line);padding:3px 8px;text-align:left;overflow-wrap:anywhere}</style><main><h1>wordcount-2-forks-xctrace-ipc: hot methods by counter</h1><pre>
+== INST_ALL (bench threads)
+   50.2%  java.util.HashMap.merge
+   40.1%  sample.WordCountBenchmark.countAndLookUp
+    5.1%  java.util.HashMap.resize
+    4.2%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.0%  pthread_jit_write_protect_np
+    0.0%  &lt;unknown 0x1245e2665&gt;
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  _tlv_get_addr
+    0.0%  __bzero
+    0.0%  MemAllocator::Allocation::check_out_of_memory()
+    0.0%  OptoRuntime::new_instance_C(Klass*, JavaThread*)
+
+== INST_BRANCH (bench threads)
+   50.2%  java.util.HashMap.merge
+   40.1%  sample.WordCountBenchmark.countAndLookUp
+    5.0%  java.util.HashMap.resize
+    4.2%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.0%  pthread_jit_write_protect_np
+    0.0%  &lt;unknown 0x1245e2665&gt;
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  _tlv_get_addr
+    0.0%  MemAllocator::Allocation::check_out_of_memory()
+    0.0%  __bzero
+    0.0%  Klass::check_array_allocation_length(int, int, JavaThread*)
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   50.6%  java.util.HashMap.merge
+   39.6%  sample.WordCountBenchmark.countAndLookUp
+    5.0%  java.util.HashMap.resize
+    4.4%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  &lt;unknown 0x1245e2665&gt;
+    0.0%  pthread_jit_write_protect_np
+    0.0%  Klass::check_array_allocation_length(int, int, JavaThread*)
+    0.0%  MemAllocator::Allocation::check_out_of_memory()
+    0.0%  __bzero
+    0.0%  G1AllocRegion::new_alloc_region_and_allocate(unsigned long, bool)
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   49.4%  java.util.HashMap.merge
+   39.8%  sample.WordCountBenchmark.countAndLookUp
+    6.1%  java.util.HashMap.resize
+    4.2%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.1%  G1FromCardCache::clear(unsigned int)
+    0.0%  pthread_jit_write_protect_np
+    0.0%  &lt;unknown 0x1245e2665&gt;
+    0.0%  OptoRuntime::new_instance_C(Klass*, JavaThread*)
+    0.0%  __bzero
+    0.0%  MemAllocator::Allocation::check_out_of_memory()
+    0.0%  G1AllocRegion::new_alloc_region_and_allocate(unsigned long, bool)
+
+== samples (bench threads)
+   50.9%  java.util.HashMap.merge
+   39.3%  sample.WordCountBenchmark.countAndLookUp
+    5.0%  java.util.HashMap.resize
+    4.4%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.0%  &lt;unknown 0x1245e2665&gt;
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  pthread_jit_write_protect_np
+    0.0%  __bzero
+    0.0%  MemAllocator::mem_allocate_inside_tlab_slow(MemAllocator::Allocation&amp;) const
+    0.0%  __psynch_cvwait
+    0.0%  &lt;unknown 0x124610b01&gt;
+</pre></main>

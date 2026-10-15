@@ -1,0 +1,12 @@
+{
+  "counters": {
+    "normalize.count": 1510000,
+    "normalize.lookup": 15100
+  },
+  "probes": {
+    "normalize-sites": {"kind": "sites", "hits": 1525100, "sample": 100, "sites": {
+      "sample.WordCount.count:19 <- sample.WordCountBenchmark.countAndLookUp:66": 15344,
+      "sample.WordCount.contains:24 <- sample.WordCountBenchmark.countAndLookUp:67": 158
+    }}
+  }
+}

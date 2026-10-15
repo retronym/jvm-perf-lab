@@ -1,0 +1,289 @@
+<!doctype html><meta charset="utf-8"><title>Campaigns</title>
+  <style>:root{--bg:#f6f7f9;--fg:#1d232b;--muted:#5d6875;--line:#dde2e8;--link:#2f6fb2;--panel:#fff}
+  @media (prefers-color-scheme: dark){:root{--bg:#14181d;--fg:#e3e8ee;--muted:#94a0ad;--line:#2c333c;--link:#6ea8e6;--panel:#1b2027;color-scheme:dark}}
+  body{background:var(--bg);color:var(--fg);font:13px/1.5 -apple-system,system-ui,sans-serif;margin:20px} a{color:var(--link)}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 16px;margin:0 0 16px}
+  table{border-collapse:collapse} td,th{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}
+  .pending{color:var(--muted)} code{font-size:11px}
+  .notes{border-left:3px solid var(--link);padding:2px 12px;margin:8px 0 12px} .notes h3{margin:6px 0}
+  .when{color:var(--muted);font-weight:normal;font-size:12px;white-space:nowrap}
+  .bar{position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;border-bottom:1px solid var(--line);margin-bottom:12px}
+  .bar h1{font-size:16px;margin:0}
+  .chip{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:14px;padding:3px 10px;font:inherit;cursor:pointer}
+  .chip.on{background:var(--link);color:var(--bg);border-color:var(--link)} .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+  #q{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:6px;padding:4px 8px;font:inherit;min-width:200px}
+  .hidden{display:none}
+  #tl{margin:0 0 16px} #tl h2{font-size:14px;margin:0 0 6px} #tl select{font:inherit;max-width:100%} #tl .k{color:var(--muted);font-size:12px}
+  
+:root { --life:#9aa5b1; --v0:#2f6fb2; --v1:#c2571a; --v2:#2e8a57; --v3:#8a4fbf; --v4:#b8860b; --v5:#3a9aa6; --pause:#d33; --grey:#c3c9d1; }
+@media (prefers-color-scheme: dark) { :root { --v0:#6ea8e6; --v1:#e58a4e; --v2:#5cc08a; --v3:#b58ae6; --v4:#e0b84a; --v5:#6cc6d1;
+  --pause:#ff6b6b; --grey:#46505c; --life:#5f6b78; } }
+svg.timeline { background:var(--panel); border:1px solid var(--line); border-radius:8px; width:100%; touch-action:none; cursor:grab; display:block; }
+svg.timeline text { fill:var(--fg); font-size:11px; } svg.timeline .lab { fill:var(--muted); } svg.timeline .grid { stroke:var(--line); }
+.tl-legend span { display:inline-block; margin-right:12px; font-size:12px; }
+.tl-legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+.tl-tip { position:fixed; pointer-events:none; background:var(--panel); border:1px solid var(--line); border-radius:6px;
+  padding:4px 8px; font-size:12px; display:none; max-width:360px; z-index:5; }
+</style>
+
+  <header class="bar"><h1>Campaigns</h1><span class="sep"></span><span>corpus:</span><button class="chip" data-corpus="10000">10000</button><button class="chip" data-corpus="100000">100000</button><button class="chip" data-corpus="1048576">1048576</button><button class="chip" data-corpus="4194304">4194304</button><span class="sep"></span>
+  <button class="chip" data-kind="profiled">profiled</button><button class="chip" data-kind="timing">timing only</button>
+  <button class="chip" data-kind="notes">with notes</button><span class="sep"></span>
+  <button class="chip" data-age="86400">last 24 h</button><button class="chip" data-age="10800">last 3 h</button>
+  <input id="q" placeholder="filter: name, flags, notes…"></header>
+  <p>Newest first. bench: benchmark threads · reverse: by leaf · threads: all threads · classify: all threads by category ·
+  bench-/reverse-classify: benchmark threads with --classify. Grey links are not rendered yet; reload after
+  <code>perflab regraph</code> finishes.</p>
+  <section id="tl"><h2>Fork timeline</h2>
+  <div><select id="tl-cell"><option value="branch-paired/1048576/paired/2/">branch-paired · 1048576 · paired #2</option><option value="branch-paired/1048576/paired/1/">branch-paired · 1048576 · paired #1</option><option value="memory-paired/4194304/paired/2/">memory-paired · 4194304 · paired #2</option><option value="memory-paired/4194304/paired/1/">memory-paired · 4194304 · paired #1</option><option value="maps-counters/100000/paired/1/">maps-counters · 100000 · paired #1</option><option value="maps-async/100000/tree/1/">maps-async · 100000 · tree #1</option><option value="maps-async/100000/hash/1/">maps-async · 100000 · hash #1</option><option value="maps/10000/paired/2/">maps · 10000 · paired #2</option><option value="maps/10000/paired/1/">maps · 10000 · paired #1</option><option value="gc/100000/parallel/2/">gc · 100000 · parallel #2</option><option value="gc/100000/g1/2/">gc · 100000 · g1 #2</option><option value="gc/10000/parallel/2/">gc · 10000 · parallel #2</option><option value="gc/10000/g1/2/">gc · 10000 · g1 #2</option><option value="gc/100000/parallel/1/">gc · 100000 · parallel #1</option><option value="gc/100000/g1/1/">gc · 100000 · g1 #1</option><option value="gc/10000/parallel/1/">gc · 10000 · parallel #1</option><option value="gc/10000/g1/1/">gc · 10000 · g1 #1</option></select> <label class="k"><input type="checkbox" id="tl-follow" checked> follow the running fork</label>
+  <span class="k" id="tl-status"></span></div>
+  <div class="tl-legend" id="tl-legend"></div><svg class="timeline" id="tl-chart"></svg>
+  <p class="k">Iterations appear as they finish; counter lanes once the fork has finished (xctrace export). Wheel to zoom, drag to pan, double-click to reset.</p></section>
+  <div class="tl-tip" id="tl-tip"></div>
+  <div id="campaigns">
+  <section data-last="1792036656" data-notes="0"><h2>branch-paired <span class="when">Thu 15 Oct 13:57 – Thu 15 Oct 13:57</span></h2><table class="summary"><tr><th>corpus</th><th>variant</th><th>n</th><th>ms/op</th><th>Δ</th><th>cycles/op</th><th>Δ</th><th>instructions/op</th><th>Δ</th></tr><tr><td>1048576</td><td>paired</td><td>2</td><td>1205 ± 0.6%</td><td></td><td>0.002G ± 0.4%</td><td></td><td>0.007G ± 0.3%</td><td></td></tr></table>
+  <table><tr><th>corpus</th><th>variant</th><th>ms/op</th><th>cycles/op (xctrace)</th><th>instructions/op</th><th>flags</th><th>finished</th><th>flame graphs</th></tr><tr data-corpus="1048576" data-profiled="1"><td>1048576</td><td>paired #1</td><td>1200 ± 1927</td><td>0.00G</td><td>0.006G</td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:57</td><td><a href="branch-paired/1048576/paired/1/timeline.html">timeline</a></td></tr><tr data-corpus="1048576" data-profiled="1"><td>1048576</td><td>paired #2</td><td>1210 ± 1944</td><td>0.00G</td><td>0.007G</td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:57</td><td><a href="branch-paired/1048576/paired/2/timeline.html">timeline</a></td></tr></table></section><section data-last="1792036613" data-notes="0"><h2>memory-paired <span class="when">Thu 15 Oct 13:56 – Thu 15 Oct 13:56</span></h2><table class="summary"><tr><th>corpus</th><th>variant</th><th>n</th><th>ms/op</th><th>Δ</th><th>cycles/op</th><th>Δ</th><th>instructions/op</th><th>Δ</th></tr><tr><td>4194304</td><td>paired</td><td>2</td><td>31343 ± 4.7%</td><td></td><td>0.010G ± 3.1%</td><td></td><td>0.026G ± 0.6%</td><td></td></tr></table>
+  <table><tr><th>corpus</th><th>variant</th><th>ms/op</th><th>cycles/op (xctrace)</th><th>instructions/op</th><th>flags</th><th>finished</th><th>flame graphs</th></tr><tr data-corpus="4194304" data-profiled="1"><td>4194304</td><td>paired #1</td><td>30291 ± 59472</td><td>0.01G</td><td>0.026G</td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:56</td><td><a href="memory-paired/4194304/paired/1/timeline.html">timeline</a></td></tr><tr data-corpus="4194304" data-profiled="1"><td>4194304</td><td>paired #2</td><td>32395 ± 63913</td><td>0.01G</td><td>0.025G</td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:56</td><td><a href="memory-paired/4194304/paired/2/timeline.html">timeline</a></td></tr></table></section><section data-last="1792036570" data-notes="0"><h2>maps-counters <span class="when">Thu 15 Oct 13:56 – Thu 15 Oct 13:56</span></h2><table class="summary"><tr><th>corpus</th><th>variant</th><th>n</th><th>ms/op</th><th>Δ</th><th>cycles/op</th><th>Δ</th><th>instructions/op</th><th>Δ</th></tr><tr><td>100000</td><td>paired</td><td>1</td><td>5886</td><td></td><td>0.018G</td><td></td><td>0.050G</td><td></td></tr></table>
+  <table><tr><th>corpus</th><th>variant</th><th>ms/op</th><th>cycles/op (xctrace)</th><th>instructions/op</th><th>flags</th><th>finished</th><th>flame graphs</th></tr><tr data-corpus="100000" data-profiled="1"><td>100000</td><td>paired #1</td><td>5886 ± 6773</td><td>0.02G</td><td>0.050G</td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:56</td><td><a href="maps-counters/100000/paired/1/timeline.html">timeline</a></td></tr></table></section><section data-last="1792034561" data-notes="0"><h2>maps-async <span class="when">Thu 15 Oct 13:22 – Thu 15 Oct 13:22</span></h2><p>Differential flame graphs (a → b): <a href="maps-async/diff-hash-vs-tree-alloc/diff-alloc.html">hash-vs-tree-alloc</a> · <a href="maps-async/diff-hash-vs-tree-cpu/diff-cpu.html">hash-vs-tree-cpu</a></p><table class="summary"><tr><th>corpus</th><th>variant</th><th>n</th><th>ms/op</th><th>Δ</th><th>cycles/op</th><th>Δ</th><th>instructions/op</th><th>Δ</th></tr><tr><td>100000</td><td>hash</td><td>1</td><td>3145</td><td></td><td></td><td></td><td></td><td></td></tr><tr><td>100000</td><td>tree</td><td>1</td><td>11399</td><td>+262.48%</td><td></td><td></td><td></td><td></td></tr></table>
+  <table><tr><th>corpus</th><th>variant</th><th>ms/op</th><th>cycles/op (xctrace)</th><th>instructions/op</th><th>flags</th><th>finished</th><th>flame graphs</th></tr><tr data-corpus="100000" data-profiled="1"><td>100000</td><td>hash #1</td><td>3145 ± 108</td><td></td><td></td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:22</td><td><a href="maps-async/100000/hash/1/timeline.html">timeline</a><br><b>cpu</b>: <a href="maps-async/100000/hash/1/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-hash-size-100000-variants-/jfr-cpu-cpu.html">bench</a> · <a href="maps-async/100000/hash/1/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-hash-size-100000-variants-/jfr-cpu-cpu-reverse.html">reverse</a> · <a href="maps-async/100000/hash/1/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-hash-size-100000-variants-/jfr-cpu-cpu-classify.html">classify</a><br><b>alloc</b>: <a href="maps-async/100000/hash/1/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-hash-size-100000-variants-/jfr-cpu-alloc.html">bench</a> · <a href="maps-async/100000/hash/1/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-hash-size-100000-variants-/jfr-cpu-alloc-reverse.html">reverse</a> · <a href="maps-async/100000/hash/1/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-hash-size-100000-variants-/jfr-cpu-alloc-classify.html">classify</a></td></tr><tr data-corpus="100000" data-profiled="1"><td>100000</td><td>tree #1</td><td>11399 ± 418</td><td></td><td></td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:22</td><td><a href="maps-async/100000/tree/1/timeline.html">timeline</a><br><b>cpu</b>: <a href="maps-async/100000/tree/1/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-tree-size-100000-variants-/jfr-cpu-cpu.html">bench</a> · <a href="maps-async/100000/tree/1/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-tree-size-100000-variants-/jfr-cpu-cpu-reverse.html">reverse</a> · <a href="maps-async/100000/tree/1/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-tree-size-100000-variants-/jfr-cpu-cpu-classify.html">classify</a><br><b>alloc</b>: <a href="maps-async/100000/tree/1/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-tree-size-100000-variants-/jfr-cpu-alloc.html">bench</a> · <a href="maps-async/100000/tree/1/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-tree-size-100000-variants-/jfr-cpu-alloc-reverse.html">reverse</a> · <a href="maps-async/100000/tree/1/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-tree-size-100000-variants-/jfr-cpu-alloc-classify.html">classify</a></td></tr></table></section><section data-last="1792034535" data-notes="0"><h2>maps <span class="when">Thu 15 Oct 13:22 – Thu 15 Oct 13:22</span></h2><table class="summary"><tr><th>corpus</th><th>variant</th><th>n</th><th>ms/op</th><th>Δ</th><th>cycles/op</th><th>Δ</th><th>instructions/op</th><th>Δ</th></tr><tr><td>10000</td><td>paired</td><td>2</td><td>264 ± 1.3%</td><td></td><td></td><td></td><td></td><td></td></tr></table>
+  <table><tr><th>corpus</th><th>variant</th><th>ms/op</th><th>cycles/op (xctrace)</th><th>instructions/op</th><th>flags</th><th>finished</th><th>flame graphs</th></tr><tr data-corpus="10000" data-profiled="1"><td>10000</td><td>paired #1</td><td>261 ± 328</td><td></td><td></td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:22</td><td><a href="maps/10000/paired/1/timeline.html">timeline</a></td></tr><tr data-corpus="10000" data-profiled="1"><td>10000</td><td>paired #2</td><td>266 ± 323</td><td></td><td></td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:22</td><td><a href="maps/10000/paired/2/timeline.html">timeline</a></td></tr></table></section><section data-last="1792034506" data-notes="0"><h2>gc <span class="when">Thu 15 Oct 13:20 – Thu 15 Oct 13:21</span></h2><table class="summary"><tr><th>corpus</th><th>variant</th><th>n</th><th>ms/op</th><th>Δ</th><th>cycles/op</th><th>Δ</th><th>instructions/op</th><th>Δ</th></tr><tr><td>10000</td><td>g1</td><td>2</td><td>160 ± 3.9%</td><td></td><td></td><td></td><td></td><td></td></tr><tr><td>10000</td><td>parallel</td><td>2</td><td>159 ± 0.4%</td><td>-0.45%</td><td></td><td></td><td></td><td></td></tr><tr><td>100000</td><td>g1</td><td>2</td><td>2991 ± 0.4%</td><td></td><td></td><td></td><td></td><td></td></tr><tr><td>100000</td><td>parallel</td><td>2</td><td>2888 ± 0.2%</td><td>-3.45%</td><td></td><td></td><td></td><td></td></tr></table>
+  <table><tr><th>corpus</th><th>variant</th><th>ms/op</th><th>cycles/op (xctrace)</th><th>instructions/op</th><th>flags</th><th>finished</th><th>flame graphs</th></tr><tr data-corpus="10000" data-profiled="1"><td>10000</td><td>g1 #1</td><td>155 ± 8</td><td></td><td></td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:20</td><td><a href="gc/10000/g1/1/timeline.html">timeline</a></td></tr><tr data-corpus="10000" data-profiled="1"><td>10000</td><td>g1 #2</td><td>164 ± 8</td><td></td><td></td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:21</td><td><a href="gc/10000/g1/2/timeline.html">timeline</a></td></tr><tr data-corpus="10000" data-profiled="1"><td>10000</td><td>parallel #1</td><td>159 ± 7</td><td></td><td></td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:20</td><td><a href="gc/10000/parallel/1/timeline.html">timeline</a></td></tr><tr data-corpus="10000" data-profiled="1"><td>10000</td><td>parallel #2</td><td>160 ± 13</td><td></td><td></td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:21</td><td><a href="gc/10000/parallel/2/timeline.html">timeline</a></td></tr><tr data-corpus="100000" data-profiled="1"><td>100000</td><td>g1 #1</td><td>2983 ± 146</td><td></td><td></td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:20</td><td><a href="gc/100000/g1/1/timeline.html">timeline</a></td></tr><tr data-corpus="100000" data-profiled="1"><td>100000</td><td>g1 #2</td><td>2998 ± 98</td><td></td><td></td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:21</td><td><a href="gc/100000/g1/2/timeline.html">timeline</a></td></tr><tr data-corpus="100000" data-profiled="1"><td>100000</td><td>parallel #1</td><td>2892 ± 188</td><td></td><td></td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:20</td><td><a href="gc/100000/parallel/1/timeline.html">timeline</a></td></tr><tr data-corpus="100000" data-profiled="1"><td>100000</td><td>parallel #2</td><td>2883 ± 103</td><td></td><td></td><td><code>(none)</code></td><td class="when">Thu 15 Oct 13:21</td><td><a href="gc/100000/parallel/2/timeline.html">timeline</a></td></tr></table></section></div>
+  <script>// A benchmark fork's timeline: its iterations (coloured by variant when variants alternate within the fork) and, on the
+// same wall-clock axis, what the machine did meanwhile. Reads a cell's files as written by the fork and `perflab ab`:
+//   iterations.tsv  every iteration as it finishes: index, kind, variant, start_ms, end_ms, score, ops, gc_ms, pid, unit;
+//                   all forks of a run append to it; kind "startup" (JVM start to the first iteration) and "exit"
+//                   (the last iteration to JVM exit) give each fork's lifetime
+//   timeline.tsv    per 50 ms: cycles and instructions of the benchmark thread, JIT, GC, other threads of the fork and
+//                   other processes (from xctrace, so only once the fork has finished)
+//   gc.log          -Xlog:gc with wall-clock `time` decorations: pauses (a run's forks' logs concatenated)
+//   load.tsv        the load gate's 5 s samples of other processes' CPU, in cores
+// Used by timeline.py (a page per cell) and index.py (a live panel in index.html).
+const BenchTimeline = (() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const BIN_MS = 50;
+
+  function tsv(text) {
+    if (!text) return [];
+    const lines = text.split('\n').filter(l => l.trim());
+    if (!lines.length) return [];
+    const head = lines[0].split('\t');
+    return lines.slice(1).map(l => Object.fromEntries(l.split('\t').map((v, i) => [head[i], v])));
+  }
+
+  function parse(f) {
+    const iters = tsv(f.iterations).map(r => ({i: +r.index, kind: r.kind, variant: r.variant, s: +r.start_ms, e: +r.end_ms,
+      score: +r.score, gc: r.gc_ms === '' || r.gc_ms == null ? null : +r.gc_ms, pid: r.pid || '', unit: r.unit || 'ms/op'}));
+    // forks in the order they ran, numbered from 1
+    const pids = [...new Set(iters.slice().sort((a, b) => a.s - b.s).map(i => i.pid))];
+    for (const it of iters) it.fork = pids.indexOf(it.pid) + 1;
+    const series = tsv(f.timeline).map(b => ({t: +b.bin_ms, bench_c: +b.bench_cycles, bench_i: +b.bench_inst, jit_c: +b.jit_cycles,
+      gc_c: +b.gc_cycles, other_c: +b.other_cycles, processes_c: +b.processes_cycles}));
+    const pauses = [];
+    for (const line of (f.gc || '').split('\n')) {
+      const m = line.match(/^\[([^\]]+)\]\[[^\]]+\].*?(Pause[^(]*(?:\([^)]*\))*).*?([\d.]+)ms\s*$/);
+      if (!m) continue;
+      const end = Date.parse(m[1].replace(/([+-]\d\d)(\d\d)$/, '$1:$2'));
+      if (!isNaN(end)) pauses.push({s: end - +m[3], e: end, what: m[2].trim()});
+    }
+    const load = (f.load || '').split('\n').map(l => l.split('\t')).filter(p => p.length >= 2 && p[0])
+      .map(p => ({t: +p[0] * 1000, cores: +p[1], top: p[2] || ''}));
+    return {iters, series, pauses, load};
+  }
+
+  async function fetchCell(base) {
+    const get = async n => { try { const r = await fetch(base + n, {cache: 'no-store'}); return r.ok ? await r.text() : ''; } catch (e) { return ''; } };
+    const [iterations, timeline, gc, load] = await Promise.all(['iterations.tsv', 'timeline.tsv', 'gc.log', 'load.tsv'].map(get));
+    return parse({iterations, timeline, gc, load});
+  }
+
+  function mount(svg, legend, tip) {
+    let D = {iters: [], series: [], pauses: [], load: []}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
+    const L = 150, R = 16;
+    const counterRows = [
+      {name: 'iterations', h: 46},
+      {name: 'benchmark thread', h: 80, key: 'bench_c', unit: 'G cycles/s'},
+      {name: 'IPC (benchmark)', h: 56, ipc: true},
+      {name: 'GC threads', h: 70, key: 'gc_c', unit: 'G cycles/s', pauses: true},
+      {name: 'JIT threads', h: 56, key: 'jit_c', unit: 'G cycles/s'},
+      {name: 'other in fork', h: 46, key: 'other_c', unit: 'G cycles/s'},
+      {name: 'other processes', h: 86, key: 'processes_c', unit: 'G cycles/s', load: true},
+    ];
+    // without counters (no xctrace): iterations and GC pauses only, plus the load gate's samples when there are any
+    const plainRows = [{name: 'iterations', h: 46}, {name: 'GC pauses', h: 34, pauses: true}];
+    let rows = counterRows, height = 0;
+    const layout = () => {
+      rows = D.series.length ? counterRows : plainRows.concat(D.load.length ? [{name: 'other processes', h: 60, load: true}] : []);
+      height = rows.reduce((a, r) => a + r.h + 8, 8) + 24;
+    };
+    let variants = [];
+    const color = v => v ? `var(--v${variants.indexOf(v) % 6})` : 'var(--v0)';
+    function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; }
+
+    function draw() {
+      svg.innerHTML = '';
+      const W = svg.clientWidth || 900, X = t => L + (t - x0) / (x1 - x0) * (W - L - R);
+      if (!D.iters.length && !D.series.length) {
+        svg.setAttribute('height', 40);
+        el('text', {x: 12, y: 24, class: 'lab'}).textContent = 'No iterations yet.';
+        return;
+      }
+      layout();
+      svg.setAttribute('height', height);
+      let y = 8;
+      const span = x1 - x0, step = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 60000].find(s => span / s < 12) || 120000;
+      for (let t = Math.ceil((x0 - t0) / step) * step; t0 + t <= x1; t += step) {
+        el('line', {x1: X(t0 + t), x2: X(t0 + t), y1: 0, y2: height - 22, class: 'grid'});
+        el('text', {x: X(t0 + t) + 2, y: height - 8, class: 'lab'}).textContent = (t / 1000).toFixed(step < 1000 ? 1 : 0) + ' s';
+      }
+      for (const r of rows) {
+        el('text', {x: 6, y: y + 14}).textContent = r.name;
+        if (r.unit) el('text', {x: 6, y: y + 28, class: 'lab'}).textContent = r.unit;
+        el('line', {x1: L, x2: W - R, y1: y + r.h, y2: y + r.h, class: 'grid'});
+        if (r.name === 'iterations') {
+          const forks = Math.max(0, ...D.iters.map(i => i.fork));
+          for (const it of D.iters) {
+            if (it.e < x0 || it.s > x1) continue;
+            const a = Math.max(X(it.s), L), b = Math.min(X(it.e), W - R);
+            const life = it.kind === 'startup' || it.kind === 'exit';
+            const fork = forks > 1 ? `fork ${it.fork}: ` : '';
+            const rect = el('rect', {x: a, y: y + (life ? 14 : 6), width: Math.max(1, b - a - 1), height: life ? r.h - 28 : r.h - 12, rx: 2,
+              fill: life ? 'var(--life)' : it.kind === 'warmup' ? 'var(--grey)' : color(it.variant)});
+            rect.dataset.tip = life
+              ? `${fork}${it.kind === 'startup' ? 'JVM start to first iteration (JVM boot, benchmark setup)' : 'last iteration to JVM exit'}: ${((it.e - it.s) / 1000).toFixed(2)} s`
+              : `${fork}#${it.i} ${it.kind} ${it.variant || ''}: ${it.score.toFixed(1)} ${it.unit}` + (it.gc != null ? `, GC pauses ${it.gc} ms` : '');
+            if (!life && b - a > 46) el('text', {x: a + 4, y: y + r.h / 2 + 4}).textContent = it.score.toFixed(1);
+          }
+          // each fork's start, labelled when there are several
+          if (forks > 1) for (let f = 1; f <= forks; f++) {
+            const s = Math.min(...D.iters.filter(i => i.fork === f).map(i => i.s));
+            if (s < x0 || s > x1) continue;
+            el('line', {x1: X(s), x2: X(s), y1: 0, y2: height - 22, stroke: 'var(--fg)', 'stroke-width': 1, opacity: 0.35});
+            el('text', {x: X(s) + 2, y: y + r.h + 1, class: 'lab'}).textContent = `fork ${f}`;
+          }
+        } else if (!r.key && !r.ipc) {
+          // pauses / load only
+        } else {
+          const pts = r.ipc ? D.series.map(s => ({t: s.t, v: s.bench_c ? s.bench_i / s.bench_c : null}))
+                            : D.series.map(s => ({t: s.t, v: s[r.key] / (BIN_MS / 1000) / 1e9}));
+          const vis = pts.filter(p => p.t >= x0 - BIN_MS && p.t <= x1 && p.v != null);
+          const max = r.ipc ? Math.max(4, ...vis.map(p => p.v)) : Math.max(0.5, ...vis.map(p => p.v));
+          const Y = v => y + r.h - 4 - v / max * (r.h - 10);
+          el('text', {x: L - 4, y: y + 12, 'text-anchor': 'end', class: 'lab'}).textContent = max.toFixed(1);
+          let d = '', prev = null;
+          // a new segment after a gap (between forks, or between xctrace's recordings)
+          for (const p of vis) { d += (prev == null || p.t - prev > 2 * BIN_MS ? 'M' : 'L') + X(p.t + BIN_MS / 2).toFixed(1) + ',' + Y(p.v).toFixed(1); prev = p.t; }
+          if (d) el('path', {d, fill: 'none', stroke: r.ipc ? 'var(--v2)' : 'var(--v0)', 'stroke-width': 1.2});
+        }
+        if (r.pauses) for (const p of D.pauses) {
+          if (p.e < x0 || p.s > x1) continue;
+          const m = el('rect', {x: X(p.s), y: y + 2, width: Math.max(2, X(p.e) - X(p.s)), height: r.h - 4, fill: 'var(--pause)', opacity: 0.55});
+          m.dataset.tip = `${p.what}: ${(p.e - p.s).toFixed(1)} ms`;
+        }
+        if (r.load && D.load.length) {
+          const lmax = Math.max(2, ...D.load.map(l => l.cores));
+          el('text', {x: W - R - 2, y: y + 12, 'text-anchor': 'end', class: 'lab'}).textContent = `load.tsv: other processes, cores (max ${lmax.toFixed(1)})`;
+          let ld = '';
+          for (const l of D.load) {
+            if (l.t < x0 - 5000 || l.t > x1 + 5000) continue;
+            const yy = y + r.h - 4 - l.cores / lmax * (r.h - 10);
+            const clamp = x => Math.min(Math.max(x, L), W - R);
+            ld += (ld ? 'L' : 'M') + clamp(X(l.t - 5000)).toFixed(1) + ',' + yy.toFixed(1) + 'L' + clamp(X(l.t)).toFixed(1) + ',' + yy.toFixed(1);
+          }
+          if (ld) el('path', {d: ld, fill: 'none', stroke: 'var(--v1)', 'stroke-width': 1.2, 'stroke-dasharray': '4 3'});
+        }
+        y += r.h + 8;
+      }
+    }
+
+    function set(data) {
+      D = data;
+      variants = [...new Set(D.iters.map(i => i.variant).filter(v => v))];
+      const ts = [...D.iters.flatMap(i => [i.s, i.e]), ...D.series.map(s => s.t), ...D.series.map(s => s.t + BIN_MS)];
+      const n0 = ts.length ? Math.min(...ts) : 0, n1 = ts.length ? Math.max(...ts) : 1;
+      // keep a zoomed view where it is as data arrives; otherwise follow the whole range
+      if (!zoomed) { x0 = n0; x1 = Math.max(n1, n0 + 1); }
+      t0 = n0; t1 = Math.max(n1, n0 + 1);
+      if (legend) legend.innerHTML = variants.map(v => `<span><i style="background:${color(v)}"></i>${v}</span>`).join('')
+        + '<span><i style="background:var(--grey)"></i>warmup</span>'
+        + (D.iters.some(i => i.kind === 'startup') ? '<span><i style="background:var(--life)"></i>JVM start / exit</span>' : '') + (D.pauses.length ? '<span><i style="background:var(--pause)"></i>GC pause</span>' : '');
+      draw();
+    }
+
+    svg.addEventListener('wheel', e => { e.preventDefault(); const W = svg.clientWidth, f = Math.exp(e.deltaY * 0.002);
+      const at = x0 + (e.offsetX - L) / (W - L - R) * (x1 - x0); x0 = Math.max(t0, at - (at - x0) * f); x1 = Math.min(t1, at + (x1 - at) * f); zoomed = true; draw(); }, {passive: false});
+    let drag = null;
+    svg.addEventListener('pointerdown', e => { drag = {x: e.clientX, x0, x1}; svg.setPointerCapture(e.pointerId); });
+    svg.addEventListener('pointermove', e => {
+      const t = e.target.dataset && e.target.dataset.tip;
+      if (tip && t && !drag) { tip.textContent = t; tip.style.display = 'block'; tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 12) + 'px'; }
+      else if (tip && !drag) tip.style.display = 'none';
+      if (!drag) return;
+      const W = svg.clientWidth, dt = (e.clientX - drag.x) / (W - L - R) * (drag.x1 - drag.x0), w = drag.x1 - drag.x0;
+      x0 = Math.min(Math.max(t0, drag.x0 - dt), t1 - w); x1 = x0 + w; zoomed = true; draw();
+    });
+    svg.addEventListener('pointerup', () => drag = null);
+    svg.addEventListener('dblclick', () => { zoomed = false; x0 = t0; x1 = t1; draw(); });
+    window.addEventListener('resize', draw);
+    return {set, reset() { zoomed = false; }};
+  }
+
+  return {parse, fetchCell, mount};
+})();
+</script>
+  <script>
+  const chips = [...document.querySelectorAll('.chip')];
+  chips.forEach(c => c.onclick = () => { c.classList.toggle('on'); apply(); });
+  document.getElementById('q').oninput = apply;
+  function on(attr) { return chips.filter(c => c.classList.contains('on') && c.dataset[attr]).map(c => c.dataset[attr]); }
+  function apply() {
+    const corpora = on('corpus'), kinds = on('kind'), ages = on('age').map(Number);
+    const q = document.getElementById('q').value.toLowerCase(), now = Date.now() / 1000;
+    for (const sec of document.querySelectorAll('section')) {
+      let visible = 0;
+      for (const tr of sec.querySelectorAll('tr[data-corpus]')) {
+        let ok = !corpora.length || corpora.includes(tr.dataset.corpus);
+        if (kinds.includes('profiled') && !kinds.includes('timing')) ok = ok && tr.dataset.profiled === '1';
+        if (kinds.includes('timing') && !kinds.includes('profiled')) ok = ok && tr.dataset.profiled === '0';
+        tr.classList.toggle('hidden', !ok); if (ok) visible++;
+      }
+      let show = visible > 0 || !sec.querySelector('tr[data-corpus]');
+      if (kinds.includes('notes')) show = show && sec.dataset.notes === '1';
+      if (ages.length) show = show && now - Number(sec.dataset.last) < Math.max(...ages);
+      if (q) show = show && sec.textContent.toLowerCase().includes(q);
+      sec.classList.toggle('hidden', !show);
+    }
+  }
+  // live: the timeline follows the running fork (running.json, written by `perflab ab`) and polls its files; the
+  // campaign tables are refetched from this page, which `perflab ab` rebuilds around every cell
+  const tl = BenchTimeline.mount(document.getElementById('tl-chart'), document.getElementById('tl-legend'), document.getElementById('tl-tip'));
+  const sel = document.getElementById('tl-cell'), follow = document.getElementById('tl-follow'), status = document.getElementById('tl-status');
+  let shown = null, running = null;
+  sel.onchange = () => { follow.checked = false; tick(); };
+  async function tick() {
+    try { const r = await fetch('running.json', {cache: 'no-store'}); running = r.ok ? await r.json() : null; } catch (e) { running = null; }
+    if (follow.checked && running) {
+      const v = running.cell.replace(/\/?$/, '/');
+      if (![...sel.options].some(o => o.value === v)) sel.add(new Option('running: ' + running.cell, v), 0);
+      sel.value = v;
+    }
+    if (!sel.value) return;
+    if (sel.value !== shown) { tl.reset(); shown = sel.value; }
+    tl.set(await BenchTimeline.fetchCell(sel.value));
+    status.textContent = running && running.cell.replace(/\/?$/, '/') === sel.value
+      ? `running since ${new Date(running.started * 1000).toLocaleTimeString()}` : (running ? `running: ${running.cell}` : 'nothing running');
+  }
+  async function refreshTables() {
+    try {
+      const r = await fetch(location.pathname.endsWith('/') ? 'index.html' : location.pathname, {cache: 'no-store'});
+      if (!r.ok) return;
+      const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+      document.getElementById('campaigns').innerHTML = doc.getElementById('campaigns').innerHTML;
+      const keep = sel.value;
+      sel.innerHTML = doc.getElementById('tl-cell').innerHTML;
+      if (keep && ![...sel.options].some(o => o.value === keep)) sel.add(new Option(keep, keep), 0);
+      sel.value = keep;
+      apply();
+    } catch (e) {}
+  }
+  tick(); setInterval(tick, 5000); setInterval(refreshTables, 20000);
+  </script>

@@ -1,0 +1,31 @@
+
+[perflab] WordCountBenchmark(10000) in pid 66757, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -XX:+UseParallelGC, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/gc/10000/parallel/1, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh9364488011438323445compilecommand]
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   695 /   194.2 /    7
+  WARMUP        2:    36 /    64.3 /    3
+  WARMUP        3:    14 /     2.3 /    1
+  WARMUP        4:     3 /     0.4 /    1
+  WARMUP        5:    10 /     2.4 /    0
+  MEASUREMENT   6:     7 /     0.9 /    0
+  MEASUREMENT   7:     9 /     0.5 /    0
+  MEASUREMENT   8:     7 /     0.7 /    0
+  MEASUREMENT   9:     3 /     1.0 /    0
+  MEASUREMENT  10:     9 /     0.9 /    0
+[jit] compiled while measuring:
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.lang.Long.stringSize (tier 3)
+     1  java.lang.invoke.DirectMethodHandle$Holder.invokeSpecial (tier 3)
+     1  java.lang.invoke.Invokers$Holder.linkToTargetMethod (tier 4)
+     1  java.lang.management.ManagementFactory$$Lambda.0x000000800107d080.apply (tier 3)
+     1  java.lang.management.ManagementFactory.lambda$getPlatformMXBeans$3 (tier 3)
+     1  java.nio.Buffer.capacity (tier 1)
+     1  java.nio.ByteBuffer.limit (tier 3)
+     1  java.util.ArrayList.addAll (tier 3)
+     1  java.util.Collection.stream (tier 3)
+     1  java.util.concurrent.atomic.AtomicInteger.get (tier 1)
+     1  java.util.concurrent.locks.ReentrantLock$NonfairSync.initialTryLock (tier 4)
+     1  java.util.stream.AbstractPipeline.sequential (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-66757.txt

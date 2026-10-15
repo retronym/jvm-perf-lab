@@ -1,0 +1,208 @@
+# JMH version: 1.37
+# VM version: JDK 21.0.12.1, OpenJDK 64-Bit Server VM, 21.0.12.1+1-LTS
+# VM invoker: ~/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java
+# VM options: -XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -XX:+PreserveFramePointer -Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-paired-kperf -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-paired-kperf/gc-%p.log:time,uptime
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 4 iterations, 1 s each
+# Measurement: 6 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: sample.BranchBenchmark.sumAbove
+# Parameters: (data = random, size = 1048576, variants = sorted=sorted|random=random)
+
+# Run progress: 0.00% complete, ETA 00:00:10
+# Fork: 1 of 1
+# Preparing profilers: AsyncProfiler 
+# Warmup Iteration   1: [INFO] kperf: cycles (CORE_ACTIVE_CYCLE) every 1000000 on PMC2
+[INFO] kperf: branch-misses (BRANCH_MISPRED_NONSPEC) every 10000 on PMC5, precise PC
+307.886 us/op
+# Warmup Iteration   2: 2493.773 us/op
+# Warmup Iteration   3: 2499.080 us/op
+# Warmup Iteration   4: [INFO] kperf: cycles: 21110316.547 us/op
+ samples, 0 with precise PC, 0 Iteration   1: used as leaf
+[INFO] kperf: branch-misses: 47388 samples, 47385 with precise PC, 43998 used as leaf
+[INFO] kperf: cycles (CORE_ACTIVE_CYCLE) every 1000000 on PMC2
+[INFO] kperf: branch-misses (BRANCH_MISPRED_NONSPEC) every 10000 on PMC5, precise PC
+324.359 us/op
+                 gc.alloc.rate:      0.048 MB/sec
+                 gc.alloc.rate.norm: 16.219 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 2511.970 us/op
+                 gc.alloc.rate:      0.056 MB/sec
+                 gc.alloc.rate.norm: 146.773 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 3239.573 us/op
+                 gc.alloc.rate:      0.044 MB/sec
+                 gc.alloc.rate.norm: 148.000 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 408.667 us/op
+                 gc.alloc.rate:      0.037 MB/sec
+                 gc.alloc.rate.norm: 16.248 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 290.444 us/op
+                 gc.alloc.rate:      0.031 MB/sec
+                 gc.alloc.rate.norm: 9.398 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   6: [INFO] kperf: cycles: 23332 samples, 0 with precise PC, 0 used as leaf
+[INFO] kperf: branch-misses: 57906 samples, 57904 with precise PC, 57734 used as leaf
+2436.971 us/op
+                 async:                              (text only)
+                 gc.alloc.rate:                      0.467 MB/sec
+                 gc.alloc.rate.norm:                 2997.869 B/op
+                 gc.count:                           ≈ 0 counts
+                 jit.compilations:                   84.000 #
+                 jit.compileTime:                    10.149 ms
+                 jit.deopts:                         ≈ 0 #
+                 jit.lastWarmup.compilations:        6.000 #
+                 jit.lastWarmup.deopts:              ≈ 0 #
+                 paired.gcFree.random:               2729.505 us/op
+                 paired.gcFree.random.delta%:        702.069 %
+                 paired.gcFree.random.delta%.median: 692.717 %
+                 paired.gcFree.random.delta%.sd:     33.303 %
+                 paired.gcFree.sorted:               341.157 us/op
+                 paired.random:                      2729.505 us/op
+                 paired.random.delta%:               702.069 %
+                 paired.random.delta%.median:        692.717 %
+                 paired.random.delta%.sd:            33.303 %
+                 paired.sorted:                      341.157 us/op
+
+# Processing profiler results: AsyncProfiler 
+
+
+Result "sample.BranchBenchmark.sumAbove":
+  1535.331 ±(99.9%) 3753.169 us/op [Average]
+  (min, avg, max) = (290.444, 1535.331, 3239.573), stdev = 1338.416
+  CI (99.9%): [≈ 0, 5288.499] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:async":
+Async profiler results:
+  ~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-paired-kperf/sample.BranchBenchmark.sumAbove-AverageTime-data-random-size-1048576-variants-sorted_3Dsorted_7Crandom_3Drandom/jfr-cycles+branch-misses.jfr
+
+Secondary result "sample.BranchBenchmark.sumAbove:gc.alloc.rate":
+  0.114 ±(99.9%) 0.487 MB/sec [Average]
+  (min, avg, max) = (0.031, 0.114, 0.467), stdev = 0.173
+  CI (99.9%): [≈ 0, 0.600] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:gc.alloc.rate.norm":
+  555.751 ±(99.9%) 3359.908 B/op [Average]
+  (min, avg, max) = (9.398, 555.751, 2997.869), stdev = 1198.176
+  CI (99.9%): [≈ 0, 3915.660] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:gc.count":
+  ≈ 0 counts
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.compilations":
+  84.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 14.000, 84.000), stdev = 34.293
+  CI (99.9%): [84.000, 84.000] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.compileTime":
+  10.149 ±(99.9%) 0.001 ms [Maximum]
+  (min, avg, max) = (≈ 0, 1.691, 10.149), stdev = 4.143
+  CI (99.9%): [10.149, 10.149] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.deopts":
+  ≈ 0 #
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.lastWarmup.compilations":
+  6.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 1.000, 6.000), stdev = 2.449
+  CI (99.9%): [6.000, 6.000] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.lastWarmup.deopts":
+  ≈ 0 #
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.gcFree.random":
+  2729.505 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 454.917, 2729.505), stdev = 1114.316
+  CI (99.9%): [2729.505, 2729.505] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.gcFree.random.delta%":
+  702.069 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 117.012, 702.069), stdev = 286.619
+  CI (99.9%): [702.069, 702.069] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.gcFree.random.delta%.median":
+  692.717 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 115.453, 692.717), stdev = 282.800
+  CI (99.9%): [692.717, 692.717] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.gcFree.random.delta%.sd":
+  33.303 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 5.551, 33.303), stdev = 13.596
+  CI (99.9%): [33.303, 33.303] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.gcFree.sorted":
+  341.157 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 56.859, 341.157), stdev = 139.277
+  CI (99.9%): [341.157, 341.157] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.random":
+  2729.505 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 454.917, 2729.505), stdev = 1114.316
+  CI (99.9%): [2729.505, 2729.505] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.random.delta%":
+  702.069 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 117.012, 702.069), stdev = 286.619
+  CI (99.9%): [702.069, 702.069] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.random.delta%.median":
+  692.717 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 115.453, 692.717), stdev = 282.800
+  CI (99.9%): [692.717, 692.717] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.random.delta%.sd":
+  33.303 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 5.551, 33.303), stdev = 13.596
+  CI (99.9%): [33.303, 33.303] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:paired.sorted":
+  341.157 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 56.859, 341.157), stdev = 139.277
+  CI (99.9%): [341.157, 341.157] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:12
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                    (data)   (size)                   (variants)  Mode  Cnt     Score      Error   Units
+BranchBenchmark.sumAbove                                     random  1048576  sorted=sorted|random=random  avgt    6  1535.331 ± 3753.169   us/op
+BranchBenchmark.sumAbove:async                               random  1048576  sorted=sorted|random=random  avgt            NaN                ---
+BranchBenchmark.sumAbove:gc.alloc.rate                       random  1048576  sorted=sorted|random=random  avgt    6     0.114 ±    0.487  MB/sec
+BranchBenchmark.sumAbove:gc.alloc.rate.norm                  random  1048576  sorted=sorted|random=random  avgt    6   555.751 ± 3359.908    B/op
+BranchBenchmark.sumAbove:gc.count                            random  1048576  sorted=sorted|random=random  avgt    6       ≈ 0             counts
+BranchBenchmark.sumAbove:jit.compilations                    random  1048576  sorted=sorted|random=random  avgt    6    84.000                  #
+BranchBenchmark.sumAbove:jit.compileTime                     random  1048576  sorted=sorted|random=random  avgt    6    10.149                 ms
+BranchBenchmark.sumAbove:jit.deopts                          random  1048576  sorted=sorted|random=random  avgt    6       ≈ 0                  #
+BranchBenchmark.sumAbove:jit.lastWarmup.compilations         random  1048576  sorted=sorted|random=random  avgt    6     6.000                  #
+BranchBenchmark.sumAbove:jit.lastWarmup.deopts               random  1048576  sorted=sorted|random=random  avgt    6       ≈ 0                  #
+BranchBenchmark.sumAbove:paired.gcFree.random                random  1048576  sorted=sorted|random=random  avgt    6  2729.505              us/op
+BranchBenchmark.sumAbove:paired.gcFree.random.delta%         random  1048576  sorted=sorted|random=random  avgt    6   702.069                  %
+BranchBenchmark.sumAbove:paired.gcFree.random.delta%.median  random  1048576  sorted=sorted|random=random  avgt    6   692.717                  %
+BranchBenchmark.sumAbove:paired.gcFree.random.delta%.sd      random  1048576  sorted=sorted|random=random  avgt    6    33.303                  %
+BranchBenchmark.sumAbove:paired.gcFree.sorted                random  1048576  sorted=sorted|random=random  avgt    6   341.157              us/op
+BranchBenchmark.sumAbove:paired.random                       random  1048576  sorted=sorted|random=random  avgt    6  2729.505              us/op
+BranchBenchmark.sumAbove:paired.random.delta%                random  1048576  sorted=sorted|random=random  avgt    6   702.069                  %
+BranchBenchmark.sumAbove:paired.random.delta%.median         random  1048576  sorted=sorted|random=random  avgt    6   692.717                  %
+BranchBenchmark.sumAbove:paired.random.delta%.sd             random  1048576  sorted=sorted|random=random  avgt    6    33.303                  %
+BranchBenchmark.sumAbove:paired.sorted                       random  1048576  sorted=sorted|random=random  avgt    6   341.157              us/op
+
+Benchmark result is saved to ~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-paired-kperf/result.json

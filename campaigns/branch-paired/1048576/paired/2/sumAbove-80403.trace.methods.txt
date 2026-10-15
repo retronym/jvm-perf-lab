@@ -1,0 +1,30 @@
+
+== INST_ALL (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x120de307d>
+    0.0%  vframeStreamCommon::fill_from_frame()
+    0.0%  pthread_jit_write_protect_np
+
+== INST_BRANCH (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x120de307d>
+    0.0%  vframeStreamCommon::fill_from_frame()
+    0.0%  pthread_jit_write_protect_np
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x120de307d>
+    0.0%  vframeStreamCommon::fill_from_frame()
+    0.0%  pthread_jit_write_protect_np
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  vframeStreamCommon::fill_from_frame()
+    0.0%  <unknown 0x120de307d>
+    0.0%  pthread_jit_write_protect_np
+
+== samples (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  vframeStreamCommon::fill_from_frame()
+    0.0%  <unknown 0x120de307d>
+    0.0%  pthread_jit_write_protect_np

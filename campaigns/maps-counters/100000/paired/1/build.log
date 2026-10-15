@@ -1,0 +1,120 @@
+
+[perflab] WordCountBenchmark(100000) in pid 80009, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps-counters/100000/paired/1/gc.log:time,uptime, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps-counters/100000/paired/1, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh9177753877680982008compilecommand]
+[xctrace] Starting recording with the perflab-ipc-5978135930424686765.template template. Attaching to: java (80009). 
+[xctrace] Ctrl-C to stop the recording
+[perflab] paired paired. (us/op): hash 3156 linked 3242 (+2.75% ± 2.68, median +2.87%, 3 pairs) tree 1.126e+04 (+256.81% ± 7.55, median +260.53%, 3 pairs)
+[perflab] paired paired.gcFree. (us/op): hash 3150 linked 3237 (+2.78% ± 2.68, median +2.97%, 3 pairs) tree 1.126e+04 (+257.41% ± 8.05, median +261.61%, 3 pairs)
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   738 /   284.9 /   13
+  WARMUP        2:    40 /    49.5 /   17
+  WARMUP        3:    58 /    43.8 /   10
+  WARMUP        4:    12 /     1.0 /    1
+  WARMUP        5:    16 /    10.7 /    0
+  WARMUP        6:    18 /     2.0 /    0
+  MEASUREMENT   7:     9 /     1.8 /    0
+  MEASUREMENT   8:    12 /     0.7 /    0
+  MEASUREMENT   9:     8 /     0.6 /    0
+  MEASUREMENT  10:     7 /     1.7 /    0
+  MEASUREMENT  11:    12 /     2.0 /    0
+  MEASUREMENT  12:     3 /     1.9 /    0
+  MEASUREMENT  13:     3 /     1.5 /    0
+  MEASUREMENT  14:     3 /     0.2 /    0
+  MEASUREMENT  15:    25 /     2.3 /    1
+[jit] compiled while measuring:
+     2  java.nio.ByteBuffer.wrap (tier 3)
+     2  jdk.internal.math.FormattedFPDecimal.toDigit (tier 3)
+     1  java.io.ObjectOutputStream$HandleTable.assign (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeClassDesc (tier 3)
+     1  java.io.ObjectOutputStream.writeOrdinaryObject (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.getClassDataLayout (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.io.ObjectStreamClass.isExternalizable (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.ClassLoader.findBootstrapClassOrNull (tier 3)
+     1  java.lang.Long.getChars (tier 4)
+     1  java.lang.Math.multiplyHigh (tier 3)
+     1  java.lang.String.<init> (tier 3)
+[jit] deoptimized while measuring:
+     1  java.util.TreeMap.rotateLeft (c2: unstable_if, reinterpret)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-80009.txt
+[xctrace] code map: 3563 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: countAndLookUp-80009.trace
+
+== INST_ALL (bench threads)
+   37.4%  java.util.HashMap.merge
+   32.1%  sample.WordCount.count
+   21.3%  java.util.TreeMap.merge
+    3.9%  java.util.HashMap.resize
+    3.2%  java.lang.String.hashCode
+    0.9%  <unknown 0x12643f455>
+    0.2%  <unknown 0x12643f4bd>
+    0.2%  <unknown 0x12643f459>
+    0.2%  <unknown 0x12643f441>
+    0.1%  <unknown 0x12643f469>
+    0.1%  java.util.TreeMap.rotateRight
+    0.1%  java.util.TreeMap.rotateLeft
+
+== INST_BRANCH (bench threads)
+   34.5%  java.util.HashMap.merge
+   30.5%  sample.WordCount.count
+   26.4%  java.util.TreeMap.merge
+    3.6%  java.util.HashMap.resize
+    2.9%  java.lang.String.hashCode
+    0.8%  <unknown 0x12643f455>
+    0.2%  <unknown 0x12643f4bd>
+    0.2%  <unknown 0x12643f459>
+    0.2%  <unknown 0x12643f441>
+    0.1%  <unknown 0x12643f469>
+    0.1%  java.util.TreeMap.rotateRight
+    0.1%  java.util.TreeMap.rotateLeft
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   32.8%  java.util.HashMap.merge
+   29.5%  sample.WordCount.count
+   29.3%  java.util.TreeMap.merge
+    3.6%  java.util.HashMap.resize
+    2.8%  java.lang.String.hashCode
+    0.8%  <unknown 0x12643f455>
+    0.2%  <unknown 0x12643f4bd>
+    0.2%  <unknown 0x12643f459>
+    0.2%  <unknown 0x12643f441>
+    0.1%  java.util.TreeMap.rotateRight
+    0.1%  <unknown 0x12643f469>
+    0.1%  java.util.TreeMap.rotateLeft
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   34.0%  java.util.TreeMap.merge
+   30.0%  java.util.HashMap.merge
+   27.9%  sample.WordCount.count
+    3.5%  java.util.HashMap.resize
+    2.5%  java.lang.String.hashCode
+    0.8%  <unknown 0x12643f455>
+    0.2%  <unknown 0x12643f4bd>
+    0.2%  java.util.TreeMap.rotateRight
+    0.2%  <unknown 0x12643f459>
+    0.1%  <unknown 0x12643f441>
+    0.1%  java.util.TreeMap.rotateLeft
+    0.1%  <unknown 0x12643f469>
+
+== samples (bench threads)
+   32.9%  java.util.HashMap.merge
+   29.5%  sample.WordCount.count
+   29.2%  java.util.TreeMap.merge
+    3.5%  java.util.HashMap.resize
+    2.7%  java.lang.String.hashCode
+    0.8%  <unknown 0x12643f455>
+    0.2%  <unknown 0x12643f4bd>
+    0.2%  <unknown 0x12643f459>
+    0.1%  java.util.TreeMap.rotateRight
+    0.1%  <unknown 0x12643f441>
+    0.1%  <unknown 0x12643f469>
+    0.1%  java.util.TreeMap.rotateLeft
+[perflab] paired xctrace.INST_ALL. (#/op): hash 4.212e+07 linked 4.483e+07 (+6.44% ± 1.11, median +6.03%, 3 pairs) tree 9.845e+07 (+133.75% ± 0.78, median +134.01%, 3 pairs)
+[perflab] paired xctrace.INST_BRANCH. (#/op): hash 8.290e+06 linked 9.015e+06 (+8.76% ± 1.14, median +8.32%, 3 pairs) tree 2.640e+07 (+218.44% ± 1.08, median +218.77%, 3 pairs)
+[perflab] paired xctrace.CORE_ACTIVE_CYCLE. (#/op): hash 1.341e+07 linked 1.376e+07 (+2.59% ± 0.47, median +2.75%, 3 pairs) tree 4.823e+07 (+259.55% ± 1.87, median +259.92%, 3 pairs)
+[perflab] paired xctrace.BRANCH_MISPRED_NONSPEC. (#/op): hash 1.722e+05 linked 1.733e+05 (+0.67% ± 0.83, median +0.23%, 3 pairs) tree 7.764e+05 (+350.96% ± 5.65, median +351.47%, 3 pairs)

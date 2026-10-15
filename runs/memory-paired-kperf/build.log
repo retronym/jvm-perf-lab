@@ -1,0 +1,31 @@
+[perflab] paired paired. (us/op): sequential 1296 shuffled 3.444e+05 (+26454.73% ± 3285.11, median +26589.45%, 3 pairs)
+[perflab] paired paired.gcFree. (us/op): sequential 1296 shuffled 3.444e+05 (+26454.73% ± 3285.11, median +26589.45%, 3 pairs)
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   548 /   249.9 /   11
+  WARMUP        2:    76 /    40.2 /    6
+  WARMUP        3:    24 /    10.8 /    1
+  WARMUP        4:    10 /     1.9 /    0
+  MEASUREMENT   5:    20 /     1.7 /    0
+  MEASUREMENT   6:    17 /     2.5 /    0
+  MEASUREMENT   7:     7 /     4.1 /    0
+  MEASUREMENT   8:     5 /     1.4 /    0
+  MEASUREMENT   9:     1 /     0.1 /    0
+  MEASUREMENT  10:    30 /     3.6 /    0
+[jit] compiled while measuring:
+     2  java.nio.ByteBuffer.limit (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.AbstractStringBuilder.length (tier 1)
+     1  java.lang.CharacterData.of (tier 3)
+     1  java.lang.ClassLoader.findBootstrapClassOrNull (tier 3)
+     1  java.lang.Integer.rotateLeft (tier 4)
+     1  java.lang.Math.max (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+     1  java.lang.StringBuilder.charAt (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-chase-11911.txt

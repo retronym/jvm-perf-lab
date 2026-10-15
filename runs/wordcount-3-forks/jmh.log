@@ -1,0 +1,213 @@
+# JMH version: 1.37
+# VM version: JDK 21.0.12.1, OpenJDK 64-Bit Server VM, 21.0.12.1+1-LTS
+# VM invoker: ~/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java
+# VM options: -Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-3-forks -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-3-forks/gc-%p.log:time,uptime
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: sample.WordCountBenchmark.countAndLookUp
+# Parameters: (map = hash, size = 100000, variants = )
+
+# Run progress: 0.00% complete, ETA 00:00:24
+# Fork: 1 of 3
+# Warmup Iteration   1: 4564.500 us/op
+# Warmup Iteration   2: 4780.095 us/op
+# Warmup Iteration   3: 4547.752 us/op
+Iteration   1: 4711.161 us/op
+                 gc.alloc.rate:      683.396 MB/sec
+                 gc.alloc.rate.norm: 3378672.037 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   2: 4535.664 us/op
+                 gc.alloc.rate:      709.825 MB/sec
+                 gc.alloc.rate.norm: 3378655.604 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   3: 4540.997 us/op
+                 gc.alloc.rate:      709.081 MB/sec
+                 gc.alloc.rate.norm: 3378645.189 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   4: 4839.641 us/op
+                 gc.alloc.rate:      665.271 MB/sec
+                 gc.alloc.rate.norm: 3378624.654 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   5: 5030.698 us/op
+                 gc.alloc.rate:               256.296 MB/sec
+                 gc.alloc.rate.norm:          3383208.279 B/op
+                 gc.count:                    1.000 counts
+                 gc.time:                     1.000 ms
+                 jit.compilations:            41.000 #
+                 jit.compileTime:             6.058 ms
+                 jit.deopts:                  ≈ 0 #
+                 jit.lastWarmup.compilations: 14.000 #
+                 jit.lastWarmup.deopts:       2.000 #
+
+
+# Run progress: 33.33% complete, ETA 00:00:19
+# Fork: 2 of 3
+# Warmup Iteration   1: 4675.256 us/op
+# Warmup Iteration   2: 4682.487 us/op
+# Warmup Iteration   3: 4429.514 us/op
+Iteration   1: 4282.963 us/op
+                 gc.alloc.rate:      751.756 MB/sec
+                 gc.alloc.rate.norm: 3378640.987 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   2: 4757.451 us/op
+                 gc.alloc.rate:      676.763 MB/sec
+                 gc.alloc.rate.norm: 3378646.830 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   3: 4603.303 us/op
+                 gc.alloc.rate:      699.509 MB/sec
+                 gc.alloc.rate.norm: 3378640.404 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   4: 4582.854 us/op
+                 gc.alloc.rate:      702.622 MB/sec
+                 gc.alloc.rate.norm: 3378620.858 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   5: 4868.955 us/op
+                 gc.alloc.rate:               264.054 MB/sec
+                 gc.alloc.rate.norm:          3383118.136 B/op
+                 gc.count:                    2.000 counts
+                 gc.time:                     2.000 ms
+                 jit.compilations:            35.000 #
+                 jit.compileTime:             3.632 ms
+                 jit.deopts:                  ≈ 0 #
+                 jit.lastWarmup.compilations: 17.000 #
+                 jit.lastWarmup.deopts:       1.000 #
+
+
+# Run progress: 66.67% complete, ETA 00:00:09
+# Fork: 3 of 3
+# Warmup Iteration   1: 4458.369 us/op
+# Warmup Iteration   2: 4467.347 us/op
+# Warmup Iteration   3: 4164.743 us/op
+Iteration   1: 4225.961 us/op
+                 gc.alloc.rate:      762.039 MB/sec
+                 gc.alloc.rate.norm: 3378652.471 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   2: 3371.770 us/op
+                 gc.alloc.rate:      954.970 MB/sec
+                 gc.alloc.rate.norm: 3378616.322 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   3: 3547.769 us/op
+                 gc.alloc.rate:      907.632 MB/sec
+                 gc.alloc.rate.norm: 3378621.944 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   4: 3443.673 us/op
+                 gc.alloc.rate:      935.125 MB/sec
+                 gc.alloc.rate.norm: 3378596.986 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 3793.770 us/op
+                 gc.alloc.rate:               339.283 MB/sec
+                 gc.alloc.rate.norm:          3382069.585 B/op
+                 gc.count:                    1.000 counts
+                 gc.time:                     1.000 ms
+                 jit.compilations:            37.000 #
+                 jit.compileTime:             4.372 ms
+                 jit.deopts:                  ≈ 0 #
+                 jit.lastWarmup.compilations: 17.000 #
+                 jit.lastWarmup.deopts:       2.000 #
+
+
+
+Result "sample.WordCountBenchmark.countAndLookUp":
+  4342.442 ±(99.9%) 586.145 us/op [Average]
+  (min, avg, max) = (3371.770, 4342.442, 5030.698), stdev = 548.280
+  CI (99.9%): [3756.297, 4928.586] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.alloc.rate":
+  667.841 ±(99.9%) 234.510 MB/sec [Average]
+  (min, avg, max) = (256.296, 667.841, 954.970), stdev = 219.361
+  CI (99.9%): [433.332, 902.351] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.alloc.rate.norm":
+  3379468.686 ±(99.9%) 1860.222 B/op [Average]
+  (min, avg, max) = (3378596.986, 3379468.686, 3383208.279), stdev = 1740.053
+  CI (99.9%): [3377608.464, 3381328.907] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.count":
+  18.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (1.000, 1.200, 2.000), stdev = 0.414
+  CI (99.9%): [18.000, 18.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.time":
+  20.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (1.000, 1.333, 2.000), stdev = 0.488
+  CI (99.9%): [20.000, 20.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.compilations":
+  41.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 7.533, 41.000), stdev = 15.638
+  CI (99.9%): [41.000, 41.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.compileTime":
+  6.058 ±(99.9%) 0.001 ms [Maximum]
+  (min, avg, max) = (≈ 0, 0.938, 6.058), stdev = 1.997
+  CI (99.9%): [6.058, 6.058] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.deopts":
+  ≈ 0 #
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.lastWarmup.compilations":
+  17.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 3.200, 17.000), stdev = 6.657
+  CI (99.9%): [17.000, 17.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.lastWarmup.deopts":
+  2.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 0.333, 2.000), stdev = 0.724
+  CI (99.9%): [2.000, 2.000] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:29
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                      (map)  (size)  (variants)  Mode  Cnt        Score      Error   Units
+WordCountBenchmark.countAndLookUp                               hash  100000              avgt   15     4342.442 ±  586.145   us/op
+WordCountBenchmark.countAndLookUp:gc.alloc.rate                 hash  100000              avgt   15      667.841 ±  234.510  MB/sec
+WordCountBenchmark.countAndLookUp:gc.alloc.rate.norm            hash  100000              avgt   15  3379468.686 ± 1860.222    B/op
+WordCountBenchmark.countAndLookUp:gc.count                      hash  100000              avgt   15       18.000             counts
+WordCountBenchmark.countAndLookUp:gc.time                       hash  100000              avgt   15       20.000                 ms
+WordCountBenchmark.countAndLookUp:jit.compilations              hash  100000              avgt   15       41.000                  #
+WordCountBenchmark.countAndLookUp:jit.compileTime               hash  100000              avgt   15        6.058                 ms
+WordCountBenchmark.countAndLookUp:jit.deopts                    hash  100000              avgt   15          ≈ 0                  #
+WordCountBenchmark.countAndLookUp:jit.lastWarmup.compilations   hash  100000              avgt   15       17.000                  #
+WordCountBenchmark.countAndLookUp:jit.lastWarmup.deopts         hash  100000              avgt   15        2.000                  #
+
+Benchmark result is saved to ~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-3-forks/result.json

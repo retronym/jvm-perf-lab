@@ -1,0 +1,209 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Timeline</title>
+<style>
+:root { --bg:#f6f7f9; --panel:#fff; --fg:#1d232b; --muted:#5d6875; --line:#dde2e8; }
+@media (prefers-color-scheme: dark) { :root { --bg:#14181d; --panel:#1b2027; --fg:#e3e8ee; --muted:#94a0ad; --line:#2c333c; color-scheme:dark; } }
+body { margin:0; background:var(--bg); color:var(--fg); font:13px/1.45 -apple-system,system-ui,sans-serif; }
+main { padding:16px; } h1 { font-size:16px; margin:0 0 4px; overflow-wrap:anywhere; } .k { color:var(--muted); font-size:12px; }
+
+:root { --life:#9aa5b1; --v0:#2f6fb2; --v1:#c2571a; --v2:#2e8a57; --v3:#8a4fbf; --v4:#b8860b; --v5:#3a9aa6; --pause:#d33; --grey:#c3c9d1; }
+@media (prefers-color-scheme: dark) { :root { --v0:#6ea8e6; --v1:#e58a4e; --v2:#5cc08a; --v3:#b58ae6; --v4:#e0b84a; --v5:#6cc6d1;
+  --pause:#ff6b6b; --grey:#46505c; --life:#5f6b78; } }
+svg.timeline { background:var(--panel); border:1px solid var(--line); border-radius:8px; width:100%; touch-action:none; cursor:grab; display:block; }
+svg.timeline text { fill:var(--fg); font-size:11px; } svg.timeline .lab { fill:var(--muted); } svg.timeline .grid { stroke:var(--line); }
+.tl-legend span { display:inline-block; margin-right:12px; font-size:12px; }
+.tl-legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+.tl-tip { position:fixed; pointer-events:none; background:var(--panel); border:1px solid var(--line); border-radius:6px;
+  padding:4px 8px; font-size:12px; display:none; max-width:360px; z-index:5; }
+
+</style>
+<main><h1>out/runs/wordcount-tree-xctrace-ipc</h1>
+<p class="k">Each fork from JVM start to exit, on the wall clock: startup (JVM boot and benchmark setup), iterations,
+exit, and GC pauses. Wheel or pinch to zoom, drag to pan, double-click to reset. With xctrace, counter lanes cover the
+measurement iterations (xctrace records those); cycles are per second, so one busy performance core is about 4–4.5 G.</p>
+<div class="tl-legend" id="legend"></div><svg class="timeline" id="chart"></svg></main><div class="tl-tip" id="tip"></div>
+<script>// A benchmark fork's timeline: its iterations (coloured by variant when variants alternate within the fork) and, on the
+// same wall-clock axis, what the machine did meanwhile. Reads a cell's files as written by the fork and `perflab ab`:
+//   iterations.tsv  every iteration as it finishes: index, kind, variant, start_ms, end_ms, score, ops, gc_ms, pid, unit;
+//                   all forks of a run append to it; kind "startup" (JVM start to the first iteration) and "exit"
+//                   (the last iteration to JVM exit) give each fork's lifetime
+//   timeline.tsv    per 50 ms: cycles and instructions of the benchmark thread, JIT, GC, other threads of the fork and
+//                   other processes (from xctrace, so only once the fork has finished)
+//   gc.log          -Xlog:gc with wall-clock `time` decorations: pauses (a run's forks' logs concatenated)
+//   load.tsv        the load gate's 5 s samples of other processes' CPU, in cores
+// Used by timeline.py (a page per cell) and index.py (a live panel in index.html).
+const BenchTimeline = (() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const BIN_MS = 50;
+
+  function tsv(text) {
+    if (!text) return [];
+    const lines = text.split('\n').filter(l => l.trim());
+    if (!lines.length) return [];
+    const head = lines[0].split('\t');
+    return lines.slice(1).map(l => Object.fromEntries(l.split('\t').map((v, i) => [head[i], v])));
+  }
+
+  function parse(f) {
+    const iters = tsv(f.iterations).map(r => ({i: +r.index, kind: r.kind, variant: r.variant, s: +r.start_ms, e: +r.end_ms,
+      score: +r.score, gc: r.gc_ms === '' || r.gc_ms == null ? null : +r.gc_ms, pid: r.pid || '', unit: r.unit || 'ms/op'}));
+    // forks in the order they ran, numbered from 1
+    const pids = [...new Set(iters.slice().sort((a, b) => a.s - b.s).map(i => i.pid))];
+    for (const it of iters) it.fork = pids.indexOf(it.pid) + 1;
+    const series = tsv(f.timeline).map(b => ({t: +b.bin_ms, bench_c: +b.bench_cycles, bench_i: +b.bench_inst, jit_c: +b.jit_cycles,
+      gc_c: +b.gc_cycles, other_c: +b.other_cycles, processes_c: +b.processes_cycles}));
+    const pauses = [];
+    for (const line of (f.gc || '').split('\n')) {
+      const m = line.match(/^\[([^\]]+)\]\[[^\]]+\].*?(Pause[^(]*(?:\([^)]*\))*).*?([\d.]+)ms\s*$/);
+      if (!m) continue;
+      const end = Date.parse(m[1].replace(/([+-]\d\d)(\d\d)$/, '$1:$2'));
+      if (!isNaN(end)) pauses.push({s: end - +m[3], e: end, what: m[2].trim()});
+    }
+    const load = (f.load || '').split('\n').map(l => l.split('\t')).filter(p => p.length >= 2 && p[0])
+      .map(p => ({t: +p[0] * 1000, cores: +p[1], top: p[2] || ''}));
+    return {iters, series, pauses, load};
+  }
+
+  async function fetchCell(base) {
+    const get = async n => { try { const r = await fetch(base + n, {cache: 'no-store'}); return r.ok ? await r.text() : ''; } catch (e) { return ''; } };
+    const [iterations, timeline, gc, load] = await Promise.all(['iterations.tsv', 'timeline.tsv', 'gc.log', 'load.tsv'].map(get));
+    return parse({iterations, timeline, gc, load});
+  }
+
+  function mount(svg, legend, tip) {
+    let D = {iters: [], series: [], pauses: [], load: []}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
+    const L = 150, R = 16;
+    const counterRows = [
+      {name: 'iterations', h: 46},
+      {name: 'benchmark thread', h: 80, key: 'bench_c', unit: 'G cycles/s'},
+      {name: 'IPC (benchmark)', h: 56, ipc: true},
+      {name: 'GC threads', h: 70, key: 'gc_c', unit: 'G cycles/s', pauses: true},
+      {name: 'JIT threads', h: 56, key: 'jit_c', unit: 'G cycles/s'},
+      {name: 'other in fork', h: 46, key: 'other_c', unit: 'G cycles/s'},
+      {name: 'other processes', h: 86, key: 'processes_c', unit: 'G cycles/s', load: true},
+    ];
+    // without counters (no xctrace): iterations and GC pauses only, plus the load gate's samples when there are any
+    const plainRows = [{name: 'iterations', h: 46}, {name: 'GC pauses', h: 34, pauses: true}];
+    let rows = counterRows, height = 0;
+    const layout = () => {
+      rows = D.series.length ? counterRows : plainRows.concat(D.load.length ? [{name: 'other processes', h: 60, load: true}] : []);
+      height = rows.reduce((a, r) => a + r.h + 8, 8) + 24;
+    };
+    let variants = [];
+    const color = v => v ? `var(--v${variants.indexOf(v) % 6})` : 'var(--v0)';
+    function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; }
+
+    function draw() {
+      svg.innerHTML = '';
+      const W = svg.clientWidth || 900, X = t => L + (t - x0) / (x1 - x0) * (W - L - R);
+      if (!D.iters.length && !D.series.length) {
+        svg.setAttribute('height', 40);
+        el('text', {x: 12, y: 24, class: 'lab'}).textContent = 'No iterations yet.';
+        return;
+      }
+      layout();
+      svg.setAttribute('height', height);
+      let y = 8;
+      const span = x1 - x0, step = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 60000].find(s => span / s < 12) || 120000;
+      for (let t = Math.ceil((x0 - t0) / step) * step; t0 + t <= x1; t += step) {
+        el('line', {x1: X(t0 + t), x2: X(t0 + t), y1: 0, y2: height - 22, class: 'grid'});
+        el('text', {x: X(t0 + t) + 2, y: height - 8, class: 'lab'}).textContent = (t / 1000).toFixed(step < 1000 ? 1 : 0) + ' s';
+      }
+      for (const r of rows) {
+        el('text', {x: 6, y: y + 14}).textContent = r.name;
+        if (r.unit) el('text', {x: 6, y: y + 28, class: 'lab'}).textContent = r.unit;
+        el('line', {x1: L, x2: W - R, y1: y + r.h, y2: y + r.h, class: 'grid'});
+        if (r.name === 'iterations') {
+          const forks = Math.max(0, ...D.iters.map(i => i.fork));
+          for (const it of D.iters) {
+            if (it.e < x0 || it.s > x1) continue;
+            const a = Math.max(X(it.s), L), b = Math.min(X(it.e), W - R);
+            const life = it.kind === 'startup' || it.kind === 'exit';
+            const fork = forks > 1 ? `fork ${it.fork}: ` : '';
+            const rect = el('rect', {x: a, y: y + (life ? 14 : 6), width: Math.max(1, b - a - 1), height: life ? r.h - 28 : r.h - 12, rx: 2,
+              fill: life ? 'var(--life)' : it.kind === 'warmup' ? 'var(--grey)' : color(it.variant)});
+            rect.dataset.tip = life
+              ? `${fork}${it.kind === 'startup' ? 'JVM start to first iteration (JVM boot, benchmark setup)' : 'last iteration to JVM exit'}: ${((it.e - it.s) / 1000).toFixed(2)} s`
+              : `${fork}#${it.i} ${it.kind} ${it.variant || ''}: ${it.score.toFixed(1)} ${it.unit}` + (it.gc != null ? `, GC pauses ${it.gc} ms` : '');
+            if (!life && b - a > 46) el('text', {x: a + 4, y: y + r.h / 2 + 4}).textContent = it.score.toFixed(1);
+          }
+          // each fork's start, labelled when there are several
+          if (forks > 1) for (let f = 1; f <= forks; f++) {
+            const s = Math.min(...D.iters.filter(i => i.fork === f).map(i => i.s));
+            if (s < x0 || s > x1) continue;
+            el('line', {x1: X(s), x2: X(s), y1: 0, y2: height - 22, stroke: 'var(--fg)', 'stroke-width': 1, opacity: 0.35});
+            el('text', {x: X(s) + 2, y: y + r.h + 1, class: 'lab'}).textContent = `fork ${f}`;
+          }
+        } else if (!r.key && !r.ipc) {
+          // pauses / load only
+        } else {
+          const pts = r.ipc ? D.series.map(s => ({t: s.t, v: s.bench_c ? s.bench_i / s.bench_c : null}))
+                            : D.series.map(s => ({t: s.t, v: s[r.key] / (BIN_MS / 1000) / 1e9}));
+          const vis = pts.filter(p => p.t >= x0 - BIN_MS && p.t <= x1 && p.v != null);
+          const max = r.ipc ? Math.max(4, ...vis.map(p => p.v)) : Math.max(0.5, ...vis.map(p => p.v));
+          const Y = v => y + r.h - 4 - v / max * (r.h - 10);
+          el('text', {x: L - 4, y: y + 12, 'text-anchor': 'end', class: 'lab'}).textContent = max.toFixed(1);
+          let d = '', prev = null;
+          // a new segment after a gap (between forks, or between xctrace's recordings)
+          for (const p of vis) { d += (prev == null || p.t - prev > 2 * BIN_MS ? 'M' : 'L') + X(p.t + BIN_MS / 2).toFixed(1) + ',' + Y(p.v).toFixed(1); prev = p.t; }
+          if (d) el('path', {d, fill: 'none', stroke: r.ipc ? 'var(--v2)' : 'var(--v0)', 'stroke-width': 1.2});
+        }
+        if (r.pauses) for (const p of D.pauses) {
+          if (p.e < x0 || p.s > x1) continue;
+          const m = el('rect', {x: X(p.s), y: y + 2, width: Math.max(2, X(p.e) - X(p.s)), height: r.h - 4, fill: 'var(--pause)', opacity: 0.55});
+          m.dataset.tip = `${p.what}: ${(p.e - p.s).toFixed(1)} ms`;
+        }
+        if (r.load && D.load.length) {
+          const lmax = Math.max(2, ...D.load.map(l => l.cores));
+          el('text', {x: W - R - 2, y: y + 12, 'text-anchor': 'end', class: 'lab'}).textContent = `load.tsv: other processes, cores (max ${lmax.toFixed(1)})`;
+          let ld = '';
+          for (const l of D.load) {
+            if (l.t < x0 - 5000 || l.t > x1 + 5000) continue;
+            const yy = y + r.h - 4 - l.cores / lmax * (r.h - 10);
+            const clamp = x => Math.min(Math.max(x, L), W - R);
+            ld += (ld ? 'L' : 'M') + clamp(X(l.t - 5000)).toFixed(1) + ',' + yy.toFixed(1) + 'L' + clamp(X(l.t)).toFixed(1) + ',' + yy.toFixed(1);
+          }
+          if (ld) el('path', {d: ld, fill: 'none', stroke: 'var(--v1)', 'stroke-width': 1.2, 'stroke-dasharray': '4 3'});
+        }
+        y += r.h + 8;
+      }
+    }
+
+    function set(data) {
+      D = data;
+      variants = [...new Set(D.iters.map(i => i.variant).filter(v => v))];
+      const ts = [...D.iters.flatMap(i => [i.s, i.e]), ...D.series.map(s => s.t), ...D.series.map(s => s.t + BIN_MS)];
+      const n0 = ts.length ? Math.min(...ts) : 0, n1 = ts.length ? Math.max(...ts) : 1;
+      // keep a zoomed view where it is as data arrives; otherwise follow the whole range
+      if (!zoomed) { x0 = n0; x1 = Math.max(n1, n0 + 1); }
+      t0 = n0; t1 = Math.max(n1, n0 + 1);
+      if (legend) legend.innerHTML = variants.map(v => `<span><i style="background:${color(v)}"></i>${v}</span>`).join('')
+        + '<span><i style="background:var(--grey)"></i>warmup</span>'
+        + (D.iters.some(i => i.kind === 'startup') ? '<span><i style="background:var(--life)"></i>JVM start / exit</span>' : '') + (D.pauses.length ? '<span><i style="background:var(--pause)"></i>GC pause</span>' : '');
+      draw();
+    }
+
+    svg.addEventListener('wheel', e => { e.preventDefault(); const W = svg.clientWidth, f = Math.exp(e.deltaY * 0.002);
+      const at = x0 + (e.offsetX - L) / (W - L - R) * (x1 - x0); x0 = Math.max(t0, at - (at - x0) * f); x1 = Math.min(t1, at + (x1 - at) * f); zoomed = true; draw(); }, {passive: false});
+    let drag = null;
+    svg.addEventListener('pointerdown', e => { drag = {x: e.clientX, x0, x1}; svg.setPointerCapture(e.pointerId); });
+    svg.addEventListener('pointermove', e => {
+      const t = e.target.dataset && e.target.dataset.tip;
+      if (tip && t && !drag) { tip.textContent = t; tip.style.display = 'block'; tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 12) + 'px'; }
+      else if (tip && !drag) tip.style.display = 'none';
+      if (!drag) return;
+      const W = svg.clientWidth, dt = (e.clientX - drag.x) / (W - L - R) * (drag.x1 - drag.x0), w = drag.x1 - drag.x0;
+      x0 = Math.min(Math.max(t0, drag.x0 - dt), t1 - w); x1 = x0 + w; zoomed = true; draw();
+    });
+    svg.addEventListener('pointerup', () => drag = null);
+    svg.addEventListener('dblclick', () => { zoomed = false; x0 = t0; x1 = t1; draw(); });
+    window.addEventListener('resize', draw);
+    return {set, reset() { zoomed = false; }};
+  }
+
+  return {parse, fetchCell, mount};
+})();
+
+BenchTimeline.mount(document.getElementById('chart'), document.getElementById('legend'), document.getElementById('tip'))
+  .set(BenchTimeline.parse({"iterations": "index\tkind\tvariant\tstart_ms\tend_ms\tscore\tops\tgc_ms\tpid\tunit\n-1\tstartup\t\t1792039369423\t1792039369672\t\t\t\t8621\tus/op\n0\twarmup\t\t1792039369672\t1792039370729\t16766.6947\t61\t\t8621\tus/op\n1\twarmup\t\t1792039370741\t1792039371758\t16140.2632\t63\t\t8621\tus/op\n2\twarmup\t\t1792039371759\t1792039372775\t15161.3035\t67\t\t8621\tus/op\n3\tmeasure\t\t1792039374851\t1792039375861\t12472.9018\t81\t\t8621\tus/op\n4\tmeasure\t\t1792039375863\t1792039376877\t12833.4557\t79\t\t8621\tus/op\n5\tmeasure\t\t1792039376878\t1792039377895\t13377.0411\t76\t\t8621\tus/op\n6\tmeasure\t\t1792039377896\t1792039378909\t13688.1498\t74\t\t8621\tus/op\n7\tmeasure\t\t1792039378910\t1792039379935\t14818.2168\t69\t\t8621\tus/op\n-1\texit\t\t1792039379935\t1792039387354\t\t\t\t8621\tus/op\n", "timeline": "bin_ms\tbench_cycles\tbench_inst\tjit_cycles\tjit_inst\tgc_cycles\tgc_inst\tother_cycles\tother_inst\tprocesses_cycles\tprocesses_inst\n1792039374750\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\n1792039374800\t0\t0\t0\t0\t0\t0\t0\t0\t27220507\t58958192\n1792039374850\t191151912\t358350854\t337\t30\t0\t0\t313345\t147307\t87402258\t233457958\n1792039374900\t204079250\t393154144\t0\t0\t0\t0\t0\t0\t79249684\t219113000\n1792039374950\t201648157\t397357148\t0\t0\t0\t0\t0\t0\t15348430\t21426482\n1792039375000\t200933873\t400029298\t0\t0\t0\t0\t0\t0\t17597846\t25375972\n1792039375050\t198792364\t392041867\t0\t0\t0\t0\t0\t0\t15810057\t25084509\n1792039375100\t197905471\t394815193\t2865\t648\t0\t0\t0\t0\t62889935\t116802885\n1792039375150\t196434142\t387147278\t202016\t83031\t0\t0\t0\t0\t19128693\t29011743\n1792039375200\t193366261\t386547108\t0\t0\t0\t0\t0\t0\t31053516\t45979523\n1792039375250\t191690541\t380046497\t0\t0\t0\t0\t0\t0\t27776284\t43964846\n1792039375300\t192669961\t391924197\t964730\t1263282\t0\t0\t0\t0\t44680502\t73446785\n1792039375350\t194584026\t391623944\t0\t0\t0\t0\t0\t0\t7452798\t11591326\n1792039375400\t199331332\t394616154\t0\t0\t8846784\t15352933\t537883\t763606\t86129330\t90620358\n1792039375450\t206598963\t415518722\t0\t0\t0\t0\t0\t0\t5569614\t7223236\n1792039375500\t204909935\t398000039\t0\t0\t0\t0\t0\t0\t55527255\t192501779\n1792039375550\t200675885\t384099971\t5503\t799\t0\t0\t0\t0\t209129525\t534342781\n1792039375600\t207148108\t393495754\t0\t0\t0\t0\t0\t0\t107120588\t228757398\n1792039375650\t198648630\t371118806\t598565\t722892\t0\t0\t1328849\t2498577\t552249174\t1155088221\n1792039375700\t193182294\t360378430\t0\t0\t0\t0\t0\t0\t366384310\t835507859\n1792039375750\t191267389\t362897217\t0\t0\t0\t0\t0\t0\t326374733\t751330769\n1792039375800\t190525045\t365541565\t0\t0\t0\t0\t0\t0\t229752205\t502632293\n1792039375850\t193711099\t377067713\t3509396\t6133367\t0\t0\t133913\t177643\t370756350\t841493903\n1792039375900\t195714714\t368754797\t0\t0\t0\t0\t0\t0\t232316385\t522926779\n1792039375950\t197834396\t375469407\t0\t0\t0\t0\t0\t0\t107742088\t214391433\n1792039376000\t188268220\t343665551\t0\t0\t0\t0\t0\t0\t865279978\t1970969541\n1792039376050\t164918504\t280524114\t0\t0\t0\t0\t0\t0\t865837342\t1985296480\n1792039376100\t182587839\t309388618\t0\t0\t0\t0\t0\t0\t956023790\t1922244949\n1792039376150\t158650344\t281044981\t0\t0\t0\t0\t0\t0\t1018006608\t2081100800\n1792039376200\t155164136\t270329366\t0\t0\t0\t0\t0\t0\t1178537674\t2180984735\n1792039376250\t199889896\t375700618\t0\t0\t0\t0\t0\t0\t326234013\t769200681\n1792039376300\t187241559\t360043539\t0\t0\t0\t0\t0\t0\t284603631\t692281604\n1792039376350\t199876111\t387066749\t0\t0\t0\t0\t0\t0\t111661209\t477145476\n1792039376400\t194699564\t377233960\t0\t0\t6009\t771\t55724\t17019\t263361488\t946400237\n1792039376450\t188591645\t372996117\t0\t0\t0\t0\t0\t0\t428086802\t1810769345\n1792039376500\t209495678\t412497034\t0\t0\t0\t0\t0\t0\t24018421\t40753735\n1792039376550\t203969657\t401248044\t0\t0\t0\t0\t0\t0\t72579934\t114873598\n1792039376600\t206582222\t404671535\t0\t0\t0\t0\t0\t0\t16768815\t18037611\n1792039376650\t206450456\t410176522\t957087\t1200922\t0\t0\t883139\t1660216\t31609693\t39120913\n1792039376700\t207001577\t411620187\t0\t0\t0\t0\t0\t0\t10469120\t11276464\n1792039376750\t205527482\t412590986\t0\t0\t0\t0\t0\t0\t11991086\t17164666\n1792039376800\t205922114\t411616457\t0\t0\t0\t0\t0\t0\t11505737\t15978865\n1792039376850\t199657254\t397590512\t0\t0\t0\t0\t860656\t573641\t46306775\t58227302\n1792039376900\t203655342\t401212000\t0\t0\t0\t0\t0\t0\t22691400\t41230693\n1792039376950\t199342868\t382150512\t0\t0\t0\t0\t0\t0\t75610952\t191393677\n1792039377000\t194566702\t373843761\t0\t0\t0\t0\t0\t0\t115083764\t327443050\n1792039377050\t204453468\t398472155\t0\t0\t0\t0\t0\t0\t43824447\t129857541\n1792039377100\t204755115\t398320724\t0\t0\t0\t0\t0\t0\t111277346\t385135296\n1792039377150\t199519992\t377114139\t0\t0\t0\t0\t0\t0\t166406783\t458596332\n1792039377200\t193763894\t365260615\t0\t0\t0\t0\t0\t0\t142423075\t481415055\n1792039377250\t201748073\t386912767\t0\t0\t0\t0\t0\t0\t196557763\t676905355\n1792039377300\t202518057\t389037963\t0\t0\t0\t0\t0\t0\t373508879\t803318846\n1792039377350\t206438028\t396905985\t0\t0\t0\t0\t0\t0\t124254264\t262784846\n1792039377400\t202966703\t382034765\t0\t0\t0\t0\t0\t0\t217376203\t422515042\n1792039377450\t195084427\t359356014\t0\t0\t0\t0\t0\t0\t616832378\t1359011639\n1792039377500\t199923296\t376739403\t0\t0\t0\t0\t0\t0\t427110459\t953543333\n1792039377550\t165401419\t295243994\t0\t0\t0\t0\t0\t0\t832333152\t1764042249\n1792039377600\t180966764\t313607060\t0\t0\t0\t0\t0\t0\t1671568415\t3639256713\n1792039377650\t159971093\t260597880\t3849547\t8437701\t0\t0\t255734\t69362\t1278483177\t3231071323\n1792039377700\t176967014\t288722998\t0\t0\t0\t0\t0\t0\t1059784822\t2774757348\n1792039377750\t178405153\t277807245\t0\t0\t0\t0\t0\t0\t1206016666\t2527752747\n1792039377800\t187730211\t294623690\t0\t0\t0\t0\t0\t0\t1628366986\t3499671992\n1792039377850\t190407409\t321285945\t5774204\t11656443\t0\t0\t1524668\t1291642\t2542354188\t5238449784\n1792039377900\t194904842\t346443581\t0\t0\t0\t0\t0\t0\t643369457\t1336232566\n1792039377950\t191177270\t354876912\t0\t0\t1790577\t3011417\t435563\t440579\t1042533007\t2026619369\n1792039378000\t194554977\t357945543\t0\t0\t0\t0\t0\t0\t415241209\t984525026\n1792039378050\t190165538\t351799118\t0\t0\t0\t0\t0\t0\t631863682\t1457655396\n1792039378100\t202460403\t371458454\t0\t0\t0\t0\t0\t0\t521666422\t1619858819\n1792039378150\t211751191\t416848083\t0\t0\t0\t0\t0\t0\t210795405\t617420890\n1792039378200\t198668482\t367264118\t0\t0\t0\t0\t0\t0\t485907583\t1211904444\n1792039378250\t198831688\t361107170\t0\t0\t0\t0\t0\t0\t570186274\t1698159034\n1792039378300\t185403257\t310355617\t0\t0\t0\t0\t0\t0\t1620025875\t2699429032\n1792039378350\t186908827\t305539538\t0\t0\t0\t0\t0\t0\t1561543961\t2638679392\n1792039378400\t197147631\t343936769\t0\t0\t0\t0\t0\t0\t1929282120\t3969032813\n1792039378450\t191393652\t342769660\t0\t0\t0\t0\t0\t0\t917455784\t1685907225\n1792039378500\t195166759\t347303224\t0\t0\t0\t0\t0\t0\t1060754100\t2039468526\n1792039378550\t190993711\t336862411\t0\t0\t0\t0\t0\t0\t942155859\t2462283432\n1792039378600\t196019361\t359071633\t0\t0\t0\t0\t0\t0\t1049166435\t2628686114\n1792039378650\t186714270\t340492976\t185694\t111545\t0\t0\t815513\t1533942\t1239901897\t2924882163\n1792039378700\t199530280\t357173547\t0\t0\t0\t0\t0\t0\t920365383\t1942420912\n1792039378750\t155007478\t267951354\t0\t0\t0\t0\t0\t0\t1878566624\t3047214822\n1792039378800\t160189897\t270342908\t0\t0\t0\t0\t0\t0\t3079801704\t3907690299\n1792039378850\t162817657\t285035956\t0\t0\t0\t0\t0\t0\t732288083\t1656083561\n1792039378900\t175444385\t314039057\t228610\t379045\t0\t0\t1384973\t1060289\t409733876\t896347734\n1792039378950\t183739201\t317463563\t0\t0\t0\t0\t0\t0\t1117101530\t2296135121\n1792039379000\t198030295\t360325322\t0\t0\t0\t0\t0\t0\t736433231\t1827489078\n1792039379050\t206001761\t386210813\t1450218\t2790838\t0\t0\t0\t0\t817111699\t1781094712\n1792039379100\t192000680\t361283208\t0\t0\t0\t0\t0\t0\t531887543\t1146100661\n1792039379150\t195410795\t365807883\t0\t0\t0\t0\t10884\t796\t610831032\t1507199017\n1792039379200\t193069325\t364513792\t0\t0\t0\t0\t0\t0\t667907803\t1451566275\n1792039379250\t172487060\t300540693\t0\t0\t0\t0\t0\t0\t1398930609\t4216734399\n1792039379300\t193140533\t339193294\t0\t0\t0\t0\t0\t0\t1031111008\t1803748247\n1792039379350\t191671683\t321132690\t0\t0\t0\t0\t0\t0\t1614611975\t3880736767\n1792039379400\t125016966\t151263445\t0\t0\t0\t0\t0\t0\t1326699034\t1777611239\n1792039379450\t155362184\t247076707\t0\t0\t0\t0\t0\t0\t4164304406\t7442761581\n1792039379500\t173889723\t307570054\t0\t0\t0\t0\t0\t0\t690455951\t1035677098\n1792039379550\t172203755\t243518197\t0\t0\t0\t0\t0\t0\t2155624072\t3604270870\n1792039379600\t171408921\t271573974\t0\t0\t0\t0\t0\t0\t1335887399\t2004857964\n1792039379650\t194309256\t342764998\t0\t0\t0\t0\t233159\t87270\t887491532\t1636473608\n1792039379700\t201839346\t381414288\t0\t0\t0\t0\t0\t0\t205635086\t411775951\n1792039379750\t176224003\t257825632\t0\t0\t0\t0\t0\t0\t1246213001\t1925785602\n1792039379800\t173180790\t217954867\t0\t0\t0\t0\t0\t0\t2911374961\t4615408280\n1792039379850\t202608630\t343598423\t0\t0\t0\t0\t0\t0\t389700627\t707641125\n1792039379900\t117024061\t182231218\t229436\t263412\t0\t0\t0\t0\t1154758557\t2631386761\n1792039379950\t0\t0\t0\t0\t0\t0\t0\t0\t436876778\t931571542\n1792039380000\t0\t0\t0\t0\t0\t0\t0\t0\t282344937\t627368613\n1792039380050\t0\t0\t0\t0\t0\t0\t0\t0\t103428188\t271453736\n1792039380100\t0\t0\t0\t0\t0\t0\t0\t0\t201123569\t519679550\n1792039380150\t0\t0\t0\t0\t0\t0\t0\t0\t160772438\t233245341\n1792039380200\t0\t0\t0\t0\t0\t0\t0\t0\t238503118\t364154521\n1792039380250\t0\t0\t0\t0\t0\t0\t0\t0\t212038093\t295691789\n1792039380300\t0\t0\t0\t0\t0\t0\t0\t0\t777392127\t1115251984\n1792039380350\t0\t0\t0\t0\t0\t0\t0\t0\t1691213757\t2993664750\n1792039380400\t0\t0\t0\t0\t0\t0\t0\t0\t920413877\t1309487760\n1792039380450\t0\t0\t0\t0\t0\t0\t0\t0\t2192140403\t3252106569\n1792039380500\t0\t0\t0\t0\t0\t0\t0\t0\t638274604\t895820186\n1792039380600\t0\t0\t0\t0\t0\t0\t0\t0\t3977167027\t6903274489\n1792039380650\t0\t0\t1053738\t1891322\t0\t0\t116236\t34076\t10722661152\t22371245343\n1792039380700\t0\t0\t0\t0\t0\t0\t0\t0\t1795132707\t2653696235\n1792039380750\t0\t0\t0\t0\t0\t0\t0\t0\t58533271\t70302909\n1792039380800\t0\t0\t0\t0\t0\t0\t0\t0\t2710234264\t5647717075\n1792039380850\t0\t0\t0\t0\t0\t0\t0\t0\t2887532161\t5023612639\n1792039380900\t0\t0\t0\t0\t0\t0\t0\t0\t458867859\t966104264\n1792039380950\t0\t0\t0\t0\t0\t0\t0\t0\t279944748\t1052521361\n1792039381000\t0\t0\t0\t0\t0\t0\t0\t0\t9083510\t21517579\n1792039381050\t0\t0\t0\t0\t0\t0\t0\t0\t8262088\t36643762\n1792039381100\t0\t0\t0\t0\t0\t0\t0\t0\t514925875\t1240682155\n1792039381150\t0\t0\t0\t0\t0\t0\t0\t0\t135649\t148376\n1792039381200\t0\t0\t0\t0\t0\t0\t0\t0\t9178\t1857\n1792039381250\t0\t0\t0\t0\t0\t0\t0\t0\t293389714\t391735630\n1792039381300\t0\t0\t0\t0\t0\t0\t0\t0\t19779225\t23497075\n1792039381350\t0\t0\t0\t0\t0\t0\t0\t0\t884688869\t1264107800\n1792039381400\t0\t0\t15515555\t27477616\t0\t0\t16129471\t26362891\t3954297583\t6716316206\n1792039381450\t0\t0\t210444053\t522622815\t0\t0\t96353940\t283011544\t5101202077\t9749148903\n1792039381500\t0\t0\t74678243\t200095960\t0\t0\t8012153\t58252319\t5411608028\t9082313828\n1792039381550\t0\t0\t0\t0\t0\t0\t0\t0\t3110259\t4161320\n1792039381600\t0\t0\t0\t0\t0\t0\t0\t0\t15865718\t18117483\n1792039381650\t0\t0\t0\t0\t0\t0\t245954\t100921\t131995945\t285837729\n1792039381700\t0\t0\t0\t0\t0\t0\t0\t0\t2077831\t4887057\n", "gc": "[2026-10-15T14:42:49.411+1000][0.006s] Using G1\n[2026-10-15T14:42:49.786+1000][0.381s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 52M->11M(1024M) 2.341ms\n[2026-10-15T14:42:50.017+1000][0.612s] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 60M->11M(1024M) 1.589ms\n[2026-10-15T14:42:50.426+1000][1.021s] GC(2) Pause Young (Normal) (G1 Evacuation Pause) 92M->10M(1024M) 0.689ms\n[2026-10-15T14:42:55.430+1000][6.025s] GC(3) Pause Young (Normal) (G1 Evacuation Pause) 623M->13M(1024M) 1.291ms\n[2026-10-15T14:42:57.955+1000][8.551s] GC(4) Pause Young (Normal) (G1 Evacuation Pause) 623M->14M(1024M) 0.950ms\n", "load": ""}));
+</script>

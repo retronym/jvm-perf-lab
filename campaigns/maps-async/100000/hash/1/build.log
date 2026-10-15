@@ -1,0 +1,31 @@
+
+[perflab] WordCountBenchmark(100000) in pid 67186, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps-async/100000/hash/1, -XX:+UnlockDiagnosticVMOptions, -XX:+DebugNonSafepoints, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh17444471820323502162compilecommand]
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   737 /   274.9 /   13
+  WARMUP        2:    25 /    30.9 /    3
+  WARMUP        3:     6 /     1.2 /    1
+  WARMUP        4:    15 /     1.4 /    1
+  MEASUREMENT   5:     7 /     7.5 /    0
+  MEASUREMENT   6:    15 /     1.2 /    0
+  MEASUREMENT   7:    11 /     1.4 /    0
+  MEASUREMENT   8:    12 /     1.3 /    0
+  MEASUREMENT   9:    10 /     1.3 /    0
+  MEASUREMENT  10:    12 /     2.0 /    0
+[jit] compiled while measuring:
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$HandleTable.assign (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.forClass (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.Math.min (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.String.getChars (tier 3)
+     1  java.lang.String.isASCII (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-67186.txt

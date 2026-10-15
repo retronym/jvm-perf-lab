@@ -1,0 +1,15 @@
+
+== INST_ALL (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+
+== INST_BRANCH (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+
+== samples (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove

@@ -1,0 +1,449 @@
+# JMH version: 1.37
+# VM version: JDK 21.0.12.1, OpenJDK 64-Bit Server VM, 21.0.12.1+1-LTS
+# VM invoker: ~/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java
+# VM options: -Xms1G -Xmx1G -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/memory-paired/4194304/paired/2/gc.log:time,uptime -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/memory-paired/4194304/paired/2
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 4 iterations, 1 s each
+# Measurement: 8 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: sample.MemoryBenchmark.chase
+# Parameters: (layout = shuffled, size = 4194304, variants = sequential=sequential|shuffled=shuffled)
+
+# Run progress: 0.00% complete, ETA 00:00:12
+# Fork: 1 of 1
+# Warmup Iteration   1: 1196.024 us/op
+# Warmup Iteration   2: 60783.422 us/op
+# Warmup Iteration   3: 56798.280 us/op
+# Warmup Iteration   4: 1180.915 us/op
+Iteration   1: 1204.961 us/op
+                 gc.alloc.rate:      0.057 MB/sec
+                 gc.alloc.rate.norm: 71.635 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 60418.194 us/op
+                 gc.alloc.rate:      0.060 MB/sec
+                 gc.alloc.rate.norm: 3776.000 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 63743.141 us/op
+                 gc.alloc.rate:      0.041 MB/sec
+                 gc.alloc.rate.norm: 2731.500 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 1187.292 us/op
+                 gc.alloc.rate:      0.040 MB/sec
+                 gc.alloc.rate.norm: 49.496 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 1156.795 us/op
+                 gc.alloc.rate:      0.033 MB/sec
+                 gc.alloc.rate.norm: 40.479 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   6: 67325.067 us/op
+                 gc.alloc.rate:      0.034 MB/sec
+                 gc.alloc.rate.norm: 2379.200 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   7: 62973.984 us/op
+                 gc.alloc.rate:      0.032 MB/sec
+                 gc.alloc.rate.norm: 2107.500 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   8: 1152.117 us/op
+                 gc.alloc.rate:                                                       0.400 MB/sec
+                 gc.alloc.rate.norm:                                                  1214.616 B/op
+                 gc.count:                                                            ≈ 0 counts
+                 jit.compilations:                                                    109.000 #
+                 jit.compileTime:                                                     15.429 ms
+                 jit.deopts:                                                          ≈ 0 #
+                 jit.lastWarmup.compilations:                                         13.000 #
+                 jit.lastWarmup.deopts:                                               1.000 #
+                 paired.gcFree.sequential:                                            1175.291 us/op
+                 paired.gcFree.shuffled:                                              63615.096 us/op
+                 paired.gcFree.shuffled.delta%:                                       5317.202 %
+                 paired.gcFree.shuffled.delta%.median:                                5317.362 %
+                 paired.gcFree.shuffled.delta%.sd:                                    331.367 %
+                 paired.sequential:                                                   1175.291 us/op
+                 paired.shuffled:                                                     63615.096 us/op
+                 paired.shuffled.delta%:                                              5317.202 %
+                 paired.shuffled.delta%.median:                                       5317.362 %
+                 paired.shuffled.delta%.sd:                                           331.367 %
+                 xctrace.CORE_ACTIVE_CYCLE:                                           9935803.032 #/op
+                 xctrace.CORE_ACTIVE_CYCLE.sequential:                                5052516.460 #/op
+                 xctrace.CORE_ACTIVE_CYCLE.shuffled:                                  271691079.639 #/op
+                 xctrace.CORE_ACTIVE_CYCLE.shuffled.delta%:                           5278.320 %
+                 xctrace.CORE_ACTIVE_CYCLE.shuffled.delta%.median:                    5248.542 %
+                 xctrace.CORE_ACTIVE_CYCLE.shuffled.delta%.sd:                        260.110 %
+                 xctrace.INST_ALL:                                                    25458549.832 #/op
+                 xctrace.INST_ALL.sequential:                                         25456388.369 #/op
+                 xctrace.INST_ALL.shuffled:                                           25500714.408 #/op
+                 xctrace.INST_ALL.shuffled.delta%:                                    0.175 %
+                 xctrace.INST_ALL.shuffled.delta%.median:                             0.117 %
+                 xctrace.INST_ALL.shuffled.delta%.sd:                                 0.147 %
+                 xctrace.IPC.bench:                                                   2.562 insts/clk
+                 xctrace.IPC.gc:                                                      1.717 insts/clk
+                 xctrace.IPC.jit:                                                     2.486 insts/clk
+                 xctrace.IPC.other:                                                   2.897 insts/clk
+                 xctrace.L1D_CACHE_MISS_LD_NONSPEC:                                   76549.700 #/op
+                 xctrace.L1D_CACHE_MISS_LD_NONSPEC.sequential:                        3821.360 #/op
+                 xctrace.L1D_CACHE_MISS_LD_NONSPEC.shuffled:                          3968147.457 #/op
+                 xctrace.L1D_CACHE_MISS_LD_NONSPEC.shuffled.delta%:                   103770.007 %
+                 xctrace.L1D_CACHE_MISS_LD_NONSPEC.shuffled.delta%.median:            103790.697 %
+                 xctrace.L1D_CACHE_MISS_LD_NONSPEC.shuffled.delta%.sd:                1849.401 %
+                 xctrace.L1D_CACHE_MISS_LD_NONSPEC/kinst:                             3.007 #/kinst
+                 xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS:                        3670854.920 #/op
+                 xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.sequential:             40016.275 #/op
+                 xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.shuffled:               198363657.412 #/op
+                 xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.shuffled.delta%:        495463.640 %
+                 xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.shuffled.delta%.median: 502005.331 %
+                 xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.shuffled.delta%.sd:     18715.067 %
+                 xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS/cycles:                 36.946 %
+                 xctrace.bench.oncpu:                                                 8.079 s
+                 xctrace.cycles%.bench:                                               98.600 %
+                 xctrace.cycles%.gc:                                                  0.031 %
+                 xctrace.cycles%.jit:                                                 0.989 %
+                 xctrace.cycles%.other:                                               0.380 %
+
+
+
+Result "sample.MemoryBenchmark.chase":
+  32395.194 ±(99.9%) 63912.909 us/op [Average]
+  (min, avg, max) = (1152.117, 32395.194, 67325.067), stdev = 33427.687
+  CI (99.9%): [≈ 0, 96308.103] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:gc.alloc.rate":
+  0.087 ±(99.9%) 0.243 MB/sec [Average]
+  (min, avg, max) = (0.032, 0.087, 0.400), stdev = 0.127
+  CI (99.9%): [≈ 0, 0.330] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:gc.alloc.rate.norm":
+  1546.303 ±(99.9%) 2721.028 B/op [Average]
+  (min, avg, max) = (40.479, 1546.303, 3776.000), stdev = 1423.150
+  CI (99.9%): [≈ 0, 4267.331] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:gc.count":
+  ≈ 0 counts
+
+Secondary result "sample.MemoryBenchmark.chase:jit.compilations":
+  109.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 13.625, 109.000), stdev = 38.537
+  CI (99.9%): [109.000, 109.000] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:jit.compileTime":
+  15.429 ±(99.9%) 0.001 ms [Maximum]
+  (min, avg, max) = (≈ 0, 1.929, 15.429), stdev = 5.455
+  CI (99.9%): [15.429, 15.429] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:jit.deopts":
+  ≈ 0 #
+
+Secondary result "sample.MemoryBenchmark.chase:jit.lastWarmup.compilations":
+  13.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 1.625, 13.000), stdev = 4.596
+  CI (99.9%): [13.000, 13.000] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:jit.lastWarmup.deopts":
+  1.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 0.125, 1.000), stdev = 0.354
+  CI (99.9%): [1.000, 1.000] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:paired.gcFree.sequential":
+  1175.291 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 146.911, 1175.291), stdev = 415.528
+  CI (99.9%): [1175.291, 1175.291] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:paired.gcFree.shuffled":
+  63615.096 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 7951.887, 63615.096), stdev = 22491.333
+  CI (99.9%): [63615.096, 63615.096] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:paired.gcFree.shuffled.delta%":
+  5317.202 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 664.650, 5317.202), stdev = 1879.915
+  CI (99.9%): [5317.202, 5317.202] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:paired.gcFree.shuffled.delta%.median":
+  5317.362 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 664.670, 5317.362), stdev = 1879.971
+  CI (99.9%): [5317.362, 5317.362] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:paired.gcFree.shuffled.delta%.sd":
+  331.367 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 41.421, 331.367), stdev = 117.156
+  CI (99.9%): [331.367, 331.367] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:paired.sequential":
+  1175.291 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 146.911, 1175.291), stdev = 415.528
+  CI (99.9%): [1175.291, 1175.291] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:paired.shuffled":
+  63615.096 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 7951.887, 63615.096), stdev = 22491.333
+  CI (99.9%): [63615.096, 63615.096] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:paired.shuffled.delta%":
+  5317.202 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 664.650, 5317.202), stdev = 1879.915
+  CI (99.9%): [5317.202, 5317.202] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:paired.shuffled.delta%.median":
+  5317.362 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 664.670, 5317.362), stdev = 1879.971
+  CI (99.9%): [5317.362, 5317.362] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:paired.shuffled.delta%.sd":
+  331.367 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 41.421, 331.367), stdev = 117.156
+  CI (99.9%): [331.367, 331.367] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.CORE_ACTIVE_CYCLE":
+  9935803.032 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 1241975.379, 9935803.032), stdev = 3512836.850
+  CI (99.9%): [9935803.032, 9935803.032] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.CORE_ACTIVE_CYCLE.sequential":
+  5052516.460 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 631564.558, 5052516.460), stdev = 1786334.325
+  CI (99.9%): [5052516.460, 5052516.460] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.CORE_ACTIVE_CYCLE.shuffled":
+  271691079.639 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 33961384.955, 271691079.639), stdev = 96057302.400
+  CI (99.9%): [271691079.639, 271691079.639] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.CORE_ACTIVE_CYCLE.shuffled.delta%":
+  5278.320 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 659.790, 5278.320), stdev = 1866.168
+  CI (99.9%): [5278.320, 5278.320] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.CORE_ACTIVE_CYCLE.shuffled.delta%.median":
+  5248.542 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 656.068, 5248.542), stdev = 1855.640
+  CI (99.9%): [5248.542, 5248.542] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.CORE_ACTIVE_CYCLE.shuffled.delta%.sd":
+  260.110 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 32.514, 260.110), stdev = 91.963
+  CI (99.9%): [260.110, 260.110] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.INST_ALL":
+  25458549.832 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 3182318.729, 25458549.832), stdev = 9000956.613
+  CI (99.9%): [25458549.832, 25458549.832] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.INST_ALL.sequential":
+  25456388.369 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 3182048.546, 25456388.369), stdev = 9000192.420
+  CI (99.9%): [25456388.369, 25456388.369] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.INST_ALL.shuffled":
+  25500714.408 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 3187589.301, 25500714.408), stdev = 9015864.041
+  CI (99.9%): [25500714.408, 25500714.408] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.INST_ALL.shuffled.delta%":
+  0.175 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.022, 0.175), stdev = 0.062
+  CI (99.9%): [0.175, 0.175] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.INST_ALL.shuffled.delta%.median":
+  0.117 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.015, 0.117), stdev = 0.041
+  CI (99.9%): [0.117, 0.117] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.INST_ALL.shuffled.delta%.sd":
+  0.147 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.018, 0.147), stdev = 0.052
+  CI (99.9%): [0.147, 0.147] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.IPC.bench":
+  2.562 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.320, 2.562), stdev = 0.906
+  CI (99.9%): [2.562, 2.562] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.IPC.gc":
+  1.717 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.215, 1.717), stdev = 0.607
+  CI (99.9%): [1.717, 1.717] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.IPC.jit":
+  2.486 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.311, 2.486), stdev = 0.879
+  CI (99.9%): [2.486, 2.486] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.IPC.other":
+  2.897 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.362, 2.897), stdev = 1.024
+  CI (99.9%): [2.897, 2.897] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC":
+  76549.700 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 9568.713, 76549.700), stdev = 27064.406
+  CI (99.9%): [76549.700, 76549.700] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC.sequential":
+  3821.360 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 477.670, 3821.360), stdev = 1351.055
+  CI (99.9%): [3821.360, 3821.360] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC.shuffled":
+  3968147.457 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 496018.432, 3968147.457), stdev = 1402951.988
+  CI (99.9%): [3968147.457, 3968147.457] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC.shuffled.delta%":
+  103770.007 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 12971.251, 103770.007), stdev = 36688.238
+  CI (99.9%): [103770.007, 103770.007] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC.shuffled.delta%.median":
+  103790.697 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 12973.837, 103790.697), stdev = 36695.553
+  CI (99.9%): [103790.697, 103790.697] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC.shuffled.delta%.sd":
+  1849.401 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 231.175, 1849.401), stdev = 653.862
+  CI (99.9%): [1849.401, 1849.401] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC/kinst":
+  3.007 ±(99.9%) 0.001 #/kinst [Maximum]
+  (min, avg, max) = (≈ 0, 0.376, 3.007), stdev = 1.063
+  CI (99.9%): [3.007, 3.007] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS":
+  3670854.920 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 458856.865, 3670854.920), stdev = 1297843.203
+  CI (99.9%): [3670854.920, 3670854.920] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.sequential":
+  40016.275 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 5002.034, 40016.275), stdev = 14147.890
+  CI (99.9%): [40016.275, 40016.275] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.shuffled":
+  198363657.412 ±(99.9%) 0.001 #/op [Sum]
+  (min, avg, max) = (≈ 0, 24795457.177, 198363657.412), stdev = 70132143.649
+  CI (99.9%): [198363657.412, 198363657.412] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.shuffled.delta%":
+  495463.640 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 61932.955, 495463.640), stdev = 175172.850
+  CI (99.9%): [495463.640, 495463.640] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.shuffled.delta%.median":
+  502005.331 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 62750.666, 502005.331), stdev = 177485.687
+  CI (99.9%): [502005.331, 502005.331] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.shuffled.delta%.sd":
+  18715.067 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 2339.383, 18715.067), stdev = 6616.775
+  CI (99.9%): [18715.067, 18715.067] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS/cycles":
+  36.946 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 4.618, 36.946), stdev = 13.062
+  CI (99.9%): [36.946, 36.946] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.bench.oncpu":
+  8.079 ±(99.9%) 0.001 s [Maximum]
+  (min, avg, max) = (≈ 0, 1.010, 8.079), stdev = 2.856
+  CI (99.9%): [8.079, 8.079] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.cycles%.bench":
+  98.600 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 12.325, 98.600), stdev = 34.861
+  CI (99.9%): [98.600, 98.600] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.cycles%.gc":
+  0.031 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.004, 0.031), stdev = 0.011
+  CI (99.9%): [0.031, 0.031] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.cycles%.jit":
+  0.989 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.124, 0.989), stdev = 0.350
+  CI (99.9%): [0.989, 0.989] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:xctrace.cycles%.other":
+  0.380 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.048, 0.380), stdev = 0.134
+  CI (99.9%): [0.380, 0.380] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:21
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                                                  (layout)   (size)                               (variants)  Mode  Cnt          Score       Error      Units
+MemoryBenchmark.chase                                                                      shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8      32395.194 ± 63912.909      us/op
+MemoryBenchmark.chase:gc.alloc.rate                                                        shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          0.087 ±     0.243     MB/sec
+MemoryBenchmark.chase:gc.alloc.rate.norm                                                   shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8       1546.303 ±  2721.028       B/op
+MemoryBenchmark.chase:gc.count                                                             shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8            ≈ 0                 counts
+MemoryBenchmark.chase:jit.compilations                                                     shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8        109.000                      #
+MemoryBenchmark.chase:jit.compileTime                                                      shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8         15.429                     ms
+MemoryBenchmark.chase:jit.deopts                                                           shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8            ≈ 0                      #
+MemoryBenchmark.chase:jit.lastWarmup.compilations                                          shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8         13.000                      #
+MemoryBenchmark.chase:jit.lastWarmup.deopts                                                shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          1.000                      #
+MemoryBenchmark.chase:paired.gcFree.sequential                                             shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8       1175.291                  us/op
+MemoryBenchmark.chase:paired.gcFree.shuffled                                               shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8      63615.096                  us/op
+MemoryBenchmark.chase:paired.gcFree.shuffled.delta%                                        shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8       5317.202                      %
+MemoryBenchmark.chase:paired.gcFree.shuffled.delta%.median                                 shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8       5317.362                      %
+MemoryBenchmark.chase:paired.gcFree.shuffled.delta%.sd                                     shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8        331.367                      %
+MemoryBenchmark.chase:paired.sequential                                                    shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8       1175.291                  us/op
+MemoryBenchmark.chase:paired.shuffled                                                      shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8      63615.096                  us/op
+MemoryBenchmark.chase:paired.shuffled.delta%                                               shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8       5317.202                      %
+MemoryBenchmark.chase:paired.shuffled.delta%.median                                        shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8       5317.362                      %
+MemoryBenchmark.chase:paired.shuffled.delta%.sd                                            shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8        331.367                      %
+MemoryBenchmark.chase:xctrace.CORE_ACTIVE_CYCLE                                            shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8    9935803.032                   #/op
+MemoryBenchmark.chase:xctrace.CORE_ACTIVE_CYCLE.sequential                                 shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8    5052516.460                   #/op
+MemoryBenchmark.chase:xctrace.CORE_ACTIVE_CYCLE.shuffled                                   shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8  271691079.639                   #/op
+MemoryBenchmark.chase:xctrace.CORE_ACTIVE_CYCLE.shuffled.delta%                            shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8       5278.320                      %
+MemoryBenchmark.chase:xctrace.CORE_ACTIVE_CYCLE.shuffled.delta%.median                     shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8       5248.542                      %
+MemoryBenchmark.chase:xctrace.CORE_ACTIVE_CYCLE.shuffled.delta%.sd                         shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8        260.110                      %
+MemoryBenchmark.chase:xctrace.INST_ALL                                                     shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8   25458549.832                   #/op
+MemoryBenchmark.chase:xctrace.INST_ALL.sequential                                          shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8   25456388.369                   #/op
+MemoryBenchmark.chase:xctrace.INST_ALL.shuffled                                            shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8   25500714.408                   #/op
+MemoryBenchmark.chase:xctrace.INST_ALL.shuffled.delta%                                     shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          0.175                      %
+MemoryBenchmark.chase:xctrace.INST_ALL.shuffled.delta%.median                              shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          0.117                      %
+MemoryBenchmark.chase:xctrace.INST_ALL.shuffled.delta%.sd                                  shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          0.147                      %
+MemoryBenchmark.chase:xctrace.IPC.bench                                                    shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          2.562              insts/clk
+MemoryBenchmark.chase:xctrace.IPC.gc                                                       shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          1.717              insts/clk
+MemoryBenchmark.chase:xctrace.IPC.jit                                                      shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          2.486              insts/clk
+MemoryBenchmark.chase:xctrace.IPC.other                                                    shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          2.897              insts/clk
+MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC                                    shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8      76549.700                   #/op
+MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC.sequential                         shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8       3821.360                   #/op
+MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC.shuffled                           shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8    3968147.457                   #/op
+MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC.shuffled.delta%                    shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8     103770.007                      %
+MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC.shuffled.delta%.median             shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8     103790.697                      %
+MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC.shuffled.delta%.sd                 shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8       1849.401                      %
+MemoryBenchmark.chase:xctrace.L1D_CACHE_MISS_LD_NONSPEC/kinst                              shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          3.007                #/kinst
+MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS                         shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8    3670854.920                   #/op
+MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.sequential              shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8      40016.275                   #/op
+MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.shuffled                shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8  198363657.412                   #/op
+MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.shuffled.delta%         shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8     495463.640                      %
+MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.shuffled.delta%.median  shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8     502005.331                      %
+MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS.shuffled.delta%.sd      shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8      18715.067                      %
+MemoryBenchmark.chase:xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS/cycles                  shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8         36.946                      %
+MemoryBenchmark.chase:xctrace.bench.oncpu                                                  shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          8.079                      s
+MemoryBenchmark.chase:xctrace.cycles%.bench                                                shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8         98.600                      %
+MemoryBenchmark.chase:xctrace.cycles%.gc                                                   shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          0.031                      %
+MemoryBenchmark.chase:xctrace.cycles%.jit                                                  shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          0.989                      %
+MemoryBenchmark.chase:xctrace.cycles%.other                                                shuffled  4194304  sequential=sequential|shuffled=shuffled  avgt    8          0.380                      %
+
+Benchmark result is saved to ~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/memory-paired/4194304/paired/2/result.json

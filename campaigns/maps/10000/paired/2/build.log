@@ -1,0 +1,38 @@
+
+[perflab] WordCountBenchmark(10000) in pid 67130, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps/10000/paired/2/gc.log:time,uptime, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps/10000/paired/2, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh1798159495792254923compilecommand]
+[perflab] paired paired. (us/op): hash 182.7 linked 201.0 (+10.03% ± 2.92, median +10.03%, 2 pairs) tree 414.4 (+126.94% ± 9.93, median +126.94%, 2 pairs)
+[perflab] paired paired.gcFree. (us/op): hash 182.3 linked 200.7 (+10.14% ± 2.92, median +10.14%, 2 pairs) tree 414.0 (+127.27% ± 9.79, median +127.27%, 2 pairs)
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   698 /   220.5 /   11
+  WARMUP        2:    53 /   110.3 /   19
+  WARMUP        3:    63 /    43.8 /   12
+  WARMUP        4:     9 /     0.4 /    1
+  WARMUP        5:    16 /     5.2 /    0
+  WARMUP        6:    14 /     1.0 /    0
+  MEASUREMENT   7:    11 /     1.4 /    0
+  MEASUREMENT   8:     7 /     0.3 /    0
+  MEASUREMENT   9:     3 /     1.0 /    0
+  MEASUREMENT  10:     5 /     1.0 /    0
+  MEASUREMENT  11:    14 /     2.0 /    0
+  MEASUREMENT  12:    24 /     3.2 /    3
+[jit] compiled while measuring:
+     2  java.lang.invoke.MethodHandleImpl.makePairwiseConvert (tier 3)
+     2  java.nio.ByteBuffer.limit (tier 3)
+     1  java.io.ObjectOutputStream$HandleTable.assign (tier 3)
+     1  java.io.ObjectOutputStream.writeClassDesc (tier 3)
+     1  java.io.ObjectOutputStream.writeSerialData (tier 3)
+     1  java.io.ObjectStreamClass.checkSerialize (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.Math.min (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.String.getBytesNoRepl1 (tier 3)
+     1  java.lang.String.isASCII (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+     1  java.lang.StringBuilder.charAt (tier 3)
+     1  java.lang.System$2.getBytesNoRepl (tier 3)
+[jit] deoptimized while measuring:
+     2  java.util.TreeMap.compare (c2: class_check, maybe_recompile)
+     1  java.util.TreeMap.rotateLeft (c2: unstable_if, reinterpret)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-67130.txt

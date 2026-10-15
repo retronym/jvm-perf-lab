@@ -1,0 +1,23 @@
+-o
+~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/branch-paired/1048576/paired/2/jmh.log
+-rf
+json
+-rff
+~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/branch-paired/1048576/paired/2/result.json
+-prof
+io.github.retronym.perflab.xctrace.XctraceProfiler:template=ipc;dir=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/branch-paired/1048576/paired/2
+-jvmArgsAppend
+-Xms1G -Xmx1G -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/branch-paired/1048576/paired/2/gc.log:time,uptime -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/branch-paired/1048576/paired/2
+-p
+size=1048576
+-wi
+4
+-i
+8
+-w
+1
+-r
+1
+-p
+variants=sorted=sorted|random=random
+BranchBenchmark

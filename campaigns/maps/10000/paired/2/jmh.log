@@ -1,0 +1,266 @@
+# JMH version: 1.37
+# VM version: JDK 21.0.12.1, OpenJDK 64-Bit Server VM, 21.0.12.1+1-LTS
+# VM invoker: ~/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java
+# VM options: -Xms1G -Xmx1G -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps/10000/paired/2/gc.log:time,uptime -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps/10000/paired/2
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 6 iterations, 1 s each
+# Measurement: 6 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: sample.WordCountBenchmark.countAndLookUp
+# Parameters: (map = hash, size = 10000, variants = hash=hash|linked=linked|tree=tree)
+
+# Run progress: 0.00% complete, ETA 00:00:12
+# Fork: 1 of 1
+# Warmup Iteration   1: 180.813 us/op
+# Warmup Iteration   2: 199.789 us/op
+# Warmup Iteration   3: 406.602 us/op
+# Warmup Iteration   4: 203.297 us/op
+# Warmup Iteration   5: 431.743 us/op
+# Warmup Iteration   6: 178.861 us/op
+Iteration   1: 408.291 us/op
+                 gc.alloc.rate:      778.403 MB/sec
+                 gc.alloc.rate.norm: 333563.353 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   2: 185.661 us/op
+                 gc.alloc.rate:      1788.871 MB/sec
+                 gc.alloc.rate.norm: 348520.290 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            3.000 ms
+
+Iteration   3: 200.449 us/op
+                 gc.alloc.rate:      1741.949 MB/sec
+                 gc.alloc.rate.norm: 366414.563 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   4: 420.584 us/op
+                 gc.alloc.rate:      755.812 MB/sec
+                 gc.alloc.rate.norm: 333558.437 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   5: 201.500 us/op
+                 gc.alloc.rate:      1732.579 MB/sec
+                 gc.alloc.rate.norm: 366415.129 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   6: 179.767 us/op
+                 gc.alloc.rate:                      735.358 MB/sec
+                 gc.alloc.rate.norm:                 348744.673 B/op
+                 gc.count:                           3.000 counts
+                 gc.time:                            2.000 ms
+                 jit.compilations:                   64.000 #
+                 jit.compileTime:                    8.850 ms
+                 jit.deopts:                         3.000 #
+                 jit.lastWarmup.compilations:        14.000 #
+                 jit.lastWarmup.deopts:              ≈ 0 #
+                 paired.gcFree.hash:                 182.258 us/op
+                 paired.gcFree.linked:               200.675 us/op
+                 paired.gcFree.linked.delta%:        10.137 %
+                 paired.gcFree.linked.delta%.median: 10.137 %
+                 paired.gcFree.linked.delta%.sd:     2.920 %
+                 paired.gcFree.tree:                 414.025 us/op
+                 paired.gcFree.tree.delta%:          127.273 %
+                 paired.gcFree.tree.delta%.median:   127.273 %
+                 paired.gcFree.tree.delta%.sd:       9.788 %
+                 paired.hash:                        182.714 us/op
+                 paired.linked:                      200.975 us/op
+                 paired.linked.delta%:               10.027 %
+                 paired.linked.delta%.median:        10.027 %
+                 paired.linked.delta%.sd:            2.916 %
+                 paired.tree:                        414.438 us/op
+                 paired.tree.delta%:                 126.937 %
+                 paired.tree.delta%.median:          126.937 %
+                 paired.tree.delta%.sd:              9.933 %
+
+
+
+Result "sample.WordCountBenchmark.countAndLookUp":
+  266.042 ±(99.9%) 323.372 us/op [Average]
+  (min, avg, max) = (179.767, 266.042, 420.584), stdev = 115.318
+  CI (99.9%): [≈ 0, 589.414] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.alloc.rate":
+  1255.495 ±(99.9%) 1534.164 MB/sec [Average]
+  (min, avg, max) = (735.358, 1255.495, 1788.871), stdev = 547.098
+  CI (99.9%): [≈ 0, 2789.659] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.alloc.rate.norm":
+  349536.074 ±(99.9%) 41248.371 B/op [Average]
+  (min, avg, max) = (333558.437, 349536.074, 366415.129), stdev = 14709.566
+  CI (99.9%): [308287.703, 390784.445] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.count":
+  14.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (1.000, 2.333, 3.000), stdev = 1.033
+  CI (99.9%): [14.000, 14.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.time":
+  10.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (1.000, 1.667, 3.000), stdev = 0.816
+  CI (99.9%): [10.000, 10.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.compilations":
+  64.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 10.667, 64.000), stdev = 26.128
+  CI (99.9%): [64.000, 64.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.compileTime":
+  8.850 ±(99.9%) 0.001 ms [Maximum]
+  (min, avg, max) = (≈ 0, 1.475, 8.850), stdev = 3.613
+  CI (99.9%): [8.850, 8.850] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.deopts":
+  3.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 0.500, 3.000), stdev = 1.225
+  CI (99.9%): [3.000, 3.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.lastWarmup.compilations":
+  14.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 2.333, 14.000), stdev = 5.715
+  CI (99.9%): [14.000, 14.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.lastWarmup.deopts":
+  ≈ 0 #
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.hash":
+  182.258 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 30.376, 182.258), stdev = 74.406
+  CI (99.9%): [182.258, 182.258] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.linked":
+  200.675 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 33.446, 200.675), stdev = 81.925
+  CI (99.9%): [200.675, 200.675] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.linked.delta%":
+  10.137 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 1.690, 10.137), stdev = 4.139
+  CI (99.9%): [10.137, 10.137] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.linked.delta%.median":
+  10.137 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 1.690, 10.137), stdev = 4.139
+  CI (99.9%): [10.137, 10.137] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.linked.delta%.sd":
+  2.920 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.487, 2.920), stdev = 1.192
+  CI (99.9%): [2.920, 2.920] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.tree":
+  414.025 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 69.004, 414.025), stdev = 169.025
+  CI (99.9%): [414.025, 414.025] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.tree.delta%":
+  127.273 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 21.212, 127.273), stdev = 51.959
+  CI (99.9%): [127.273, 127.273] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.tree.delta%.median":
+  127.273 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 21.212, 127.273), stdev = 51.959
+  CI (99.9%): [127.273, 127.273] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.gcFree.tree.delta%.sd":
+  9.788 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 1.631, 9.788), stdev = 3.996
+  CI (99.9%): [9.788, 9.788] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.hash":
+  182.714 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 30.452, 182.714), stdev = 74.593
+  CI (99.9%): [182.714, 182.714] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.linked":
+  200.975 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 33.496, 200.975), stdev = 82.048
+  CI (99.9%): [200.975, 200.975] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.linked.delta%":
+  10.027 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 1.671, 10.027), stdev = 4.094
+  CI (99.9%): [10.027, 10.027] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.linked.delta%.median":
+  10.027 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 1.671, 10.027), stdev = 4.094
+  CI (99.9%): [10.027, 10.027] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.linked.delta%.sd":
+  2.916 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 0.486, 2.916), stdev = 1.191
+  CI (99.9%): [2.916, 2.916] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.tree":
+  414.438 ±(99.9%) 0.001 us/op [Sum]
+  (min, avg, max) = (≈ 0, 69.073, 414.438), stdev = 169.193
+  CI (99.9%): [414.438, 414.438] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.tree.delta%":
+  126.937 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 21.156, 126.937), stdev = 51.822
+  CI (99.9%): [126.937, 126.937] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.tree.delta%.median":
+  126.937 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 21.156, 126.937), stdev = 51.822
+  CI (99.9%): [126.937, 126.937] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:paired.tree.delta%.sd":
+  9.933 ±(99.9%) 0.001 % [Sum]
+  (min, avg, max) = (≈ 0, 1.656, 9.933), stdev = 4.055
+  CI (99.9%): [9.933, 9.933] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:13
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                             (map)  (size)                         (variants)  Mode  Cnt       Score       Error   Units
+WordCountBenchmark.countAndLookUp                                      hash   10000  hash=hash|linked=linked|tree=tree  avgt    6     266.042 ±   323.372   us/op
+WordCountBenchmark.countAndLookUp:gc.alloc.rate                        hash   10000  hash=hash|linked=linked|tree=tree  avgt    6    1255.495 ±  1534.164  MB/sec
+WordCountBenchmark.countAndLookUp:gc.alloc.rate.norm                   hash   10000  hash=hash|linked=linked|tree=tree  avgt    6  349536.074 ± 41248.371    B/op
+WordCountBenchmark.countAndLookUp:gc.count                             hash   10000  hash=hash|linked=linked|tree=tree  avgt    6      14.000              counts
+WordCountBenchmark.countAndLookUp:gc.time                              hash   10000  hash=hash|linked=linked|tree=tree  avgt    6      10.000                  ms
+WordCountBenchmark.countAndLookUp:jit.compilations                     hash   10000  hash=hash|linked=linked|tree=tree  avgt    6      64.000                   #
+WordCountBenchmark.countAndLookUp:jit.compileTime                      hash   10000  hash=hash|linked=linked|tree=tree  avgt    6       8.850                  ms
+WordCountBenchmark.countAndLookUp:jit.deopts                           hash   10000  hash=hash|linked=linked|tree=tree  avgt    6       3.000                   #
+WordCountBenchmark.countAndLookUp:jit.lastWarmup.compilations          hash   10000  hash=hash|linked=linked|tree=tree  avgt    6      14.000                   #
+WordCountBenchmark.countAndLookUp:jit.lastWarmup.deopts                hash   10000  hash=hash|linked=linked|tree=tree  avgt    6         ≈ 0                   #
+WordCountBenchmark.countAndLookUp:paired.gcFree.hash                   hash   10000  hash=hash|linked=linked|tree=tree  avgt    6     182.258               us/op
+WordCountBenchmark.countAndLookUp:paired.gcFree.linked                 hash   10000  hash=hash|linked=linked|tree=tree  avgt    6     200.675               us/op
+WordCountBenchmark.countAndLookUp:paired.gcFree.linked.delta%          hash   10000  hash=hash|linked=linked|tree=tree  avgt    6      10.137                   %
+WordCountBenchmark.countAndLookUp:paired.gcFree.linked.delta%.median   hash   10000  hash=hash|linked=linked|tree=tree  avgt    6      10.137                   %
+WordCountBenchmark.countAndLookUp:paired.gcFree.linked.delta%.sd       hash   10000  hash=hash|linked=linked|tree=tree  avgt    6       2.920                   %
+WordCountBenchmark.countAndLookUp:paired.gcFree.tree                   hash   10000  hash=hash|linked=linked|tree=tree  avgt    6     414.025               us/op
+WordCountBenchmark.countAndLookUp:paired.gcFree.tree.delta%            hash   10000  hash=hash|linked=linked|tree=tree  avgt    6     127.273                   %
+WordCountBenchmark.countAndLookUp:paired.gcFree.tree.delta%.median     hash   10000  hash=hash|linked=linked|tree=tree  avgt    6     127.273                   %
+WordCountBenchmark.countAndLookUp:paired.gcFree.tree.delta%.sd         hash   10000  hash=hash|linked=linked|tree=tree  avgt    6       9.788                   %
+WordCountBenchmark.countAndLookUp:paired.hash                          hash   10000  hash=hash|linked=linked|tree=tree  avgt    6     182.714               us/op
+WordCountBenchmark.countAndLookUp:paired.linked                        hash   10000  hash=hash|linked=linked|tree=tree  avgt    6     200.975               us/op
+WordCountBenchmark.countAndLookUp:paired.linked.delta%                 hash   10000  hash=hash|linked=linked|tree=tree  avgt    6      10.027                   %
+WordCountBenchmark.countAndLookUp:paired.linked.delta%.median          hash   10000  hash=hash|linked=linked|tree=tree  avgt    6      10.027                   %
+WordCountBenchmark.countAndLookUp:paired.linked.delta%.sd              hash   10000  hash=hash|linked=linked|tree=tree  avgt    6       2.916                   %
+WordCountBenchmark.countAndLookUp:paired.tree                          hash   10000  hash=hash|linked=linked|tree=tree  avgt    6     414.438               us/op
+WordCountBenchmark.countAndLookUp:paired.tree.delta%                   hash   10000  hash=hash|linked=linked|tree=tree  avgt    6     126.937                   %
+WordCountBenchmark.countAndLookUp:paired.tree.delta%.median            hash   10000  hash=hash|linked=linked|tree=tree  avgt    6     126.937                   %
+WordCountBenchmark.countAndLookUp:paired.tree.delta%.sd                hash   10000  hash=hash|linked=linked|tree=tree  avgt    6       9.933                   %
+
+Benchmark result is saved to ~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/maps/10000/paired/2/result.json

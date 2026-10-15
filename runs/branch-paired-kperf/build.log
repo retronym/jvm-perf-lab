@@ -1,0 +1,31 @@
+[perflab] paired paired. (us/op): sorted 341.2 random 2730 (+702.07% ± 33.30, median +692.72%, 3 pairs)
+[perflab] paired paired.gcFree. (us/op): sorted 341.2 random 2730 (+702.07% ± 33.30, median +692.72%, 3 pairs)
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   550 /   178.6 /    8
+  WARMUP        2:    82 /   132.7 /    3
+  WARMUP        3:    23 /     5.0 /    1
+  WARMUP        4:     6 /     9.2 /    0
+  MEASUREMENT   5:    16 /     1.6 /    0
+  MEASUREMENT   6:    16 /     2.8 /    0
+  MEASUREMENT   7:    13 /     1.4 /    0
+  MEASUREMENT   8:     6 /     0.5 /    0
+  MEASUREMENT   9:     3 /     1.2 /    0
+  MEASUREMENT  10:    30 /     2.5 /    0
+[jit] compiled while measuring:
+     2  java.nio.ByteBuffer.limit (tier 3)
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.ClassLoader.findBootstrapClassOrNull (tier 3)
+     1  java.lang.Math.max (tier 3)
+     1  java.lang.Math.min (tier 3)
+     1  java.lang.String.compareTo (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.String.isASCII (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-sumAbove-12118.txt

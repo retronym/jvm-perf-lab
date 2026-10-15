@@ -1,0 +1,21 @@
+-o
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-random-async/jmh.log
+-rf
+json
+-rff
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-random-async/result.json
+-prof
+async:output=jfr;dir=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-random-async;libPath=~/code/retronym/jvm-perf-lab/examples/sample/../../tools/build/async-profiler/build/lib/libasyncProfiler.dylib;rawCommand=cstack=vm,features=mixed+vtable+comptask;event=cpu;interval=1000000;alloc=512k
+-jvmArgsAppend
+-Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-random-async -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-random-async/gc-%p.log:time,uptime
+-wi
+3
+-i
+5
+-w
+1
+-r
+1
+-p
+data=random
+BranchBenchmark

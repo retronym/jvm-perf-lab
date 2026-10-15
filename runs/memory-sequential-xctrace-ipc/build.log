@@ -1,0 +1,63 @@
+[xctrace] Starting recording with the perflab-ipc-14170042542466458874.template template. Attaching to: java (9706). 
+[xctrace] Ctrl-C to stop the recording
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   539 /   138.4 /   11
+  WARMUP        2:    79 /    94.7 /    6
+  WARMUP        3:    19 /     9.8 /    1
+  MEASUREMENT   4:     4 /     0.4 /    0
+  MEASUREMENT   5:    10 /     1.5 /    0
+  MEASUREMENT   6:    11 /     0.7 /    0
+  MEASUREMENT   7:     4 /     1.2 /    0
+  MEASUREMENT   8:    16 /     3.3 /    0
+[jit] compiled while measuring:
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.Math.min (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+     1  java.lang.StringBuilder.charAt (tier 3)
+     1  java.lang.System$2.getBytesNoRepl (tier 3)
+     1  java.lang.System$2.getCarrierThreadLocal (tier 3)
+     1  java.lang.ThreadLocal.get (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-chase-9706.txt
+[xctrace] code map: 3312 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: chase-9706.trace
+
+== INST_ALL (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x125a6ded1>
+    0.0%  <unknown 0x125a65099>
+    0.0%  <unknown 0x125a72659>
+
+== INST_BRANCH (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x125a6ded1>
+    0.0%  <unknown 0x125a65099>
+    0.0%  <unknown 0x125a72659>
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x125a6ded1>
+    0.0%  <unknown 0x125a65099>
+    0.0%  <unknown 0x125a72659>
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x125a6ded1>
+    0.0%  <unknown 0x125a65099>
+    0.0%  <unknown 0x125a72659>
+
+== samples (bench threads)
+   99.9%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x125a72659>
+    0.0%  <unknown 0x125a6ded1>
+    0.0%  <unknown 0x125a65099>

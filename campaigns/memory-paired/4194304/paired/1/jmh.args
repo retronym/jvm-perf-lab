@@ -1,0 +1,23 @@
+-o
+~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/memory-paired/4194304/paired/1/jmh.log
+-rf
+json
+-rff
+~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/memory-paired/4194304/paired/1/result.json
+-prof
+io.github.retronym.perflab.xctrace.XctraceProfiler:template=mem-l1d;dir=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/memory-paired/4194304/paired/1
+-jvmArgsAppend
+-Xms1G -Xmx1G -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/memory-paired/4194304/paired/1/gc.log:time,uptime -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/campaigns/memory-paired/4194304/paired/1
+-p
+size=4194304
+-wi
+4
+-i
+8
+-w
+1
+-r
+1
+-p
+variants=sequential=sequential|shuffled=shuffled
+MemoryBenchmark

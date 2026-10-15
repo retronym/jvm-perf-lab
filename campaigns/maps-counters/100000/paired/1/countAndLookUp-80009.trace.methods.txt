@@ -1,0 +1,70 @@
+
+== INST_ALL (bench threads)
+   37.4%  java.util.HashMap.merge
+   32.1%  sample.WordCount.count
+   21.3%  java.util.TreeMap.merge
+    3.9%  java.util.HashMap.resize
+    3.2%  java.lang.String.hashCode
+    0.9%  <unknown 0x12643f455>
+    0.2%  <unknown 0x12643f4bd>
+    0.2%  <unknown 0x12643f459>
+    0.2%  <unknown 0x12643f441>
+    0.1%  <unknown 0x12643f469>
+    0.1%  java.util.TreeMap.rotateRight
+    0.1%  java.util.TreeMap.rotateLeft
+
+== INST_BRANCH (bench threads)
+   34.5%  java.util.HashMap.merge
+   30.5%  sample.WordCount.count
+   26.4%  java.util.TreeMap.merge
+    3.6%  java.util.HashMap.resize
+    2.9%  java.lang.String.hashCode
+    0.8%  <unknown 0x12643f455>
+    0.2%  <unknown 0x12643f4bd>
+    0.2%  <unknown 0x12643f459>
+    0.2%  <unknown 0x12643f441>
+    0.1%  <unknown 0x12643f469>
+    0.1%  java.util.TreeMap.rotateRight
+    0.1%  java.util.TreeMap.rotateLeft
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   32.8%  java.util.HashMap.merge
+   29.5%  sample.WordCount.count
+   29.3%  java.util.TreeMap.merge
+    3.6%  java.util.HashMap.resize
+    2.8%  java.lang.String.hashCode
+    0.8%  <unknown 0x12643f455>
+    0.2%  <unknown 0x12643f4bd>
+    0.2%  <unknown 0x12643f459>
+    0.2%  <unknown 0x12643f441>
+    0.1%  java.util.TreeMap.rotateRight
+    0.1%  <unknown 0x12643f469>
+    0.1%  java.util.TreeMap.rotateLeft
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   34.0%  java.util.TreeMap.merge
+   30.0%  java.util.HashMap.merge
+   27.9%  sample.WordCount.count
+    3.5%  java.util.HashMap.resize
+    2.5%  java.lang.String.hashCode
+    0.8%  <unknown 0x12643f455>
+    0.2%  <unknown 0x12643f4bd>
+    0.2%  java.util.TreeMap.rotateRight
+    0.2%  <unknown 0x12643f459>
+    0.1%  <unknown 0x12643f441>
+    0.1%  java.util.TreeMap.rotateLeft
+    0.1%  <unknown 0x12643f469>
+
+== samples (bench threads)
+   32.9%  java.util.HashMap.merge
+   29.5%  sample.WordCount.count
+   29.2%  java.util.TreeMap.merge
+    3.5%  java.util.HashMap.resize
+    2.7%  java.lang.String.hashCode
+    0.8%  <unknown 0x12643f455>
+    0.2%  <unknown 0x12643f4bd>
+    0.2%  <unknown 0x12643f459>
+    0.1%  java.util.TreeMap.rotateRight
+    0.1%  <unknown 0x12643f441>
+    0.1%  <unknown 0x12643f469>
+    0.1%  java.util.TreeMap.rotateLeft

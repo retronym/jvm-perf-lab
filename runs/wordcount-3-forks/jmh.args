@@ -1,0 +1,23 @@
+-o
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-3-forks/jmh.log
+-rf
+json
+-rff
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-3-forks/result.json
+-jvmArgsAppend
+-Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-3-forks -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-3-forks/gc-%p.log:time,uptime
+-f
+3
+-wi
+3
+-i
+5
+-w
+1
+-r
+1
+-p
+size=100000
+-p
+map=hash
+WordCountBenchmark
