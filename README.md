@@ -7,16 +7,14 @@ JMH profilers and a Java agent for benchmarking JVM programs:
 - Apple Silicon PMU counters per thread, via `xctrace`
 - an agent that counts the callers reaching a method
 
-Split out of the Scala 3 compiler's bench-lab. Design and plan: [doc/design.md](doc/design.md).
-
-Java 17 or later, no Scala.
+Requires Java 17. Design and plan: [doc/design.md](doc/design.md).
 
 ## Modules
 
 **`perflab-jmh`**: depend on it from the benchmarks (JMH itself is `provided`, so your build picks the version).
 
-- `io.github.retronym.perflab.jmh.Main`: `org.openjdk.jmh.Main` with default profilers (`gc`, `JitProfiler`, `PairedProfiler`). Use it as the benchmark's main class. It takes `@file` arguments (the file's lines, one argument each, unquoted) and `&` between a profiler's options, so build tools that split a typed command at `;` (sbt) never see JMH's `;`.
-- `JitProfiler`: compilations, compile time and deoptimizations while measuring and in the last warmup iteration. Is the JIT still busy?
+- `io.github.retronym.perflab.jmh.Main`: `org.openjdk.jmh.Main` with default profilers (`gc`, `JitProfiler`, `PairedProfiler`). Use it as the benchmark's main class. It takes `@file` arguments (the file's lines, one argument each, unquoted) and `&` between a profiler's options, for build tools that split a command at `;` (sbt).
+- `JitProfiler`: compilations, compile time and deoptimizations while measuring and in the last warmup iteration.
 - `Variants`, `IterationLog`, `PairedProfiler`: compare variants that a benchmark can switch between iterations (e.g. compiler settings) within one fork, in a Williams design, so they share the fork's compiled code. Reports time per variant and paired differences ([doc/paired-ab.md](doc/paired-ab.md)).
 - `xctrace.XctraceProfiler`: Apple Silicon PMU counters through `xctrace`, for the benchmark thread separately from JIT, GC and other threads, per variant when variants alternate, plus per-method attribution and a 50 ms timeline. Bundled templates: `template=ipc`, `frontend`, `mem-l1d`.
 
@@ -35,7 +33,7 @@ libraryDependencies += "com.github.retronym.jvm-perf-lab" % "perflab-jmh" % "<ta
 Jmh / run / mainClass := Some("io.github.retronym.perflab.jmh.Main")
 ```
 
-then put profiler options in a file instead of typing them:
+with profiler options in an arguments file:
 
 ```
 sbt "Jmh/run @prof.args -p corpus=x MyBenchmark"

@@ -17,7 +17,7 @@ import java.util.*;
  * the classes they name as those load, and writes the report ({@link Audit}) at exit. A probe becomes a call to
  * {@code Audit.hit(id, receiver)} at the method's entry, or before each of its returns.
  *
- * Built on ASM, shaded into the agent's jar, rather than the ClassFile API, which would need JDK 24 at build and run time.
+ * Weaves with ASM, shaded and relocated into the agent's jar.
  */
 public final class AuditAgent {
     private AuditAgent() {}
