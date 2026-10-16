@@ -13,6 +13,7 @@
   auditfold  merge and fold caller-audit reports
   loadgate   wait for a quiet machine, or sample competing load
   site       a static site of the campaigns and runs, for publishing
+  defcosts   cost per definition from a compiler's table (Scala 3 -Yprofile-defs): histograms, outliers, comparison
 
 Configuration: perflab.toml in the project (see perflab.config). `perflab <command> --help` for a command's options.
 """
@@ -20,7 +21,7 @@ import importlib, sys
 
 COMMANDS = {"run": "jmh", "ab": "ab", "trees": "trees", "index": "index", "timeline": "timeline", "regraph": "regraph",
             "profdiff": "profdiff", "frameweight": "frameweight", "subtree": "subtree", "analyze": "analyze",
-            "auditfold": "auditfold", "loadgate": "loadgate", "site": "site", "serve": "serve"}
+            "auditfold": "auditfold", "loadgate": "loadgate", "site": "site", "serve": "serve", "defcosts": "defcosts"}
 
 
 def main(argv=None):
