@@ -1,7 +1,7 @@
 import json, os, sys, tempfile, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from perflab import analyze, auditfold, config, jmh, regraph, timeline  # noqa: E402
+from perflab import analyze, auditfold, config, defcosts, jmh, regraph, timeline  # noqa: E402
 
 
 class Project:
@@ -109,6 +109,36 @@ class TimelineTest(unittest.TestCase):
         page = open(timeline.write(d)).read()
         self.assertIn("BenchTimeline.parse", page)
         self.assertIn("0\\twarmup\\ta", page)
+
+
+class DefCostsTest(unittest.TestCase):
+    HEAD = "kind\tphase\tsymbol\tfile\tline\tchars\tcalls\tself_us\ttotal_us\tmax_self_us\tself_alloc\n"
+
+    def table(self, rows):
+        f = tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False)
+        f.write(self.HEAD + "".join("\t".join(map(str, r)) + "\n" for r in rows))
+        f.close()
+        return defcosts.load(f.name)
+
+    def test_histogram_buckets_are_powers_of_two(self):
+        self.assertEqual(defcosts.histogram([1, 3, 4, 1000]), [(b, {0: 1, 1: 1, 2: 1, 9: 1}.get(b, 0)) for b in range(10)])
+
+    def test_cost_of_a_definition_sums_its_kinds_and_outliers_are_by_size(self):
+        rows = [("def", "", f"C.m{i}", "C.scala", i, 100, 1, 100 + i, 100 + i, 100 + i, 0) for i in range(20)]
+        # small, but its inferred type took long to complete
+        rows += [("def", "", "C.slow", "C.scala", 99, 20, 1, 50, 50, 50, 0), ("complete", "", "C.slow", "C.scala", 99, 0, 1, 50000, 50000, 50000, 0)]
+        t = self.table(rows)
+        syms = defcosts.by_symbol(t)
+        self.assertEqual(syms["C.slow"]["self_us"], 50050)
+        self.assertEqual([s for _, s, _ in defcosts.size_outliers(syms)], ["C.slow"])
+
+    def test_comparison_lists_the_largest_changes(self):
+        base = self.table([("def", "", "A.x", "", "", 10, 1, 1000, 1000, 1000, 0), ("def", "", "A.y", "", "", 10, 1, 1000, 1000, 1000, 0)])
+        this = self.table([("def", "", "A.x", "", "", 10, 1, 5000, 5000, 5000, 0), ("def", "", "A.y", "", "", 10, 1, 900, 900, 900, 0)])
+        text, page, _ = defcosts.report(this, 5, base)
+        changes = text.split("changed against the base")[1].splitlines()[1:]
+        self.assertIn("A.x", changes[0])
+        self.assertIn("+4.0 ms", changes[0])
 
 
 if __name__ == "__main__":
