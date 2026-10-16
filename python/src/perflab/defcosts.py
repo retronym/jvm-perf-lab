@@ -2,15 +2,17 @@
 
   perflab defcosts [--top 30] [--min-us 1000] [--out <page.html>] [--compare <base.tsv>] <costs.tsv>
 
-The table (Scala 3's -Yprofile-defs) has one row per kind of work, phase and key: kind, phase (for the kinds that are
+The table (Scala 3's and scalac's -Yprofile-defs) has one row per kind of work, phase and key: kind, phase (for the kinds that are
 per phase), symbol, file, line, chars (the definition's size in source characters), calls, self_us (time excluding
 nested frames' work), total_us, max_self_us, self_alloc. Kinds:
   - phase, unit: a phase, and a compilation unit in a phase, outside the definitions in it; `symbol` is the phase's
     name or the unit's source path
   - def (type checking in the typer), complete (completing a symbol from source: its signature, and its body when its
     type is inferred), load (from a classfile or TASTy), retype (typing after the typer, as in erasure), transform
-    (a definition's subtree in a MegaPhase): `symbol` is the definition's full name
-  - implicit, inline: implicit searches and inline expansions, charged to the definition they are made in
+    (a definition's subtree in a MegaPhase; in scalac, typing a definition after the typer): `symbol` is the
+    definition's full name
+  - implicit, inline, macro: implicit searches, inline expansions and (scalac) macro expansions, charged to the
+    definition they are made in
 
 Prints, and writes as a page:
   - per kind: rows, total self time, and a histogram of self time in power-of-two buckets
@@ -28,7 +30,7 @@ import argparse, collections, csv, html, math, os, re
 
 # Kinds whose rows are containers of definitions, not definitions
 CONTAINERS = ("phase", "unit")
-KINDS = ["phase", "unit", "def", "complete", "load", "implicit", "inline", "retype", "transform"]
+KINDS = ["phase", "unit", "def", "complete", "load", "implicit", "inline", "macro", "retype", "transform"]
 MAD_SCALE = 1.4826  # the median absolute deviation of a normal distribution, in standard deviations
 MIN_MAD = 0.1       # in log units, about 10%: when most values are equal the MAD is 0, and every larger value would score
 
@@ -132,7 +134,7 @@ def report(rows, top, base=None, min_us=1000, k=3.5):
     # top definitions
     syms = by_symbol(rows)
     ranked = sorted(syms.items(), key=lambda kv: -kv[1]["self_us"])[:top]
-    parts.append("<h2>Most self time</h2><p class='k'>All kinds summed per definition: its type checking, its completion (signature, and body when its type is inferred), its implicit searches and inline expansions, its retyping and its MegaPhase transforms.</p>"
+    parts.append("<h2>Most self time</h2><p class='k'>All kinds summed per definition: its type checking, its completion (signature, and body when its type is inferred), its implicit searches, inline and macro expansions, its retyping and its MegaPhase transforms.</p>"
                  "<table><tr><th>definition</th><th>self ms</th><th>split by kind</th><th>alloc MB</th><th>chars</th><th>where</th></tr>")
     text.append("\nmost self time:")
     for sym, d in ranked:
