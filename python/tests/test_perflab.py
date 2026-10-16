@@ -114,31 +114,56 @@ class TimelineTest(unittest.TestCase):
 class DefCostsTest(unittest.TestCase):
     HEAD = "kind\tphase\tsymbol\tfile\tline\tchars\tcalls\tself_us\ttotal_us\tmax_self_us\tself_alloc\n"
 
-    def table(self, rows):
-        f = tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False)
-        f.write(self.HEAD + "".join("\t".join(map(str, r)) + "\n" for r in rows))
-        f.close()
-        return defcosts.load(f.name)
+    def table(self, rows, head=HEAD):
+        fd, path = tempfile.mkstemp(suffix=".tsv")
+        self.addCleanup(os.unlink, path)
+        with os.fdopen(fd, "w") as f:
+            f.write(head + "".join("\t".join(map(str, r)) + "\n" for r in rows))
+        return defcosts.load(path)
 
     def test_histogram_buckets_are_powers_of_two(self):
         self.assertEqual(defcosts.histogram([1, 3, 4, 1000]), [(b, {0: 1, 1: 1, 2: 1, 9: 1}.get(b, 0)) for b in range(10)])
+        self.assertEqual(defcosts.histogram([0]), [(0, 1)])
+        self.assertEqual(defcosts.histogram([]), [])
 
     def test_cost_of_a_definition_sums_its_kinds_and_outliers_are_by_size(self):
         rows = [("def", "", f"C.m{i}", "C.scala", i, 100, 1, 100 + i, 100 + i, 100 + i, 0) for i in range(20)]
         # small, but its inferred type took long to complete
         rows += [("def", "", "C.slow", "C.scala", 99, 20, 1, 50, 50, 50, 0), ("complete", "", "C.slow", "C.scala", 99, 0, 1, 50000, 50000, 50000, 0)]
-        t = self.table(rows)
-        syms = defcosts.by_symbol(t)
+        # phases and units contain definitions; they are not definitions
+        rows += [("phase", "typer", "typer", "", "", 0, 1, 90000, 90000, 90000, 0), ("unit", "typer", "C.scala", "C.scala", "", 0, 1, 5000, 5000, 5000, 0)]
+        syms = defcosts.by_symbol(self.table(rows))
         self.assertEqual(syms["C.slow"]["self_us"], 50050)
+        self.assertNotIn("typer", syms)
+        self.assertNotIn("C.scala", syms)
         self.assertEqual([s for _, s, _ in defcosts.size_outliers(syms)], ["C.slow"])
 
+    def test_identical_sizes_and_times_have_no_outliers(self):
+        # the median absolute deviation is 0: slightly slower definitions must not all score as outliers
+        rows = [("def", "", f"C.m{i}", "", "", 100, 1, 2000, 2000, 2000, 0) for i in range(20)]
+        rows += [("def", "", "C.a", "", "", 100, 1, 2100, 2100, 2100, 0)]
+        self.assertEqual(defcosts.size_outliers(defcosts.by_symbol(self.table(rows))), [])
+
     def test_comparison_lists_the_largest_changes(self):
-        base = self.table([("def", "", "A.x", "", "", 10, 1, 1000, 1000, 1000, 0), ("def", "", "A.y", "", "", 10, 1, 1000, 1000, 1000, 0)])
+        base = self.table([("def", "", "A.x", "", "", 10, 1, 1000, 1000, 1000, 0), ("def", "", "A.y", "", "", 10, 1, 1000, 1000, 1000, 0),
+                           ("def", "", "A.gone", "", "", 10, 1, 3000, 3000, 3000, 0)])
         this = self.table([("def", "", "A.x", "", "", 10, 1, 5000, 5000, 5000, 0), ("def", "", "A.y", "", "", 10, 1, 900, 900, 900, 0)])
-        text, page, _ = defcosts.report(this, 5, base)
+        text, page = defcosts.report(this, 5, base)
         changes = text.split("changed against the base")[1].splitlines()[1:]
         self.assertIn("A.x", changes[0])
         self.assertIn("+4.0 ms", changes[0])
+        self.assertIn("A.gone", changes[1])
+        self.assertIn("-3.0 ms", changes[1])
+
+    def test_old_tables_and_short_rows_load(self):
+        old = "kind\tsymbol\tfile\tline\tchars\tcalls\tself_us\ttotal_us\tmax_self_us\tself_alloc\n"
+        rows = self.table([("def", "A.x", "A.scala", 1, 10, 1, 5, 5, 5, 0), ("def", "A.y")], head=old)
+        self.assertEqual([(r["phase"], r["file"], r["self_us"]) for r in rows], [("", "A.scala", 5), ("", "", 0)])
+
+    def test_names_are_escaped_in_the_page(self):
+        _, page = defcosts.report(self.table([("def", "", "Apply.<*>", "", "", 10, 1, 1000, 1000, 1000, 0)]), 5)
+        self.assertIn("Apply.&lt;*&gt;", page)
+        self.assertNotIn("Apply.<*>", page)
 
 
 if __name__ == "__main__":
