@@ -7,7 +7,7 @@ rebuilds it around each cell, and the page refreshes itself.
 """
 import glob, html, json, os, re, sys, time
 
-from . import config, regraph, timeline
+from . import config, regraph, specs, timeline
 
 root = None
 esc = html.escape
@@ -50,12 +50,14 @@ def cell_row(spec, corpus, variant, cell):
     if os.path.exists(tl):
         graphs = link(tl, "timeline") + ("<br>" + graphs if graphs else "")
     when = os.path.getmtime(res_f)
+    version = specs.of_cell(cell)
+    ver_html = f' <span class="when" title="spec version">spec {esc(version)}</span>' if version else ""
     html_row = (f'<tr data-corpus="{esc(corpus)}" data-profiled="{1 if graphs else 0}">'
-                f"<td>{esc(corpus)}</td><td>{esc(variant)} #{esc(os.path.basename(cell))}</td>"
+                f"<td>{esc(corpus)}</td><td>{esc(variant)} #{esc(os.path.basename(cell))}{ver_html}</td>"
                 f"<td>{p['score']:.0f} ± {p['scoreError']:.0f}</td><td>{f'{cyc / 1e9:.2f}G' if cyc else ''}</td>"
                 f"<td>{f'{ins / 1e9:.3f}G' if ins else ''}</td>"
                 f"<td><code>{esc(flags) or '(none)'}</code></td><td class=\"when\">{stamp(when)}</td><td>{graphs}</td></tr>")
-    return html_row, when, corpus, (variant, p["score"], cyc, ins)
+    return html_row, when, corpus, (variant, p["score"], cyc, ins, version)
 
 
 def summary(name, cells):
@@ -66,6 +68,9 @@ def summary(name, cells):
     out = []
     for corpus in sorted(cells):
         vs = cells[corpus]
+        versions = {c[4] for cs in vs.values() for c in cs}
+        mixed = (f' <span class="mixed" title="the cells of this corpus ran under different spec versions">⚠ mixed spec versions: '
+                 f'{esc(", ".join(sorted(v or "unversioned" for v in versions)))}</span>') if len(versions) > 1 else ""
         names = [v for v in order if v in vs] + sorted(v for v in vs if v not in order)
         def stats(xs):
             xs = [x for x in xs if x]
@@ -77,7 +82,7 @@ def summary(name, cells):
         base = {k: stats([c[i] for c in vs[names[0]]])[0] for i, k in ((1, "ms"), (2, "cyc"), (3, "ins"))}
         for v in names:
             cs = vs[v]
-            tds = [f"<td>{esc(corpus)}</td><td>{esc(v)}</td><td>{len(cs)}</td>"]
+            tds = [f"<td>{esc(corpus)}{mixed if v == names[0] else ''}</td><td>{esc(v)}</td><td>{len(cs)}</td>"]
             for i, k, fmt in ((1, "ms", lambda x: f"{x:.0f}"), (2, "cyc", lambda x: f"{x / 1e9:.3f}G"), (3, "ins", lambda x: f"{x / 1e9:.3f}G")):
                 mean, sd = stats([c[i] for c in cs])
                 if mean is None:
@@ -88,6 +93,21 @@ def summary(name, cells):
             out.append("<tr>" + "".join(tds) + "</tr>")
     return ("<table class=\"summary\"><tr><th>corpus</th><th>variant</th><th>n</th><th>ms/op</th><th>Δ</th><th>cycles/op</th><th>Δ</th>"
             "<th>instructions/op</th><th>Δ</th></tr>" + "".join(out) + "</table>") if out else ""
+
+
+def spec_history(spec_dir, counts):
+    """The campaign's spec versions, each with the cells that ran under it and what changed from the previous version."""
+    hist = specs.history(spec_dir)
+    if not hist and not counts.get(None):
+        return ""
+    items = []
+    for v, _, changes in hist:
+        when = time.strftime("%a %d %b %H:%M:%S", time.strptime(v[:15], "%Y%m%d-%H%M%S"))
+        body = ("<ul>" + "".join(f"<li><code>{esc(c)}</code></li>" for c in changes) + "</ul>") if changes else ""
+        items.append(f'<li><b>{esc(v)}</b> <span class="when">{when} · {counts.get(v, 0)} cells</span>{body}</li>')
+    if counts.get(None):
+        items.append(f'<li><i>unversioned</i> <span class="when">{counts[None]} cells (before spec versions were recorded)</span></li>')
+    return f'<div class="specs"><b>Spec versions</b><ul>{"".join(items)}</ul></div>'
 
 
 def stamp(t):
@@ -154,7 +174,7 @@ def build(campaigns):
   timeline_cells = []  # (mtime, value, label) of cells with an iterations.tsv, for the timeline panel
   for spec_dir in glob.glob(os.path.join(root, "*/")):
       name = os.path.basename(spec_dir.rstrip("/"))
-      rows, whens, corpora, cells = [], [], set(), {}
+      rows, whens, corpora, cells, counts = [], [], set(), {}, {}
       for corpus_dir in sorted(glob.glob(os.path.join(spec_dir, "*/"))):
           corpus = os.path.basename(corpus_dir.rstrip("/"))
           if corpus.startswith("diff-"):
@@ -163,6 +183,8 @@ def build(campaigns):
               variant = os.path.basename(variant_dir.rstrip("/"))
               for cell in sorted(glob.glob(os.path.join(variant_dir, "*"))):
                   if os.path.isdir(cell) and os.path.basename(cell).isdigit():
+                      ver = specs.of_cell(cell)
+                      counts[ver] = counts.get(ver, 0) + 1
                       if os.path.exists(os.path.join(cell, "iterations.tsv")):
                           timeline_cells.append((os.path.getmtime(os.path.join(cell, "iterations.tsv")), os.path.relpath(cell, root) + "/",
                                                  f"{name} · {corpus} · {variant} #{os.path.basename(cell)}"))
@@ -181,7 +203,7 @@ def build(campaigns):
       last = max(whens) if whens else os.path.getmtime(spec_dir)
       span = f"{stamp(min(whens))} – {stamp(last)}" if whens else stamp(last)
       has_notes = os.path.exists(os.path.join(spec_dir, "NOTES.md"))
-      sections.append((last, f"""<section data-last="{last:.0f}" data-notes="{1 if has_notes else 0}"><h2>{esc(name)} <span class="when">{span}</span>{progress_badge(prog, name)}</h2>{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{summary(name, cells)}
+      sections.append((last, f"""<section data-last="{last:.0f}" data-notes="{1 if has_notes else 0}"><h2>{esc(name)} <span class="when">{span}</span>{progress_badge(prog, name)}</h2>{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{spec_history(spec_dir, counts)}{summary(name, cells)}
   <table><tr><th>corpus</th><th>variant</th><th>ms/op</th><th>cycles/op (xctrace)</th><th>instructions/op</th><th>flags</th><th>finished</th><th>flame graphs</th></tr>{''.join(rows)}</table></section>"""))
   sections = [h for _, h in sorted(sections, key=lambda x: -x[0])]
   options = "".join(f'<option value="{esc(v)}">{esc(l)}</option>' for _, v, l in sorted(timeline_cells, reverse=True))
@@ -201,7 +223,7 @@ def build(campaigns):
   .chip{{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:14px;padding:3px 10px;font:inherit;cursor:pointer}}
   .chip.on{{background:var(--link);color:var(--bg);border-color:var(--link)}} .sep{{width:1px;height:18px;background:var(--line);margin:0 4px}}
   #q{{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:6px;padding:4px 8px;font:inherit;min-width:200px}}
-  .hidden{{display:none}}
+  .hidden{{display:none}} .mixed{{color:#a05a00;font-size:11px}} .specs ul{{margin:2px 0 8px;padding-left:20px}}
   #tl{{margin:0 0 16px}} #tl h2{{font-size:14px;margin:0 0 6px}} #tl select{{font:inherit;max-width:100%}} #tl .k{{color:var(--muted);font-size:12px}}
   {timeline.CSS}</style>
 

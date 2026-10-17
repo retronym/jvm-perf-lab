@@ -32,7 +32,7 @@ and for kperf, that samples were not lost.
 """
 import atexit, glob, json, os, re, shlex, shutil, subprocess, sys, time
 
-from . import config, jmh, loadgate
+from . import config, jmh, loadgate, specs
 
 JMH_LOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "jmh.lock")
 MAX_ATTEMPTS = 10
@@ -201,6 +201,8 @@ def run(spec, dry):
     os.makedirs(spec.out, exist_ok=True)
     if os.path.abspath(spec.path) != os.path.abspath(os.path.join(spec.out, "spec.json")):
         shutil.copy(spec.path, os.path.join(spec.out, "spec.json"))
+    # the spec version cells are tagged with; `perflab trees` records the user's spec once and passes its id down
+    version = os.environ.get(specs.ENV) or specs.record(spec.out, spec.path)
     todo = [c for c in cells if not os.path.exists(os.path.join(spec.cell_dir(c[1], c[3], c[0]), "result.json"))]
     log(f"{spec.name}: {len(cells)} cells, {len(todo)} to run")
     if not dry:
@@ -213,6 +215,8 @@ def run(spec, dry):
     for r, corpus, iters, variant, flags in todo:
         dest = spec.cell_dir(corpus, variant, r)
         cmd = spec.command(corpus, iters, variant, flags, dest)
+        if not dry:
+            specs.tag(dest, version)
         if dry:
             print(f"{dest}:\n  {cmd}")
             continue

@@ -8,12 +8,12 @@ from "variants" (default none). With an sbt build, each checkout needs its sbt s
 """
 import json, os, shutil, subprocess, sys
 
-from . import config
+from . import config, specs
 
 
-def run_in(tree, *args):
+def run_in(tree, *args, version=None):
     """`perflab <args>` with `tree` as the project root (its perflab.toml, its build)."""
-    env = {**os.environ, "PERFLAB_ROOT": tree}
+    env = {**os.environ, "PERFLAB_ROOT": tree, **({specs.ENV: version} if version else {})}
     return subprocess.run([sys.executable, "-m", "perflab", *args], cwd=tree, env=env).returncode
 
 
@@ -55,6 +55,7 @@ def main(argv):
     os.makedirs(out, exist_ok=True)
     path = os.path.join(out, "spec.json")
     json.dump(combined, open(path, "w"), indent=2)
+    version = specs.record(out, argv[0])  # the spec as given, trees and all; each tree's cells are tagged with it
     from . import index, serve
     try:
         print(f"perflab trees: index (updates after each round): {serve.ensure()}", flush=True)
@@ -62,7 +63,7 @@ def main(argv):
         print(f"perflab trees: index not served: {e}", flush=True)
     for r in range(1, spec["rounds"] + 1):
         for variant, tree in trees.items():
-            if run_in(tree, "ab", "run", tree_spec(spec, variant, r, tree)) != 0:
+            if run_in(tree, "ab", "run", tree_spec(spec, variant, r, tree), version=version) != 0:
                 sys.exit(f"perflab trees: {variant} round {r} failed ({tree})")
             gather(spec, trees, out)
             try:

@@ -1,7 +1,7 @@
 import json, os, sys, tempfile, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from perflab import analyze, auditfold, config, defcosts, index, jmh, regraph, timeline, trees  # noqa: E402
+from perflab import analyze, auditfold, config, defcosts, index, jmh, regraph, specs, timeline, trees  # noqa: E402
 
 
 class Project:
@@ -178,6 +178,43 @@ class IndexTest(unittest.TestCase):
         page = open(os.path.join(camp, "index.html")).read()
         self.assertIn("<i>running</i>", page)
         self.assertIn("0 of 1 cells", page)
+
+
+class SpecHistoryTest(unittest.TestCase):
+    def spec(self, d, name, **kw):
+        path = os.path.join(d, name)
+        json.dump({"name": "c", "rounds": 3, "corpora": {"k": "-wi 6 -i 6"}, "variants": {"a": "", "b": ""}, **kw}, open(path, "w"))
+        return path
+
+    def test_record_reuses_identical_and_snapshots_changes(self):
+        d = tempfile.mkdtemp()
+        camp = os.path.join(d, "c")
+        v1 = specs.record(camp, self.spec(d, "s1.json"))
+        self.assertEqual(specs.record(camp, self.spec(d, "s2.json")), v1)
+        v2 = specs.record(camp, self.spec(d, "s3.json", rounds=4, corpora={"k": "-wi 2 -i 4"}))
+        self.assertNotEqual(v1, v2)
+        hist = specs.history(camp)
+        self.assertEqual([h[0] for h in hist], [v1, v2])
+        self.assertEqual(hist[1][2], ["corpora.k: '-wi 6 -i 6' → '-wi 2 -i 4'", "rounds: 3 → 4"])
+
+    def test_index_lists_versions_and_flags_mixed_cells(self):
+        Project('[build]\njmh = "x"\n')
+        camp = os.path.join(config.get().campaigns, "c")
+        d = tempfile.mkdtemp()
+        v1 = specs.record(camp, self.spec(d, "s1.json"))
+        v2 = specs.record(camp, self.spec(d, "s2.json", rounds=4))
+        for variant, r, v in (("a", 1, v1), ("b", 1, v1), ("a", 2, v2)):
+            cell = os.path.join(camp, "k", variant, str(r))
+            os.makedirs(cell)
+            json.dump([{"primaryMetric": {"score": 1.0, "scoreError": 0.1}, "jvmArgs": []}], open(os.path.join(cell, "result.json"), "w"))
+            specs.tag(cell, v)
+        json.dump(json.load(open(os.path.join(camp, "specs", v2 + ".json"))), open(os.path.join(camp, "spec.json"), "w"))
+        page = open(index.build(config.get().campaigns)).read()
+        self.assertIn("Spec versions", page)
+        self.assertIn("rounds: 3 → 4", page)
+        self.assertIn("2 cells", page)
+        self.assertIn("mixed spec versions", page)
+        self.assertIn(f"spec {v1}", page)
 
 
 class TreesTest(unittest.TestCase):
