@@ -1,13 +1,14 @@
-"""Serves the campaigns' index over HTTP on 127.0.0.1 and prints its URL; the page updates itself as results arrive.
+"""Serves the index of campaigns and runs over HTTP on 127.0.0.1 and prints its URL; the page updates itself as results
+arrive.
 
   perflab serve [--port <port>] [--stop]
 
-Builds the index, then starts a server for <campaigns> in the background, unless one this command started is still
-running there, so it can be run any number of times and always prints the same URL. The port is [index] port in
-perflab.toml, else one derived from the project's path (8700-8799), so each checkout keeps its own address.
-`perflab ab run` does this before its first cell.
+Builds the index, then starts a server in the background for the directory holding both <campaigns> and <runs>, unless
+one this command started is still serving it, so it can be run any number of times and always prints the same URL. The
+port is [index] port in perflab.toml, else one derived from the project's path (8700-8799), so each checkout keeps its
+own address. `perflab run` and `perflab ab run` do this before they start.
 """
-import argparse, hashlib, json, os, signal, socket, subprocess, sys
+import argparse, hashlib, json, os, signal, socket, subprocess, sys, time
 
 from . import config
 
@@ -51,30 +52,47 @@ def default_port(root):
     return 8700 + int(hashlib.sha1(os.path.realpath(root).encode()).hexdigest(), 16) % 100
 
 
+def doc_root(campaigns, runs):
+    """What the server serves: the closest directory holding both the campaigns and the runs, which the index links."""
+    return os.path.commonpath([campaigns, runs]) if runs else campaigns
+
+
 def ensure(root=None, port=None):
-    """The index's URL, starting a server for `root` (default: the campaigns directory) if none is running."""
+    """The index's URL, starting a server if none is serving it. `root` is the campaigns directory (default: the
+    project's); the index and the server's state live there."""
     root = os.path.abspath(root or config.get().campaigns)
+    runs = config.get().runs
+    serve = doc_root(root, os.path.abspath(runs) if runs else None)
     os.makedirs(root, exist_ok=True)
     from . import index
     index.build(root)
+    rel = os.path.relpath(root, serve)
+    url = lambda p: f"http://127.0.0.1:{p}/" + ("index.html" if rel == "." else f"{rel}/index.html")
     st = _state(root)
     if st and _alive(st.get("pid")) and _listening(st["port"]) and (port is None or port == st["port"]):
-        return f"http://127.0.0.1:{st['port']}/index.html"
+        if st.get("root") == serve:
+            return url(st["port"])
+        # an older server, for the campaigns alone: replaced on its port, so the URL stays the same
+        os.kill(st["pid"], signal.SIGTERM)
+        for _ in range(50):
+            if _free(st["port"]):
+                break
+            time.sleep(0.1)
+        port = port or st["port"]
     want = port or default_port(root)
     for p in [want] + ([] if port else list(range(want + 1, want + 50))):
         if _free(p):
             break
     else:
         sys.exit(f"perflab serve: port {want} is in use")
-    proc = subprocess.Popen([sys.executable, "-m", "http.server", str(p), "--bind", "127.0.0.1", "--directory", root],
+    proc = subprocess.Popen([sys.executable, "-m", "http.server", str(p), "--bind", "127.0.0.1", "--directory", serve],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, start_new_session=True)
-    json.dump({"pid": proc.pid, "port": p}, open(os.path.join(root, STATE), "w"))
+    json.dump({"pid": proc.pid, "port": p, "root": serve}, open(os.path.join(root, STATE), "w"))
     for _ in range(50):
         if _listening(p):
             break
-        import time
         time.sleep(0.1)
-    return f"http://127.0.0.1:{p}/index.html"
+    return url(p)
 
 
 def stop(root=None):

@@ -16,9 +16,10 @@ Options for async: --kperf <socket> (macOS PMU events through a running asprof-k
 The arguments go to the build in a file, as `@file`, so no profiler option is ever typed into a tool that splits a
 command at `;`. Output: <out>/jmh.log, result.json, the profile's files, and timeline.html (every fork's JVM start, iterations, GC
 pauses and exit on one wall-clock axis, plus PMU counter lanes with xctrace); afterwards flame graphs for async, a merged
-report for audits.
+report for audits. The run is on the index (`perflab serve`, whose URL it prints first) as it goes: <out>/run.json holds
+its status.
 """
-import argparse, glob, os, shlex, subprocess, sys, time
+import argparse, glob, json, os, shlex, subprocess, sys, time
 
 from . import config
 
@@ -107,7 +108,7 @@ def write_args(path, args):
 
 # what a run writes into its directory: cleared before the next run there, so nothing stale is merged into its results
 OUTPUTS = ["jmh.log", "result.json", "report.md", "audit-*.json", "**/*.jfr", "**/*.html", "**/*.regraph", "*.trace", "*.trace.*",
-           "iterations.tsv", "timeline.tsv", "gc.log", "gc-*.log"]
+           "iterations.tsv", "timeline.tsv", "gc.log", "gc-*.log", "run.json"]
 
 
 def prepare(out, profile, jmh_args, kperf=None, lib=None, jvm_append=None):
@@ -148,10 +149,45 @@ def finish(out, profile, lib=None):
                 auditfold.main(reports, out=f)
 
 
-def run_build(cmd, log_path):
+def run_build(cmd, log_path, every=None, tick=None):
+    """Runs the build, logging to `log_path`; calls `tick` every `every` seconds while it runs."""
     root = config.get().root
     with open(log_path, "w") as log:
-        return subprocess.run(cmd, shell=True, cwd=root, stdout=log, stderr=subprocess.STDOUT).returncode
+        proc = subprocess.Popen(cmd, shell=True, cwd=root, stdout=log, stderr=subprocess.STDOUT)
+        while True:
+            try:
+                return proc.wait(timeout=every)
+            except subprocess.TimeoutExpired:
+                tick()
+
+
+def mark(out, status, **kw):
+    """<out>/run.json: the run's status for the index (running, with perflab's pid; finished; failed, with the exit
+    code), and while it runs <campaigns>/running.json names it, so the index's timeline follows it. Then the index is
+    rebuilt."""
+    from . import ab
+    with open(os.path.join(out, "run.json"), "w") as f:
+        json.dump({"status": status, "pid": os.getpid(), "time": time.time(), **kw}, f)
+    campaigns = config.get().campaigns
+    running = os.path.join(campaigns, ab.RUNNING_NAME)
+    cell = os.path.relpath(out, campaigns)
+    try:
+        if status == "running":
+            os.makedirs(campaigns, exist_ok=True)
+            json.dump({"run": os.path.basename(out), "cell": cell, "started": time.time()}, open(running, "w"))
+        elif json.load(open(running)).get("cell") == cell:
+            os.unlink(running)
+    except (OSError, ValueError):
+        pass
+    refresh_index()
+
+
+def refresh_index():
+    from . import index
+    try:
+        index.build(config.get().campaigns)
+    except Exception as e:  # the index is a convenience; never let it stop a run
+        print(f"[perflab] index not rebuilt: {e}", flush=True)
 
 
 def main(argv):
@@ -174,9 +210,20 @@ def main(argv):
         print(cmd)
         print(open(os.path.join(out, "jmh.args")).read(), end="")
         return 0
+    from . import serve
+    mark(out, "running")
+    try:
+        print(f"[perflab] index (updates as the run goes): {serve.ensure()}", flush=True)
+    except Exception as e:  # the index is a convenience; never let it stop a run
+        print(f"[perflab] index not served: {e}", flush=True)
     print(f"[perflab] {cmd}\n[perflab] output: {out}", flush=True)
-    rc = run_build(cmd, os.path.join(out, "build.log"))
-    if rc == 0:
-        finish(out, x.profile, x.lib)
+    try:
+        rc = run_build(cmd, os.path.join(out, "build.log"), every=10, tick=refresh_index)
+        if rc == 0:
+            finish(out, x.profile, x.lib)
+    except BaseException:
+        mark(out, "interrupted")
+        raise
+    mark(out, "finished" if rc == 0 else "failed", rc=rc)
     print(f"[perflab] {'done' if rc == 0 else f'build exited with {rc}, see build.log'}: {out}")
     return rc

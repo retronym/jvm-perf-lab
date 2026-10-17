@@ -3,8 +3,8 @@
   run        one JMH run under a profile (none, xctrace:<template>, async:<events>, audit:<spec>)
   ab         campaigns: run and report variants over corpora, interleaved and checked
   trees      campaigns across checkouts (builds) instead of flags
-  index      the campaigns' index.html, with a live timeline of the running fork
-  serve      serve the index on 127.0.0.1 and print its URL (idempotent; `ab run` does it too)
+  index      index.html of the campaigns and runs, with a live timeline of the running fork
+  serve      serve the index on 127.0.0.1 and print its URL (idempotent; `run` and `ab run` do it too)
   timeline   timeline.html for one campaign cell
   regraph    flame graphs of async-profiler runs
   profdiff   two async-profiler runs compared per op
