@@ -179,6 +179,26 @@ class IndexTest(unittest.TestCase):
         self.assertIn("<i>running</i>", page)
         self.assertIn("0 of 1 cells", page)
 
+    def test_paired_campaign_shows_each_variant_and_its_paired_difference(self):
+        Project('[build]\njmh = "x"\n')
+        camp = config.get().campaigns
+        s = lambda x: {"score": x}
+        for r, (d, a) in enumerate([(-2.0, 87e6), (-3.0, 86e6)], 1):
+            cell = os.path.join(camp, "c", "k", "paired", str(r))
+            os.makedirs(cell)
+            m = {"paired.base": s(100.0), "paired.fast": s(98.0), "paired.fast.delta%": s(d),
+                 "paired.alloc.base": s(89e6), "paired.alloc.fast": s(a), "paired.alloc.fast.delta%": s(100 * (a / 89e6 - 1)),
+                 "gc.alloc.rate.norm": s(1e6)}
+            json.dump([{"primaryMetric": {"score": 99.0, "scoreError": 1.0}, "jvmArgs": [], "secondaryMetrics": m}],
+                      open(os.path.join(cell, "result.json"), "w"))
+        json.dump({"name": "c", "rounds": 2, "corpora": {"k": ""}, "paired": {"base": "-Yx", "fast": ""}},
+                  open(os.path.join(camp, "c", "spec.json"), "w"))
+        page = open(index.build(camp)).read()
+        self.assertIn("<td>fast</td><td>2</td><td>98</td><td>-2.50% ± 0.71</td>", page)
+        self.assertIn("<td>86.5MB</td><td>-2.81% ± 0.79</td>", page)
+        self.assertIn("base 89.0MB · fast 87.0MB", page)
+        self.assertNotIn("1.0MB", page)  # -prof gc mixes the variants
+
 
 class SpecHistoryTest(unittest.TestCase):
     def spec(self, d, name, **kw):

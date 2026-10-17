@@ -7,7 +7,7 @@ rebuilds it around each cell, and the page refreshes itself.
 """
 import glob, html, json, os, re, sys, time
 
-from . import config, regraph, specs, timeline
+from . import ab, config, regraph, specs, timeline
 
 root = None
 esc = html.escape
@@ -28,11 +28,17 @@ def cell_row(spec, corpus, variant, cell):
     except (OSError, ValueError, IndexError, KeyError):
         # JMH writes result.json when the fork ends, so an empty or partial one is a cell still running
         return (f'<tr class="running" data-corpus="{esc(corpus)}" data-profiled="0"><td>{esc(corpus)}</td>'
-                f'<td>{esc(variant)} #{esc(os.path.basename(cell))}</td><td colspan="5"><i>running</i></td><td></td></tr>',
+                f'<td>{esc(variant)} #{esc(os.path.basename(cell))}</td><td colspan="6"><i>running</i></td><td></td></tr>',
                 time.time(), corpus, None)
     m = r.get("secondaryMetrics", {})
     cyc = m.get("xctrace.CORE_ACTIVE_CYCLE", {}).get("score")
     ins = m.get("xctrace.INST_ALL", {}).get("score")
+    alloc = m.get("gc.alloc.rate.norm", {}).get("score")
+    # a paired cell's -prof gc mixes its variants, so show each variant's own
+    paired_alloc = [(k.removeprefix("paired.alloc."), x["score"]) for k, x in m.items()
+                    if k.startswith("paired.alloc.") and ".delta%" not in k]
+    alloc_html = (" · ".join(f"{esc(v)} {x / 1e6:.1f}MB" for v, x in paired_alloc) if paired_alloc
+                  else f"{alloc / 1e6:.1f}MB" if alloc else "")
     scalac = r.get("params", {}).get("scalacOptions", "")
     pattern = re.compile(config.get().get("index", "flags"))
     flags = " ".join([a for a in r["jvmArgs"] if pattern.search(a) and not a.startswith("-Dperflab.")] + ([scalac] if scalac else []))
@@ -55,22 +61,23 @@ def cell_row(spec, corpus, variant, cell):
     html_row = (f'<tr data-corpus="{esc(corpus)}" data-profiled="{1 if graphs else 0}">'
                 f"<td>{esc(corpus)}</td><td>{esc(variant)} #{esc(os.path.basename(cell))}{ver_html}</td>"
                 f"<td>{p['score']:.0f} ± {p['scoreError']:.0f}</td><td>{f'{cyc / 1e9:.2f}G' if cyc else ''}</td>"
-                f"<td>{f'{ins / 1e9:.3f}G' if ins else ''}</td>"
+                f"<td>{f'{ins / 1e9:.3f}G' if ins else ''}</td><td>{alloc_html}</td>"
                 f"<td><code>{esc(flags) or '(none)'}</code></td><td class=\"when\">{stamp(when)}</td><td>{graphs}</td></tr>")
-    return html_row, when, corpus, (variant, p["score"], cyc, ins, version)
+    return html_row, when, corpus, (variant, p["score"], cyc, ins, version, alloc, m)
 
 
 def summary(name, cells):
-    """Per corpus and variant: mean ms/op, cycles/op and instructions/op over rounds, each against the spec's first
-    variant (in the order of the campaign's spec.json, else alphabetical)."""
+    """Per corpus and variant: mean ms/op, cycles/op, instructions/op and allocation/op over rounds, each against the
+    spec's first variant (in the order of the campaign's spec.json, else alphabetical). For a paired campaign, each
+    variant's own metrics and the paired differences within forks (`paired_summary`)."""
     spec_f = os.path.join(root, name, "spec.json")
-    order = list(json.load(open(spec_f)).get("variants", {})) if os.path.exists(spec_f) else []
+    spec = json.load(open(spec_f)) if os.path.exists(spec_f) else {}
+    if spec.get("paired"):
+        return paired_summary(list(spec["paired"]), cells)
+    order = list(spec.get("variants", {}))
     out = []
     for corpus in sorted(cells):
         vs = cells[corpus]
-        versions = {c[4] for cs in vs.values() for c in cs}
-        mixed = (f' <span class="mixed" title="the cells of this corpus ran under different spec versions">⚠ mixed spec versions: '
-                 f'{esc(", ".join(sorted(v or "unversioned" for v in versions)))}</span>') if len(versions) > 1 else ""
         names = [v for v in order if v in vs] + sorted(v for v in vs if v not in order)
         def stats(xs):
             xs = [x for x in xs if x]
@@ -79,20 +86,45 @@ def summary(name, cells):
             mean = sum(xs) / len(xs)
             sd = (sum((x - mean) ** 2 for x in xs) / (len(xs) - 1)) ** 0.5 if len(xs) > 1 else 0.0
             return mean, sd
-        base = {k: stats([c[i] for c in vs[names[0]]])[0] for i, k in ((1, "ms"), (2, "cyc"), (3, "ins"))}
+        cols = ((1, lambda x: f"{x:.0f}"), (2, lambda x: f"{x / 1e9:.3f}G"), (3, lambda x: f"{x / 1e9:.3f}G"), (5, lambda x: f"{x / 1e6:.1f}MB"))
+        base = {i: stats([c[i] for c in vs[names[0]]])[0] for i, _ in cols}
         for v in names:
             cs = vs[v]
-            tds = [f"<td>{esc(corpus)}{mixed if v == names[0] else ''}</td><td>{esc(v)}</td><td>{len(cs)}</td>"]
-            for i, k, fmt in ((1, "ms", lambda x: f"{x:.0f}"), (2, "cyc", lambda x: f"{x / 1e9:.3f}G"), (3, "ins", lambda x: f"{x / 1e9:.3f}G")):
+            tds = [f"<td>{esc(corpus)}{mixed(vs) if v == names[0] else ''}</td><td>{esc(v)}</td><td>{len(cs)}</td>"]
+            for i, fmt in cols:
                 mean, sd = stats([c[i] for c in cs])
                 if mean is None:
                     tds.append("<td></td><td></td>"); continue
                 rel_sd = f" ± {100 * sd / mean:.1f}%" if len(cs) > 1 else ""
-                d = "" if v == names[0] or not base[k] else f"{100 * (mean / base[k] - 1):+.2f}%"
+                d = "" if v == names[0] or not base[i] else f"{100 * (mean / base[i] - 1):+.2f}%"
                 tds.append(f"<td>{fmt(mean)}{rel_sd}</td><td>{d}</td>")
             out.append("<tr>" + "".join(tds) + "</tr>")
     return ("<table class=\"summary\"><tr><th>corpus</th><th>variant</th><th>n</th><th>ms/op</th><th>Δ</th><th>cycles/op</th><th>Δ</th>"
-            "<th>instructions/op</th><th>Δ</th></tr>" + "".join(out) + "</table>") if out else ""
+            "<th>instructions/op</th><th>Δ</th><th>alloc/op</th><th>Δ</th></tr>" + "".join(out) + "</table>") if out else ""
+
+
+def mixed(variants):
+    """A warning when a corpus's cells ran under different spec versions."""
+    versions = {c[4] for cs in variants.values() for c in cs}
+    return (f' <span class="mixed" title="the cells of this corpus ran under different spec versions">⚠ mixed spec versions: '
+            f'{esc(", ".join(sorted(v or "unversioned" for v in versions)))}</span>') if len(versions) > 1 else ""
+
+
+def paired_summary(names, cells):
+    """A paired campaign's variants alternate within each fork (cell), so its JMH score mixes them: per corpus and
+    variant, the variant's own metrics (`ab.PAIRED_METRICS`) as means over forks, and the paired difference against
+    the first variant, as the mean and spread over forks of each fork's difference."""
+    out = []
+    for corpus in sorted(cells):
+        forks = [c[6] for cs in cells[corpus].values() for c in cs]
+        for v in names:
+            tds = [f"<td>{esc(corpus)}{mixed(cells[corpus]) if v == names[0] else ''}</td><td>{esc(v)}</td><td>{len(forks)}</td>"]
+            for _, key, scale, fmt in ab.PAIRED_METRICS:
+                m, ds, _ = ab.paired_metric(forks, key.format(v))
+                tds.append(f"<td>{fmt.format(m / scale) if m is not None else ''}</td><td>{ab.delta_summary(ds) if ds else ''}</td>")
+            out.append("<tr>" + "".join(tds) + "</tr>")
+    head = "".join(f"<th>{esc(label)}</th><th>Δ (paired)</th>" for label, *_ in ab.PAIRED_METRICS)
+    return (f'<table class="summary"><tr><th>corpus</th><th>variant</th><th>forks</th>{head}</tr>' + "".join(out) + "</table>") if out else ""
 
 
 def spec_history(spec_dir, counts):
@@ -204,7 +236,7 @@ def build(campaigns):
       span = f"{stamp(min(whens))} – {stamp(last)}" if whens else stamp(last)
       has_notes = os.path.exists(os.path.join(spec_dir, "NOTES.md"))
       sections.append((last, f"""<section data-last="{last:.0f}" data-notes="{1 if has_notes else 0}"><h2>{esc(name)} <span class="when">{span}</span>{progress_badge(prog, name)}</h2>{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{spec_history(spec_dir, counts)}{summary(name, cells)}
-  <table><tr><th>corpus</th><th>variant</th><th>ms/op</th><th>cycles/op (xctrace)</th><th>instructions/op</th><th>flags</th><th>finished</th><th>flame graphs</th></tr>{''.join(rows)}</table></section>"""))
+  <table><tr><th>corpus</th><th>variant</th><th>ms/op</th><th>cycles/op (xctrace)</th><th>instructions/op</th><th>alloc/op</th><th>flags</th><th>finished</th><th>flame graphs</th></tr>{''.join(rows)}</table></section>"""))
   sections = [h for _, h in sorted(sections, key=lambda x: -x[0])]
   options = "".join(f'<option value="{esc(v)}">{esc(l)}</option>' for _, v, l in sorted(timeline_cells, reverse=True))
   chips = "".join(f'<button class="chip" data-corpus="{esc(c)}">{esc(c)}</button>' for c in sorted(all_corpora))

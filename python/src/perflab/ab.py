@@ -278,38 +278,53 @@ def mean(xs):
     return sum(xs) / len(xs) if xs else None
 
 
+PAIRED_METRICS = [("score", "paired.{}", 1, "{:.4g}"), ("score excl. GC", "paired.gcFree.{}", 1, "{:.4g}"),
+                  ("instructions/op", "xctrace.INST_ALL.{}", 1e9, "{:.3f}G"),
+                  ("cycles/op", "xctrace.CORE_ACTIVE_CYCLE.{}", 1e9, "{:.3f}G"),
+                  ("alloc/op", "paired.alloc.{}", 1e6, "{:.1f}MB")]
+
+
+def paired_metric(cells, key):
+    """A metric of a paired campaign over its forks, each fork a cell's secondaryMetrics: the mean of `key`, and its
+    paired difference against the baseline per fork (`key.delta%`) with that fork's median difference, or None."""
+    vals = [c[key]["score"] for c in cells if key in c]
+    ds = [c[key + ".delta%"]["score"] for c in cells if key + ".delta%" in c]
+    meds = [c[key + ".delta%.median"]["score"] for c in cells if key + ".delta%.median" in c]
+    return mean(vals), ds, meds if len(meds) == len(ds) else None
+
+
+def delta_summary(ds):
+    """The mean of per-fork paired differences, with their spread over forks."""
+    d = mean(ds)
+    sd = (sum((x - d) ** 2 for x in ds) / (len(ds) - 1)) ** 0.5 if len(ds) > 1 else 0.0
+    return f"{d:+.2f}% ± {sd:.2f}"
+
+
 def report_paired(spec):
     """One row per corpus and variant: its mean per fork, and the paired difference against the first variant (the
     mean within each fork, then the mean and spread of those over forks)."""
     names = list(spec.paired)
     print(f"### {spec.name} (paired within forks: {', '.join(names)})\n")
-    metrics = [("score", "paired.{}", 1, "{:.4g}"), ("score excl. GC", "paired.gcFree.{}", 1, "{:.4g}"),
-               ("instructions/op", "xctrace.INST_ALL.{}", 1e9, "{:.3f}G"),
-               ("cycles/op", "xctrace.CORE_ACTIVE_CYCLE.{}", 1e9, "{:.3f}G"),
-               ("alloc/op", "paired.alloc.{}", 1e6, "{:.1f}MB")]
-    print("| corpus | variant | forks | " + " | ".join(f"{m} | Δ (paired) | Δ per fork (median)" for m, *_ in metrics) + " |")
-    print("|---|---|---|" + "---|---|---|" * len(metrics))
+    print("| corpus | variant | forks | " + " | ".join(f"{m} | Δ (paired) | Δ per fork (median)" for m, *_ in PAIRED_METRICS) + " |")
+    print("|---|---|---|" + "---|---|---|" * len(PAIRED_METRICS))
     for corpus in spec.corpora:
         cells = []
         for r in range(1, spec.rounds + 1):
             f = os.path.join(spec.cell_dir(corpus, "paired", r), "result.json")
-            if os.path.exists(f):
+            try:
                 cells.append(json.load(open(f))[0].get("secondaryMetrics", {}))
+            except (OSError, ValueError, IndexError):
+                pass  # not run, or still running: JMH writes result.json when the fork ends
         if not cells:
             continue
         for v in names:
             tds = []
-            for _, key, scale, fmt in metrics:
-                vals = [c[key.format(v)]["score"] for c in cells if key.format(v) in c]
-                ds = [c[key.format(v) + ".delta%"]["score"] for c in cells if key.format(v) + ".delta%" in c]
-                meds = [c[key.format(v) + ".delta%.median"]["score"] for c in cells if key.format(v) + ".delta%.median" in c]
-                m = mean(vals)
+            for _, key, scale, fmt in PAIRED_METRICS:
+                m, ds, meds = paired_metric(cells, key.format(v))
                 tds.append(fmt.format(m / scale) if m is not None else "–")
                 if ds:
-                    d = mean(ds)
-                    sd = (sum((x - d) ** 2 for x in ds) / (len(ds) - 1)) ** 0.5 if len(ds) > 1 else 0.0
-                    per = " ".join(f"{x:+.2f}" + (f" ({md:+.2f})" if len(meds) == len(ds) else "") for x, md in zip(ds, meds or ds))
-                    tds += [f"{d:+.2f}% ± {sd:.2f}", per]
+                    per = " ".join(f"{x:+.2f}" + (f" ({md:+.2f})" if meds else "") for x, md in zip(ds, meds or ds))
+                    tds += [delta_summary(ds), per]
                 else:
                     tds += ["", ""]
             print(f"| {corpus} | {v} | {len(cells)} | " + " | ".join(tds) + " |")
