@@ -1,6 +1,6 @@
 // A benchmark fork's timeline: its iterations (coloured by variant when variants alternate within the fork) and, on the
 // same wall-clock axis, what the machine did meanwhile. Reads a cell's files as written by the fork and `perflab ab`:
-//   iterations.tsv  every iteration as it finishes: index, kind, variant, start_ms, end_ms, score, ops, gc_ms, pid, unit;
+//   iterations.tsv  every iteration as it finishes: index, kind, variant, start_ms, end_ms, score, ops, gc_ms, pid, unit, alloc_bytes;
 //                   all forks of a run append to it; kind "startup" (JVM start to the first iteration) and "exit"
 //                   (the last iteration to JVM exit) give each fork's lifetime
 //   timeline.tsv    per 50 ms: cycles and instructions of the benchmark thread, JIT, GC, other threads of the fork and

@@ -11,8 +11,13 @@ import java.util.List;
 public final class IterationLog {
     /** One iteration: its position among all iterations of the trial, warmup included, so consecutive iterations
      *  {@code index / variants().size()} form a cycle in which each variant ran once; its wall-clock span; and the time
-     *  the JVM spent in collection pauses during it. */
-    public record Entry(int index, String variant, boolean measured, long startMillis, long endMillis, long gcMillis) {
+     *  the JVM spent in collection pauses during it, and the bytes all its threads allocated during it (-1 when the JVM
+     *  cannot say). */
+    public record Entry(int index, String variant, boolean measured, long startMillis, long endMillis, long gcMillis,
+                        long allocBytes) {
+        public Entry(int index, String variant, boolean measured, long startMillis, long endMillis, long gcMillis) {
+            this(index, variant, measured, startMillis, endMillis, gcMillis, -1);
+        }
         public int cycle(int variants) { return index / variants; }
     }
 
@@ -20,6 +25,7 @@ public final class IterationLog {
     private static List<String> variants = List.of();
     private static Entry open;
     private static long gcAtStart;
+    private static long allocAtStart;
 
     /** Total time of collection pauses so far, by the GC MXBeans. Not G1's "Concurrent GC", which counts marking that
      *  runs beside the application rather than stopping it. */
@@ -28,6 +34,35 @@ public final class IterationLog {
         for (var gc : java.lang.management.ManagementFactory.getGarbageCollectorMXBeans())
             if (!gc.getName().contains("Concurrent")) t += Math.max(0, gc.getCollectionTime());
         return t;
+    }
+
+    private static final java.lang.management.ThreadMXBean THREADS = java.lang.management.ManagementFactory.getThreadMXBean();
+    // ThreadMXBean.getTotalThreadAllocatedBytes, JDK 21 and later (this module targets 17), counts ended threads too
+    private static final java.lang.invoke.MethodHandle TOTAL_ALLOCATED = totalAllocated();
+
+    private static java.lang.invoke.MethodHandle totalAllocated() {
+        try {
+            return java.lang.invoke.MethodHandles.publicLookup().findVirtual(com.sun.management.ThreadMXBean.class,
+                "getTotalThreadAllocatedBytes", java.lang.invoke.MethodType.methodType(long.class));
+        } catch (ReflectiveOperationException e) {
+            return null;
+        }
+    }
+
+    /** Bytes allocated so far by all threads (before JDK 21, by the live ones), or -1 when the JVM does not count them. */
+    static long allocatedBytes() {
+        if (!(THREADS instanceof com.sun.management.ThreadMXBean t) || !t.isThreadAllocatedMemorySupported()
+                || !t.isThreadAllocatedMemoryEnabled()) return -1;
+        if (TOTAL_ALLOCATED != null) {
+            try {
+                return (long) TOTAL_ALLOCATED.invoke(t);
+            } catch (Throwable e) {
+                return -1;
+            }
+        }
+        long sum = 0;
+        for (long b : t.getThreadAllocatedBytes(t.getAllThreadIds())) if (b > 0) sum += b;
+        return sum;
     }
 
     private IterationLog() {}
@@ -46,13 +81,15 @@ public final class IterationLog {
 
     public static synchronized void begin(String variant, boolean measured) {
         gcAtStart = gcMillis();
+        allocAtStart = allocatedBytes();
         open = new Entry(entries.size(), variant, measured, System.currentTimeMillis(), -1, 0);
     }
 
     public static synchronized void end() {
         if (open == null) return;
+        long alloc = allocatedBytes();
         Entry e = new Entry(open.index(), open.variant(), open.measured(), open.startMillis(), System.currentTimeMillis(),
-                gcMillis() - gcAtStart);
+                gcMillis() - gcAtStart, alloc < 0 || allocAtStart < 0 ? -1 : alloc - allocAtStart);
         entries.add(e);
         open = null;
     }

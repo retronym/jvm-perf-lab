@@ -19,7 +19,8 @@ import java.util.*;
  * ({@code paired.<variant>}, in the benchmark's unit), and for each variant but the baseline the paired difference, the
  * mean and standard deviation over cycles of {@code 100 * (variant / baseline - 1)}, where a cycle is the consecutive
  * iterations in which each variant ran once ({@code paired.<variant>.delta%}, {@code .delta%.sd}). The same again with
- * each iteration's GC time taken out ({@code paired.gcFree.<variant>}).
+ * each iteration's GC time taken out ({@code paired.gcFree.<variant>}), and for the bytes allocated per op, by all
+ * threads ({@code paired.alloc.<variant>}, in B/op: JMH's {@code -prof gc} mixes the variants).
  */
 public class PairedProfiler implements InternalProfiler {
     // Each result is emitted once per fork, after the last measurement iteration. Not MAX, which floors at zero and
@@ -31,6 +32,7 @@ public class PairedProfiler implements InternalProfiler {
 
     private final List<Point> points = new ArrayList<>();
     private final List<Point> gcFree = new ArrayList<>();
+    private final List<Point> alloc = new ArrayList<>();
     private String unit = "";
     private int seen;
 
@@ -44,7 +46,7 @@ public class PairedProfiler implements InternalProfiler {
     // a fork also adds a "startup" row (JVM start to its first iteration: JVM boot, benchmark setup) and, from a
     // shutdown hook, an "exit" row (its last iteration to JVM exit).
     private static final String CELL = System.getProperty("perflab.cell");
-    static final String HEADER = "index\tkind\tvariant\tstart_ms\tend_ms\tscore\tops\tgc_ms\tpid\tunit\n";
+    static final String HEADER = "index\tkind\tvariant\tstart_ms\tend_ms\tscore\tops\tgc_ms\tpid\tunit\talloc_bytes\n";
     private static final long PID = ProcessHandle.current().pid();
     private long iterationStart;
     private int iterations;
@@ -66,24 +68,30 @@ public class PairedProfiler implements InternalProfiler {
         }
     }
 
-    static String row(int index, String kind, String variant, long start, long end, String score, String ops, String gc, String unit) {
+    static String row(int index, String kind, String variant, long start, long end, String score, String ops, String gc, String unit,
+                      String alloc) {
         return String.join("\t", Integer.toString(index), kind, variant, Long.toString(start), Long.toString(end), score, ops, gc,
-            Long.toString(PID), unit) + "\n";
+            Long.toString(PID), unit, alloc) + "\n";
     }
+
+    /** Did the iteration finish with a score? Not when the benchmark threw: JMH then has no primary result. */
+    static boolean scored(IterationResult ir) { return !ir.getRawPrimaryResults().isEmpty(); }
 
     private void logIteration(IterationParams ip, IterationResult ir) {
         if (CELL == null) return;
-        String unit = ir.getPrimaryResult().getScoreUnit();
+        boolean scored = scored(ir);
+        String unit = scored ? ir.getPrimaryResult().getScoreUnit() : "";
         if (iterations == 0) {
-            append(row(-1, "startup", "", ManagementFactory.getRuntimeMXBean().getStartTime(), iterationStart, "", "", "", unit));
+            append(row(-1, "startup", "", ManagementFactory.getRuntimeMXBean().getStartTime(), iterationStart, "", "", "", unit, ""));
             Runtime.getRuntime().addShutdownHook(new Thread(() ->
-                append(row(-1, "exit", "", lastEnd, System.currentTimeMillis(), "", "", "", unit)), "perflab-exit"));
+                append(row(-1, "exit", "", lastEnd, System.currentTimeMillis(), "", "", "", unit, "")), "perflab-exit"));
         }
         IterationLog.Entry e = IterationLog.paired() ? IterationLog.last() : null;
         lastEnd = System.currentTimeMillis();
         append(row(iterations, ip.getType() == IterationType.MEASUREMENT ? "measure" : "warmup", e == null ? "" : e.variant(),
-            iterationStart, lastEnd, String.format(Locale.ROOT, "%.4f", ir.getPrimaryResult().getScore()),
-            Long.toString(ir.getMetadata().getMeasuredOps()), e == null ? "" : Long.toString(e.gcMillis()), unit));
+            iterationStart, lastEnd, scored ? String.format(Locale.ROOT, "%.4f", ir.getPrimaryResult().getScore()) : "",
+            ir.getMetadata() == null ? "" : Long.toString(ir.getMetadata().getMeasuredOps()), e == null ? "" : Long.toString(e.gcMillis()), unit,
+            e == null || e.allocBytes() < 0 ? "" : Long.toString(e.allocBytes())));
         iterations++;
     }
 
@@ -92,18 +100,21 @@ public class PairedProfiler implements InternalProfiler {
         logIteration(ip, ir);
         if (!IterationLog.paired()) return List.of();
         IterationLog.Entry e = IterationLog.last();
-        if (e != null && ip.getType() == IterationType.MEASUREMENT) {
+        if (e != null && ip.getType() == IterationType.MEASUREMENT && scored(ir)) {
             double score = ir.getPrimaryResult().getScore();
             points.add(new Point(e, score));
             // the same time per op with the iteration's GC time taken out, pro rata: separates "this variant's code is
             // slower" from "a collection landed in this variant's iteration"
             long span = e.endMillis() - e.startMillis();
             if (span > 0) gcFree.add(new Point(e, score * Math.max(0, 1 - e.gcMillis() / (double) span)));
+            long ops = ir.getMetadata().getMeasuredOps();
+            if (e.allocBytes() >= 0 && ops > 0) alloc.add(new Point(e, e.allocBytes() / (double) ops));
             unit = ir.getPrimaryResult().getScoreUnit();
         }
         if (ip.getType() != IterationType.MEASUREMENT || ++seen < ip.getCount()) return List.of();
         List<Result> out = new ArrayList<>(results(IterationLog.variants(), points, unit, "paired."));
         out.addAll(results(IterationLog.variants(), gcFree, unit, "paired.gcFree."));
+        if (!alloc.isEmpty()) out.addAll(results(IterationLog.variants(), alloc, "B/op", "paired.alloc."));
         return out;
     }
 

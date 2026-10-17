@@ -285,7 +285,8 @@ def report_paired(spec):
     print(f"### {spec.name} (paired within forks: {', '.join(names)})\n")
     metrics = [("score", "paired.{}", 1, "{:.4g}"), ("score excl. GC", "paired.gcFree.{}", 1, "{:.4g}"),
                ("instructions/op", "xctrace.INST_ALL.{}", 1e9, "{:.3f}G"),
-               ("cycles/op", "xctrace.CORE_ACTIVE_CYCLE.{}", 1e9, "{:.3f}G")]
+               ("cycles/op", "xctrace.CORE_ACTIVE_CYCLE.{}", 1e9, "{:.3f}G"),
+               ("alloc/op", "paired.alloc.{}", 1e6, "{:.1f}MB")]
     print("| corpus | variant | forks | " + " | ".join(f"{m} | Δ (paired) | Δ per fork (median)" for m, *_ in metrics) + " |")
     print("|---|---|---|" + "---|---|---|" * len(metrics))
     for corpus in spec.corpora:
