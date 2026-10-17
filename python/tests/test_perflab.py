@@ -1,7 +1,7 @@
 import json, os, sys, tempfile, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from perflab import analyze, auditfold, config, defcosts, jmh, regraph, timeline  # noqa: E402
+from perflab import analyze, auditfold, config, defcosts, index, jmh, regraph, timeline, trees  # noqa: E402
 
 
 class Project:
@@ -164,6 +164,35 @@ class DefCostsTest(unittest.TestCase):
         _, page = defcosts.report(self.table([("def", "", "Apply.<*>", "", "", 10, 1, 1000, 1000, 1000, 0)]), 5)
         self.assertIn("Apply.&lt;*&gt;", page)
         self.assertNotIn("Apply.<*>", page)
+
+
+class IndexTest(unittest.TestCase):
+    def test_empty_result_json_is_a_running_cell(self):
+        p = Project('[build]\njmh = "x"\n')
+        camp = config.get().campaigns
+        cell = os.path.join(camp, "c", "corpus", "v", "1")
+        os.makedirs(cell)
+        open(os.path.join(cell, "result.json"), "w").close()
+        json.dump({"name": "c", "rounds": 1, "corpora": ["corpus"], "variants": {"v": ""}}, open(os.path.join(camp, "c", "spec.json"), "w"))
+        index.build(camp)
+        page = open(os.path.join(camp, "index.html")).read()
+        self.assertIn("<i>running</i>", page)
+        self.assertIn("0 of 1 cells", page)
+
+
+class TreesTest(unittest.TestCase):
+    def test_gather_merges_without_removing(self):
+        tmp = tempfile.mkdtemp()
+        tree = Project('[build]\njmh = "x"\n').dir
+        src = os.path.join(config.find(tree).campaigns, "c", "k", "v", "1")
+        os.makedirs(src)
+        open(os.path.join(src, "result.json"), "w").write("[]")
+        out = os.path.join(tmp, "c")
+        keep = os.path.join(out, "k", "v", "0")
+        os.makedirs(keep)
+        trees.gather({"name": "c"}, {"v": tree}, out)
+        self.assertTrue(os.path.exists(os.path.join(out, "k", "v", "1", "result.json")))
+        self.assertTrue(os.path.isdir(keep))
 
 
 if __name__ == "__main__":

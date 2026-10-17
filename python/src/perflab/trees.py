@@ -31,29 +31,44 @@ def tree_spec(spec, variant, rounds, tree):
     return path
 
 
-def main(argv):
-    spec = json.load(open(argv[0]))
-    here = config.get().root
-    trees = {v: os.path.abspath(os.path.join(here, t)) for v, t in spec["trees"].items()}
-    for r in range(1, spec["rounds"] + 1):
-        for variant, tree in trees.items():
-            if run_in(tree, "ab", "run", tree_spec(spec, variant, r, tree)) != 0:
-                sys.exit(f"perflab trees: {variant} round {r} failed ({tree})")
-    out = os.path.join(config.get().campaigns, spec["name"])
+def gather(spec, trees, out):
+    """Copy each variant's cells from its checkout's campaign into `out`, merging into what is already there."""
     for variant, tree in trees.items():
         src = os.path.join(campaigns_of(tree), spec["name"])
-        if os.path.abspath(src) == os.path.abspath(out):
+        if os.path.abspath(src) == os.path.abspath(out) or not os.path.isdir(src):
             continue
         for corpus in os.listdir(src):
             v = os.path.join(src, corpus, variant)
             if os.path.isdir(v):
-                dest = os.path.join(out, corpus, variant)
-                shutil.rmtree(dest, ignore_errors=True)
-                shutil.copytree(v, dest)
+                shutil.copytree(v, os.path.join(out, corpus, variant), dirs_exist_ok=True)
+
+
+def main(argv):
+    spec = json.load(open(argv[0]))
+    here = config.get().root
+    trees = {v: os.path.abspath(os.path.join(here, t)) for v, t in spec["trees"].items()}
+    out = os.path.join(config.get().campaigns, spec["name"])
+    # one live view from the start: the combined campaign and its spec (so the index knows the planned cells) exist
+    # before the first round, are served from this checkout, and gain each variant's cells as its round finishes
     combined = {k: v for k, v in spec.items() if k != "trees"}
     combined["variants"] = {v: spec.get("variants", {}).get(v, "") for v in trees}
+    os.makedirs(out, exist_ok=True)
     path = os.path.join(out, "spec.json")
     json.dump(combined, open(path, "w"), indent=2)
+    from . import index, serve
+    try:
+        print(f"perflab trees: index (updates after each round): {serve.ensure()}", flush=True)
+    except Exception as e:  # the index is a convenience; never let it stop a campaign
+        print(f"perflab trees: index not served: {e}", flush=True)
+    for r in range(1, spec["rounds"] + 1):
+        for variant, tree in trees.items():
+            if run_in(tree, "ab", "run", tree_spec(spec, variant, r, tree)) != 0:
+                sys.exit(f"perflab trees: {variant} round {r} failed ({tree})")
+            gather(spec, trees, out)
+            try:
+                index.build(config.get().campaigns)
+            except Exception as e:
+                print(f"perflab trees: index not rebuilt: {e}", flush=True)
     from . import ab
     ab.report(ab.Spec(path))
     return 0

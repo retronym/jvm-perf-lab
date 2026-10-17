@@ -22,8 +22,14 @@ def cell_row(spec, corpus, variant, cell):
     res_f = os.path.join(cell, "result.json")
     if not os.path.exists(res_f):
         return None
-    r = json.load(open(res_f))[0]
-    p = r["primaryMetric"]
+    try:
+        r = json.load(open(res_f))[0]
+        p = r["primaryMetric"]
+    except (OSError, ValueError, IndexError, KeyError):
+        # JMH writes result.json when the fork ends, so an empty or partial one is a cell still running
+        return (f'<tr class="running" data-corpus="{esc(corpus)}" data-profiled="0"><td>{esc(corpus)}</td>'
+                f'<td>{esc(variant)} #{esc(os.path.basename(cell))}</td><td colspan="5"><i>running</i></td><td></td></tr>',
+                time.time(), corpus, None)
     m = r.get("secondaryMetrics", {})
     cyc = m.get("xctrace.CORE_ACTIVE_CYCLE", {}).get("score")
     ins = m.get("xctrace.INST_ALL", {}).get("score")
@@ -121,7 +127,7 @@ def progress(spec_dir):
     planned = s.get("rounds", 2) * len(s["corpora"]) * variants
   except (OSError, ValueError, KeyError, TypeError):
     return None
-  done = len(glob.glob(os.path.join(spec_dir, "*", "*", "*", "result.json")))
+  done = sum(1 for f in glob.glob(os.path.join(spec_dir, "*", "*", "*", "result.json")) if os.path.getsize(f) > 0)
   return done, planned
 
 
@@ -163,7 +169,8 @@ def build(campaigns):
                       row = cell_row(name, corpus, variant, cell)
                       if row:
                           rows.append(row[0]); whens.append(row[1]); corpora.add(row[2])
-                          cells.setdefault(corpus, {}).setdefault(row[3][0], []).append(row[3])
+                          if row[3]:
+                              cells.setdefault(corpus, {}).setdefault(row[3][0], []).append(row[3])
       diffs = sorted(glob.glob(os.path.join(spec_dir, "diff-*", "*.html")))
       prog = progress(spec_dir)
       if not rows and not diffs and not prog:
