@@ -1,9 +1,11 @@
-"""<campaigns>/index.html: every campaign with a summary and its cells (score, cycles, instructions, flags), links to
-each cell's flame graphs (greyed out until rendered) and timeline, the campaign's differential flame graphs, notes
-(<campaign>/NOTES.md) and findings (<campaigns>/FINDINGS.md), and a live timeline of the running fork. `perflab ab`
-rebuilds it around each cell, and the page refreshes itself.
+"""<campaigns>/index.html: every campaign and every run of `perflab run` (<runs>), newest first, and a live timeline of
+the running fork. A campaign shows a summary and its cells (score, cycles, instructions, flags), links to each cell's
+flame graphs (greyed out until rendered) and timeline, its differential flame graphs, notes (<campaign>/NOTES.md) and
+findings (<campaigns>/FINDINGS.md); a run its benchmark, parameters, JVM, status, scores, and links to its timeline,
+logs and flame graphs. `perflab ab` rebuilds it around each cell, `perflab run` at its start and end, and the page
+refreshes itself.
 
-  perflab index [<campaigns-dir>]
+  perflab index [<campaigns-dir> [<runs-dir>]]
 """
 import glob, html, json, os, re, sys, time
 
@@ -16,6 +18,20 @@ rel = lambda f: esc(os.path.relpath(f, root))
 
 def link(path, label):
     return f'<a href="{rel(path)}">{esc(label)}</a>' if os.path.exists(path) else f'<span class="pending">{esc(label)}</span>'
+
+
+def flame_graphs(cell):
+    """Links to an async-profiler cell's or run's flame graphs, per event and kind (greyed out until rendered)."""
+    if not (os.path.exists(os.path.join(cell, "profile.txt")) and open(os.path.join(cell, "profile.txt")).read().startswith("async")):
+        return ""
+    jfr = (glob.glob(os.path.join(cell, "**", "*.jfr"), recursive=True) or [None])[0]
+    if not jfr:
+        return ""
+    parts = []
+    for label, _ in regraph.events_of(cell):
+        ks = " · ".join(link(regraph.graph_path(jfr, label, k), k) for k in regraph.kinds())
+        parts.append(f"<b>{esc(label.removeprefix('hw-'))}</b>: {ks}")
+    return "<br>".join(parts)
 
 
 def cell_row(spec, corpus, variant, cell):
@@ -36,16 +52,7 @@ def cell_row(spec, corpus, variant, cell):
     scalac = r.get("params", {}).get("scalacOptions", "")
     pattern = re.compile(config.get().get("index", "flags"))
     flags = " ".join([a for a in r["jvmArgs"] if pattern.search(a) and not a.startswith("-Dperflab.")] + ([scalac] if scalac else []))
-    graphs = ""
-    if os.path.exists(os.path.join(cell, "profile.txt")) and open(os.path.join(cell, "profile.txt")).read().startswith("async"):
-        prof = cell
-        jfr = (glob.glob(os.path.join(prof, "**", "*.jfr"), recursive=True) or [None])[0]
-        if jfr:
-            parts = []
-            for label, _ in regraph.events_of(prof):
-                ks = " · ".join(link(regraph.graph_path(jfr, label, k), k) for k in regraph.kinds())
-                parts.append(f"<b>{esc(label.removeprefix('hw-'))}</b>: {ks}")
-            graphs = "<br>".join(parts)
+    graphs = flame_graphs(cell)
     tl = os.path.join(cell, "timeline.html")
     if os.path.exists(tl):
         graphs = link(tl, "timeline") + ("<br>" + graphs if graphs else "")
@@ -110,6 +117,153 @@ def spec_history(spec_dir, counts):
     return f'<div class="specs"><b>Spec versions</b><ul>{"".join(items)}</ul></div>'
 
 
+# JMH options that take no value; every other option in a run's jmh.args is followed by one
+JMH_FLAGS = {"-h", "-l", "-lp", "-lprof", "-lrf"}
+RUN_STATE = "run.json"
+STALE_SECS = 600  # a run without run.json (an older perflab) counts as running while its logs grow
+
+
+def run_args(run):
+    """A run's jmh.args as (benchmarks, {param: value}, [(option, value)], JVM, JVM arguments)."""
+    try:
+        args = open(os.path.join(run, "jmh.args")).read().splitlines()
+    except OSError:
+        return [], {}, [], None, []
+    benches, params, opts, jvm, jvm_args = [], {}, [], None, []
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a.startswith("-") and a not in JMH_FLAGS and i + 1 < len(args):
+            v = args[i + 1]
+            if a == "-p":
+                k, _, pv = v.partition("=")
+                params[k] = pv
+            elif a == "-jvm":
+                jvm = v
+            elif a in ("-jvmArgs", "-jvmArgsAppend", "-jvmArgsPrepend"):
+                jvm_args += v.split()
+            elif a not in ("-o", "-rf", "-rff", "-prof"):
+                opts.append((a, v))
+            i += 2
+        else:
+            if not a.startswith("-"):
+                benches.append(a)
+            i += 1
+    return benches, params, opts, jvm, jvm_args
+
+
+def run_status(run):
+    """(status, detail, results) of a run: running, finished, failed or interrupted; results are result.json's entries."""
+    try:
+        results = json.load(open(os.path.join(run, "result.json")))
+    except (OSError, ValueError):
+        results = None
+    try:
+        st = json.load(open(os.path.join(run, RUN_STATE)))
+    except (OSError, ValueError):
+        st = None
+    if st:
+        if st.get("status") == "running":
+            alive = True
+            try:
+                os.kill(st["pid"], 0)
+            except (OSError, KeyError, TypeError):
+                alive = False
+            return ("running", "", results) if alive else ("interrupted", "perflab exited without finishing the run", results)
+        if st.get("status") == "failed":
+            return "failed", f"build exited with {st.get('rc')}", results
+        if st.get("status") == "interrupted":
+            return "interrupted", "", results
+        return ("finished", "", results) if results else ("failed", "no results", results)
+    if results:
+        return "finished", "", results
+    logs = [f for f in (os.path.join(run, n) for n in ("jmh.log", "build.log", "iterations.tsv", "result.json")) if os.path.exists(f)]
+    if logs and time.time() - max(os.path.getmtime(f) for f in logs) < STALE_SECS:
+        return "running", "", None
+    return "failed", "no results", None
+
+
+def iterations(run):
+    """'forks · warmup · measurement · last score' from a run's iterations.tsv, for a run in progress."""
+    try:
+        rows = [l.split("\t") for l in open(os.path.join(run, "iterations.tsv")).read().splitlines()[1:]]
+    except OSError:
+        return ""
+    rows = [r for r in rows if len(r) >= 10]
+    if not rows:
+        return ""
+    count = lambda k: sum(1 for r in rows if r[1] == k)
+    last = next((r for r in reversed(rows) if r[5]), None)
+    forks = len({r[8] for r in rows})
+    return (f"{forks} fork{'s' if forks > 1 else ''} · {count('warmup')} warmup, {count('measure')} measurement iterations"
+            + (f" · last {float(last[5]):.1f} {last[9]}" if last else ""))
+
+
+def short_jvm(jvm):
+    home = os.path.expanduser("~")
+    jvm = jvm.removesuffix("/bin/java")
+    return "~" + jvm[len(home):] if jvm.startswith(home + "/") else jvm
+
+
+def run_section(run):
+    """A run of `perflab run`: its benchmark, parameters, JVM, status, scores and links. (mtime, html) or None."""
+    if not any(os.path.exists(os.path.join(run, f)) for f in ("jmh.args", "result.json", "jmh.log")):
+        return None
+    name = os.path.basename(run.rstrip("/"))
+    benches, params, opts, jvm, jvm_args = run_args(run)
+    status, detail, results = run_status(run)
+    corpus_param = config.get().get("benchmark", "corpus")
+    corpus = params.get(corpus_param, "")
+    try:
+        profile = open(os.path.join(run, "profile.txt")).read().strip()
+    except OSError:
+        profile = ""
+    pattern = re.compile(config.get().get("index", "flags"))
+    flags = [a for a in jvm_args if pattern.search(a) and not a.startswith("-Dperflab.")]
+    facts = [f"<b>{esc(' '.join(benches) or '(default benchmark)')}</b>"]
+    facts += [f"<code>-p {esc(k)}={esc(v)}</code>" for k, v in params.items()]
+    if opts:
+        facts.append(f"<code>{esc(' '.join(f'{o} {v}' for o, v in opts))}</code>")
+    if jvm:
+        facts.append(f'JVM <code title="{esc(jvm)}">{esc(short_jvm(jvm))}</code>')
+    if flags:
+        facts.append(f"flags <code>{esc(' '.join(flags))}</code>")
+    if profile and profile != "none":
+        facts.append(f"profile <code>{esc(profile)}</code>")
+    graphs = flame_graphs(run)
+    links = [link(os.path.join(run, f), label) for f, label in (("timeline.html", "timeline"), ("jmh.log", "jmh.log"),
+                                                                 ("build.log", "build.log"), ("report.md", "audit report"))
+             if os.path.exists(os.path.join(run, f)) or f == "timeline.html"]
+    rows = ""
+    if results:
+        varying = [k for k in results[0].get("params", {}) if len({str(r.get("params", {}).get(k)) for r in results}) > 1]
+        out = []
+        for r in results:
+            p = r["primaryMetric"]
+            m = r.get("secondaryMetrics", {})
+            cyc = m.get("xctrace.CORE_ACTIVE_CYCLE", {}).get("score")
+            ins = m.get("xctrace.INST_ALL", {}).get("score")
+            rp = r.get("params", {})
+            err = f" ± {p['scoreError']:.3g}" if isinstance(p.get("scoreError"), (int, float)) else ""
+            out.append(f'<tr data-corpus="{esc(str(rp.get(corpus_param, corpus)))}" data-profiled="{1 if graphs else 0}">'
+                       f"<td>{esc(r['benchmark'].rsplit('.', 1)[-1])}</td>"
+                       f"<td><code>{esc(' '.join(f'{k}={rp.get(k)}' for k in varying))}</code></td>"
+                       f"<td>{p['score']:.4g}{err} {esc(p.get('scoreUnit', ''))}</td><td>{f'{cyc / 1e9:.2f}G' if cyc else ''}</td>"
+                       f"<td>{f'{ins / 1e9:.3f}G' if ins else ''}</td></tr>")
+        rows = ("<table><tr><th>benchmark</th><th>params</th><th>score</th><th>cycles/op (xctrace)</th><th>instructions/op</th></tr>"
+                + "".join(out) + "</table>")
+    progress = iterations(run) if status == "running" else ""
+    mtimes = [os.path.getmtime(os.path.join(run, f)) for f in os.listdir(run)] or [os.path.getmtime(run)]
+    args_f = os.path.join(run, "jmh.args")
+    started = os.path.getmtime(args_f) if os.path.exists(args_f) else min(mtimes)
+    last = time.time() if status == "running" else max(mtimes)
+    span = f"{stamp(started)} – {stamp(max(mtimes))}" if status != "running" else f"since {stamp(started)}"
+    badge = f'<span class="status {status}">{status}{": " + esc(detail) if detail else ""}</span>'
+    return last, (f'<section class="run" data-last="{last:.0f}" data-notes="0"><h2>run {esc(name)} <span class="when">{span}</span> {badge}</h2>'
+                  f'<p>{" · ".join(facts)}</p>{f"<p>{esc(progress)}</p>" if progress else ""}{rows}'
+                  f'<p>{" · ".join(links)}{"<br>" + graphs if graphs else ""}</p></section>')
+
+
 def stamp(t):
     return time.strftime("%a %d %b %H:%M", time.localtime(t))
 
@@ -165,9 +319,11 @@ def progress_badge(prog, name):
   return f' <span class="prog {cls}">{done} of {planned} cells{running}</span>'
 
 
-def build(campaigns):
+def build(campaigns, runs=None):
+  """<campaigns>/index.html over the campaigns and the runs of `perflab run` (<runs>, default [paths] runs)."""
   global root
   root = campaigns
+  runs = runs or config.get().runs
   os.makedirs(root, exist_ok=True)
   sections = []
   all_corpora = set()
@@ -205,11 +361,19 @@ def build(campaigns):
       has_notes = os.path.exists(os.path.join(spec_dir, "NOTES.md"))
       sections.append((last, f"""<section data-last="{last:.0f}" data-notes="{1 if has_notes else 0}"><h2>{esc(name)} <span class="when">{span}</span>{progress_badge(prog, name)}</h2>{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{spec_history(spec_dir, counts)}{summary(name, cells)}
   <table><tr><th>corpus</th><th>variant</th><th>ms/op</th><th>cycles/op (xctrace)</th><th>instructions/op</th><th>flags</th><th>finished</th><th>flame graphs</th></tr>{''.join(rows)}</table></section>"""))
+  for run in glob.glob(os.path.join(runs, "*/")) if runs else []:
+      sec = run_section(run)
+      if sec:
+          sections.append(sec)
+          tsv = os.path.join(run, "iterations.tsv")
+          if os.path.exists(tsv):
+              timeline_cells.append((os.path.getmtime(tsv), os.path.relpath(run, root).rstrip("/") + "/",
+                                     f"run · {os.path.basename(run.rstrip('/'))}"))
   sections = [h for _, h in sorted(sections, key=lambda x: -x[0])]
   options = "".join(f'<option value="{esc(v)}">{esc(l)}</option>' for _, v, l in sorted(timeline_cells, reverse=True))
   chips = "".join(f'<button class="chip" data-corpus="{esc(c)}">{esc(c)}</button>' for c in sorted(all_corpora))
 
-  page = f"""<!doctype html><meta charset="utf-8"><title>Campaigns</title>
+  page = f"""<!doctype html><meta charset="utf-8"><title>Campaigns and runs</title>
   <style>:root{{--bg:#f6f7f9;--fg:#1d232b;--muted:#5d6875;--line:#dde2e8;--link:#2f6fb2;--panel:#fff}}
   @media (prefers-color-scheme: dark){{:root{{--bg:#14181d;--fg:#e3e8ee;--muted:#94a0ad;--line:#2c333c;--link:#6ea8e6;--panel:#1b2027;color-scheme:dark}}}}
   body{{background:var(--bg);color:var(--fg);font:13px/1.5 -apple-system,system-ui,sans-serif;margin:20px}} a{{color:var(--link)}}
@@ -223,11 +387,13 @@ def build(campaigns):
   .chip{{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:14px;padding:3px 10px;font:inherit;cursor:pointer}}
   .chip.on{{background:var(--link);color:var(--bg);border-color:var(--link)}} .sep{{width:1px;height:18px;background:var(--line);margin:0 4px}}
   #q{{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:6px;padding:4px 8px;font:inherit;min-width:200px}}
-  .hidden{{display:none}} .mixed{{color:#a05a00;font-size:11px}} .specs ul{{margin:2px 0 8px;padding-left:20px}}
+  .hidden{{display:none}} .status{{font-size:12px;font-weight:normal;border-radius:999px;padding:1px 8px;margin-left:6px}}
+  .status.running{{background:#fdf0d5;color:#7a5200}} .status.finished{{background:#e3f1e7;color:#22663a}} .status.failed,.status.interrupted{{background:#fbe3e3;color:#9b1c1c}}
+  section.run h2{{font-size:15px}} .mixed{{color:#a05a00;font-size:11px}} .specs ul{{margin:2px 0 8px;padding-left:20px}}
   #tl{{margin:0 0 16px}} #tl h2{{font-size:14px;margin:0 0 6px}} #tl select{{font:inherit;max-width:100%}} #tl .k{{color:var(--muted);font-size:12px}}
   {timeline.CSS}</style>
 
-  <header class="bar"><h1>Campaigns</h1><span class="sep"></span><span>corpus:</span>{chips}<span class="sep"></span>
+  <header class="bar"><h1>Campaigns and runs</h1><span class="sep"></span><span>corpus:</span>{chips}<span class="sep"></span>
   <button class="chip" data-kind="profiled">profiled</button><button class="chip" data-kind="timing">timing only</button>
   <button class="chip" data-kind="notes">with notes</button><span class="sep"></span>
   <button class="chip" data-age="86400">last 24 h</button><button class="chip" data-age="10800">last 3 h</button>
@@ -307,5 +473,5 @@ def build(campaigns):
 
 
 def main(argv):
-    print(build(os.path.abspath(argv[0]) if argv else config.get().campaigns))
+    print(build(os.path.abspath(argv[0]) if argv else config.get().campaigns, os.path.abspath(argv[1]) if len(argv) > 1 else None))
     return 0

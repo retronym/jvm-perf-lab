@@ -41,11 +41,11 @@ java -javaagent:perflab-agent.jar=spec=envelope.audit,out=audit-{pid}.json ...
 
 | command | |
 |---|---|
-| `perflab run --profile <p> -- <jmh args>` | one run under a profile: `none`, `xctrace:<template>`, `async:<events>`, `audit:<spec>`; flame graphs or an audit report afterwards |
+| `perflab run --profile <p> -- <jmh args>` | one run under a profile: `none`, `xctrace:<template>`, `async:<events>`, `audit:<spec>`; flame graphs or an audit report afterwards; serves the index first and shows the run there live |
 | `perflab ab run\|report <spec>` | campaigns: variants over corpora, interleaved by round or paired within forks, each run checked |
 | `perflab trees <spec>` | campaigns across checkouts |
-| `perflab index` | `index.html` over all campaigns, with a live timeline of the running fork |
-| `perflab serve` | serve the index on 127.0.0.1 and print its URL; the page updates itself as cells finish (`ab run` does this first) |
+| `perflab index` | `index.html` over all campaigns and runs, newest first, with a live timeline of the running fork |
+| `perflab serve` | serve the index (one server per checkout, covering campaigns and runs) on 127.0.0.1 and print its URL, the same every time; the page updates itself as results arrive (`run` and `ab run` do this first) |
 | `perflab regraph`, `profdiff`, `frameweight`, `subtree`, `analyze` | flame graphs and analysis of async-profiler runs |
 | `perflab auditfold` | merging and folding audit reports |
 | `perflab loadgate` | waiting for a quiet machine; sampling competing load |
