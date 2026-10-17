@@ -1,7 +1,7 @@
-import json, os, sys, tempfile, unittest
+import json, os, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from perflab import ab, analyze, auditfold, compare, config, defcosts, index, jmh, regraph, specs, timeline, trees  # noqa: E402
+from perflab import ab, analyze, auditfold, compare, config, defcosts, index, jmh, regraph, serve, specs, timeline, trees  # noqa: E402
 
 
 class Project:
@@ -223,6 +223,90 @@ class PairedSpecTest(unittest.TestCase):
         spec.command("k", "-wi 1", "paired", "", dest)
         args = open(os.path.join(dest, "jmh.args")).read().split("\n")
         self.assertIn("variants=base=-Ya -Yb|new=", args)
+
+
+class RunIndexTest(unittest.TestCase):
+    def run_dir(self, name, args, result=None, state=None):
+        out = os.path.join(config.get().runs, name)
+        jmh.prepare(out, "none", args, jvm_append="-Xmx1G -XX:+UseG1GC -Dperflab.cell=x")
+        if result is not None:
+            json.dump(result, open(os.path.join(out, "result.json"), "w"))
+        if state:
+            json.dump(state, open(os.path.join(out, "run.json"), "w"))
+        return out
+
+    def test_args_of_a_run(self):
+        Project('[build]\njmh = "x"\n')
+        out = self.run_dir("r", ["-jvm", "/jdk/bin/java", "-p", "corpus=re2s", "-p", "g=0,4", "-wi", "16", "-l", "CompileBenchmark"])
+        benches, params, opts, jvm, jvm_args = index.run_args(out)
+        self.assertEqual(benches, ["CompileBenchmark"])
+        self.assertEqual(params, {"corpus": "re2s", "g": "0,4"})
+        self.assertEqual(opts, [("-wi", "16")])
+        self.assertEqual(jvm, "/jdk/bin/java")
+        self.assertIn("-XX:+UseG1GC", jvm_args)
+
+    def test_status_of_a_run(self):
+        Project('[build]\njmh = "x"\n')
+        ok = [{"benchmark": "a.B.m", "params": {}, "jvmArgs": [], "primaryMetric": {"score": 1.0, "scoreError": 0.1, "scoreUnit": "ms/op"}}]
+        dead = 2 ** 22 + 12345  # beyond macOS's and Linux's default pid_max
+        cases = {"running": dict(state={"status": "running", "pid": os.getpid()}),
+                 "interrupted": dict(state={"status": "running", "pid": dead}),
+                 "failed": dict(state={"status": "failed", "rc": 3}),
+                 "finished": dict(result=ok, state={"status": "finished", "rc": 0})}
+        for want, kw in cases.items():
+            self.assertEqual(index.run_status(self.run_dir(want, ["B"], **kw))[0], want)
+        legacy = self.run_dir("legacy", ["B"], result=[])
+        self.assertEqual(index.run_status(legacy)[0], "running")  # no run.json: running while its files are fresh
+        old = time.time() - 2 * index.STALE_SECS
+        for f in os.listdir(legacy):
+            os.utime(os.path.join(legacy, f), (old, old))
+        self.assertEqual(index.run_status(legacy)[0], "failed")
+
+    def test_index_lists_runs_with_scores_and_links(self):
+        Project('[build]\njmh = "x"\n[index]\nflags = "^-XX"\n')
+        res = [{"benchmark": "a.B.compile", "params": {"corpus": "re2s", "g": g}, "jvmArgs": [],
+                "primaryMetric": {"score": 150.0 + int(g), "scoreError": 3.2, "scoreUnit": "ms/op"}} for g in ("0", "4")]
+        out = self.run_dir("multi-global", ["-jvm", "/jdk/bin/java", "-p", "corpus=re2s", "B"], result=res,
+                           state={"status": "finished", "rc": 0})
+        open(os.path.join(out, "jmh.log"), "w").close()
+        open(os.path.join(out, "iterations.tsv"), "w").write("index\tkind\n")
+        page = open(index.build(config.get().campaigns)).read()
+        self.assertIn("run multi-global", page)
+        self.assertIn('class="status finished"', page)
+        self.assertIn("<code>-p corpus=re2s</code>", page)
+        self.assertIn("<code>-XX:+UseG1GC</code>", page)
+        self.assertIn("<code>g=4</code></td><td>154 ± 3.2 ms/op", page)
+        self.assertIn('<a href="../runs/multi-global/jmh.log">jmh.log</a>', page)
+        self.assertIn('<option value="../runs/multi-global/">run · multi-global</option>', page)
+
+
+class ServeTest(unittest.TestCase):
+    def test_one_server_for_campaigns_and_runs(self):
+        with socket.socket() as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+        Project(f'[build]\njmh = "x"\n[paths]\nruns = "out/lab/runs"\ncampaigns = "out/lab/ab"\n[index]\nport = {port}\n')
+        camp = config.get().campaigns
+        os.makedirs(camp)
+        # an older perflab's server, for the campaigns alone
+        old = subprocess.Popen([sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1", "--directory", camp],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            json.dump({"pid": old.pid, "port": port}, open(os.path.join(camp, serve.STATE), "w"))
+            for _ in range(50):
+                if serve._listening(port):
+                    break
+                time.sleep(0.1)
+            url = serve.ensure()
+            self.assertEqual(url, f"http://127.0.0.1:{port}/ab/index.html")
+            self.assertEqual(old.wait(5), -signal.SIGTERM)
+            self.assertEqual(serve.ensure(), url)
+            st = json.load(open(os.path.join(camp, serve.STATE)))
+            self.assertEqual(st["root"], os.path.dirname(camp))
+            self.assertIn(b"Campaigns and runs", urllib.request.urlopen(url).read())
+        finally:
+            old.kill()
+            serve.stop()
 
 
 class SpecHistoryTest(unittest.TestCase):
