@@ -1,6 +1,10 @@
 """compare.html in a `perflab profdiff` output directory: for each event diffed there, the two runs' flame graphs and the
 differential ones in both directions, as tabs over the same frame (after branch-bench's diff view), so that flipping
 between them shows what changed. Keys: 1-4 pick a tab of the widget under the pointer (else the first), [ and ] step.
+
+The graphs' controls are linked: async-profiler's flame graph (retronym/async-profiler's integration branch) posts the
+state of its toolbar (view toggles, search, highlights, filters, zoom) after each change, and the page relays it to the
+other graphs of the same event, or of every event, or to none (the header's "link" buttons).
 """
 import glob, html, os
 
@@ -54,6 +58,27 @@ document.addEventListener('keydown', onKey);
 document.querySelectorAll('iframe').forEach(f => f.addEventListener('load', () => {
   try { f.contentWindow.addEventListener('keydown', onKey); } catch (e) {}
 }));
+// linked controls: a graph's {flameState} goes to the other graphs of its event (or of every event); the last one is
+// replayed to a graph that loads later
+let linkMode = 'event';
+const lastState = new Map();  // widget (or 'all') -> the last state posted in it
+function scopeOf(f) { return linkMode === 'all' ? 'all' : f.closest('.w'); }
+addEventListener('message', e => {
+  if (!e.data || !e.data.flameState || linkMode === 'off') return;
+  const from = [...document.querySelectorAll('iframe')].find(f => f.contentWindow === e.source);
+  if (!from) return;
+  const scope = scopeOf(from);
+  lastState.set(scope, e.data.flameState);
+  for (const f of document.querySelectorAll('iframe'))
+    if (f !== from && scopeOf(f) === scope) f.contentWindow.postMessage(e.data, '*');
+});
+document.querySelectorAll('iframe').forEach(f => f.addEventListener('load', () => {
+  const s = linkMode === 'off' ? null : lastState.get(scopeOf(f));
+  if (s) f.contentWindow.postMessage({flameState: s}, '*');
+}));
+for (const b of document.querySelectorAll('header button[data-link]'))
+  b.onclick = () => { linkMode = b.dataset.link; lastState.clear();
+                      document.querySelectorAll('header button[data-link]').forEach(x => x.classList.toggle('on', x === b)); };
 for (const b of document.querySelectorAll('header button[data-cols]'))
   b.onclick = () => { document.getElementById('grid').className = 'cols-' + b.dataset.cols;
                       document.querySelectorAll('header button[data-cols]').forEach(x => x.classList.toggle('on', x === b)); };
@@ -79,7 +104,9 @@ def write(out, a, b):
                        f'<div class="body">{frames}</div></div>')
     page = (f'<!doctype html><meta charset="utf-8"><title>{esc(a)} vs {esc(b)}</title><style>{CSS}</style>'
             f'<header><h1>{esc(a)} → {esc(b)}</h1><span class="k">1–4 pick a tab, [ ] step · per op, benchmark threads</span>'
-            f'<button data-cols="2" class="on">2 columns</button><button data-cols="1">1 column</button></header>'
+            f'<button data-cols="2" class="on">2 columns</button><button data-cols="1">1 column</button>'
+            f'<span class="k">link</span><button data-link="event" class="on" title="Each graph\'s controls drive the other graphs of its event">event</button>'
+            f'<button data-link="all" title="... and of every event">all</button><button data-link="off" title="Unlinked">off</button></header>'
             f'<div id="grid">{"".join(widgets)}</div><script>{SCRIPT}</script>')
     path = os.path.join(out, "compare.html")
     with open(path, "w") as f:

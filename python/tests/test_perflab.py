@@ -211,6 +211,8 @@ class CompareTest(unittest.TestCase):
         self.assertIn('<iframe src="diff-cpu.html" data-view="diff">', page)
         self.assertIn('<iframe src="b-cpu.html" data-view="b" class=hidden>', page)
         self.assertNotIn("a-alloc.html", page)
+        self.assertIn('<button data-link="event" class="on"', page)  # the graphs' controls are linked within an event
+        self.assertIn("flameState", page)
 
 
 class PairedSpecTest(unittest.TestCase):
