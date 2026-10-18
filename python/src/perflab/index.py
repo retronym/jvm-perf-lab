@@ -225,7 +225,10 @@ def build(campaigns):
                           rows.append(row[0]); whens.append(row[1]); corpora.add(row[2])
                           if row[3]:
                               cells.setdefault(corpus, {}).setdefault(row[3][0], []).append(row[3])
-      diffs = sorted(glob.glob(os.path.join(spec_dir, "diff-*", "*.html")))
+      # a profdiff output directory: its compare page (each event's graphs as tabs), else its graphs
+      diffs = sorted(f for d in glob.glob(os.path.join(spec_dir, "diff-*/"))
+                     for f in ([os.path.join(d, "compare.html")] if os.path.exists(os.path.join(d, "compare.html"))
+                               else glob.glob(os.path.join(d, "*.html"))))
       prog = progress(spec_dir)
       if not rows and not diffs and not prog:
           continue

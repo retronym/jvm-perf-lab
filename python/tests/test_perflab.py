@@ -1,7 +1,7 @@
 import json, os, sys, tempfile, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from perflab import ab, analyze, auditfold, config, defcosts, index, jmh, regraph, specs, timeline, trees  # noqa: E402
+from perflab import ab, analyze, auditfold, compare, config, defcosts, index, jmh, regraph, specs, timeline, trees  # noqa: E402
 
 
 class Project:
@@ -198,6 +198,19 @@ class IndexTest(unittest.TestCase):
         self.assertIn("<td>86.5MB</td><td>-2.81% ± 0.79</td>", page)
         self.assertIn("base 89.0MB · fast 87.0MB", page)
         self.assertNotIn("1.0MB", page)  # -prof gc mixes the variants
+
+
+class CompareTest(unittest.TestCase):
+    def test_a_widget_per_event_with_both_sides_and_both_diffs(self):
+        d = tempfile.mkdtemp()
+        for name in ("a-cpu.html", "diff-cpu.html", "diff-cpu-inverse.html", "b-cpu.html", "diff-alloc.html"):
+            open(os.path.join(d, name), "w").close()
+        page = open(compare.write(d, "base/1", "new/1")).read()
+        self.assertEqual(page.count('class="w"'), 2)
+        self.assertIn('data-view="inverse" title="diff-cpu-inverse.html">DIFF⁻¹</button>', page)
+        self.assertIn('<iframe src="diff-cpu.html" data-view="diff">', page)
+        self.assertIn('<iframe src="b-cpu.html" data-view="b" class=hidden>', page)
+        self.assertNotIn("a-alloc.html", page)
 
 
 class PairedSpecTest(unittest.TestCase):

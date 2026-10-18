@@ -1,5 +1,7 @@
 """Compares the async-profiler recordings of two bench-lab runs (e.g. two cells of a campaign with an async profile):
-a differential flame graph of the benchmark threads, and the methods whose self time per op changed most.
+a differential flame graph of the benchmark threads (and the reverse one, and each run's own), and the methods whose self
+time per op changed most. `compare.html` in the output directory shows the graphs of every event diffed there as tabs
+over one frame, to flip between them (`compare.write`).
 
   perflab profdiff [--event cycles] [--jfrconv <jfrconv>] [--top 25] <run-a> <run-b> <out-dir>
 
@@ -7,9 +9,9 @@ A run is a directory written by `perflab run` or a campaign cell, with an async 
 normalized per op (each iteration has ceil(iteration time / its mean op time) ops), so runs of different lengths or speeds compare;
 with hardware events the table is in events per op.
 """
-import argparse, collections, glob, json, math, os, subprocess, sys
+import argparse, collections, glob, io, json, math, os, subprocess, sys
 
-from . import regraph
+from . import compare, regraph
 
 
 def profile_dir(run):
@@ -41,6 +43,12 @@ def load(run, event, jfrconv, out_dir, name):
             "score": res["primaryMetric"]["score"], "dir": d}
 
 
+def label(run):
+    """A run's name in titles: a campaign cell's variant and round (`base/1`), else its directory."""
+    parts = os.path.normpath(run).split(os.sep)
+    return "/".join(parts[-2:]) if parts[-1].isdigit() else parts[-1]
+
+
 def main(argv):
     ap = argparse.ArgumentParser(prog="perflab profdiff", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--event", default="cycles")
@@ -56,25 +64,32 @@ def main(argv):
     B = load(x.b, x.event, x.jfrconv, x.out, "b")
     # collapsed hardware-event stacks count events (samples × period), not samples
     per_op = lambda r, n: n / r["ops"]
+    la, lb = label(x.a), label(x.b)
+    graph = lambda title, *args: subprocess.run([x.jfrconv, "-J-Xmx8g", "--minwidth", "0.2", "--title", title, *args],
+                                                capture_output=True)
     diff_html = os.path.join(x.out, f"diff-{x.event}.html")
-    subprocess.run([x.jfrconv, "-J-Xmx8g", "--diff", "--minwidth", "0.2", "--title",
-                    f"{x.event}: {os.path.basename(x.a.rstrip('/'))} → {os.path.basename(x.b.rstrip('/'))}",
-                    A["collapsed"], B["collapsed"], diff_html], capture_output=True)
+    graph(f"{x.event}: {la} → {lb}", "--diff", A["collapsed"], B["collapsed"], diff_html)
+    graph(f"{x.event}: {lb} → {la}", "--diff", B["collapsed"], A["collapsed"], os.path.join(x.out, f"diff-{x.event}-inverse.html"))
+    graph(f"{x.event}: {la}", A["collapsed"], os.path.join(x.out, f"a-{x.event}.html"))
+    graph(f"{x.event}: {lb}", B["collapsed"], os.path.join(x.out, f"b-{x.event}.html"))
     ta, tb = per_op(A, A["total"]), per_op(B, B["total"])
-    print(f"{x.event} per op (benchmark threads): a {ta / 1e9:.2f}G, b {tb / 1e9:.2f}G, {100 * (tb / ta - 1):+.1f}%  "
-          f"(ms/op a {A['score']:.0f}, b {B['score']:.0f}; ops a {A['ops']}, b {B['ops']})")
+    table = io.StringIO()
+    out = lambda s="": (print(s), table.write(s + "\n"))
+    out(f"{x.event} per op (benchmark threads): a {ta / 1e9:.2f}G, b {tb / 1e9:.2f}G, {100 * (tb / ta - 1):+.1f}%  "
+        f"(ms/op a {A['score']:.0f}, b {B['score']:.0f}; ops a {A['ops']}, b {B['ops']}; a = {la}, b = {lb})")
     delta = {m: per_op(B, B["self"][m]) - per_op(A, A["self"][m]) for m in set(A["self"]) | set(B["self"])}
     rows = sorted(delta.items(), key=lambda kv: kv[1])
     fmt = lambda m, d: (f"| {d / 1e6:+7.0f}M | {per_op(A, A['self'][m]) / 1e6:6.0f}M | {per_op(B, B['self'][m]) / 1e6:6.0f}M | "
                        f"{100 * d / ta:+.2f}% | `{m}` |")
-    print(f"\nself {x.event} per op, biggest decreases then increases (b − a):\n")
-    print("| Δ | a | b | Δ of a's total | method |\n|---|---|---|---|---|")
+    out(f"\nself {x.event} per op, biggest decreases then increases (b − a):\n")
+    out("| Δ | a | b | Δ of a's total | method |\n|---|---|---|---|---|")
     for m, d in rows[:x.top]:
-        print(fmt(m, d))
-    print("| … | | | | |")
+        out(fmt(m, d))
+    out("| … | | | | |")
     for m, d in rows[-x.top:][::-1]:
-        print(fmt(m, d))
-    print(f"\ndifferential flame graph: {diff_html}")
+        out(fmt(m, d))
+    with open(os.path.join(x.out, f"table-{x.event}.md"), "w") as f:
+        f.write(table.getvalue())
+    print(f"\ndifferential flame graph: {diff_html}\ncompared: {compare.write(x.out, la, lb)}")
     for f in (A["collapsed"], B["collapsed"]):
         os.unlink(f)
-
