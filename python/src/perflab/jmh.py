@@ -77,11 +77,17 @@ def profile_args(profile, out, kperf=None, lib=None):
         jvm = []
         if kperf:
             # PMU events through the asprof-kperf helper: the kernel walks stacks by frame pointer
-            opts.append(f"rawCommand=kperf={kperf}")
+            raw = [f"kperf={kperf}"]
             jvm = ["-XX:+UnlockDiagnosticVMOptions", "-XX:+DebugNonSafepoints", "-XX:+PreserveFramePointer"]
         else:
             # native frames through the VM, vtable/itable receivers, compile tasks; JMH's cstack option lacks `vm`
-            opts.append("rawCommand=cstack=vm,features=mixed+vtable+comptask")
+            raw = ["cstack=vm", "features=mixed+vtable+comptask"]
+        # deep recursion (e.g. a compiler's typer) overflows async-profiler's default of 2048 frames, truncating stacks;
+        # JMH's option parser has no stackdepth, so it goes in the raw command
+        depth = config.get().get("async", "stackdepth")
+        if depth:
+            raw.append(f"jstackdepth={depth}")
+        opts.append("rawCommand=" + ",".join(raw))
         return ["-prof", "async:" + ";".join(opts + async_events(arg or "cpu"))], jvm
     if kind == "audit":
         jar = config.get().path("agent", "jar")
