@@ -1,7 +1,7 @@
 import json, os, sys, tempfile, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from perflab import analyze, auditfold, config, defcosts, index, jmh, regraph, specs, timeline, trees  # noqa: E402
+from perflab import ab, analyze, auditfold, config, defcosts, index, jmh, regraph, specs, timeline, trees  # noqa: E402
 
 
 class Project:
@@ -198,6 +198,18 @@ class IndexTest(unittest.TestCase):
         self.assertIn("<td>86.5MB</td><td>-2.81% ± 0.79</td>", page)
         self.assertIn("base 89.0MB · fast 87.0MB", page)
         self.assertNotIn("1.0MB", page)  # -prof gc mixes the variants
+
+
+class PairedSpecTest(unittest.TestCase):
+    def test_a_variant_of_several_options_stays_one_parameter(self):
+        p = Project('[build]\njmh = "x {args}"\n[benchmark]\ndefault = "B"\n')
+        path = os.path.join(p.dir, "s.json")
+        json.dump({"name": "c", "corpora": {"k": "-wi 1"}, "paired": {"base": "-Ya -Yb", "new": ""}}, open(path, "w"))
+        spec = ab.Spec(path)
+        dest = os.path.join(p.dir, "cell")
+        spec.command("k", "-wi 1", "paired", "", dest)
+        args = open(os.path.join(dest, "jmh.args")).read().split("\n")
+        self.assertIn("variants=base=-Ya -Yb|new=", args)
 
 
 class SpecHistoryTest(unittest.TestCase):

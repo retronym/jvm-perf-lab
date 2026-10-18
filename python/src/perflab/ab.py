@@ -69,7 +69,8 @@ class Spec:
             spec = "|".join(f"{n}={o}" for n, o in self.paired.items())
             if "," in spec:
                 sys.exit("paired: JMH splits parameter values at commas; options cannot contain one")
-            self.variant_jmh_args = {"paired": f"-p {cfg.get('benchmark', 'variants')}={spec}"}
+            # quoted: a variant's options may be several words, and this string is split as a command line
+            self.variant_jmh_args = {"paired": "-p " + shlex.quote(f"{cfg.get('benchmark', 'variants')}={spec}")}
         self.loadgate = s.get("loadgate")
         self.gc_log = s.get("gcLog", False)
         self.historical = s.get("historical")
