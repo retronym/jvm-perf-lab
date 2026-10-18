@@ -22,7 +22,11 @@ import argparse, glob, os, shlex, subprocess, sys, time
 
 from . import config
 
-ASYNC_LIBS = ["/opt/homebrew/lib/libasyncProfiler.dylib", "/usr/local/lib/libasyncProfiler.dylib",
+# retronym/async-profiler's integration branch as built by `mise run tools:async-profiler` (kperf events, jfrconv --spans
+# and its flame graph UI), ahead of a stock install
+LAB_ASYNC = os.path.join(os.path.dirname(os.path.abspath(__file__)), *[os.pardir] * 3, "tools", "build", "async-profiler", "build")
+ASYNC_LIBS = [os.path.join(LAB_ASYNC, "lib", "libasyncProfiler.dylib"), os.path.join(LAB_ASYNC, "lib", "libasyncProfiler.so"),
+              "/opt/homebrew/lib/libasyncProfiler.dylib", "/usr/local/lib/libasyncProfiler.dylib",
               "/usr/local/lib/libasyncProfiler.so", "/usr/lib/libasyncProfiler.so"]
 XCTRACE = "io.github.retronym.perflab.xctrace.XctraceProfiler"
 
