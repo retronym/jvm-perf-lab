@@ -31,6 +31,8 @@ def _listening(port):
 
 def _free(port):
     with socket.socket() as s:
+        # as http.server binds: a port whose last server just exited still has connections in TIME_WAIT
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             s.bind(("127.0.0.1", port))
             return True
