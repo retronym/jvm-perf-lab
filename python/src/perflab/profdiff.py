@@ -9,9 +9,21 @@ A run is a directory written by `perflab run` or a campaign cell, with an async 
 normalized per op (each iteration has ceil(iteration time / its mean op time) ops), so runs of different lengths or speeds compare;
 with hardware events the table is in events per op.
 """
-import argparse, collections, glob, io, json, math, os, subprocess, sys
+import argparse, collections, glob, io, json, math, os, re, subprocess, sys
 
 from . import compare, regraph
+
+
+LAMBDA_ADDRESS = re.compile(r"\$\$Lambda[./]0x[0-9a-f]+")
+FRAME_KIND = re.compile(r"_\[[a-z0-9]+\]$")
+
+
+def si(x):
+    """`x` with an SI suffix: 1.2G, 340M, 5.6k."""
+    for div, suffix in ((1e9, "G"), (1e6, "M"), (1e3, "k")):
+        if abs(x) >= div:
+            return f"{x / div:.3g}{suffix}"
+    return f"{x:.3g}"
 
 
 def profile_dir(run):
@@ -33,12 +45,18 @@ def load(run, event, jfrconv, out_dir, name):
     select = [s for label, s in regraph.events_of(d) if label.removeprefix("hw-") == event][0]
     subprocess.run([jfrconv, "-J-Xmx8g", *select, "--threads", "-I", ".*jmh-worker.*", "-o", "collapsed", jfr, collapsed],
                    check=True, capture_output=True)
+    # a lambda's hidden class is named for its address in that JVM (`Foo$$Lambda.0x0000f80140b6b0`), which differs
+    # between the runs: without it, the same lambda in both runs is one frame
+    lines = [LAMBDA_ADDRESS.sub("$$Lambda", line) for line in open(collapsed)]
+    with open(collapsed, "w") as f:
+        f.writelines(lines)
     self_, total = collections.Counter(), 0
-    for line in open(collapsed):
+    for line in lines:
         stack, _, n = line.rstrip().rpartition(" ")
         n = int(n)
         total += n
-        self_[stack.rsplit(";", 1)[-1]] += n
+        # by method, however it was compiled (jfrconv's _[j] JIT, _[i] inlined, _[1] C1, ...)
+        self_[FRAME_KIND.sub("", stack.rsplit(";", 1)[-1])] += n
     return {"collapsed": collapsed, "ops": ops, "self": self_, "total": total,
             "score": res["primaryMetric"]["score"], "dir": d}
 
@@ -75,11 +93,11 @@ def main(argv):
     ta, tb = per_op(A, A["total"]), per_op(B, B["total"])
     table = io.StringIO()
     out = lambda s="": (print(s), table.write(s + "\n"))
-    out(f"{x.event} per op (benchmark threads): a {ta / 1e9:.2f}G, b {tb / 1e9:.2f}G, {100 * (tb / ta - 1):+.1f}%  "
+    out(f"{x.event} per op (benchmark threads): a {si(ta)}, b {si(tb)}, {100 * (tb / ta - 1):+.1f}%  "
         f"(ms/op a {A['score']:.0f}, b {B['score']:.0f}; ops a {A['ops']}, b {B['ops']}; a = {la}, b = {lb})")
     delta = {m: per_op(B, B["self"][m]) - per_op(A, A["self"][m]) for m in set(A["self"]) | set(B["self"])}
     rows = sorted(delta.items(), key=lambda kv: kv[1])
-    fmt = lambda m, d: (f"| {d / 1e6:+7.0f}M | {per_op(A, A['self'][m]) / 1e6:6.0f}M | {per_op(B, B['self'][m]) / 1e6:6.0f}M | "
+    fmt = lambda m, d: (f"| {'+' if d > 0 else ''}{si(d)} | {si(per_op(A, A['self'][m]))} | {si(per_op(B, B['self'][m]))} | "
                        f"{100 * d / ta:+.2f}% | `{m}` |")
     out(f"\nself {x.event} per op, biggest decreases then increases (b − a):\n")
     out("| Δ | a | b | Δ of a's total | method |\n|---|---|---|---|---|")
