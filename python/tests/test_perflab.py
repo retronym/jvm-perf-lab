@@ -1,4 +1,4 @@
-import json, os, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
+import json, os, re, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from perflab import ab, analyze, auditfold, compare, config, defcosts, index, jmh, regraph, serve, specs, timeline, trees  # noqa: E402
@@ -214,6 +214,21 @@ class IndexTest(unittest.TestCase):
         self.assertIn('<span class="pv">base <b>89.0MB</b></span><span class="pv">fast <b>87.0MB</b></span>', page)
         self.assertIn("<td>fork 1</td>", page)
         self.assertNotIn("1.0MB", page)  # -prof gc mixes the variants
+
+    def test_the_corpus_column_is_named_by_its_parameter(self):
+        Project('[build]\njmh = "x"\n[benchmark]\ncorpus = "size"\n')
+        camp = config.get().campaigns
+        for v in ("a", "b"):
+            cell = os.path.join(camp, "c", "10000", v, "1")
+            os.makedirs(cell)
+            json.dump([{"primaryMetric": {"score": 5.0, "scoreError": 1.0, "scoreUnit": "us/op"}, "params": {"size": "10000"},
+                        "jvmArgs": [], "secondaryMetrics": {}}], open(os.path.join(cell, "result.json"), "w"))
+        json.dump({"name": "c", "rounds": 1, "corpora": {"10000": ""}, "variants": {"a": "", "b": ""}},
+                  open(os.path.join(camp, "c", "spec.json"), "w"))
+        page = open(index.build(camp)).read()
+        heads = re.findall(r"<th[^>]*>([^<]*)", page)
+        self.assertIn("size", heads)
+        self.assertNotIn("corpus", heads)
 
 
 class CompareTest(unittest.TestCase):

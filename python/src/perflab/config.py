@@ -62,6 +62,11 @@ class Config:
         return os.path.join(self.root, os.path.expanduser(v)) if v else None
 
     @property
+    def corpus_param(self):
+        """The JMH parameter that campaigns' corpora set, which also names that column and filter on the page."""
+        return self.get("benchmark", "corpus") or "corpus"
+
+    @property
     def runs(self):
         return self.path("paths", "runs")
 

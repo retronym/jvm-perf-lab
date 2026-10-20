@@ -76,7 +76,7 @@ def timeline_link(d):
     return link(os.path.join(d, "timeline.html"), "timeline", "timeline", "Each fork from JVM start to exit: iterations, GC pauses, counters")
 
 
-CELL_HEADS = [("corpus", False), ("variant", False), ("{unit}", True), ("cycles/op", True), ("instructions/op", True),
+CELL_HEADS = [("{corpus}", False), ("variant", False), ("{unit}", True), ("cycles/op", True), ("instructions/op", True),
               ("alloc/op", True), ("flags", False), ("finished", False)]
 
 
@@ -163,7 +163,7 @@ def summary(name, cells):
                 spread = 100 * ((sd / mean) ** 2 + (bsd / b) ** 2) ** 0.5 if b and len(cs) > 1 and len(vs[names[0]]) > 1 else None
                 tds.append(with_delta(f"{fmt(mean)}{rel_sd}", "" if v == names[0] or not b else delta(100 * (mean / b - 1), spread, ui.delta_ok(b, kind))))
             out.append(("", tds))
-    heads = [("corpus", False), ("variant", False), ("rounds", False), (score_head(units), False), ("cycles/op", False),
+    heads = [(esc(config.get().corpus_param), False), ("variant", False), ("rounds", False), (score_head(units), False), ("cycles/op", False),
              ("instructions/op", False), ("alloc/op", False)]
     return table(heads, out, "t summary") if out else ""
 
@@ -215,7 +215,7 @@ def paired_summary(names, cells):
                     sd = (sum((x - d) ** 2 for x in ds) / (len(ds) - 1)) ** 0.5 if len(ds) > 1 else None
                 tds.append(with_delta((show(m) or "0") if m is not None else "", delta(d, sd, ui.delta_ok(b, kind) and ui.delta_ok(m, kind))))
             out.append(("", tds))
-    heads = [("corpus", False), ("variant", False), ("forks", False)]
+    heads = [(esc(config.get().corpus_param), False), ("variant", False), ("forks", False)]
     heads += [h for label, *_ in ab.PAIRED_METRICS
               for h in ((score_head(units, label[5:]) if label.startswith("score") else esc(label), False),)]
     return table(heads, out, "t summary") if out else ""
@@ -591,7 +591,8 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       buttons = (link(runinfo.md_page(report, os.path.join(spec_dir, "report.html"), f"{name}: report", home=HOME), "report", "report",
                       "The campaign's report (perflab ab report)") if os.path.exists(report) else "")
       units = {c[7] for vs in cells.values() for cs in vs.values() for c in cs}
-      heads = [(esc(unit(units.pop())) if len(units) == 1 else "score", n) if h == "{unit}" else (h, n) for h, n in CELL_HEADS]
+      heads = [(esc(unit(units.pop())) if len(units) == 1 else "score", n) if h == "{unit}" else (esc(config.get().corpus_param), n) if h == "{corpus}" else (h, n)
+               for h, n in CELL_HEADS]
       try:
           paired = list(json.load(open(os.path.join(spec_dir, "spec.json"))).get("paired") or [])
       except (OSError, ValueError):
@@ -633,7 +634,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   options = "".join(f'<optgroup label="{g}">' + "".join(f'<option value="{esc(v)}">{esc(l)}</option>'
                                                         for _, v, l, gg in sorted(timeline_cells, reverse=True) if gg == g) + "</optgroup>"
                     for g in ("runs", "campaign cells") if any(c[3] == g for c in timeline_cells))
-  groups = "".join(f'<span class="fg"><span class="fl">{f}</span>' + "".join(f'<button class="chip" data-f="{f}" data-v="{esc(v)}">{esc(v)}</button>'
+  groups = "".join(f'<span class="fg"><span class="fl">{esc(config.get().corpus_param) if f == "corpus" else f}</span>' + "".join(f'<button class="chip" data-f="{f}" data-v="{esc(v)}">{esc(v)}</button>'
                                                                            for v in sorted(vs)) + "</span>"
                    for f, vs in facet.items() if len(vs) > 1)
   kinds = "".join(f"<li><b>{esc(k)}</b>: {esc(regraph.KIND_HELP[k])}</li>" for k in regraph.kinds() if k in regraph.KIND_HELP)

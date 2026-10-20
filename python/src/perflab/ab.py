@@ -309,7 +309,7 @@ def report_paired(spec):
     from . import ui
     names = list(spec.paired)
     print(f"### {spec.name} (paired within forks: {', '.join(names)})\n")
-    print("| corpus | variant | forks | " + " | ".join(f"{m} | Δ (paired)" for m, *_ in PAIRED_METRICS) + " |")
+    print(f"| {spec.corpus_param} | variant | forks | " + " | ".join(f"{m} | Δ (paired)" for m, *_ in PAIRED_METRICS) + " |")
     print("|---|---|---|" + "---|---|" * len(PAIRED_METRICS))
     per_fork = []
     for corpus in spec.corpora:
@@ -339,7 +339,7 @@ def report_paired(spec):
             print(f"| {corpus} | {v} | {len(cells)} | " + " | ".join(tds) + " |")
     if per_fork:
         print(f"\nΔ per fork against {names[0]}: each fork's mean difference over its iteration pairs (and their median).\n")
-        print("| corpus | variant | metric | per fork |\n|---|---|---|---|")
+        print(f"| {spec.corpus_param} | variant | metric | per fork |\n|---|---|---|---|")
         for row in per_fork:
             print("| " + " | ".join(row) + " |")
 
@@ -349,7 +349,7 @@ def report(spec):
         return report_paired(spec)
     print(f"### {spec.name}\n")
     unit = next((summary(json.load(open(f))[0])["unit"] for f in glob.glob(os.path.join(spec.out, "*", "*", "*", "result.json"))), "score")
-    print(f"| corpus | variant | {unit} (per round) | mean | Δ | instructions/op (per round) | Δ | cycles/op | Δ | IPC | alloc/op | GC time |")
+    print(f"| {spec.corpus_param} | variant | {unit} (per round) | mean | Δ | instructions/op (per round) | Δ | cycles/op | Δ | IPC | alloc/op | GC time |")
     print("|---|---|---|---|---|---|---|---|---|---|---|---|")
     for corpus in spec.corpora:
         base = None
@@ -389,7 +389,7 @@ def graphs(spec):
                 if os.path.exists(os.path.join(cell, "result.json")):
                     cells.append((corpus, variant, flags, r, cell, cell))
     regraph.regraph([c[5] for c in cells], jmh.jfrconv(jmh.async_lib(spec.lib)))
-    rows = []
+    rows, unit = [], "score"
     for corpus, variant, flags, r, cell, prof in cells:
         jfr = (glob.glob(os.path.join(prof, "**", "*.jfr"), recursive=True) or [None])[0]
         if jfr is None:
@@ -400,6 +400,7 @@ def graphs(spec):
                      for k in regraph.KINDS if os.path.exists(regraph.graph_path(jfr, label, k))]
             tds.append("<td>" + " · ".join(links) + "</td>")
         s = summary(json.load(open(os.path.join(cell, "result.json")))[0])
+        unit = s["unit"] or unit
         rows.append(f"<tr><th>{corpus}</th><th title=\"{flags}\">{variant} #{r}</th><td>{s['ms']:.0f} ± {s['err']:.0f}</td>{''.join(tds)}</tr>")
     events = [e.removeprefix("hw-") for e in events]
     page = f"""<!doctype html><meta charset="utf-8"><title>{spec.name} flame graphs</title>
@@ -411,7 +412,7 @@ table{{border-collapse:collapse}} td,th{{border:1px solid var(--line);padding:4p
 <p class="k">{spec.benchmark}, profile {spec.profile}, JVM arguments for every variant: {spec.jvm_args}.
 Variants: {"; ".join(f"{v}: {f or '(none)'}" for v, f in spec.variants.items())}.<br>
 bench: benchmark threads · reverse: by leaf · *-classify: benchmark threads, jfrconv --classify · threads: all threads · classify: all threads by category</p>
-<table><tr><th>corpus</th><th>variant</th><th>ms/op</th>{''.join(f'<th>{e}</th>' for e in events)}</tr>{''.join(rows)}</table>"""
+<table><tr><th>{spec.corpus_param}</th><th>variant</th><th>{unit}</th>{''.join(f'<th>{e}</th>' for e in events)}</tr>{''.join(rows)}</table>"""
     index = os.path.join(spec.out, "index.html")
     os.makedirs(spec.out, exist_ok=True)
     open(index, "w").write(page)
