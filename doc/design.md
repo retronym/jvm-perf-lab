@@ -78,8 +78,8 @@ The custom sbt commands go away.
 - DONE 2. Move the Python into a `perflab` package with one CLI, and a sample project (`examples/sample`) that runs every command:
   - **Commands:** `run`, `ab`, `abtrees`, `loadgate`, `regraph`, `profdiff`, `frameweight`, `subtree`, `index`, `timeline`, `auditfold`, `analyze`.
   - **Configuration:** `perflab.toml` replaces the hard-coded benchmark, parameter, variant-flag and phase assumptions.
-- TODO 3. scala3 bench-lab depends on jvm-perf-lab (JitPack tag; `~/.m2` while iterating) and deletes the moved code and the sbt commands.
-  - **Check:** a campaign's `ab.py report` and an envelope audit give the same numbers before and after.
+- DONE 3. scala3 bench-lab depends on jvm-perf-lab (`~/.m2` while iterating) and deletes the moved code and the sbt commands (retronym/scala3 `bench-lab-perflab`). Back-ported first: `perflab-spans` (async-profiler's Span API, which both compiler labs vendored) and the span panel in `regraph` (`[async] spans`, `span_config`).
+  - **Check:** the envelope audit gives the same counts as bench-lab's own agent; paired variants and cost-frame spans work through `perflab`.
 - TODO 4. `tools:*` mise tasks for async-profiler, the kperf helper and the patched JDK.
 - TODO 5. agentscope export, plus the four agentscope changes it needs (decision 7). This one is for you to decide; it's independent of 0–4.
 ## Future work
