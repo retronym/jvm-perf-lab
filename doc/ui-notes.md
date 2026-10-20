@@ -82,3 +82,23 @@ Deferred, with reasons:
 ### Follow-ups for retronym/async-profiler (integration-kperf-flamegraph)
 
 The "Flame graphs" notes above: open the bench graph zoomed to the benchmark method (or fold the JMH harness frames), dock the span panel and collapse it by default, header tooltips for the span columns, toolbar tooltips and labels, plain-language titles. The lopsided span split is the sample's benchmark, in this repo, not the flame graph.
+
+## Plan: one page, branded
+
+Feedback on the rebuilt sample site: the landing page is plain, with no branding, and the split between the landing page (runs, counters) and the campaigns index is confusing. Two layout bugs at 800px: the header's last chip is clipped, and branch-paired's summary is cut off on the right with no sign that it scrolls.
+
+### Direction
+
+- **One page, two homes.** `index.build` renders the whole page: the intro when one is given, campaigns, runs and the counters table. `perflab serve` keeps serving it at `<campaigns>/index.html` (the same URL). `perflab site` renders the same page at the site's root, with `--intro-file`. The site's `campaigns/index.html` becomes a redirect to it, so old links keep working. site.py keeps copying and packaging; its landing-page code moves into index.py, and its run-card extras merge into the index's run cards: the about-this-profile line, the secondary metrics, hot methods, threads, the audit report page and graph totals.
+- **Navigation.** A sticky bar with section tabs: Overview (only with an intro), Campaigns n, Runs n and Counters n. They are anchors, and the current one is highlighted as you scroll. Under the tabs, one filter bar for the whole page: benchmark, tool, corpus, show (profiled / with notes / last 24 h) and text. It wraps onto a second line instead of clipping. The fork timeline panel shows only while something runs; otherwise every card's timeline button opens it in the lightbox. The lightbox is unchanged.
+- **Branding.** A dark ink header band carries the mark, an inline SVG of three flame-graph bars in flame orange; the name **jvm-perf-lab** with the project's title after it (`/ sample results`); a tagline; and GitHub and Docs links. One accent colour (flame orange) is used for the active tab, step numbers and idea cards. The timeline and compare pages get a slim version of the band, linking back to the page, and hide it when shown in the lightbox.
+- **Designed intro.** `site-intro.html` is restructured into a lead paragraph, idea cards, numbered "Where to start" steps and a glossary of terms, styled by classes the page provides (`.lead`, `.ideas`, `.steps`, `.terms`). Any HTML fragment still works as an intro.
+- **Wide tables.** Every table scrolls inside its card, with an edge shadow while there is more to the right. The summary puts each Δ under its value, in the same cell, which halves its columns, so most summaries fit without scrolling.
+
+### Steps
+
+1. TODO Branding: the header band and mark in ui.py, used by the index, timeline and compare pages.
+2. TODO One page: index.py renders intro, campaigns, runs and counters; run cards take site.py's extras; site.py renders it at the root and redirects campaigns/index.html.
+3. TODO Navigation: section tabs with scroll highlight, the shared filter bar across campaigns and runs, and a timeline panel shown only while something runs.
+4. TODO Intro: site-intro.html restructured, with styles for its blocks.
+5. TODO Layout: scroll shadows, Δ under value in summaries, and the 800px fixes. Also fix a Δ of +0.00% ± 0.00 shown red (gc campaign).
