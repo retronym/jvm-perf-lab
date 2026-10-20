@@ -509,7 +509,7 @@ footer{max-width:1400px;margin:0 auto;padding:0 20px 30px;color:var(--muted);fon
 INTRO_CSS = """
 .intro{margin:4px 0 8px} .intro .lead{font-size:16px;line-height:1.6;max-width:860px;margin:0 0 16px}
 .intro h3{font-size:13px;margin:18px 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.ideas{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.ideas{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
 .idea{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--brand);border-radius:10px;padding:12px 14px}
 .idea b{display:block;margin-bottom:4px;font-size:13.5px} .idea p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.55}
 .intro .cols{display:grid;grid-template-columns:3fr 2fr;gap:20px} @media (max-width:860px){.intro .cols{grid-template-columns:1fr}}

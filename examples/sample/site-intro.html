@@ -1,30 +1,36 @@
-<p>These are results from the sample project of <a href="https://github.com/retronym/jvm-perf-lab">jvm-perf-lab</a>, a set of JMH profilers, a Java agent and command-line tools for finding out what a change to a JVM program did to its performance, and why. The sample's benchmarks are small, and each has a known cause for its slow case, so the results below show what each tool reports when the cause is known.</p>
+<p class="lead">These are results from the sample project of <a href="https://github.com/retronym/jvm-perf-lab">jvm-perf-lab</a>, a set of JMH profilers, a Java agent and command-line tools for finding out what a change to a JVM program did to its performance, and why. The sample's benchmarks are small, and each has a known cause for its slow case, so the results below show what each tool reports when the cause is known.</p>
 
-<h2>Ideas</h2>
-<ul>
-<li><b>Measure with counts, then locate with profiles.</b> Time per operation varies from run to run with CPU frequency, other load and GC timing. Instructions and cycles per operation, counted on the benchmark thread only, vary much less, so they show smaller changes. Once the counts show what changed, a flame graph of the same event shows where in the code it happens.</li>
-<li><b>Compare variants within one JVM.</b> A paired campaign switches a benchmark between variants from one iteration to the next inside a single fork, in a balanced order. The variants share the JIT's compiled code, the heap and the machine's state at that moment, so the difference between them is not mixed up with differences between JVMs.</li>
-<li><b>Keep the benchmark apart from the JVM's own work.</b> Counters are reported for the benchmark thread separately from JIT compiler threads, GC threads and other processes.</li>
-<li><b>Look at the whole run over time.</b> A timeline shows each fork from JVM start to exit: startup, warmup and measurement iterations, GC pauses and, with counters, cycles and IPC per 50 ms.</li>
-<li><b>Count who calls what.</b> A caller audit counts the calls reaching chosen methods, grouped by caller, from probes woven in as classes load.</li>
-</ul>
+<h3>Ideas</h3>
+<div class="ideas">
+<div class="idea"><b>Measure with counts, then locate with profiles</b><p>Time per operation varies from run to run with CPU frequency, other load and GC timing. Instructions and cycles per operation, counted on the benchmark thread only, vary much less, so they show smaller changes. Once the counts show what changed, a flame graph of the same event shows where in the code it happens.</p></div>
+<div class="idea"><b>Compare variants within one JVM</b><p>A paired campaign switches a benchmark between variants from one iteration to the next inside a single fork, in a balanced order. The variants share the JIT's compiled code, the heap and the machine's state at that moment, so the difference between them is not mixed up with differences between JVMs.</p></div>
+<div class="idea"><b>Keep the benchmark apart from the JVM's own work</b><p>Counters are reported for the benchmark thread separately from JIT compiler threads, GC threads and other processes.</p></div>
+<div class="idea"><b>Look at the whole run over time</b><p>A timeline shows each fork from JVM start to exit: startup, warmup and measurement iterations, GC pauses and, with counters, cycles and IPC per 50 ms.</p></div>
+<div class="idea"><b>Count who calls what</b><p>A caller audit counts the calls reaching chosen methods, grouped by caller, from probes woven in as classes load.</p></div>
+</div>
 
-<h2>Terms</h2>
-<dl>
-<dt>Run</dt><dd>One JMH invocation under one profile: a section under <a href="#runs">Runs</a>. Its name is the benchmark setting and the profile, e.g. <code>memory-chase-kperf</code>.</dd>
-<dt>Fork</dt><dd>A JVM that JMH starts to run the benchmark: warmup iterations, then measurement iterations.</dd>
-<dt>Profile</dt><dd>What records the run. <code>async-profiler</code>: flame graphs of CPU time, allocation or wall-clock time. <code>kperf</code>: flame graphs of PMU events (async-profiler with kperf events). <code>xctrace</code>: PMU counts per operation through Apple's xctrace. <code>audit</code>: the caller audit. <code>none</code>: JMH's own results plus allocation and JIT activity.</dd>
-<dt>PMU counter</dt><dd>A CPU hardware counter: cycles, retired instructions, cache misses, branch mispredictions. <b>IPC</b> is instructions per cycle. <b>/k</b> means per 1,000 instructions.</dd>
-<dt>Campaign</dt><dd>A comparison of variants over several rounds, with a report: under <a href="campaigns/index.html">Campaigns</a>. A <b>variant</b> is one of the settings being compared; a <b>cell</b> is one variant in one round. In a <b>paired</b> campaign, the variants alternate within one fork.</dd>
-</dl>
-
-<h2>Where to start</h2>
-<ol>
-<li><b>The counters table below.</b> Compare <code>memory-chase</code> with <code>memory-sequential</code>: a similar number of instructions per operation, but the pointer chase through a shuffled array runs at about 0.08 instructions per cycle against about 4.5, and takes about 50 times as long. <code>branch-random</code> against <code>branch-sorted</code>: about 75 against 0.04 branch mispredictions per 1,000 instructions, and about 10 times as long.</li>
-<li><b>The paired timelines.</b> <a href="campaigns/memory-paired/4194304/paired/1/timeline.html">memory-paired</a> and <a href="campaigns/branch-paired/1048576/paired/1/timeline.html">branch-paired</a> alternate the two settings within one fork; IPC drops in every shuffled or random iteration.</li>
+<div class="cols">
+<div>
+<h3>Where to start</h3>
+<ol class="steps" data-lb-group="where to start">
+<li><b>The <a href="#counters">counters table</a>.</b> Compare <code>memory-chase</code> with <code>memory-sequential</code>: a similar number of instructions per operation, but the pointer chase through a shuffled array runs at about 0.08 instructions per cycle against about 4.5, and takes about 50 times as long. <code>branch-random</code> against <code>branch-sorted</code>: about 75 against 0.04 branch mispredictions per 1,000 instructions, and about 10 times as long.</li>
+<li><b>The paired timelines.</b> <a href="campaigns/memory-paired/4194304/paired/1/timeline.html" data-lb="memory-paired">memory-paired</a> and <a href="campaigns/branch-paired/1048576/paired/1/timeline.html" data-lb="branch-paired">branch-paired</a> alternate the two settings within one fork; IPC drops in every shuffled or random iteration.</li>
 <li><b>Where the misses land.</b> The kperf runs <a href="#memory-chase-kperf">memory-chase-kperf</a> (cache misses) and <a href="#branch-random-kperf">branch-random-kperf</a> (branch mispredictions); open <i>reverse</i> to see the methods where the events land.</li>
-<li><b>Ordinary profiles.</b> <a href="#wordcount-async">wordcount-async</a> has CPU and allocation flame graphs; its benchmark marks each op's count and look-up as spans, and the CPU graph's span panel splits the samples by them. The campaign <a href="campaigns/maps-async/diff-hash-vs-tree-cpu/compare.html">maps-async</a> compares a HashMap against a TreeMap: both flame graphs and the differential ones, as tabs.</li>
+<li><b>Ordinary profiles.</b> <a href="#wordcount-async">wordcount-async</a> has CPU and allocation flame graphs; its benchmark marks each op's count and look-up as spans, and the CPU graph's span panel splits the samples by them. The campaign <a href="campaigns/maps-async/diff-hash-vs-tree-cpu/compare.html" data-lb="maps-async compare">maps-async</a> compares a HashMap against a TreeMap: both flame graphs and the differential ones, as tabs.</li>
 <li><b>A run with several forks.</b> The timeline of <a href="#wordcount-2-forks-xctrace-ipc">wordcount-2-forks-xctrace-ipc</a> shows both JVMs from start to exit, with counters during measurement.</li>
-<li><b>A caller audit.</b> The <a href="runs/audit-normalize/report.html">audit report</a> counts calls to <code>WordCount.normalize</code> by caller and call site.</li>
+<li><b>A caller audit.</b> The <a href="runs/audit-normalize/report.html" data-lb="audit report">audit report</a> counts calls to <code>WordCount.normalize</code> by caller and call site.</li>
 </ol>
-<p>Flame graphs, timelines and reports open over the page (Esc closes, ↗ opens one in a new tab); hover over a button or event name for what it shows. The chips filter the table and the runs by benchmark and profile. <a href="https://github.com/retronym/jvm-perf-lab/blob/main/doc/pmu-counters.md">PMU counters on Apple Silicon</a> explains when to use xctrace and when kperf.</p>
+</div>
+<div>
+<h3>Terms</h3>
+<dl class="terms">
+<div><dt>Run</dt><dd>One JMH invocation under one profile: a section under <a href="#runs">Runs</a>. Its name is the benchmark setting and the profile, e.g. <code>memory-chase-kperf</code>.</dd></div>
+<div><dt>Fork</dt><dd>A JVM that JMH starts to run the benchmark: warmup iterations, then measurement iterations.</dd></div>
+<div><dt>Profile</dt><dd>What records the run. <code>async-profiler</code>: flame graphs of CPU time, allocation or wall-clock time. <code>kperf</code>: flame graphs of PMU events (async-profiler with kperf events). <code>xctrace</code>: PMU counts per operation through Apple's xctrace. <code>audit</code>: the caller audit. <code>none</code>: JMH's own results plus allocation and JIT activity.</dd></div>
+<div><dt>PMU counter</dt><dd>A CPU hardware counter: cycles, retired instructions, cache misses, branch mispredictions. <b>IPC</b> is instructions per cycle. <b>/k</b> means per 1,000 instructions.</dd></div>
+<div><dt>Campaign</dt><dd>A comparison of variants over several rounds, with a report: under <a href="#campaigns">Campaigns</a>. A <b>variant</b> is one of the settings being compared; a <b>cell</b> is one variant in one round. In a <b>paired</b> campaign, the variants alternate within one fork.</dd></div>
+</dl>
+</div>
+</div>
+
+<p class="note">Flame graphs, timelines and reports open over the page (Esc closes, ↗ opens one in a new tab); hover over a button or event name for what it shows. The chips under the tabs filter campaigns, counters and runs by benchmark, tool and corpus. <a href="https://github.com/retronym/jvm-perf-lab/blob/main/doc/pmu-counters.md">PMU counters on Apple Silicon</a> explains when to use xctrace and when kperf.</p>
