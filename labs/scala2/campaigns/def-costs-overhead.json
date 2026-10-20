@@ -1,0 +1,13 @@
+{
+  "name": "def-costs-overhead",
+  "benchmark": "CompileBenchmark",
+  "profile": "audit:def-costs.hooks",
+  "rounds": 3,
+  "corpora": {"scalap": "-wi 20 -i 15 -w 2 -r 2"},
+  "paired": {
+    "off": "",
+    "listener": "--defs-listener:io.github.retronym.perflab.costs.SpanCostListener",
+    "table": "--defs:/dev/null"
+  },
+  "gcLog": true
+}

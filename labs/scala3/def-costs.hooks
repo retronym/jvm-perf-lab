@@ -1,0 +1,39 @@
+# The cost per definition from the lab (../def-costs.md): perflab-agent weaves these calls into the compiler,
+# CostHooks keeps the cost stack. Run with -javaagent:<perflab-agent.jar>=spec=<this file>.
+#
+# A run's stack: made with its profiler, with the run's context; the table written when the profiler finishes
+hook run.start       at=dotty.tools.dotc.profile.Profiler$#apply(Ldotty/tools/dotc/core/Contexts$Context;)  call=dotty.tools.compilerlab.CostHooks#profilerCreated
+hook run.finish      at=dotty.tools.dotc.profile.NoOpProfiler$#finished  call=dotty.tools.compilerlab.CostHooks#profilerFinished
+# The profiler's own hooks, on the profiler of every run without -Yprofile-enabled. NoOpProfiler's forwarders have
+# copies of the trait's empty bodies, so both are woven (where Profiler is a class, NoOpProfiler has no copies)
+hook phase.before    at=dotty.tools.dotc.profile.Profiler#beforePhase           call=dotty.tools.compilerlab.CostHooks#beforePhase
+hook phase.after     at=dotty.tools.dotc.profile.Profiler#afterPhase            call=dotty.tools.compilerlab.CostHooks#afterPhase
+hook unit.before     at=dotty.tools.dotc.profile.Profiler#beforeUnit            call=dotty.tools.compilerlab.CostHooks#beforeUnit
+hook unit.after      at=dotty.tools.dotc.profile.Profiler#afterUnit             call=dotty.tools.compilerlab.CostHooks#afterUnit
+hook implicit.before at=dotty.tools.dotc.profile.Profiler#beforeImplicitSearch  call=dotty.tools.compilerlab.CostHooks#beforeImplicitSearch
+hook implicit.after  at=dotty.tools.dotc.profile.Profiler#afterImplicitSearch   call=dotty.tools.compilerlab.CostHooks#afterImplicitSearch
+hook inline.before   at=dotty.tools.dotc.profile.Profiler#beforeInlineCall      call=dotty.tools.compilerlab.CostHooks#beforeInlineCall
+hook inline.after    at=dotty.tools.dotc.profile.Profiler#afterInlineCall       call=dotty.tools.compilerlab.CostHooks#afterInlineCall
+hook phase.before.noop at=dotty.tools.dotc.profile.NoOpProfiler$#beforePhase call=dotty.tools.compilerlab.CostHooks#beforePhase
+hook phase.after.noop at=dotty.tools.dotc.profile.NoOpProfiler$#afterPhase call=dotty.tools.compilerlab.CostHooks#afterPhase
+hook unit.before.noop at=dotty.tools.dotc.profile.NoOpProfiler$#beforeUnit call=dotty.tools.compilerlab.CostHooks#beforeUnit
+hook unit.after.noop at=dotty.tools.dotc.profile.NoOpProfiler$#afterUnit call=dotty.tools.compilerlab.CostHooks#afterUnit
+hook implicit.before.noop at=dotty.tools.dotc.profile.NoOpProfiler$#beforeImplicitSearch call=dotty.tools.compilerlab.CostHooks#beforeImplicitSearch
+hook implicit.after.noop at=dotty.tools.dotc.profile.NoOpProfiler$#afterImplicitSearch call=dotty.tools.compilerlab.CostHooks#afterImplicitSearch
+hook inline.before.noop at=dotty.tools.dotc.profile.NoOpProfiler$#beforeInlineCall call=dotty.tools.compilerlab.CostHooks#beforeInlineCall
+hook inline.after.noop at=dotty.tools.dotc.profile.NoOpProfiler$#afterInlineCall call=dotty.tools.compilerlab.CostHooks#afterInlineCall
+# Around the methods the profiler's typed-definition and completion hooks are in, for their context and trees
+hook def.val         at=dotty.tools.dotc.typer.Typer#typedValDef    call=dotty.tools.compilerlab.CostHooks#typedDef  exit=dotty.tools.compilerlab.CostHooks#exit
+hook def.def         at=dotty.tools.dotc.typer.Typer#typedDefDef    call=dotty.tools.compilerlab.CostHooks#typedDef  exit=dotty.tools.compilerlab.CostHooks#exit
+hook def.type        at=dotty.tools.dotc.typer.Typer#typedTypeDef   call=dotty.tools.compilerlab.CostHooks#typedDef  exit=dotty.tools.compilerlab.CostHooks#exit
+hook def.class       at=dotty.tools.dotc.typer.Typer#typedClassDef  call=dotty.tools.compilerlab.CostHooks#typedDef  exit=dotty.tools.compilerlab.CostHooks#exit
+hook load            at=dotty.tools.dotc.core.SymbolLoader#complete(Ldotty/tools/dotc/core/SymDenotations$SymDenotation;Ldotty/tools/dotc/core/Contexts$Context;)  call=dotty.tools.compilerlab.CostHooks#load  exit=dotty.tools.compilerlab.CostHooks#exit
+# Hooks the profiler lacks: completing a symbol from source, rechecks, a member's subtree in a transform, hash-consing growth
+hook complete        at=dotty.tools.dotc.typer.Namer$Completer#complete(Ldotty/tools/dotc/core/SymDenotations$SymDenotation;Ldotty/tools/dotc/core/Contexts$Context;)  call=dotty.tools.compilerlab.CostHooks#complete  exit=dotty.tools.compilerlab.CostHooks#exit
+hook recheck.def     at=dotty.tools.dotc.transform.Recheck$Rechecker#recheckDef       call=dotty.tools.compilerlab.CostHooks#typedDef  exit=dotty.tools.compilerlab.CostHooks#exit
+hook recheck.type    at=dotty.tools.dotc.transform.Recheck$Rechecker#recheckTypeDef   call=dotty.tools.compilerlab.CostHooks#typedDef  exit=dotty.tools.compilerlab.CostHooks#exit
+hook recheck.class   at=dotty.tools.dotc.transform.Recheck$Rechecker#recheckClassDef  call=dotty.tools.compilerlab.CostHooks#recheckClassDef  exit=dotty.tools.compilerlab.CostHooks#exit
+hook transform.mega  at=dotty.tools.dotc.transform.MegaPhase#transformTree(Ldotty/tools/dotc/ast/Trees$Tree;ILdotty/tools/dotc/core/Contexts$Context;)  call=dotty.tools.compilerlab.CostHooks#transformTree  exit=dotty.tools.compilerlab.CostHooks#exit
+hook transform.macro at=dotty.tools.dotc.transform.MacroTransform$Transformer#transform(Ldotty/tools/dotc/ast/Trees$Tree;Ldotty/tools/dotc/core/Contexts$Context;)  call=dotty.tools.compilerlab.CostHooks#transform  exit=dotty.tools.compilerlab.CostHooks#exit
+hook transform.inline at=dotty.tools.dotc.transform.Inlining$InliningTreeMap#transform(Ldotty/tools/dotc/ast/Trees$Tree;Ldotty/tools/dotc/core/Contexts$Context;)  call=dotty.tools.compilerlab.CostHooks#transform  exit=dotty.tools.compilerlab.CostHooks#exit
+hook rehash          at=dotty.tools.dotc.util.WeakHashSet#resize()  call=dotty.tools.compilerlab.CostHooks#resize  exit=dotty.tools.compilerlab.CostHooks#exit

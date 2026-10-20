@@ -4,5 +4,8 @@
   <modelVersion>4.0.0</modelVersion>
   <parent><groupId>io.github.retronym.perflab</groupId><artifactId>jvm-perf-lab</artifactId><version>0.1.0-SNAPSHOT</version></parent>
   <artifactId>perflab-spans</artifactId>
-  <description>async-profiler's Span API (one.profiler.Span, Recording), vendored: a program records spans that jfrconv --spans attributes samples to</description>
+  <description>async-profiler's Span API (one.profiler.Span, Recording), vendored: a program records spans that jfrconv --spans attributes samples to; and a cost stack (exclusive cost per key, as a table or spans)</description>
+  <dependencies>
+    <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><scope>test</scope></dependency>
+  </dependencies>
 </project>

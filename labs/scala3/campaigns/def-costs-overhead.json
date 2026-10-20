@@ -1,0 +1,21 @@
+{
+  "name": "def-costs-overhead",
+  "benchmark": "CompileBenchmark",
+  "profile": {
+    "xctrace": "ipc"
+  },
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -javaagent:../../perflab-agent/target/perflab-agent-0.1.0-SNAPSHOT.jar=spec=def-costs.hooks",
+  "rounds": 3,
+  "corpora": {
+    "scalaz": "-wi 9 -i 12 -w 3 -r 3"
+  },
+  "paired": {
+    "off": "",
+    "stack": "--defs-listener:io.github.retronym.perflab.costs.SpanCostListener",
+    "table": "--defs:/dev/null"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  }
+}

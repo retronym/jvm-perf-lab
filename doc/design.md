@@ -1,5 +1,7 @@
 # jvm-perf-lab
 
+Since this was written, the compiler-specific parts left the compiler repos too: both labs now live in [labs/](../labs/README.md), loading a compiler checkout as a source dependency ([labs/PLAN.md](../labs/PLAN.md)).
+
 ## Problem
 
 bench-lab was written inside scala3 to benchmark the compiler. About two thirds of it has nothing to do with the compiler:

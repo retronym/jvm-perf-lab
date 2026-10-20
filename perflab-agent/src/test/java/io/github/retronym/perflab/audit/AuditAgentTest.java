@@ -35,6 +35,43 @@ class AuditAgentTest {
         assertThrows(IllegalArgumentException.class, () -> Spec.read(f), "a constructor probe needs exit");
     }
 
+    public static class HookFixture {
+        public long target(String s, long n, int[] xs) {
+            if (s == null) throw new IllegalStateException("boom");
+            try { Integer.parseInt(s); } catch (NumberFormatException e) { n += 100; } // the method's own handler wins
+            return n + xs.length;
+        }
+    }
+
+    public static class Hooks {
+        static final List<String> events = new ArrayList<>();
+        public static void enter(Object self, Object s, long n, Object xs) { events.add("enter " + s + " " + n + " " + ((int[]) xs).length + " " + (self != null)); }
+        public static void exit() { events.add("exit"); }
+    }
+
+    /** Weave a hook with an exit into HookFixture#target: entry gets the receiver and arguments, exit runs on return and throw. */
+    @Test
+    void hookCallsEnterAndExitOnReturnAndThrow() throws Exception {
+        String owner = HookFixture.class.getName(), self = Hooks.class.getName();
+        Path spec = Files.createTempFile("x", ".audit");
+        Files.write(spec, List.of("hook h at=" + owner + "#target call=" + self + "#enter exit=" + self + "#exit"));
+        int id = Audit.register(Spec.read(spec).lines().get(0));
+        byte[] bytes;
+        try (InputStream in = HookFixture.class.getResourceAsStream("AuditAgentTest$HookFixture.class")) { bytes = in.readAllBytes(); }
+        byte[] w = AuditAgent.weave(bytes, List.of(id), new TreeSet<>());
+        Class<?> c = new ClassLoader(getClass().getClassLoader()) {
+            Class<?> define() { return defineClass(owner, w, 0, w.length); }
+        }.define();
+        Object o = c.getConstructor().newInstance();
+        var m = c.getMethod("target", String.class, long.class, int[].class);
+        Hooks.events.clear();
+        assertEquals(3L, m.invoke(o, "1", 1L, new int[2]));
+        assertEquals(102L, m.invoke(o, "x", 1L, new int[1]));
+        var ex = assertThrows(java.lang.reflect.InvocationTargetException.class, () -> m.invoke(o, null, 5L, new int[0]));
+        assertEquals("boom", ex.getCause().getMessage());
+        assertEquals(List.of("enter 1 1 2 true", "exit", "enter x 1 1 true", "exit", "enter null 5 0 true", "exit"), Hooks.events);
+    }
+
     /** Weave a count probe into Fixture#target, called only from viaA, and run the woven class. */
     @Test
     void wovenProbeCountsCallsFromItsCaller() throws Exception {
