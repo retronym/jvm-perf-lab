@@ -8,6 +8,7 @@
 //   gc.log          -Xlog:gc with wall-clock `time` decorations: pauses (a run's forks' logs concatenated)
 //   load.tsv        the load gate's 5 s samples of other processes' CPU, in cores
 //   profile.txt     the run's profile (e.g. xctrace:ipc), to name the gaps a profiler leaves between iterations
+//   jvm-events.tsv  the JDK's events in an async run's .jfr (jvmevents.py): kind (vmop, c1, c2, deopt), start_ms, end_ms, what
 // Used by timeline.py (a page per cell) and index.py (a live panel in index.html).
 const BenchTimeline = (() => {
   const NS = 'http://www.w3.org/2000/svg';
@@ -38,17 +39,19 @@ const BenchTimeline = (() => {
     }
     const load = (f.load || '').split('\n').map(l => l.split('\t')).filter(p => p.length >= 2 && p[0])
       .map(p => ({t: +p[0] * 1000, cores: +p[1], top: p[2] || ''}));
-    return {iters, series, pauses, load, profile: (f.profile || '').trim()};
+    const jvm = tsv(f.jvm).map(r => ({kind: r.kind, s: +r.start_ms, e: +r.end_ms, what: r.what}));
+    return {iters, series, pauses, load, jvm, profile: (f.profile || '').trim()};
   }
 
   async function fetchCell(base) {
     const get = async n => { try { const r = await fetch(base + n, {cache: 'no-store'}); return r.ok ? await r.text() : ''; } catch (e) { return ''; } };
-    const [iterations, timeline, gc, load, profile] = await Promise.all(['iterations.tsv', 'timeline.tsv', 'gc.log', 'load.tsv', 'profile.txt'].map(get));
-    return parse({iterations, timeline, gc, load, profile});
+    const [iterations, timeline, gc, load, profile, jvm] = await Promise.all(
+      ['iterations.tsv', 'timeline.tsv', 'gc.log', 'load.tsv', 'profile.txt', 'jvm-events.tsv'].map(get));
+    return parse({iterations, timeline, gc, load, profile, jvm});
   }
 
   function mount(svg, legend, tip) {
-    let D = {iters: [], series: [], pauses: [], load: [], profile: ''}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
+    let D = {iters: [], series: [], pauses: [], load: [], jvm: [], profile: ''}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
     let L = 150;
     const R = 16;
     const counterRows = [
@@ -62,9 +65,14 @@ const BenchTimeline = (() => {
     ];
     // without counters (no xctrace): iterations and GC pauses only, plus the load gate's samples when there are any
     const plainRows = [{name: 'iterations', h: 46}, {name: 'GC pauses', h: 34, pauses: true}];
+    // from the JDK's events in an async-profiler recording: one track per kind
+    const JVM = {vmop: {name: 'VM op', color: 'var(--v3)'}, c1: {name: 'C1', color: 'var(--v5)'}, c2: {name: 'C2', color: 'var(--v1)'},
+                 deopt: {name: 'deopt', color: 'var(--fg)'}};
+    const jvmRows = [{name: 'VM operations', h: 26, jvm: ['vmop']}, {name: 'JIT compiles', h: 50, jvm: ['c1', 'c2', 'deopt']}];
     let rows = counterRows, height = 0;
     const layout = () => {
       rows = D.series.length ? counterRows : plainRows.concat(D.load.length ? [{name: 'other processes', h: 60, load: true}] : []);
+      if (D.jvm.length) rows = rows.concat(jvmRows);
       height = rows.reduce((a, r) => a + r.h + 8, 8) + 24;
     };
     let variants = [];
@@ -158,6 +166,30 @@ const BenchTimeline = (() => {
             el('line', {x1: X(s), x2: X(s), y1: 0, y2: height - 22, stroke: 'var(--fg)', 'stroke-width': 1, opacity: 0.35});
             el('text', {x: X(s) + 2, y: y + r.h + 1, class: 'lab'}).textContent = `fork ${f}`;
           }
+        } else if (r.jvm) {
+          const th = (r.h - 4) / r.jvm.length;
+          r.jvm.forEach((kind, k) => {
+            const ty = y + 2 + k * th;
+            // the track's name beside it, or inside the plot when the label column is too narrow (as the counter lanes' scales)
+            const sx = L < 150 ? {x: L + 3, 'text-anchor': 'start', class: 'lab halo'} : {x: L - 4, 'text-anchor': 'end', class: 'lab'};
+            if (r.jvm.length > 1) el('text', {...sx, y: ty + th / 2 + 4}).textContent = JVM[kind].name;
+            // bars closer than a pixel merge into one, its tip counting them: a fork compiles thousands of methods
+            const groups = [];
+            for (const ev of D.jvm) {
+              if (ev.kind !== kind || ev.e < x0 || ev.s > x1) continue;
+              const a = Math.max(X(ev.s), L), b = Math.min(X(ev.e), W - R), g = groups[groups.length - 1];
+              if (g && a <= g.b + 1) { g.b = Math.max(g.b, b); g.n++; g.ms += ev.e - ev.s; }
+              else groups.push({a, b, n: 1, ms: ev.e - ev.s, first: ev});
+            }
+            for (const g of groups) {
+              const m = el('rect', {x: g.a, y: ty + 1, width: Math.max(kind === 'deopt' ? 1.5 : 2, g.b - g.a), height: th - 2,
+                fill: JVM[kind].color, opacity: kind === 'deopt' ? 0.8 : 0.6});
+              m.dataset.tip = g.n === 1 ? `${JVM[kind].name}: ${g.first.what}` + (kind === 'deopt' ? '' : `: ${g.ms.toFixed(1)} ms`)
+                : `${g.n} × ${JVM[kind].name}` + (kind === 'deopt' ? '' : `, ${g.ms.toFixed(1)} ms in all`) + `; the first, ${g.first.what}`;
+            }
+          });
+          if (!D.jvm.some(ev => r.jvm.includes(ev.kind) && ev.e >= x0 && ev.s <= x1))
+            el('text', {x: L + 6, y: y + r.h / 2 + 4, class: 'lab'}).textContent = 'none in view (the recording covers the last fork\'s measurement)';
         } else if (!r.key && !r.ipc) {
           // pauses / load only
         } else {
@@ -215,7 +247,8 @@ const BenchTimeline = (() => {
         + (variants.length ? variants.map(v => sw(color(v), v)).join('') : sw('var(--v0)', 'measurement'))
         + (D.iters.some(i => i.kind === 'startup') ? sw('repeating-linear-gradient(45deg,var(--life) 0 2px,transparent 2px 4px)', 'JVM start / exit', ';outline:1px solid var(--life)') : '')
         + (gaps().length ? sw('transparent', xctrace() ? 'xctrace attaching' : 'between iterations', ';outline:1px dashed var(--life)') : '')
-        + (D.pauses.length ? sw('var(--pause)', 'GC pause') : '');
+        + (D.pauses.length ? sw('var(--pause)', 'GC pause') : '')
+        + Object.keys(JVM).filter(k => D.jvm.some(ev => ev.kind === k)).map(k => sw(JVM[k].color, k === 'vmop' ? 'VM operation at a safepoint' : JVM[k].name)).join('');
       draw();
     }
 

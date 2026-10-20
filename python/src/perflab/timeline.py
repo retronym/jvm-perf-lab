@@ -6,7 +6,7 @@ the campaigns' index.html shows the same view live.
 """
 import glob, html, json, os, sys, time
 
-from . import ui
+from . import jvmevents, ui
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -31,6 +31,7 @@ def script():
 
 def write(d, out=None):
     out = out or os.path.join(d, "timeline.html")
+    jvmevents.refresh(d)
     read = lambda n: open(os.path.join(d, n)).read() if os.path.exists(os.path.join(d, n)) else ""
     # a run of several forks: one GC log per fork, and (xctrace) one counter series per fork, named after its trace
     gc = "".join(open(f).read() for f in sorted(glob.glob(os.path.join(d, "gc.log")) + glob.glob(os.path.join(d, "gc-*.log"))))
@@ -40,10 +41,13 @@ def write(d, out=None):
         series = "\n".join(parts[0][:1] + [l for p in parts for l in p[1:]]) + "\n" if parts else ""
     files = {"iterations": read("iterations.tsv"), "timeline": series, "gc": gc, "load": read("load.tsv")}
     files["profile"] = read("profile.txt")
+    files["jvm"] = read("jvm-events.tsv")
     name, facts = describe(d)
     help_html = ui.help_popover(
         "Startup is JVM boot and benchmark setup; exit runs from the last iteration to the JVM's exit (with xctrace, it "
-        "includes saving the trace). GC pauses come from the fork's GC log. With xctrace, counter lanes cover the measurement "
+        "includes saving the trace). GC pauses come from the fork's GC log. With async-profiler, VM operations at a safepoint "
+        "and JIT compilations (C1, C2) and deoptimizations come from the JDK's events in its recording, which covers the last "
+        "fork's measurement iterations; bars closer than a pixel merge. With xctrace, counter lanes cover the measurement "
         "iterations, which is what xctrace records; cycles are per second, so one busy performance core is about 4–4.5 G. "
         "Each counter lane has its own scale. Wheel or pinch to zoom, drag to pan, double-click to reset.", right=True)
     page = f"""{ui.HEAD}<title>{html.escape(name)}: timeline</title>

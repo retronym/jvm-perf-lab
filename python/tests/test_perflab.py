@@ -1,7 +1,7 @@
 import json, os, re, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from perflab import ab, analyze, auditfold, compare, config, defcosts, index, jmh, regraph, serve, specs, timeline, trees  # noqa: E402
+from perflab import ab, analyze, auditfold, compare, config, defcosts, index, jmh, jvmevents, regraph, serve, specs, timeline, trees  # noqa: E402
 
 
 class Project:
@@ -90,6 +90,23 @@ class RunTest(unittest.TestCase):
             open(os.path.join(out, f), "w").close()
         jmh.prepare(out, "none", ["B"])
         self.assertEqual(sorted(os.listdir(out)), ["jmh.args", "notes.txt", "profile.txt"])
+
+
+class JvmEventsTest(unittest.TestCase):
+    def test_rows_of_jfr_print_json(self):
+        t = "2026-10-20T19:25:17.210995208+10:00"
+        m = {"type": {"name": "java/io/BufferedReader"}, "name": "read"}
+        comp = {"type": "jdk.Compilation", "values": {"startTime": t, "duration": "PT0.0025S", "compiler": "c2", "compileLevel": 4,
+                                                       "method": m, "succeded": True, "isOsr": True, "codeSize": 4496}}
+        k, s, e, what = jvmevents.row(comp)
+        self.assertEqual((k, round(e - s, 3), what), ("c2", 2.5, "java.io.BufferedReader.read (tier 4, OSR, 4496 B)"))
+        self.assertAlmostEqual(s, 1792488317210.995, places=2)
+        op = {"type": "jdk.ExecuteVMOperation", "values": {"startTime": t, "duration": "PT1M0.5S", "operation": "G1CollectForAllocation", "safepoint": True}}
+        self.assertEqual(jvmevents.row(op)[2] - s, 60500)
+        self.assertIsNone(jvmevents.row({"type": "jdk.ExecuteVMOperation", "values": {**op["values"], "safepoint": False}}))
+        deopt = {"type": "jdk.Deoptimization", "values": {"startTime": t, "method": m, "reason": "unstable_if", "action": "reinterpret",
+                                                           "compiler": "c2", "lineNumber": 467}}
+        self.assertEqual(jvmevents.row(deopt)[0::3], ["deopt", "java.io.BufferedReader.read: unstable_if, reinterpret (c2, line 467)"])
 
 
 class AnalyzeTest(unittest.TestCase):

@@ -16,7 +16,8 @@ Options for async: --kperf <socket> (macOS PMU events through a running asprof-k
 The arguments go to the build in a file, as `@file`, so no profiler option is ever typed into a tool that splits a
 command at `;`. Output: <out>/jmh.log, result.json, the profile's files (async's .jfr also holds the JDK's own events
 of the measured window, GC, safepoints, JIT and so on, as perflab.jfc selects: `[async] jfrsync`), and timeline.html
-(every fork's JVM start, iterations, GC pauses and exit on one wall-clock axis, plus PMU counter lanes with xctrace);
+(every fork's JVM start, iterations, GC pauses and exit on one wall-clock axis, plus PMU counter lanes with xctrace, and
+VM operation and JIT lanes from the JDK's events with async);
 afterwards flame graphs for async, a merged report for audits. The run is on the index (`perflab serve`, whose URL it prints first) as it goes: <out>/run.json holds
 its status.
 """
