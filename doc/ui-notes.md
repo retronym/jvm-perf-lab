@@ -70,6 +70,7 @@ Out of scope: the flame graph pages themselves (retronym/async-profiler's jfrcon
 6. DONE Timeline drawing: measurement in the legend; start/exit hatched and labelled; every bar labelled where it fits (unit under the lane name); gaps between iterations dashed and named (xctrace attaching); the exit bar says it includes xctrace saving the trace; "none" in empty lanes; baseline, mid line and scale per counter lane; fits a phone.
 7. DONE Timeline page: titled by run (or cell) name, with benchmark, parameters, profile and date; one line of help plus `?`.
 8. DONE Site landing: runs as cards with buttons; graph totals in short form; PMU table styled to match; one number format everywhere (scores to four significant digits with separators, counts per op as K/M/G).
+9. DONE Campaigns (second round of notes): the score column named by its unit everywhere (the `ms/op` bug was already fixed by step 3); cells in a Cells section under the summary; one line for a single spec version; Δ on one line, coloured by better/worse beyond the spread, grey when inconclusive, a dash when both values are about zero; paired cells named as forks with the variants they alternate; per-variant allocation stacked; the header on one line with scrolling chips; `perflab ab report`'s per-fork differences in a table of their own.
 
 Deferred, with reasons:
 
