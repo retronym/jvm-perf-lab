@@ -35,7 +35,11 @@ code{font:11.5px ui-monospace,SFMono-Regular,Menlo,monospace}
 .badge.running,.badge.partial{background:var(--warn-bg);color:var(--warn)} .badge.finished,.badge.done{background:var(--ok-bg);color:var(--ok)}
 .badge.failed,.badge.interrupted{background:var(--bad-bg);color:var(--bad)}
 .facts{color:var(--muted);margin:0 0 8px;overflow-wrap:anywhere} .facts b{color:var(--fg);font-weight:600} .facts code{color:var(--fg)}
-.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;
+  /* edge shadows while there is more to scroll to */
+  background:linear-gradient(to right,var(--panel) 30%,transparent),linear-gradient(to left,var(--panel) 30%,transparent) right,
+    radial-gradient(farthest-side at 0 50%,rgba(0,0,0,.2),transparent),radial-gradient(farthest-side at 100% 50%,rgba(0,0,0,.2),transparent) right;
+  background-repeat:no-repeat;background-size:40px 100%,40px 100%,12px 100%,12px 100%;background-attachment:local,local,scroll,scroll;background-color:var(--panel)}
 table.t{border-collapse:collapse;font-variant-numeric:tabular-nums;margin:4px 0 8px}
 table.t th{font-weight:600;font-size:12px;color:var(--muted);text-align:left;border-bottom:1px solid var(--line);padding:4px 10px;white-space:nowrap}
 table.t td{border-bottom:1px solid var(--line2);padding:4px 10px;text-align:left;vertical-align:top}

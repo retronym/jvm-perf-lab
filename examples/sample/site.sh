@@ -59,5 +59,5 @@ for c in campaigns/*.json; do
   [ -d "$d" ] && p ab report "$c" > "$d/report.md"
 done
 
-p site out/site --title "jvm-perf-lab sample results" --intro-file site-intro.html \
+p site out/site --title "sample results" --intro-file site-intro.html \
   --footer 'Built from <a href="https://github.com/retronym/jvm-perf-lab/tree/main/examples/sample">examples/sample</a> by <code>mise run site</code> on an Apple Silicon Mac.'
