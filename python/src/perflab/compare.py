@@ -127,7 +127,7 @@ def write(out, a, b):
         "changed. Keys: 1–4 pick a tab of the graph under the pointer, [ and ] step. <i>link</i>: a graph's controls (search, zoom, "
         "toggles) drive the other graphs of its event, of every event, or none.")
     page = (f'{ui.HEAD}<title>{esc(a)} vs {esc(b)}</title>{ui.style(ui.BASE, ui.LIGHTBOX_CSS, CSS)}'
-            f'<header><span class="kind">profdiff</span><h1>{esc(a)} → {esc(b)}</h1>{help_html}<span class="sep"></span>'
+            f'{ui.masthead(home=ui.home_from(out), slim=True)}<header><span class="kind">profdiff</span><h1>{esc(a)} → {esc(b)}</h1>{help_html}<span class="sep"></span>'
             f'<button data-cols="2" class="on">2 columns</button><button data-cols="1">1 column</button><span class="sep"></span>'
             f'<span class="k">link</span><button data-link="event" class="on" title="Each graph\'s controls drive the other graphs of its event">event</button>'
             f'<button data-link="all" title="... and of every event">all</button><button data-link="off" title="Unlinked">off</button></header>'

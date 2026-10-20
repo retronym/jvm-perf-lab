@@ -209,8 +209,8 @@ class IndexTest(unittest.TestCase):
                   open(os.path.join(camp, "c", "spec.json"), "w"))
         page = open(index.build(camp)).read()
         better = '<span class="d better" title="lower, beyond the spread">'
-        self.assertIn(f'<td>fast</td><td>2</td><td>98</td><td>{better}-2.50% <span class="pm">± 0.71</span></span></td>', page)
-        self.assertIn(f'<td>86.5MB</td><td>{better}-2.81% <span class="pm">± 0.79</span></span></td>', page)
+        self.assertIn(f'<td>fast</td><td>2</td><td>98<br>{better}-2.50% <span class="pm">± 0.71</span></span></td>', page)
+        self.assertIn(f'<td>86.5MB<br>{better}-2.81% <span class="pm">± 0.79</span></span></td>', page)
         self.assertIn('<span class="pv">base <b>89.0MB</b></span><span class="pv">fast <b>87.0MB</b></span>', page)
         self.assertIn("<td>fork 1</td>", page)
         self.assertNotIn("1.0MB", page)  # -prof gc mixes the variants
@@ -322,7 +322,7 @@ class ServeTest(unittest.TestCase):
             self.assertEqual(serve.ensure(), url)
             st = json.load(open(os.path.join(camp, serve.STATE)))
             self.assertEqual(st["root"], os.path.dirname(camp))
-            self.assertIn(b"Campaigns and runs", urllib.request.urlopen(url).read())
+            self.assertIn(b'<h2 class="sec" id="campaigns">Campaigns', urllib.request.urlopen(url).read())
             # text is served as UTF-8, as GitHub Pages does: a report's Δ reads as Δ
             with open(os.path.join(camp, "report.md"), "w", encoding="utf-8") as f:
                 f.write("| Δ |\n")
