@@ -17,7 +17,7 @@ perflab run -- -p corpus=scalap CompileBenchmark
 
 ## Why outside the compiler repos
 
-A lab inside a compiler repo has to be merged into every branch it measures, and keeps that branch from being reviewed or shared on its own. Here, the lab loads the checkout's build as a source dependency (`ProjectRef`), compiles the compiler from the checkout's sources into the checkout's own target directories, and compiles against it. The compiler branch carries only compiler changes. What needs a compiler change that is not upstream is compiled only when the checkout has it: `SpanCostListener` needs the cost per definition (`-Yprofile-defs-listener`).
+A lab inside a compiler repo has to be merged into every branch it measures, and keeps that branch from being reviewed or shared on its own. Here, the lab loads the checkout's build as a source dependency (`ProjectRef`), compiles the compiler from the checkout's sources into the checkout's own target directories, and compiles against it. The compiler branch carries only compiler changes. What would otherwise need a compiler change comes in from outside: the cost per definition is woven into the compiler by perflab-agent ([def-costs.md](def-costs.md)).
 
 What it takes to load a compiler's build from another build:
 

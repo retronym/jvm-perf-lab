@@ -17,6 +17,7 @@ One probe per line, `<kind> <name> key=value…`; `#` starts a comment.
 | `count` | counts hits under `name`, split by `onStack` labels into `name.<label>` |
 | `sites` | counts the distinct call sites reaching the probe |
 | `tag` | tags the receiver with its call site, weakly and by identity, for a later `sites` probe to read with `qualify=tag` |
+| `hook` | calls a static method of the program's: `call=Class#method` at entry, given the receiver (null in a static method) and the method's arguments (references as `Object`); with `exit=Class#method`, a `static void m()` before each return and when the method throws |
 
 | key | meaning |
 |---|---|
@@ -36,6 +37,8 @@ count fill      at=dotty.tools.dotc.ast.Positioned#envelope  from=dotty.tools.do
 tag   origin    at=dotty.tools.dotc.ast.Positioned#<init>  exit  when=<helper>#spanless  depth=6  skip=^dotty\.tools\.dotc\.ast\.(Positioned|Trees\$)
 sites filled-by at=dotty.tools.dotc.ast.Positioned#envelope  from=dotty.tools.dotc.ast.Positioned#include$1  depth=0  qualify=tag,class
 ```
+
+A hook's methods are resolved from the woven class's loader, so they live in the program (e.g. beside the compiler on a benchmark's classpath), and only the woven class's own method is woven, not its overrides. Hooks are how the compiler labs keep a cost stack in step with the compiler without changing it (`labs/def-costs.md`). A spec of hooks alone writes no report.
 
 ## Report
 

@@ -44,7 +44,17 @@ Half the value is in the new hooks: the Namer completion is what charges a typed
 - **Every enter pushes, every exit pops.** An untracked symbol (a local definition) gets a transparent frame: no clocks, no row, its children's time passed to its parent. Exits then need no key, which Scala 3's `after*` hooks don't have (their token is an empty string with the profiler off), and an around probe's exit needs no saved arguments.
 - **Turned on per compile by lab options, not scalac's**: `--defs:<file>` and `--defs-listener:<class>` in `scalacOptions` (or a variant), stripped by the lab before the compiler sees them, so a campaign can still compare stack-off, listener and table variants within a fork. They need the agent (`-jvmArgsAppend -javaagent:<perflab-agent>=spec=def-costs.hooks`); without it, the lab fails rather than writing an empty table.
 
-## Checks
+## Results
 
-- Scala 2: the same corpus (scalap) with `-Yprofile-defs` on the `cost-per-definition` branch and with the agent on its branch point; the tables should match row for row in keys and calls, and in totals within run-to-run noise.
-- Scala 3: the agent on a checkout without the patches; the table's kinds, the share of time in frames, spans in a flame graph.
+Smoke runs only (one fork, one short iteration, on a loaded machine): equal tables, not overhead.
+
+- **Scala 2, scalap.** The agent's table has the same 8613 rows as the patch's `-Yprofile-defs`, on the patched branch and on its branch point (stock 2.13.x): every key, call count, file, line and size equal. Spans: 1773 span events in a CPU recording, definitions in the flame graph's span panel.
+- **Scala 3, dottyUtil.** Against the patch on the same checkout, every row both tables have has the same call count (14845 keys, all kinds). The agent has 72 more `load` rows; on scalaz, 237 more `complete` rows and 25 symbols completed twice rather than once (scalaz's `rehash` rows land in slightly different phases between runs: the tables are weak, so when they grow depends on GC). The extra frames are completions and loads under a context whose profiler is not the run's: 261 completions on scalaz run with `ctx.profiler` the base's `NoOpProfiler` (e.g. from implicit scope computation in `OfTypeImplicits`), and the patch's hooks, which go through `ctx.profiler`, drop them. The agent, keyed to the thread rather than the context, sees them. It works the same on the patch's branch point. Spans: 1747 span events on dottyUtil.
+- **Robustness, seen once already:** Scala 3 copies the `Profiler` trait's empty hook bodies into `NoOpProfiler`'s forwarders, so weaving the trait alone reached nothing; the spec weaves both (on the patched branch, where `Profiler` is a class, only the class's lines match). Every miss of this kind shows up as a missing kind in the table.
+
+## Future work
+
+- Overhead, paired within forks (`campaigns/def-costs-overhead.json` in each lab): the woven hooks with the stack off, the listener, the table; and the agent loaded but off against no agent, across forks.
+- `perflab run --profile` with several profiles (`async:cpu` and the hooks), instead of `-jvmArgsPrepend -javaagent:...` for spans.
+- `@build=` variants (Scala 2's `IsolatedBuild`) load a compiler in its own class loader: `CostHooks` must be loadable from it for the woven calls to resolve.
+- The patch branches (retronym/scala and retronym/scala3 `cost-per-definition`) can be dropped from the upstream plan, or kept for the one finding worth upstreaming on its own: the profiler's hooks miss work done under contexts that do not carry the run's profiler.
