@@ -98,7 +98,7 @@ const BenchTimeline = (() => {
     function draw() {
       svg.innerHTML = '';
       const W = svg.clientWidth || 900;
-      L = W < 600 ? 92 : 150;
+      L = W < 600 ? 106 : 150;
       const X = t => L + (t - x0) / (x1 - x0) * (W - L - R);
       defs();
       if (!D.iters.length && !D.series.length) {
@@ -109,7 +109,8 @@ const BenchTimeline = (() => {
       layout();
       svg.setAttribute('height', height);
       let y = 8;
-      const span = x1 - x0, step = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 60000].find(s => span / s < 12) || 120000;
+      const ticks = W < 600 ? 6 : 12;
+      const span = x1 - x0, step = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 60000].find(s => span / s < ticks) || 120000;
       for (let t = Math.ceil((x0 - t0) / step) * step; t0 + t <= x1; t += step) {
         el('line', {x1: X(t0 + t), x2: X(t0 + t), y1: 0, y2: height - 22, class: 'grid'});
         el('text', {x: X(t0 + t) + 2, y: height - 8, class: 'lab'}).textContent = (t / 1000).toFixed(step < 1000 ? 1 : 0) + ' s';
@@ -168,8 +169,10 @@ const BenchTimeline = (() => {
           // a baseline, a mid line, and the lane's own scale at both
           el('line', {x1: L, x2: W - R, y1: Y(0), y2: Y(0), class: 'axis'});
           el('line', {x1: L, x2: W - R, y1: Y(max / 2), y2: Y(max / 2), class: 'grid', 'stroke-dasharray': '2 4'});
-          el('text', {x: L - 4, y: Y(max) + 8, 'text-anchor': 'end', class: 'lab'}).textContent = max.toFixed(1);
-          el('text', {x: L - 4, y: Y(max / 2) + 4, 'text-anchor': 'end', class: 'lab'}).textContent = (max / 2).toFixed(max / 2 < 1 ? 2 : 1);
+          // on a narrow chart the scale goes inside the plot, the label column being too narrow for it
+          const sx = L < 150 ? {x: L + 3, 'text-anchor': 'start', class: 'lab halo'} : {x: L - 4, 'text-anchor': 'end', class: 'lab'};
+          el('text', {...sx, y: Y(max) + 8}).textContent = max.toFixed(1);
+          el('text', {...sx, y: Y(max / 2) + 4}).textContent = (max / 2).toFixed(max / 2 < 1 ? 2 : 1);
           if (!vis.length) el('text', {x: L + 6, y: y + r.h / 2 + 4, class: 'lab'}).textContent = 'no samples in view';
           let d = '', prev = null;
           // a new segment after a gap (between forks, or between xctrace's recordings)
