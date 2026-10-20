@@ -37,6 +37,8 @@ Requires Java 17. Design and plan: [doc/design.md](doc/design.md).
 java -javaagent:perflab-agent.jar=spec=envelope.audit,out=audit-{pid}.json ...
 ```
 
+**`perflab-spans`**: async-profiler's Span API (`one.profiler.Span`, `Recording`), vendored, for a program that marks its own units of work (a compiler's phases and definitions) as spans. With retronym/async-profiler's integration branch recording JFR, `jfrconv --spans` gives the flame graph a panel that breaks samples down by the spans enclosing them (`[async] spans` and `span_config` in `perflab.toml`). Without a recording, a span costs a check of a static field.
+
 **`perflab`** (Python 3.11+, `python/`): runs and analyses benchmarks through a project's build.
 
 | command | |

@@ -14,6 +14,7 @@
   <modules>
     <module>perflab-jmh</module>
     <module>perflab-agent</module>
+    <module>perflab-spans</module>
     <module>examples/sample</module>
   </modules>
 
