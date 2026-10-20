@@ -239,7 +239,7 @@ def landing(dest, title, runs):
         profile = open(os.path.join(run, "profile.txt")).read().strip() if os.path.exists(os.path.join(run, "profile.txt")) else ""
         parts = []
         result = os.path.join(run, "result.json")
-        if os.path.exists(result):
+        if os.path.exists(result) and os.path.getsize(result):  # empty while a run is in progress, or after it failed
             parts.append(metrics_table(result))
         links = []
         report = os.path.join(run, "report.md")

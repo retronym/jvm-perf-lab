@@ -32,3 +32,33 @@ Observations from watching `mise run site` build the sample (live index at `perf
 - **The exit bar dominates.** "JVM exit" runs from 10.7 s to 18 s (xctrace saving its trace), longer than the measurement. Label what it is, or draw time spent in the profiler differently from time spent in the JVM.
 - **Lanes have only a max label.** Each counter lane shows its peak (4.5, 0.5, 17.9) and no baseline or gridline, and each lane has its own scale. A light zero line and a mid gridline would help; mark lanes that share a scale.
 - **The explanatory paragraph is dense.** Four sentences above the chart; keep the first, move the rest to a `?`.
+
+## Plan
+
+### Direction
+
+One look across the four pages (index, timeline, site landing, profdiff compare), from one module (`perflab/ui.py`) that each page inlines, so every page stays a single dependency-free file that works from `file://` and under `perflab serve`:
+
+- **Tokens, light and dark.** The existing palette, as CSS variables, plus status colours that also work in dark mode (today's badges stay pastel on dark). System font; tabular figures; numbers right-aligned.
+- **Cards with a header row.** A card's title, its date and status chip on the left; its links (timeline, graphs, logs) as small buttons on the right. Facts on one muted line under it.
+- **Quiet tables.** No empty columns, units in headers (`µs/op`), horizontal scroll inside the card on a phone instead of the page.
+- **Help on demand.** Explanations move into `?` popovers and link tooltips; what stays on the page is one short line.
+- **Graphs in a lightbox.** A link to a flame graph opens it in an overlay over the page: a bar of chips for the other graphs of the same run, cell or diff (event × kind), `↗` to open the current one in a new tab, `[` / `]` to step, Esc to close. The page under it (scroll, filters, open details) is untouched. Index run cards, campaign cells, campaign diffs, the site's runs and the compare page's widgets all use it.
+- **Phone.** A viewport meta on every page, the filter bar wrapping into labelled groups, the timeline's label column narrower.
+
+Out of scope: the flame graph pages themselves (retronym/async-profiler's jfrconv); see the follow-ups at the end.
+
+### Steps
+
+1. DONE `site.py`: a run with an empty result.json (interrupted) no longer stops the site build.
+2. TODO `ui.py`: shared tokens, base CSS and the lightbox; index, timeline, site and compare inline it. No visual change beyond dark-mode badges and the viewport meta.
+3. TODO Index cards: run and campaign headers with link buttons; facts line; results tables without empty columns, params folded into the benchmark cell, `µs/op`; campaign cell tables likewise; anchors per card.
+4. TODO Index chrome: filter bar grouped (corpus / show / age / text) with matching labels; the graph-kind legend into a `?` popover and link tooltips; the timeline picker shows each run or cell as its name only, with its status as a chip ("following the running fork since 15:57:48").
+5. TODO Lightbox: flame graph and diff links on the index and the site open in it; the compare page's widgets get `⤢` (overlay) and `↗` (new tab).
+6. TODO Timeline drawing (`timeline.js`): measurement in the legend; start/exit as a hatched bar distinct from warmup; every bar labelled with score and unit where it fits; a gap between iterations drawn as a labelled span (profiler attach when the profile is xctrace); the exit bar labelled with the profiler's share; "none" in empty lanes; a zero line and mid gridline per counter lane, and the scale's unit.
+7. TODO Timeline page (`timeline.py`): titled by run name, benchmark, profile and date; one line of help plus `?`.
+8. TODO Site landing: the same cards and buttons as the index; overview table styled to match.
+
+### Follow-ups for retronym/async-profiler (integration-kperf-flamegraph)
+
+The "Flame graphs" notes above: open the bench graph zoomed to the benchmark method (or fold the JMH harness frames), dock the span panel and collapse it by default, header tooltips for the span columns, toolbar tooltips and labels, plain-language titles. The lopsided span split is the sample's benchmark, in this repo, not the flame graph.
