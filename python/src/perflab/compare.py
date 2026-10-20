@@ -8,16 +8,18 @@ other graphs of the same event, or of every event, or to none (the header's "lin
 """
 import glob, html, os
 
+from . import ui
+
 # what profdiff writes per event, in tab order
 SLOTS = [("a", "{a}", "a-{event}.html", "side"), ("diff", "DIFF", "diff-{event}.html", "diff"),
          ("inverse", "DIFF⁻¹", "diff-{event}-inverse.html", "diff"), ("b", "{b}", "b-{event}.html", "side")]
 
 CSS = """
-:root{--bg:#f6f7f9;--fg:#1d232b;--muted:#5d6875;--line:#dde2e8;--panel:#fff;--accent:#2f6fb2;--diff:#b4560b;--diffbg:#fdf0e3}
-@media (prefers-color-scheme: dark){:root{--bg:#0d1117;--fg:#e6edf3;--muted:#8b949e;--line:#30363d;--panel:#161b22;--accent:#58a6ff;--diff:#f0883e;--diffbg:#2a1500;color-scheme:dark}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.4 -apple-system,system-ui,sans-serif;height:100vh;display:flex;flex-direction:column}
+:root{--accent:var(--link);--diff:#b4560b;--diffbg:#fdf0e3}
+@media (prefers-color-scheme: dark){:root{--diff:#f0883e;--diffbg:#2a1500}}
+body{height:100vh;display:flex;flex-direction:column}
 header{display:flex;gap:8px;align-items:center;padding:6px 12px;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
-header h1{font-size:14px;margin:0}header .k{color:var(--muted);font-size:12px}
+header h1{font-size:14px;margin:0;overflow-wrap:anywhere}header .sep{width:1px;height:16px;background:var(--line);margin:0 4px}
 header button{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:4px;padding:2px 8px;cursor:pointer}
 header button.on{color:var(--fg);border-color:var(--accent)}
 #grid{flex:1;display:flex;flex-wrap:wrap;gap:8px;padding:8px;min-height:0}
@@ -28,7 +30,8 @@ header button.on{color:var(--fg);border-color:var(--accent)}
 .tab{font:12px ui-monospace,monospace;border:1px solid var(--line);background:none;color:var(--muted);border-radius:4px;padding:1px 7px;cursor:pointer}
 .tab.active{color:var(--fg);border-color:var(--accent)}
 .tab.diff{color:var(--diff)}.tab.diff.active{background:var(--diffbg);border-color:var(--diff)}
-.tabs a{color:var(--muted);text-decoration:none;font-size:12px;margin-left:auto}.tabs a:hover{color:var(--accent)}
+.tabs .act{margin-left:auto;display:inline-flex;gap:4px}.tabs .act .btn{padding:0 7px}.tabs .act button.btn{font:inherit;font-size:12px;cursor:pointer;color:var(--fg)}
+@media (max-width:700px){#grid{padding:4px}.w{min-width:0;flex-basis:100%}}
 .body{position:relative;flex:1;min-height:420px}
 .body iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
 .body iframe.hidden{visibility:hidden}
@@ -54,6 +57,20 @@ function onKey(e) {
   if (t) { show(w, t.dataset.view); e.preventDefault(); }
 }
 document.addEventListener('keydown', onKey);
+// ↗ opens the widget's current graph in a new tab; ⤢ opens the widget's graphs in the lightbox (not when this page is
+// itself shown in one)
+for (const w of document.querySelectorAll('.w')) {
+  const cur = () => w.querySelector('iframe:not(.hidden)');
+  w.querySelector('.open').addEventListener('click', e => { e.currentTarget.href = cur().getAttribute('src'); });
+  const big = w.querySelector('.big');
+  if (window !== window.top) big.hidden = true;
+  big.addEventListener('click', () => {
+    const tabs = [...w.querySelectorAll('.tab')];
+    Lightbox.open(tabs.map(t => ({href: w.querySelector(`iframe[data-view="${t.dataset.view}"]`).getAttribute('src'),
+                                  group: w.dataset.event, label: t.textContent, tip: t.title})),
+                  tabs.findIndex(t => t.classList.contains('active')), document.querySelector('header h1').textContent);
+  });
+}
 // the flame graphs take the keys while the pointer is over them
 document.querySelectorAll('iframe').forEach(f => f.addEventListener('load', () => {
   try { f.contentWindow.addEventListener('keydown', onKey); } catch (e) {}
@@ -99,15 +116,22 @@ def write(out, a, b):
         frames = "".join(f'<iframe src="{esc(name)}" data-view="{view}"{"" if view == "diff" else " class=hidden"}></iframe>'
                          for view, _, name, _ in slots)
         table = f"table-{event}.md"
-        links = f'<a href="{esc(table)}">table</a>' if os.path.exists(os.path.join(out, table)) else ""
-        widgets.append(f'<div class="w"><div class="tabs"><span class="ev">{esc(event)}</span>{tabs}{links}</div>'
+        links = f'<a class="btn" href="{esc(table)}" title="The differences as a table">table</a>' if os.path.exists(os.path.join(out, table)) else ""
+        links += ('<a class="btn open" href="#" target="_blank" rel="noopener" title="Open this graph in a new tab">↗</a>'
+                  '<button class="btn big" title="Enlarge, over this page (Esc closes)">⤢</button>')
+        widgets.append(f'<div class="w" data-event="{esc(event)}"><div class="tabs"><span class="ev">{esc(event)}</span>{tabs}<span class="act">{links}</span></div>'
                        f'<div class="body">{frames}</div></div>')
-    page = (f'<!doctype html><meta charset="utf-8"><title>{esc(a)} vs {esc(b)}</title><style>{CSS}</style>'
-            f'<header><h1>{esc(a)} → {esc(b)}</h1><span class="k">1–4 pick a tab, [ ] step · per op, benchmark threads</span>'
-            f'<button data-cols="2" class="on">2 columns</button><button data-cols="1">1 column</button>'
+    help_html = ui.help_popover(
+        f"The flame graphs of <b>{esc(a)}</b> and <b>{esc(b)}</b> per op on the benchmark threads, and the differential graphs "
+        "between them in both directions (DIFF: a → b; DIFF⁻¹: b → a), as tabs over one frame, so flipping between them shows what "
+        "changed. Keys: 1–4 pick a tab of the graph under the pointer, [ and ] step. <i>link</i>: a graph's controls (search, zoom, "
+        "toggles) drive the other graphs of its event, of every event, or none.")
+    page = (f'{ui.HEAD}<title>{esc(a)} vs {esc(b)}</title>{ui.style(ui.BASE, ui.LIGHTBOX_CSS, CSS)}'
+            f'<header><span class="kind">profdiff</span><h1>{esc(a)} → {esc(b)}</h1>{help_html}<span class="sep"></span>'
+            f'<button data-cols="2" class="on">2 columns</button><button data-cols="1">1 column</button><span class="sep"></span>'
             f'<span class="k">link</span><button data-link="event" class="on" title="Each graph\'s controls drive the other graphs of its event">event</button>'
             f'<button data-link="all" title="... and of every event">all</button><button data-link="off" title="Unlinked">off</button></header>'
-            f'<div id="grid">{"".join(widgets)}</div><script>{SCRIPT}</script>')
+            f'<div id="grid">{"".join(widgets)}</div>{ui.lightbox_script()}<script>{SCRIPT}</script>')
     path = os.path.join(out, "compare.html")
     with open(path, "w") as f:
         f.write(page)
