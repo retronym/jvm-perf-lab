@@ -190,7 +190,7 @@ class IndexTest(unittest.TestCase):
         json.dump({"name": "c", "rounds": 1, "corpora": ["corpus"], "variants": {"v": ""}}, open(os.path.join(camp, "c", "spec.json"), "w"))
         index.build(camp)
         page = open(os.path.join(camp, "index.html")).read()
-        self.assertIn("<i>running</i>", page)
+        self.assertIn('<span class="badge running">running</span>', page)
         self.assertIn("0 of 1 cells", page)
 
     def test_paired_campaign_shows_each_variant_and_its_paired_difference(self):
@@ -287,13 +287,14 @@ class RunIndexTest(unittest.TestCase):
         open(os.path.join(out, "jmh.log"), "w").close()
         open(os.path.join(out, "iterations.tsv"), "w").write("index\tkind\n")
         page = open(index.build(config.get().campaigns)).read()
-        self.assertIn("run multi-global", page)
-        self.assertIn('class="status finished"', page)
+        self.assertIn('<span class="kind">run</span><h2>multi-global</h2><span class="badge finished">finished</span>', page)
         self.assertIn("<code>-p corpus=re2s</code>", page)
         self.assertIn("<code>-XX:+UseG1GC</code>", page)
-        self.assertIn("<code>g=4</code></td><td>154 ± 3.2 ms/op", page)
-        self.assertIn('<a href="../runs/multi-global/jmh.log">jmh.log</a>', page)
-        self.assertIn('<option value="../runs/multi-global/">run · multi-global</option>', page)
+        self.assertIn('<th class="n">ms/op</th>', page)
+        self.assertIn('compile <code>g=4</code></td><td class="n">154.0 ± 3.2</td>', page)
+        self.assertNotIn("cycles/op", page)  # no column without values
+        self.assertIn('<a class="btn" href="../runs/multi-global/jmh.log">jmh.log</a>', page)
+        self.assertIn('<optgroup label="runs"><option value="../runs/multi-global/">multi-global</option>', page)
 
 
 class ServeTest(unittest.TestCase):

@@ -25,6 +25,27 @@ KINDS = {
 }
 
 
+# what each kind and event shows, for tooltips on the pages that link the graphs
+KIND_HELP = {
+    "bench": "Benchmark threads (JMH workers) only. Root at the bottom, callees above: where the benchmark spends this event, by call path.",
+    "reverse": "Benchmark threads only, stacks reversed: the methods where the event lands (leaves) at the top level, their callers beneath. Self cost by method.",
+    "bench-classify": "Benchmark threads only, each sample put under a category frame at the root by what it was doing: [c2_comp], [c1_comp], [Interpreter], [native], [vm], [gc], [jit], [class_load], ...",
+    "reverse-classify": "Benchmark threads only, by category as in bench-classify, with stacks reversed (leaves at the top level).",
+    "threads": "Every thread of the JVM, one tower per thread: JIT compiler, GC, JMH and JFR threads beside the benchmark.",
+    "classify": "Every thread of the JVM, by category: [gc], [jit], [vm], [c2_comp], [Interpreter], [class_load], ... Shows how much goes to the JVM's own work.",
+}
+EVENT_HELP = {
+    "cpu": "CPU time: a sample per 1 ms of CPU time on a thread (async-profiler cpu).",
+    "wall": "Wall-clock time: samples of every thread at a fixed interval, running or not; shows waiting as well as running.",
+    "alloc": "Allocations: a sample about every 512 KB allocated on a thread, from TLAB refills and allocations outside TLABs. A benchmark that does not allocate has none on its threads.",
+    "lock": "Lock contention: samples of threads blocked entering a monitor or ReentrantLock.",
+    "cycles": "PMU core cycles (user mode), sampled via kperf: where the CPU's time goes, independent of frequency.",
+    "instructions": "PMU retired instructions (user mode), sampled via kperf: where the work is.",
+    "cache-misses": "PMU L1D load misses (L1D_CACHE_MISS_LD_NONSPEC, user mode), sampled via kperf, charged to the load that missed.",
+    "branch-misses": "PMU branch mispredictions (BRANCH_MISPRED_NONSPEC, user mode), sampled via kperf, charged to the branch.",
+}
+
+
 def span_args():
     """jfrconv options for the span panel of `bench` graphs, from [async] spans and span_config in perflab.toml."""
     from . import config
