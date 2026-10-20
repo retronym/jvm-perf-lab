@@ -7,6 +7,7 @@
 //                   other processes (from xctrace, so only once the fork has finished)
 //   gc.log          -Xlog:gc with wall-clock `time` decorations: pauses (a run's forks' logs concatenated)
 //   load.tsv        the load gate's 5 s samples of other processes' CPU, in cores
+//   profile.txt     the run's profile (e.g. xctrace:ipc), to name the gaps a profiler leaves between iterations
 // Used by timeline.py (a page per cell) and index.py (a live panel in index.html).
 const BenchTimeline = (() => {
   const NS = 'http://www.w3.org/2000/svg';
@@ -37,18 +38,19 @@ const BenchTimeline = (() => {
     }
     const load = (f.load || '').split('\n').map(l => l.split('\t')).filter(p => p.length >= 2 && p[0])
       .map(p => ({t: +p[0] * 1000, cores: +p[1], top: p[2] || ''}));
-    return {iters, series, pauses, load};
+    return {iters, series, pauses, load, profile: (f.profile || '').trim()};
   }
 
   async function fetchCell(base) {
     const get = async n => { try { const r = await fetch(base + n, {cache: 'no-store'}); return r.ok ? await r.text() : ''; } catch (e) { return ''; } };
-    const [iterations, timeline, gc, load] = await Promise.all(['iterations.tsv', 'timeline.tsv', 'gc.log', 'load.tsv'].map(get));
-    return parse({iterations, timeline, gc, load});
+    const [iterations, timeline, gc, load, profile] = await Promise.all(['iterations.tsv', 'timeline.tsv', 'gc.log', 'load.tsv', 'profile.txt'].map(get));
+    return parse({iterations, timeline, gc, load, profile});
   }
 
   function mount(svg, legend, tip) {
-    let D = {iters: [], series: [], pauses: [], load: []}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
-    const L = 150, R = 16;
+    let D = {iters: [], series: [], pauses: [], load: [], profile: ''}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
+    let L = 150;
+    const R = 16;
     const counterRows = [
       {name: 'iterations', h: 46},
       {name: 'benchmark thread', h: 80, key: 'bench_c', unit: 'G cycles/s'},
@@ -67,11 +69,38 @@ const BenchTimeline = (() => {
     };
     let variants = [];
     const color = v => v ? `var(--v${variants.indexOf(v) % 6})` : 'var(--v0)';
+    const unitOf = u => (u || '').replace('us/', 'µs/');
+    const fmt = x => Math.abs(x) >= 1000 ? Math.round(x).toLocaleString('en-US') : x.toPrecision(4);
+    const xctrace = () => D.profile.startsWith('xctrace');
+    // time between a fork's iterations that is in none of them: the profiler attaching (xctrace records only measurement)
+    function gaps() {
+      const out = [];
+      const byFork = {};
+      for (const it of D.iters) (byFork[it.fork] = byFork[it.fork] || []).push(it);
+      for (const its of Object.values(byFork)) {
+        its.sort((a, b) => a.s - b.s);
+        for (let i = 1; i < its.length; i++) {
+          const g = its[i].s - its[i - 1].e;
+          if (g > 250 && g > 0.2 * (its[i].e - its[i].s)) out.push({s: its[i - 1].e, e: its[i].s,
+            what: xctrace() && its[i - 1].kind === 'warmup' && its[i].kind === 'measure' ? 'xctrace attaching' : 'between iterations'});
+        }
+      }
+      return out;
+    }
+    function defs() {
+      const d = el('defs', {});
+      const p = el('pattern', {id: 'tl-hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)'}, d);
+      el('rect', {width: 6, height: 6, fill: 'var(--life)', opacity: 0.35}, p);
+      el('line', {x1: 0, y1: 0, x2: 0, y2: 6, stroke: 'var(--life)', 'stroke-width': 3}, p);
+    }
     function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; }
 
     function draw() {
       svg.innerHTML = '';
-      const W = svg.clientWidth || 900, X = t => L + (t - x0) / (x1 - x0) * (W - L - R);
+      const W = svg.clientWidth || 900;
+      L = W < 600 ? 92 : 150;
+      const X = t => L + (t - x0) / (x1 - x0) * (W - L - R);
+      defs();
       if (!D.iters.length && !D.series.length) {
         svg.setAttribute('height', 40);
         el('text', {x: 12, y: 24, class: 'lab'}).textContent = 'No iterations yet.';
@@ -87,21 +116,39 @@ const BenchTimeline = (() => {
       }
       for (const r of rows) {
         el('text', {x: 6, y: y + 14}).textContent = r.name;
-        if (r.unit) el('text', {x: 6, y: y + 28, class: 'lab'}).textContent = r.unit;
+        const u = r.name === 'iterations' ? unitOf((D.iters.find(i => i.kind === 'measure' || i.kind === 'warmup') || {}).unit) : r.unit;
+        if (u) el('text', {x: 6, y: y + 28, class: 'lab'}).textContent = u;
         el('line', {x1: L, x2: W - R, y1: y + r.h, y2: y + r.h, class: 'grid'});
         if (r.name === 'iterations') {
           const forks = Math.max(0, ...D.iters.map(i => i.fork));
+          const label = (a, b, texts, cls) => {
+            // the longest text that fits the bar
+            const t = texts.find(t => t.length * 6.2 + 8 < b - a);
+            if (t) el('text', {x: a + 4, y: y + r.h / 2 + 4, class: cls || ''}).textContent = t;
+          };
+          for (const g of gaps()) {
+            if (g.e < x0 || g.s > x1) continue;
+            const a = Math.max(X(g.s), L), b = Math.min(X(g.e), W - R);
+            const rect = el('rect', {x: a + 1, y: y + 10, width: Math.max(1, b - a - 2), height: r.h - 20, rx: 2, fill: 'none',
+              stroke: 'var(--life)', 'stroke-dasharray': '3 3'});
+            rect.dataset.tip = `${g.what}: ${((g.e - g.s) / 1000).toFixed(2)} s, in no iteration`;
+            label(a, b, [g.what, xctrace() ? 'attach' : 'gap'], 'lab');
+          }
           for (const it of D.iters) {
             if (it.e < x0 || it.s > x1) continue;
             const a = Math.max(X(it.s), L), b = Math.min(X(it.e), W - R);
             const life = it.kind === 'startup' || it.kind === 'exit';
             const fork = forks > 1 ? `fork ${it.fork}: ` : '';
-            const rect = el('rect', {x: a, y: y + (life ? 14 : 6), width: Math.max(1, b - a - 1), height: life ? r.h - 28 : r.h - 12, rx: 2,
-              fill: life ? 'var(--life)' : it.kind === 'warmup' ? 'var(--grey)' : color(it.variant)});
+            const secs = ((it.e - it.s) / 1000).toFixed(2) + ' s';
+            const rect = el('rect', {x: a, y: y + (life ? 12 : 6), width: Math.max(1, b - a - 1), height: life ? r.h - 24 : r.h - 12, rx: 2,
+              fill: life ? 'url(#tl-hatch)' : it.kind === 'warmup' ? 'var(--grey)' : color(it.variant)});
+            const exitWhat = xctrace() ? 'last iteration to JVM exit, and xctrace saving its trace' : 'last iteration to JVM exit';
             rect.dataset.tip = life
-              ? `${fork}${it.kind === 'startup' ? 'JVM start to first iteration (JVM boot, benchmark setup)' : 'last iteration to JVM exit'}: ${((it.e - it.s) / 1000).toFixed(2)} s`
-              : `${fork}#${it.i} ${it.kind} ${it.variant || ''}: ${it.score.toFixed(1)} ${it.unit}` + (it.gc != null ? `, GC pauses ${it.gc} ms` : '');
-            if (!life && b - a > 46) el('text', {x: a + 4, y: y + r.h / 2 + 4}).textContent = it.score.toFixed(1);
+              ? `${fork}${it.kind === 'startup' ? 'JVM start to first iteration (JVM boot, benchmark setup)' : exitWhat}: ${secs}`
+              : `${fork}#${it.i} ${it.kind} ${it.variant || ''}: ${fmt(it.score)} ${unitOf(it.unit)}` + (it.gc != null ? `, GC pauses ${it.gc} ms` : '');
+            if (life) label(a, b, it.kind === 'startup' ? ['JVM start ' + secs, 'start']
+                                                        : [(xctrace() ? 'JVM exit + xctrace saving trace ' : 'JVM exit ') + secs, 'JVM exit', 'exit'], 'lab halo');
+            else label(a, b, [`${fmt(it.score)} ${unitOf(it.unit)}`, fmt(it.score)], it.kind === 'warmup' ? '' : 'on');
           }
           // each fork's start, labelled when there are several
           if (forks > 1) for (let f = 1; f <= forks; f++) {
@@ -118,12 +165,19 @@ const BenchTimeline = (() => {
           const vis = pts.filter(p => p.t >= x0 - BIN_MS && p.t <= x1 && p.v != null);
           const max = r.ipc ? Math.max(4, ...vis.map(p => p.v)) : Math.max(0.5, ...vis.map(p => p.v));
           const Y = v => y + r.h - 4 - v / max * (r.h - 10);
-          el('text', {x: L - 4, y: y + 12, 'text-anchor': 'end', class: 'lab'}).textContent = max.toFixed(1);
+          // a baseline, a mid line, and the lane's own scale at both
+          el('line', {x1: L, x2: W - R, y1: Y(0), y2: Y(0), class: 'axis'});
+          el('line', {x1: L, x2: W - R, y1: Y(max / 2), y2: Y(max / 2), class: 'grid', 'stroke-dasharray': '2 4'});
+          el('text', {x: L - 4, y: Y(max) + 8, 'text-anchor': 'end', class: 'lab'}).textContent = max.toFixed(1);
+          el('text', {x: L - 4, y: Y(max / 2) + 4, 'text-anchor': 'end', class: 'lab'}).textContent = (max / 2).toFixed(max / 2 < 1 ? 2 : 1);
+          if (!vis.length) el('text', {x: L + 6, y: y + r.h / 2 + 4, class: 'lab'}).textContent = 'no samples in view';
           let d = '', prev = null;
           // a new segment after a gap (between forks, or between xctrace's recordings)
           for (const p of vis) { d += (prev == null || p.t - prev > 2 * BIN_MS ? 'M' : 'L') + X(p.t + BIN_MS / 2).toFixed(1) + ',' + Y(p.v).toFixed(1); prev = p.t; }
           if (d) el('path', {d, fill: 'none', stroke: r.ipc ? 'var(--v2)' : 'var(--v0)', 'stroke-width': 1.2});
         }
+        if (r.pauses && !r.key && !D.pauses.some(p => p.e >= x0 && p.s <= x1))
+          el('text', {x: L + 6, y: y + r.h / 2 + 4, class: 'lab'}).textContent = D.pauses.length ? 'none in view' : 'none';
         if (r.pauses) for (const p of D.pauses) {
           if (p.e < x0 || p.s > x1) continue;
           const m = el('rect', {x: X(p.s), y: y + 2, width: Math.max(2, X(p.e) - X(p.s)), height: r.h - 4, fill: 'var(--pause)', opacity: 0.55});
@@ -153,9 +207,12 @@ const BenchTimeline = (() => {
       // keep a zoomed view where it is as data arrives; otherwise follow the whole range
       if (!zoomed) { x0 = n0; x1 = Math.max(n1, n0 + 1); }
       t0 = n0; t1 = Math.max(n1, n0 + 1);
-      if (legend) legend.innerHTML = variants.map(v => `<span><i style="background:${color(v)}"></i>${v}</span>`).join('')
-        + '<span><i style="background:var(--grey)"></i>warmup</span>'
-        + (D.iters.some(i => i.kind === 'startup') ? '<span><i style="background:var(--life)"></i>JVM start / exit</span>' : '') + (D.pauses.length ? '<span><i style="background:var(--pause)"></i>GC pause</span>' : '');
+      const sw = (bg, text, extra) => `<span><i style="background:${bg}${extra || ''}"></i>${text}</span>`;
+      if (legend) legend.innerHTML = sw('var(--grey)', 'warmup')
+        + (variants.length ? variants.map(v => sw(color(v), v)).join('') : sw('var(--v0)', 'measurement'))
+        + (D.iters.some(i => i.kind === 'startup') ? sw('repeating-linear-gradient(45deg,var(--life) 0 2px,transparent 2px 4px)', 'JVM start / exit', ';outline:1px solid var(--life)') : '')
+        + (gaps().length ? sw('transparent', xctrace() ? 'xctrace attaching' : 'between iterations', ';outline:1px dashed var(--life)') : '')
+        + (D.pauses.length ? sw('var(--pause)', 'GC pause') : '');
       draw();
     }
 

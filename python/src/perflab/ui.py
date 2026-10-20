@@ -27,6 +27,7 @@ code{font:11.5px ui-monospace,SFMono-Regular,Menlo,monospace}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:0 0 14px;box-shadow:var(--shadow)}
 .card-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:0 0 6px}
 .card-h h2{font-size:15px;margin:0;overflow-wrap:anywhere} .card-h .btns{margin-left:auto}
+.kind{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px;line-height:16px}
 .btns{display:inline-flex;flex-wrap:wrap;gap:4px}
 .btn{display:inline-block;font-size:12px;line-height:18px;border:1px solid var(--line);border-radius:6px;padding:1px 8px;background:var(--panel);color:var(--link);white-space:nowrap}
 .btn:hover{background:var(--link-bg);text-decoration:none} .btn.pending{color:var(--muted);border-style:dashed}

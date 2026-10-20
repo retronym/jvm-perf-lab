@@ -354,7 +354,8 @@ def run_section(run):
                  ("instructions/op", True), ("alloc/op", True)]
         rows = table(heads, out)
     progress = iterations(run) if status == "running" else ""
-    mtimes = [os.path.getmtime(os.path.join(run, f)) for f in os.listdir(run)] or [os.path.getmtime(run)]
+    # the run's own files: pages rendered from it later (timeline, report) don't move its end
+    mtimes = [os.path.getmtime(os.path.join(run, f)) for f in os.listdir(run) if not f.endswith(".html")] or [os.path.getmtime(run)]
     args_f = os.path.join(run, "jmh.args")
     started = os.path.getmtime(args_f) if os.path.exists(args_f) else min(mtimes)
     last = time.time() if status == "running" else max(mtimes)
@@ -435,7 +436,6 @@ main{max-width:1400px;margin:0 auto;padding:0 20px 24px}
 .bar h1{font-size:17px;margin:0;display:flex;gap:8px;align-items:center}
 .fg{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center} .fl{color:var(--muted);font-size:12px;margin-right:2px}
 #q{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:6px;padding:4px 8px;font:inherit;min-width:220px;margin-left:auto}
-.kind{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px;line-height:16px}
 .card .notes{border-left:3px solid var(--link);padding:0 12px;margin:8px 0 12px} .notes h3{margin:6px 0;font-size:13px}
 #campaigns>.notes{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--link);border-radius:10px;padding:4px 16px;margin:0 0 14px}
 .mixed{color:var(--warn);font-size:11px} details.specs{margin:2px 0 6px;font-size:12px} details.specs summary{cursor:pointer;color:var(--muted)}
