@@ -9,9 +9,6 @@ val checkout = sys.props.get("scala3.checkout").orElse(sys.env.get("SCALA3_CHECK
 val compiler = ProjectRef(checkout, "scala3-compiler-bootstrapped")
 val library = ProjectRef(checkout, "scala-library-bootstrapped")
 
-// The cost per definition (-Yprofile-defs-listener) is not upstream yet: SpanCostListener only compiles against a
-// checkout that has it.
-val hasCostListener = (checkout / "compiler/src/dotty/tools/dotc/profile/DefCosts.scala").exists
 
 // retronym/jvm-perf-lab's JMH driver and profilers, and async-profiler's Span API: this checkout's, `mise run install`
 // at its root, or -Dperflab.version=<version>
@@ -29,7 +26,6 @@ lazy val lab = project.in(file("."))
     autoScalaLibrary := false,
     crossPaths := false,
     scalacOptions ++= Seq("-feature", "-deprecation", "-Yexplicit-nulls", "-language:implicitConversions", "-encoding", "UTF8"),
-    Compile / unmanagedSourceDirectories ++= (if (hasCostListener) Seq(baseDirectory.value / "src/costs/scala") else Nil),
     resolvers += Resolver.mavenLocal,
     libraryDependencies ++= Seq(
       "io.github.retronym.perflab" % "perflab-jmh" % perflabVersion,

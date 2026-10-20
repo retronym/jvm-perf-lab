@@ -17,9 +17,19 @@ import dotty.tools.io.AbstractFile
  *  and nothing survives from one compilation to the next but JVM-wide state (the name table). With `resident = true`, all
  *  compilations share one root context and `Compiler`, each a new `Run`, as a warm compile server would; dotc then
  *  retains every earlier `Run` through state on the root context and in phases, so the heap grows with each compilation.
+ *
+ *  `--defs:<file>` and `--defs-listener:<class>` among the options turn on the cost per definition (`CostHooks`), with
+ *  perflab-agent weaving its hooks.
  */
-final class InMemoryCompiler(val corpus: Corpus, extraOptions: List[String] = Nil, resident: Boolean = false,
+final class InMemoryCompiler(val corpus: Corpus, options: List[String] = Nil, resident: Boolean = false,
     classpath: InMemoryClasspath | Null = null) extends Driver:
+
+  // the lab's options for the cost per definition (CostHooks), which dotc does not see
+  private val (costOptions, extraOptions) = options.partition(_.startsWith("--defs"))
+  private val (defsTable, defsListener) =
+    def value(name: String) = costOptions.collectFirst { case o if o.startsWith(name + ":") => o.stripPrefix(name + ":") }.orNull
+    costOptions.find(o => !o.startsWith("--defs:") && !o.startsWith("--defs-listener:")).foreach(o => throw IllegalArgumentException(s"unknown option $o"))
+    (value("--defs"), value("--defs-listener"))
 
   /** The classpath snapshot this compiler reads. */
   val classpathSnapshot: InMemoryClasspath = if classpath != null then classpath else InMemoryClasspath.forCorpus(corpus)
@@ -59,8 +69,12 @@ final class InMemoryCompiler(val corpus: Corpus, extraOptions: List[String] = Ni
   def compile(): Unit =
     val (root, compiler) = prepare()
     val store = StoreReporter(null)
+    val costs = defsTable != null || defsListener != null
+    if costs then CostHooks.arm(defsTable, defsListener)
     val reporter =
-      try doCompile(compiler, corpus.files)(using root.fresh.setReporter(store))
+      try
+        try doCompile(compiler, corpus.files)(using root.fresh.setReporter(store))
+        finally if costs then CostHooks.disarm()
       catch case e: Exception =>
         throw new IllegalStateException(s"${corpus.name}: compiler crashed after:\n${store.removeBufferedMessages(using root).take(10).mkString("\n")}", e)
     if reporter.hasErrors then

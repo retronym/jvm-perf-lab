@@ -169,6 +169,12 @@ public final class CostStack {
         exitTop();
     }
 
+    /** Leaves the innermost frame, transparent or not: the exit of a hook around a method. */
+    public void exit() {
+        if (Thread.currentThread() != thread || top == null) return;
+        exitTop();
+    }
+
     private Object enclosingPhase(Object fallback) {
         for (Frame f = top; f != null; f = f.parent)
             if (!f.transparent && f.kind.phases == CostKind.Phases.OWN) return f.phase;

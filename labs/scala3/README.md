@@ -25,8 +25,20 @@ Benchmarks: `CompileBenchmark` (full compilation), `ParserBenchmark` (parsing on
 Profiles (`perflab run --profile <p>`), with results in `out/runs`:
 
 - `xctrace:<template>`: counters on Apple Silicon (needs Xcode's `xctrace`), for the benchmark thread separately from JIT and GC: `cpu-counters` (Instruments' stock template: Apple's top-down breakdown per thread group) or perflab's event-sampling templates `ipc`, `frontend`, `mem-l1d` (event counts per op and per-method attribution).
-- `async:<events>`: async-profiler JFR over the measurement iterations and flame graphs: the benchmark threads, reversed, and every thread by category. `<events>` is `cpu`, `wall`, `alloc`, `lock`, or PMU events joined by `+` with `--kperf`. With `-p scalacOptions=-Yprofile-defs-listener:dotty.tools.compilerlab.SpanCostListener` the compiler records its cost frames as spans, and the bench graphs get a span panel grouped as `span-config.json` says ([cost per definition](doc/def-costs.md)).
+- `async:<events>`: async-profiler JFR over the measurement iterations and flame graphs: the benchmark threads, reversed, and every thread by category. `<events>` is `cpu`, `wall`, `alloc`, `lock`, or PMU events joined by `+` with `--kperf`. With the cost per definition's listener (below) the compiler's cost frames are recorded as spans, and the bench graphs get a span panel grouped as `span-config.json` says.
 - `audit:<spec file>`: a caller audit with the probes of a spec, e.g. `audit/positioned-envelope.audit` (below).
+
+### Cost per definition
+
+Exclusive time and allocation per definition, unit and phase ([doc/def-costs.md](doc/def-costs.md) for the frames, [../def-costs.md](../def-costs.md) for how the lab gets them without a compiler change): perflab-agent weaves calls into the compiler as it loads (`def-costs.hooks`), and `CostHooks` keeps perflab's `CostStack`. Two lab options among the scalac options, stripped before dotc sees them, turn it on per compile; without the agent, the compile fails.
+
+```bash
+# a table for perflab defcosts; the audit profile loads the agent with the hooks
+perflab run --profile audit:def-costs.hooks -- -p corpus=dottyUtil -p scalacOptions=--defs:$PWD/out/dottyUtil.tsv CompileBenchmark
+perflab defcosts --out out/dottyUtil.html out/dottyUtil.tsv
+# each frame as an async-profiler span (retronym/async-profiler's integration branch), the agent given beside the profile
+perflab run --profile async:cpu -- -p corpus=dottyUtil -p scalacOptions=--defs-listener:io.github.retronym.perflab.costs.SpanCostListener -jvmArgsPrepend -javaagent:<perflab-agent.jar>=spec=$PWD/def-costs.hooks CompileBenchmark
+```
 
 `perflab analyze` splits async-profiler samples by dotc's phases (`perflab-phases.toml`); `perflab regraph`, `profdiff`, `frameweight` and `subtree` work on any async-profiler run or campaign cell.
 

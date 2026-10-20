@@ -1,5 +1,7 @@
 # Cost per definition
 
+This describes the frames and their semantics as first built, as a compiler patch (retronym/scala3 `cost-per-definition`, `-Yprofile-defs`, `-Yprofile-defs-listener`). The lab now gets the same frames without it: perflab-agent weaves the hooks into the compiler (`def-costs.hooks`, `CostHooks`), turned on with the lab's `--defs:<file>` and `--defs-listener:<class>` ([../../def-costs.md](../../def-costs.md)). Where this says `DefCosts`, read perflab's `CostStack`; the table and spans are the same.
+
 ## Problem
 
 We want to find the definitions (methods, vals, classes) that take an unusual share of compile time, and see where their time goes. A flame graph cannot answer this directly: it aggregates by call path in the compiler, not by the user's definition being compiled.
