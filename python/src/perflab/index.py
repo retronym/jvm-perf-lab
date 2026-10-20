@@ -47,10 +47,15 @@ def flame_graphs(cell):
     if not (os.path.exists(os.path.join(cell, "profile.txt")) and open(os.path.join(cell, "profile.txt")).read().startswith("async")):
         return ""
     jfr = (glob.glob(os.path.join(cell, "**", "*.jfr"), recursive=True) or [None])[0]
+    events = regraph.events_of(cell)
+    if not jfr and events:
+        # a published copy leaves the recording out: find it by its first event's bench graph, <jfr stem>-<label>.html
+        g = (glob.glob(os.path.join(cell, "**", f"*-{events[0][0]}.html"), recursive=True) or [None])[0]
+        jfr = g and g[:-len(f"-{events[0][0]}.html")] + ".jfr"
     if not jfr:
         return ""
     rows = []
-    for label, _ in regraph.events_of(cell):
+    for label, _ in events:
         ev = label.removeprefix("hw-")
         ks = "".join(graph_link(regraph.graph_path(jfr, label, k), k, ev) for k in regraph.kinds())
         rows.append(f'<span class="ev" title="{esc(regraph.EVENT_HELP.get(ev, ev))}">{esc(ev)}</span><span class="btns">{ks}</span>')
@@ -392,7 +397,8 @@ def run_section(run):
         rows = table(heads, out) + runinfo.metrics_details(results)
     progress = iterations(run) if status == "running" else ""
     # the run's own files: pages rendered from it later (timeline, report) don't move its end
-    mtimes = [os.path.getmtime(os.path.join(run, f)) for f in os.listdir(run) if not f.endswith(".html")] or [os.path.getmtime(run)]
+    mtimes = [os.path.getmtime(os.path.join(run, f)) for f in os.listdir(run)
+              if not f.endswith(".html") and os.path.isfile(os.path.join(run, f))] or [os.path.getmtime(run)]
     args_f = os.path.join(run, "jmh.args")
     started = os.path.getmtime(args_f) if os.path.exists(args_f) else min(mtimes)
     last = time.time() if status == "running" else max(mtimes)

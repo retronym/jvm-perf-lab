@@ -97,9 +97,9 @@ Feedback on the rebuilt sample site: the landing page is plain, with no branding
 
 ### Steps
 
-1. TODO Branding: the header band and mark in ui.py, used by the index, timeline and compare pages.
-2. TODO One page: index.py renders intro, campaigns, runs and counters; run cards take site.py's extras; site.py renders it at the root and redirects campaigns/index.html.
-3. TODO Navigation: section tabs with scroll highlight, the shared filter bar across campaigns and runs, and a timeline panel shown only while something runs.
-4. TODO Intro: site-intro.html restructured, with styles for its blocks.
-5. TODO Layout: scroll shadows, Δ under value in summaries, and the 800px fixes. Also fix a Δ of +0.00% ± 0.00 shown red (gc campaign).
-6. TODO Campaign reports: render `report.md` as an HTML page in the page's style, opened in the lightbox, with the .md kept as a download link. (The Δ mojibake was the server's missing charset, fixed separately in 57126fb.)
+1. DONE Branding: the header band and mark in ui.py, used by the index, timeline and compare pages.
+2. DONE One page: index.py renders intro, campaigns, runs and counters; run cards take site.py's extras; site.py renders it at the root and redirects campaigns/index.html.
+3. DONE Navigation: section tabs with scroll highlight, the shared filter bar across campaigns and runs, and a timeline panel shown only while something runs.
+4. DONE Intro: site-intro.html restructured, with styles for its blocks.
+5. DONE Layout: scroll shadows, Δ under value in summaries, and the 800px fixes. Also fix a Δ of +0.00% ± 0.00 shown red (gc campaign).
+6. DONE Campaign reports: render `report.md` as an HTML page in the page's style, opened in the lightbox, with the .md kept as a download link. (The Δ mojibake was the server's missing charset, fixed separately in 57126fb.)
