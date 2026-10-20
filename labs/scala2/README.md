@@ -4,7 +4,7 @@ Benchmarks and profiles of a scala/scala checkout's quick compiler, for answerin
 
 ## Setup
 
-- A scala/scala checkout, named by `SCALA_CHECKOUT` when the lab's sbt server starts. This build loads it as a source dependency (`ProjectRef`) and compiles its library, reflect and compiler (quick, with STARR), so the branch being measured needs no lab commits. `SpanCostListener` is compiled only when the checkout has the cost per definition (`-Yprofile-defs-listener`).
+- A scala/scala checkout, named by `SCALA_CHECKOUT` when the lab's sbt server starts. This build loads it as a source dependency (`ProjectRef`) and compiles its library, reflect and compiler (quick, with STARR), so the branch being measured needs no lab commits.
 - A [scala/compiler-benchmark](https://github.com/scala/compiler-benchmark) checkout for the corpora: beside the compiler checkout, or named by `COMPILER_BENCHMARK`.
 - `mise run install` at the root of jvm-perf-lab puts perflab-jmh, perflab-spans and the audit agent in `~/.m2`, and `mise run cli` installs `perflab`.
 - sbt on Java 17 or later (perflab-jmh's baseline); the benchmark forks use the same JVM. Start a server in this directory (`sbt --client`), which `perflab` drives. It compiles into the checkout's own `build/` directory, so don't compile there from the checkout's own sbt server at the same time. `project/build.properties` must name the checkout's sbt version.
@@ -43,20 +43,22 @@ Profiles are `none`, `async:<events>` (async-profiler; kperf PMU events with ret
 
 ## Cost per definition
 
-Two compiler options (`scala.tools.nsc.profile.DefCosts`) keep a stack of frames in step with the profiler's hooks (phase, unit, typing a definition, its Namer completion, classfile loads, implicit searches, macro expansions), charging each frame its self time, so an inferred type typed ahead on another definition's stack is charged to its own definition. Work after the typer is charged to its unit, except erasure's retyping (`transform`).
+A stack of frames kept in step with the compiler (phase, unit, typing a definition, its Namer completion, classfile loads, implicit searches, macro expansions), charging each frame its self time, so an inferred type typed ahead on another definition's stack is charged to its own definition ([../def-costs.md](../def-costs.md)). Work after the typer is charged to its unit, except erasure's retyping (`transform`). It needs no compiler change: perflab-agent weaves the calls into the compiler as it loads (`def-costs.hooks`), and `CostHooks` keeps perflab's `CostStack`. Two lab options among the scalac options, stripped before scalac sees them, turn it on per compile:
 
-- `-Yprofile-defs:<file>`: a table per kind, phase and definition (calls, self and total µs, self allocation, size), for `perflab defcosts`:
+- `--defs:<file>`: a table per kind, phase and definition (calls, self and total µs, self allocation, size), for `perflab defcosts`. The `audit` profile loads the agent with the hooks:
 
   ```bash
-  sbt "lab/Jmh/runMain scala.tools.nsc.compilerlab.CompileLoop scalap 10 -Yprofile-defs:$PWD/out/scalap.tsv"
+  perflab run --profile audit:def-costs.hooks -- -p corpus=scalap -p scalacOptions=--defs:$PWD/out/scalap.tsv CompileBenchmark
   perflab defcosts --out out/scalap.html out/scalap.tsv
   ```
 
-- `-Yprofile-defs-listener:scala.tools.nsc.compilerlab.SpanCostListener`: each frame as an async-profiler span, for `jfrconv --spans` flame graphs with a span panel by definition, phase or unit. Needs retronym/async-profiler's integration branch, for the library (`perflab run --lib`) and `jfrconv`:
+- `--defs-listener:io.github.retronym.perflab.costs.SpanCostListener`: each frame as an async-profiler span, for `jfrconv --spans` flame graphs with a span panel by definition, phase or unit. Needs retronym/async-profiler's integration branch, for the library (`perflab run --lib`) and `jfrconv`, and the agent given explicitly beside the async profile:
 
   ```bash
-  perflab run --profile async:cpu --lib <libasyncProfiler> -- -p corpus=scalap -p scalacOptions=-Yprofile-defs-listener:scala.tools.nsc.compilerlab.SpanCostListener CompileBenchmark
+  perflab run --profile async:cpu --lib <libasyncProfiler> -- -p corpus=scalap -p scalacOptions=--defs-listener:io.github.retronym.perflab.costs.SpanCostListener -jvmArgsPrepend -javaagent:<perflab-agent.jar>=spec=$PWD/def-costs.hooks CompileBenchmark
   jfrconv --cpu --spans --threads -I '.*jmh-worker.*' <run>/<benchmark>/jfr-cpu.jfr spans.html
   ```
 
   With kperf events (`--kperf <socket>`, `async:cycles+instructions@1000000`), use `SpanCostListener$All`, which records every span: async-profiler does not yet tell the sampled thread about kperf samples, so the default listener would drop them all. Render with `jfrconv --hw cycles` (or `instructions`) in place of `--cpu`.
+
+Either option without the agent fails the compile rather than writing an empty table.

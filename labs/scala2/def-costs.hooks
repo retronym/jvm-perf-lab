@@ -1,0 +1,18 @@
+# The cost per definition from the lab (../def-costs.md): perflab-agent weaves these calls into the compiler,
+# CostHooks keeps the cost stack. Run with -javaagent:<perflab-agent.jar>=spec=<this file>.
+#
+# The profiler's own hooks, on NoOpProfiler (the profiler of every run without -Yprofile-enabled)
+hook phase.before    at=scala.tools.nsc.profile.NoOpProfiler$#beforePhase   call=scala.tools.nsc.compilerlab.CostHooks#beforePhase
+hook phase.after     at=scala.tools.nsc.profile.NoOpProfiler$#afterPhase    call=scala.tools.nsc.compilerlab.CostHooks#afterPhase
+hook unit.before     at=scala.tools.nsc.profile.NoOpProfiler$#beforeUnit    call=scala.tools.nsc.compilerlab.CostHooks#beforeUnit
+hook unit.after      at=scala.tools.nsc.profile.NoOpProfiler$#afterUnit     call=scala.tools.nsc.compilerlab.CostHooks#afterUnit
+hook def.before      at=scala.tools.nsc.profile.Profiler#beforeTypedImplDef     call=scala.tools.nsc.compilerlab.CostHooks#beforeTypedImplDef
+hook def.after       at=scala.tools.nsc.profile.Profiler#afterTypedImplDef      call=scala.tools.nsc.compilerlab.CostHooks#afterTypedImplDef
+hook implicit.before at=scala.tools.nsc.profile.Profiler#beforeImplicitSearch   call=scala.tools.nsc.compilerlab.CostHooks#beforeImplicitSearch
+hook implicit.after  at=scala.tools.nsc.profile.Profiler#afterImplicitSearch    call=scala.tools.nsc.compilerlab.CostHooks#afterImplicitSearch
+hook macro.before    at=scala.tools.nsc.profile.Profiler#beforeMacroExpansion   call=scala.tools.nsc.compilerlab.CostHooks#beforeMacroExpansion
+hook macro.after     at=scala.tools.nsc.profile.Profiler#afterMacroExpansion    call=scala.tools.nsc.compilerlab.CostHooks#afterMacroExpansion
+hook load.before     at=scala.tools.nsc.profile.Profiler#beforeCompletion       call=scala.tools.nsc.compilerlab.CostHooks#beforeCompletion
+hook load.after      at=scala.tools.nsc.profile.Profiler#afterCompletion        call=scala.tools.nsc.compilerlab.CostHooks#afterCompletion
+# A hook the profiler lacks: completing a symbol from source, so an inferred type typed ahead is charged to its own definition
+hook complete        at=scala.tools.nsc.typechecker.Namers$TypeCompleterBase#complete  call=scala.tools.nsc.compilerlab.CostHooks#enterCompletion  exit=scala.tools.nsc.compilerlab.CostHooks#exitCompletion

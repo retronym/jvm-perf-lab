@@ -15,8 +15,19 @@ import scala.tools.nsc.reporters.StoreReporter
  *  (definitions, classpath indexing, symbol loading) except reading files and JIT warmup, and nothing survives from
  *  one compilation to the next. With `resident = true`, compilations share one `Global`, each a new `Run`, as a
  *  compile server or the REPL does.
+ *
+ *  `--defs:<file>` and `--defs-listener:<class>` among the options turn on the cost per definition (`CostHooks`), with
+ *  perflab-agent weaving its hooks.
  */
-final class InMemoryCompiler(val corpus: Corpus, extraOptions: List[String] = Nil, resident: Boolean = false) extends Compiling {
+final class InMemoryCompiler(val corpus: Corpus, options: List[String] = Nil, resident: Boolean = false) extends Compiling {
+  // the lab's options for the cost per definition (CostHooks), which scalac does not see
+  private val (costOptions, extraOptions) = options.partition(_.startsWith("--defs"))
+  private val (defsTable, defsListener) = {
+    def value(name: String) = costOptions.collectFirst { case o if o.startsWith(name + ":") => o.stripPrefix(name + ":") }.orNull
+    costOptions.find(o => !o.startsWith("--defs:") && !o.startsWith("--defs-listener:")).foreach(o => throw new IllegalArgumentException(s"unknown option $o"))
+    (value("--defs"), value("--defs-listener"))
+  }
+
   /** The classpath snapshot this compiler reads. */
   val classpathSnapshot: InMemoryClasspath = InMemoryClasspath.forCorpus(corpus)
 
@@ -51,8 +62,13 @@ final class InMemoryCompiler(val corpus: Corpus, extraOptions: List[String] = Ni
       }
     val reporter = global.reporter.asInstanceOf[StoreReporter]
     reporter.reset()
-    try new global.Run().compileFiles(corpus.files)
-    catch {
+    val costs = defsTable != null || defsListener != null
+    try {
+      // from before the run, as the compiler's -Yprofile-defs: making it loads the root classes
+      if (costs) CostHooks.start(global, defsTable, defsListener)
+      try new global.Run().compileFiles(corpus.files)
+      finally if (costs) CostHooks.finish()
+    } catch {
       case e: Exception =>
         throw new IllegalStateException(s"${corpus.name}: compiler crashed after:\n${errors(reporter).mkString("\n")}", e)
     } finally if (!resident) global.close()
