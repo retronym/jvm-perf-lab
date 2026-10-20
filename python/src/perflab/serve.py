@@ -13,6 +13,7 @@ import argparse, hashlib, json, os, signal, socket, subprocess, sys, time
 from . import config
 
 STATE = ".serve.json"
+SERVER = "perflab.httpd"  # the server module, recorded in the state so a server of another kind is replaced
 
 
 def _alive(pid):
@@ -72,9 +73,10 @@ def ensure(root=None, port=None):
     url = lambda p: f"http://127.0.0.1:{p}/" + ("index.html" if rel == "." else f"{rel}/index.html")
     st = _state(root)
     if st and _alive(st.get("pid")) and _listening(st["port"]) and (port is None or port == st["port"]):
-        if st.get("root") == serve:
+        if st.get("root") == serve and st.get("server") == SERVER:
             return url(st["port"])
-        # an older server, for the campaigns alone: replaced on its port, so the URL stays the same
+        # an older server (for the campaigns alone, or plain http.server without charsets): replaced on its port, so
+        # the URL stays the same
         os.kill(st["pid"], signal.SIGTERM)
         for _ in range(50):
             if _free(st["port"]):
@@ -87,9 +89,12 @@ def ensure(root=None, port=None):
             break
     else:
         sys.exit(f"perflab serve: port {want} is in use")
-    proc = subprocess.Popen([sys.executable, "-m", "http.server", str(p), "--bind", "127.0.0.1", "--directory", serve],
+    # the server imports this package, wherever it was imported from (an install, or PYTHONPATH=python/src)
+    pkg = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env = {**os.environ, "PYTHONPATH": os.pathsep.join([pkg, *filter(None, [os.environ.get("PYTHONPATH")])])}
+    proc = subprocess.Popen([sys.executable, "-m", SERVER, str(p), serve], env=env,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, start_new_session=True)
-    json.dump({"pid": proc.pid, "port": p, "root": serve}, open(os.path.join(root, STATE), "w"))
+    json.dump({"pid": proc.pid, "port": p, "root": serve, "server": SERVER}, open(os.path.join(root, STATE), "w"))
     for _ in range(50):
         if _listening(p):
             break

@@ -323,6 +323,12 @@ class ServeTest(unittest.TestCase):
             st = json.load(open(os.path.join(camp, serve.STATE)))
             self.assertEqual(st["root"], os.path.dirname(camp))
             self.assertIn(b"Campaigns and runs", urllib.request.urlopen(url).read())
+            # text is served as UTF-8, as GitHub Pages does: a report's Δ reads as Δ
+            with open(os.path.join(camp, "report.md"), "w", encoding="utf-8") as f:
+                f.write("| Δ |\n")
+            r = urllib.request.urlopen(f"http://127.0.0.1:{port}/ab/report.md")
+            self.assertEqual(r.headers["Content-Type"], "text/markdown; charset=utf-8")
+            self.assertEqual(r.read().decode("utf-8"), "| Δ |\n")
         finally:
             old.kill()
             serve.stop()
