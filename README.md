@@ -1,26 +1,28 @@
 # jvm-perf-lab
 
-JMH profilers and a Java agent for benchmarking JVM programs:
+JMH profilers, a Java agent and a command-line tool for finding out what a change did to a JVM program's performance, and why:
 
 - default profilers for allocation and JIT activity
 - variants compared within one fork, by iteration
 - Apple Silicon PMU counters per thread, via `xctrace`, and flame graphs of PMU events via async-profiler ([doc/pmu-counters.md](doc/pmu-counters.md): which to use when)
 - an agent that counts the callers reaching a method
+- spans a program marks around its own units of work, to break a flame graph down by them
+- `perflab`, which runs all of this through a project's build and shows the results on one page, live as they arrive
 
 Requires Java 17. Design and plan: [doc/design.md](doc/design.md).
 
 ## Sample results
 
-[retronym.github.io/jvm-perf-lab](https://retronym.github.io/jvm-perf-lab/): the campaigns, flame graphs and audit report of [examples/sample](examples/sample), built with `mise run site`.
+[retronym.github.io/jvm-perf-lab](https://retronym.github.io/jvm-perf-lab/): the results of [examples/sample](examples/sample), built with `mise run site`. It is the same page `perflab serve` shows while benchmarks run: an overview, campaigns, PMU counters by run, and runs, with flame graphs, timelines and reports.
 
 | | |
 |---|---|
-| [![Campaigns and fork timeline](doc/screenshots/dashboard.png)](https://retronym.github.io/jvm-perf-lab/campaigns/) | [![A paired fork's timeline](doc/screenshots/timeline.png)](https://retronym.github.io/jvm-perf-lab/campaigns/maps-counters/100000/paired/1/timeline.html) |
-| Campaigns, with the fork timeline: iterations of three variants interleaved, the benchmark thread's cycles and IPC, GC, JIT and other processes | One fork's timeline: GC pauses from the GC log beside the GC threads' cycles |
-| [![Flame graph](doc/screenshots/flamegraph.png)](https://retronym.github.io/jvm-perf-lab/) | [![Audit report](doc/screenshots/audit.png)](https://retronym.github.io/jvm-perf-lab/runs/audit/report.html) |
-| async-profiler, benchmark threads | A caller audit: calls to `normalize`, by caller |
-| [![PMU counters by run](doc/screenshots/counters.png)](https://retronym.github.io/jvm-perf-lab/) | [![Paired memory benchmark timeline](doc/screenshots/memory-timeline.png)](https://retronym.github.io/jvm-perf-lab/campaigns/memory-paired/4194304/paired/1/timeline.html) |
-| PMU counters by run (xctrace): IPC, branch mispredicts per 1000 instructions, instructions and cycles per op | Pointer chase over a sequential vs shuffled array in one fork: IPC drops from about 4.5 to 0.1 in the shuffled iterations |
+| [![The results page](doc/screenshots/dashboard.png)](https://retronym.github.io/jvm-perf-lab/) | [![A paired fork's timeline](doc/screenshots/timeline.png)](https://retronym.github.io/jvm-perf-lab/campaigns/maps-counters/100000/paired/1/timeline.html) |
+| The results page: overview, campaigns, counters and runs, filtered by benchmark, tool and corpus | One fork's timeline: three map variants interleaved by iteration, the benchmark thread's cycles and IPC, GC pauses beside the GC threads' cycles |
+| [![Flame graph with the span panel](doc/screenshots/flamegraph.png)](https://retronym.github.io/jvm-perf-lab/runs/wordcount-async/sample.WordCountBenchmark.countAndLookUp-AverageTime-map-hash-size-100000-variants-/jfr-cpu-cpu.html) | [![Audit report](doc/screenshots/audit.png)](https://retronym.github.io/jvm-perf-lab/runs/audit-normalize/report.html) |
+| async-profiler, benchmark threads, with the span panel: samples by the spans the benchmark marks | A caller audit: calls to `normalize`, by caller |
+| [![PMU counters by run](doc/screenshots/counters.png)](https://retronym.github.io/jvm-perf-lab/#counters) | [![Paired memory benchmark timeline](doc/screenshots/memory-timeline.png)](https://retronym.github.io/jvm-perf-lab/campaigns/memory-paired/4194304/paired/1/timeline.html) |
+| PMU counters by run (xctrace): IPC, branch mispredicts per 1000 instructions, instructions and cycles per op | Pointer chase over a sequential vs shuffled array in one fork: IPC drops from about 4.5 to under 0.1 in the shuffled iterations |
 
 ## Modules
 
@@ -46,10 +48,12 @@ java -javaagent:perflab-agent.jar=spec=envelope.audit,out=audit-{pid}.json ...
 | `perflab run --profile <p> -- <jmh args>` | one run under a profile: `none`, `xctrace:<template>`, `async:<events>`, `audit:<spec>`; flame graphs or an audit report afterwards; serves the index first and shows the run there live |
 | `perflab ab run\|report <spec>` | campaigns: variants over corpora, interleaved by round or paired within forks, each run checked |
 | `perflab trees <spec>` | campaigns across checkouts |
-| `perflab index` | `index.html` over all campaigns and runs, newest first, with a live timeline of the running fork |
-| `perflab serve` | serve the index (one server per checkout, covering campaigns and runs) on 127.0.0.1 and print its URL, the same every time; the page updates itself as results arrive (`run` and `ab run` do this first) |
+| `perflab serve` | serve the results page (one server per checkout) on 127.0.0.1 and print its URL, the same every time; the page updates itself as results arrive and follows the running fork's timeline (`run` and `ab run` do this first) |
+| `perflab index`, `timeline` | rebuild the results page, or one run's or cell's timeline |
+| `perflab site` | the results page as a static site, with an intro, for publishing |
 | `perflab regraph`, `profdiff`, `frameweight`, `subtree`, `analyze` | flame graphs and analysis of async-profiler runs |
 | `perflab auditfold` | merging and folding audit reports |
+| `perflab defcosts` | cost per definition from a compiler's `-Yprofile-defs` table: histograms, outliers, comparisons |
 | `perflab loadgate` | waiting for a quiet machine; sampling competing load |
 
 ## In a build
@@ -63,14 +67,16 @@ server = "sbt"
 ```
 
 ```scala
-libraryDependencies += "com.github.retronym.jvm-perf-lab" % "perflab-jmh" % "<tag>"   // resolvers += "jitpack" at "https://jitpack.io"
+libraryDependencies += "io.github.retronym.perflab" % "perflab-jmh" % "0.1.0-SNAPSHOT"   // resolvers += Resolver.mavenLocal; `mise run install` here
 Jmh / run / mainClass := Some("io.github.retronym.perflab.jmh.Main")
 ```
+
+There is no release yet: build a snapshot into `~/.m2` with `mise run install`. Once tagged, JitPack serves a tag as `com.github.retronym.jvm-perf-lab:perflab-jmh:<tag>`.
 
 [examples/sample](examples/sample) is a Maven project set up this way, with campaign and audit specs.
 
 ## Building
 
-`mise run build` (Java 21 builds the Java 17 release), `mise run test`, `mise run install` for a snapshot in `~/.m2`, `mise run cli` to install `perflab`, `mise run site` and `mise run publish-site` for the sample results.
+`mise run build` (Java 21 builds the Java 17 release), `mise run test`, `mise run install` for a snapshot in `~/.m2`, `mise run cli` to install `perflab`, `mise run tools:async-profiler` for retronym/async-profiler's integration branch (kperf events, `jfrconv --spans`), `mise run site` and `mise run publish-site` for the sample results.
 
 Licensed under the Apache License 2.0.
