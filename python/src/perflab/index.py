@@ -42,11 +42,12 @@ def unit(u):
 
 
 def num(x, like=None):
-    """A score with four significant digits (separators from 1,000); an error `like` its score, to the same decimals."""
-    import math
-    ref = abs(like if like is not None else x)
-    d = max(0, 3 - int(math.floor(math.log10(ref)))) if ref else 0
-    return f"{x:,.{d}f}"
+    """A score: four significant digits, whole numbers with separators from 1,000; an error `like` its score, to the
+    score's decimals."""
+    if like is None:
+        return f"{x:,.0f}" if abs(x) >= 1000 else f"{x:.4g}"
+    shown = num(like)
+    return f"{x:,.{len(shown.partition('.')[2]) if 'e' not in shown else 2}f}"
 
 
 def si(x):
@@ -107,8 +108,7 @@ def cell_row(spec, corpus, variant, cell):
     # a paired cell's -prof gc mixes its variants, so show each variant's own
     paired_alloc = [(k.removeprefix("paired.alloc."), x["score"]) for k, x in m.items()
                     if k.startswith("paired.alloc.") and ".delta%" not in k]
-    alloc_html = (" · ".join(f"{esc(v)} {x / 1e6:.1f}MB" for v, x in paired_alloc) if paired_alloc
-                  else f"{alloc / 1e6:.1f}MB" if alloc else "")
+    alloc_html = (" · ".join(f"{esc(v)} {size(x) or 0}" for v, x in paired_alloc) if paired_alloc else size(alloc))
     scalac = r.get("params", {}).get("scalacOptions", "")
     pattern = re.compile(config.get().get("index", "flags"))
     flags = " ".join([a for a in r["jvmArgs"] if pattern.search(a) and not a.startswith("-Dperflab.")] + ([scalac] if scalac else []))
@@ -146,7 +146,7 @@ def summary(name, cells):
             mean = sum(xs) / len(xs)
             sd = (sum((x - mean) ** 2 for x in xs) / (len(xs) - 1)) ** 0.5 if len(xs) > 1 else 0.0
             return mean, sd
-        cols = ((1, num), (2, lambda x: f"{x / 1e9:.3f}G"), (3, lambda x: f"{x / 1e9:.3f}G"), (5, lambda x: f"{x / 1e6:.1f}MB"))
+        cols = ((1, num), (2, si), (3, si), (5, size))
         base = {i: stats([c[i] for c in vs[names[0]]])[0] for i, _ in cols}
         for v in names:
             cs = vs[v]
@@ -180,9 +180,10 @@ def paired_summary(names, cells):
         forks = [c[6] for cs in cells[corpus].values() for c in cs]
         for v in names:
             tds = [f"{esc(corpus)}{mixed(cells[corpus]) if v == names[0] else ''}", esc(v), str(len(forks))]
-            for _, key, scale, fmt in ab.PAIRED_METRICS:
+            for label, key, scale, fmt in ab.PAIRED_METRICS:
                 m, ds, _ = ab.paired_metric(forks, key.format(v))
-                tds += [fmt.format(m / scale) if m is not None else "", ab.delta_summary(ds) if ds else ""]
+                show = size if label.startswith("alloc") else si if label.endswith("/op") else num
+                tds += [(show(m) or "0") if m is not None else "", ab.delta_summary(ds) if ds else ""]
             out.append(("", tds))
     heads = [("corpus", False), ("variant", False), ("forks", False)]
     heads += [h for label, *_ in ab.PAIRED_METRICS for h in ((esc(label), False), ("Δ (paired)", False))]

@@ -291,7 +291,7 @@ class RunIndexTest(unittest.TestCase):
         self.assertIn("<code>-p corpus=re2s</code>", page)
         self.assertIn("<code>-XX:+UseG1GC</code>", page)
         self.assertIn('<th class="n">ms/op</th>', page)
-        self.assertIn('compile <code>g=4</code></td><td class="n">154.0 ± 3.2</td>', page)
+        self.assertIn('compile <code>g=4</code></td><td class="n">154 ± 3</td>', page)
         self.assertNotIn("cycles/op", page)  # no column without values
         self.assertIn('<a class="btn" href="../runs/multi-global/jmh.log">jmh.log</a>', page)
         self.assertIn('<optgroup label="runs"><option value="../runs/multi-global/">multi-global</option>', page)
