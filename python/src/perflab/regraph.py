@@ -6,6 +6,9 @@ beside the async-profiler library). Multi-event kperf recordings need a jfrconv 
 A run directory is one `perflab run` or a campaign cell wrote with an async profile. For each JFR under it, each event and
 each graph kind (KINDS below; `[async] graphs = [...]` in perflab.toml or --kinds picks some), writes
 `<jfr stem>-<label>[-<kind>].html`.
+
+With `[async] spans = true` the `bench` graphs get the span panel (`jfrconv --spans`), for recordings with spans from the
+program (async-profiler's Span API, the perflab-spans jar); `[async] span_config` names the panel's groupings.
 """
 import argparse, concurrent.futures, glob, os, re, shutil, subprocess, sys
 
@@ -20,6 +23,16 @@ KINDS = {
     "bench-classify": (BENCH + ["--classify"], False),
     "reverse-classify": (BENCH + ["--classify"], True),
 }
+
+
+def span_args():
+    """jfrconv options for the span panel of `bench` graphs, from [async] spans and span_config in perflab.toml."""
+    from . import config
+    c = config.get()
+    conf = c.path("async", "span_config")
+    if not (c.get("async", "spans") or conf):
+        return []
+    return ["--spans", *(["--span-config", conf] if conf else [])]
 
 
 def kinds(explicit=None):
@@ -55,7 +68,9 @@ HEAP = "24g"
 # older build) rendered are redone even when they are newer than the recording
 def stamp(jfrconv):
     path = shutil.which(jfrconv) or jfrconv
-    return f"{os.path.realpath(path)} {os.path.getmtime(path):.0f} minwidth={MINWIDTH}"
+    spans = span_args()
+    conf = f" {os.path.getmtime(spans[-1]):.0f}" if len(spans) > 1 and os.path.exists(spans[-1]) else ""
+    return f"{os.path.realpath(path)} {os.path.getmtime(path):.0f} minwidth={MINWIDTH}" + (f" {' '.join(spans)}{conf}" if spans else "")
 
 
 def stamp_of(jfr):
@@ -71,6 +86,8 @@ def graph_path(jfr, label, kind):
 
 def render_one(jfrconv, jfr, label, select, kind, title):
     extra, reverse = KINDS[kind]
+    if kind == "bench":
+        extra = extra + span_args()
     out = graph_path(jfr, label, kind)
     if not FORCE and os.path.exists(out) and stamp_of(jfr) == stamp(jfrconv) and os.path.getmtime(out) > os.path.getmtime(jfr):
         return None

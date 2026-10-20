@@ -25,6 +25,20 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(c.campaigns, os.path.join(p.dir, "out/perflab/ab"))
 
 
+class RegraphSpansTest(unittest.TestCase):
+    def test_off_by_default(self):
+        Project("")
+        self.assertEqual(regraph.span_args(), [])
+
+    def test_span_config_implies_spans(self):
+        p = Project('[async]\nspan_config = "spans.json"\n')
+        self.assertEqual(regraph.span_args(), ["--spans", "--span-config", os.path.join(p.dir, "spans.json")])
+
+    def test_spans_without_config(self):
+        Project("[async]\nspans = true\n")
+        self.assertEqual(regraph.span_args(), ["--spans"])
+
+
 class RunTest(unittest.TestCase):
     def setUp(self):
         self.p = Project('[build]\njmh = "java -jar b.jar {args}"\n[agent]\njar = "agent.jar"\n')

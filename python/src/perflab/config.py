@@ -27,6 +27,8 @@
     lib = "path/to/libasyncProfiler.dylib"   # default: $ASYNC_PROFILER_LIB, then the usual install locations
     jfrconv = "path/to/jfrconv"              # default: $JFRCONV, then beside lib, then the PATH
     stackdepth = 8192                        # frames per stack; default: async-profiler's 2048
+    spans = true                             # the span panel on `bench` graphs (jfrconv --spans)
+    span_config = "span-config.json"         # the span panel's groupings (implies spans)
 
     [analyze]
     phases = "perflab-phases.toml"    # phase table for `perflab analyze`
@@ -39,7 +41,7 @@ DEFAULTS = {
     "paths": {"runs": "out/perflab/runs", "campaigns": "out/perflab/ab"},
     "index": {"flags": "^-D"},
     "agent": {"jar": ""},
-    "async": {"lib": "", "jfrconv": "", "stackdepth": ""},
+    "async": {"lib": "", "jfrconv": "", "stackdepth": "", "spans": False, "span_config": ""},
     "analyze": {"phases": ""},
 }
 
