@@ -67,6 +67,16 @@ class RunTest(unittest.TestCase):
         self.assertEqual(regraph.events_of(out), [("hw-cycles", ["--hw", "cycles"]), ("hw-cache-misses", ["--hw", "cache-misses"])])
         self.assertEqual([l for l, _ in regraph.events_of("async:cpu,alloc")], ["cpu", "alloc"])
 
+    def test_async_records_the_jdk_events_by_jfrsync(self):
+        out = os.path.join(self.p.dir, "run")
+        jmh.prepare(out, "async:cpu", ["B"], lib="/x/lib.dylib")
+        a = self.args(out)
+        self.assertIn(f",jfrsync={jmh.PERFLAB_JFC};", a[a.index("-prof") + 1])
+        self.assertTrue(os.path.exists(jmh.PERFLAB_JFC))
+        p = Project('[build]\njmh = "java -jar b.jar {args}"\n[async]\njfrsync = false\n')
+        jmh.prepare(os.path.join(p.dir, "run"), "async:cpu", ["B"], lib="/x/lib.dylib")
+        self.assertNotIn("jfrsync", open(os.path.join(p.dir, "run", "jmh.args")).read())
+
     def test_audit_puts_the_agent_on_the_fork(self):
         out = os.path.join(self.p.dir, "run")
         jmh.prepare(out, "audit:x.audit", ["B"])

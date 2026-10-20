@@ -14,9 +14,10 @@ Profiles:
 Options for async: --kperf <socket> (macOS PMU events through a running asprof-kperf helper), --lib <libasyncProfiler>.
 
 The arguments go to the build in a file, as `@file`, so no profiler option is ever typed into a tool that splits a
-command at `;`. Output: <out>/jmh.log, result.json, the profile's files, and timeline.html (every fork's JVM start, iterations, GC
-pauses and exit on one wall-clock axis, plus PMU counter lanes with xctrace); afterwards flame graphs for async, a merged
-report for audits. The run is on the index (`perflab serve`, whose URL it prints first) as it goes: <out>/run.json holds
+command at `;`. Output: <out>/jmh.log, result.json, the profile's files (async's .jfr also holds the JDK's own events
+of the measured window, GC, safepoints, JIT and so on, as perflab.jfc selects: `[async] jfrsync`), and timeline.html
+(every fork's JVM start, iterations, GC pauses and exit on one wall-clock axis, plus PMU counter lanes with xctrace);
+afterwards flame graphs for async, a merged report for audits. The run is on the index (`perflab serve`, whose URL it prints first) as it goes: <out>/run.json holds
 its status.
 """
 import argparse, glob, json, os, shlex, subprocess, sys, time
@@ -47,6 +48,21 @@ def jfrconv(lib=None):
         if c and os.path.exists(c):
             return c
     return "jfrconv"
+
+
+PERFLAB_JFC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "perflab.jfc")
+
+
+def jfrsync():
+    """async-profiler's jfrsync setting: the JDK events to record with its own, in the same .jfr; None for none."""
+    cfg = config.get()
+    v = cfg.get("async", "jfrsync")
+    if v is True:
+        return PERFLAB_JFC
+    if not v:
+        return None
+    # a .jfc relative to the project root, else a predefined JFR profile (default, profile) or a +event list
+    return cfg.path("async", "jfrsync") if v.endswith(".jfc") else v
 
 
 def async_events(spec):
@@ -92,6 +108,9 @@ def profile_args(profile, out, kperf=None, lib=None):
         depth = config.get().get("async", "stackdepth")
         if depth:
             raw.append(f"jstackdepth={depth}")
+        sync = jfrsync()
+        if sync:
+            raw.append(f"jfrsync={sync}")
         opts.append("rawCommand=" + ",".join(raw))
         return ["-prof", "async:" + ";".join(opts + async_events(arg or "cpu"))], jvm
     if kind == "audit":
