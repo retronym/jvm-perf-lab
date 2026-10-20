@@ -22,9 +22,10 @@ class CompileBenchmark:
   @Param(Array(""))
   var scalacOptions: String = compiletime.uninitialized
 
-  /** `fresh`: a new compiler per op; `shared`: one root context and `Compiler` for all ops, as a compile server (leaks). */
+  /** `fresh`: a new compiler per op; `resident`: one root context and `Compiler` for all ops, a new `Run` per op, as a
+   *  compile server (leaks). */
   @Param(Array("fresh"))
-  var context: String = compiletime.uninitialized
+  var compiler: String = compiletime.uninitialized
 
   /** Variants compared within the fork, `<name>=<scalacOptions>|<name>=<scalacOptions>...`, the first the baseline
    *  (see `doc/paired-ab.md`). Each iteration, warmup included, runs the next variant in turn, the order changing
@@ -40,25 +41,30 @@ class CompileBenchmark:
   @Param(Array("false"))
   var gcBetweenIterations: Boolean = false
 
-  private var compiler: InMemoryCompiler = compiletime.uninitialized
+  private var current: InMemoryCompiler = compiletime.uninitialized
   private var alternatives: Array[(String, InMemoryCompiler)] = Array()
   private var iteration = 0
+
+  private def isResident: Boolean = compiler match
+    case "fresh" => false
+    case "resident" => true
+    case other => sys.error(s"compiler=$other: expected fresh or resident")
 
   @Setup(Level.Trial)
   def setup(): Unit =
     Announce.jvm(s"CompileBenchmark($corpus)")
     val common = scalacOptions.split(" ").toList.filter(_.nonEmpty)
     val src = Corpus.load(corpus)
-    compiler = InMemoryCompiler(src, common, shared = context == "shared")
-    compiler.compile()
-    println(s"\n[compiler-lab] $corpus: ${compiler.corpus.files.size} sources -> ${compiler.outputCount} output files; classpath in memory: ${compiler.classpathSnapshot}")
+    current = InMemoryCompiler(src, common, resident = isResident)
+    current.compile()
+    println(s"\n[compiler-lab] $corpus: ${current.corpus.files.size} sources -> ${current.outputCount} output files; classpath in memory: ${current.classpathSnapshot}")
     val parsed = variants.split('|').toList.map(_.trim).filter(_.nonEmpty).map { v =>
       val i = v.indexOf('=')
       if i <= 0 then sys.error(s"variant without a name: '$v' (expected <name>=<scalacOptions>)")
       v.take(i).trim -> v.drop(i + 1).split(" ").toList.filter(_.nonEmpty)
     }
     alternatives = parsed.map { (name, opts) =>
-      val c = InMemoryCompiler(src, common ::: opts, shared = context == "shared", classpath = compiler.classpathSnapshot)
+      val c = InMemoryCompiler(src, common ::: opts, resident = isResident, classpath = current.classpathSnapshot)
       c.compile()
       println(s"[compiler-lab] variant $name: ${opts.mkString(" ")} -> ${c.outputCount} output files")
       name -> c
@@ -72,7 +78,7 @@ class CompileBenchmark:
       val n = alternatives.length
       val (name, c) = alternatives(Variants.order(n, iteration / n)(iteration % n))
       if gcBetweenIterations then System.gc()
-      compiler = c
+      current = c
       iteration += 1
       IterationLog.begin(name, ip.getType == IterationType.MEASUREMENT)
 
@@ -80,20 +86,20 @@ class CompileBenchmark:
   def endVariant(): Unit = if alternatives.nonEmpty then IterationLog.end()
 
   @Benchmark
-  def compile(): Unit = compiler.compile()
+  def compile(): Unit = current.compile()
 
 
 /** Compiles a corpus repeatedly outside JMH, printing each run's time, e.g. to attach a profiler or Instruments. */
 object CompileLoop:
   /** `CompileLoop [corpus] [runs] [scalac options...]`: compiles the corpus in a loop, printing each run's time and the
-   *  live heap after it (after a full GC); `-Dcompilerlab.shared` shares one compiler across runs. `-Dcompilerlab.histoAt=2,10` also writes a class histogram of the live heap after
+   *  live heap after it (after a full GC); `-Dcompilerlab.resident` shares one compiler across runs. `-Dcompilerlab.histoAt=2,10` also writes a class histogram of the live heap after
    *  those runs to `$TMPDIR/compilerlab-histo-<corpus>-<run>.txt`, to find what survives from one run to the next.
    */
   def main(args: Array[String]): Unit =
     val corpus = args.headOption.getOrElse("dottyUtil")
     val n = args.lift(1).fold(20)(_.toInt)
     val histoAt = sys.props.get("compilerlab.histoAt").toList.flatMap(_.split(",")).map(_.trim.toInt).toSet
-    val compiler = InMemoryCompiler(Corpus.load(corpus), args.drop(2).toList, shared = sys.props.contains("compilerlab.shared"))
+    val compiler = InMemoryCompiler(Corpus.load(corpus), args.drop(2).toList, resident = sys.props.contains("compilerlab.resident"))
     println(s"classpath in memory: ${compiler.classpathSnapshot}")
     val memory = java.lang.management.ManagementFactory.getMemoryMXBean
     for i <- 1 to n do

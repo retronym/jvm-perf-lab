@@ -14,11 +14,11 @@ import dotty.tools.io.AbstractFile
  *
  *  By default each compilation starts from scratch, as a fresh `ContextBase`, platform and `Compiler`. It pays for
  *  everything a cold compile does (definitions, classpath indexing, symbol loading) except reading files and JIT warmup,
- *  and nothing survives from one compilation to the next but JVM-wide state (the name table). With `shared = true`, all
+ *  and nothing survives from one compilation to the next but JVM-wide state (the name table). With `resident = true`, all
  *  compilations share one root context and `Compiler`, each a new `Run`, as a warm compile server would; dotc then
  *  retains every earlier `Run` through state on the root context and in phases, so the heap grows with each compilation.
  */
-final class InMemoryCompiler(val corpus: Corpus, extraOptions: List[String] = Nil, shared: Boolean = false,
+final class InMemoryCompiler(val corpus: Corpus, extraOptions: List[String] = Nil, resident: Boolean = false,
     classpath: InMemoryClasspath | Null = null) extends Driver:
 
   /** The classpath snapshot this compiler reads. */
@@ -43,13 +43,13 @@ final class InMemoryCompiler(val corpus: Corpus, extraOptions: List[String] = Ni
     val (_, ctx) = setup(args, initCtx).getOrElse(sys.error(s"bad options: ${args.mkString(" ")}"))
     ctx.fresh.setSetting(ctx.settings.outputDir, out)
 
-  private lazy val sharedRoot: (Context, Compiler) =
+  private lazy val residentRoot: (Context, Compiler) =
     val ctx = newRootContext(output)
     (ctx, newCompiler(using ctx))
 
   /** A root context and compiler for the next compilation, and where it writes. */
   private def prepare(): (Context, Compiler) =
-    if shared then sharedRoot
+    if resident then residentRoot
     else
       output = dotty.tools.io.virtualDirectory("<compiler-lab output>")
       val ctx = newRootContext(output)

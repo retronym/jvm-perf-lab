@@ -28,7 +28,7 @@ class CompileBenchmark {
 
   /** `fresh`: a new `Global` per op; `resident`: one `Global` for all ops, a new `Run` per op. */
   @Param(Array("fresh"))
-  var global: String = _
+  var compiler: String = _
 
   /** Variants compared within the fork, `<name>=<scalacOptions>|<name>=<scalacOptions>...`, the first the baseline.
    *  Each iteration, warmup included, runs the next variant in a Williams order (perflab's `Variants`), so the variants
@@ -54,7 +54,7 @@ class CompileBenchmark {
   @Param(Array("false"))
   var gcBetweenIterations: Boolean = false
 
-  private var compiler: Compiling = _
+  private var current: Compiling = _
   private var parsed: Variants = _
   private var alternatives: Map[String, Compiling] = Map.empty
   private var iteration = 0
@@ -70,18 +70,18 @@ class CompileBenchmark {
     }
     val common = CompileBenchmark.split(scalacOptions)
     val src = Corpus.load(corpus)
-    val resident = global match {
+    val resident = compiler match {
       case "fresh" => false
       case "resident" => true
-      case other => sys.error(s"global=$other: expected fresh or resident")
+      case other => sys.error(s"compiler=$other: expected fresh or resident")
     }
     parsed = Variants.parse(variants)
     val own = new InMemoryCompiler(src, common, resident)
     println(s"\n[compiler-lab] $corpus: ${src.files.size} sources; classpath in memory: ${own.classpathSnapshot}")
     if (parsed.isEmpty) {
-      compiler = own
-      compiler.compile()
-      println(s"[compiler-lab] ${compiler.outputCount} output files")
+      current = own
+      current.compile()
+      println(s"[compiler-lab] ${current.outputCount} output files")
     }
     alternatives = parsed.all.asScala.map { v =>
       val (builds, options) = v.options.asScala.toList.partition(_.startsWith(BuildOption))
@@ -104,7 +104,7 @@ class CompileBenchmark {
       val v = parsed.forIteration(iteration)
       iteration += 1
       if (gcBetweenIterations) System.gc()
-      compiler = alternatives(v.name)
+      current = alternatives(v.name)
       IterationLog.begin(v.name, ip.getType == IterationType.MEASUREMENT)
     }
 
@@ -112,7 +112,7 @@ class CompileBenchmark {
   def endVariant(): Unit = if (!parsed.isEmpty) IterationLog.end()
 
   @Benchmark
-  def compile(): Unit = compiler.compile()
+  def compile(): Unit = current.compile()
 }
 
 object CompileBenchmark {

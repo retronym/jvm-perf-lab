@@ -72,7 +72,7 @@ Checked on `dottyUtil` with JFR file events (`jdk.FileRead`, `jdk.FileWrite`, no
 
 ### Live heap across ops
 
-`CompileLoop` prints the live heap after each run (after a full GC), and `-Dcompilerlab.histoAt=<runs>` writes class histograms, to diff what survives. From scratch per op, it stays flat (scalaz: 110 MB over 8 runs); with `-Dcompilerlab.shared` it grows by a whole `Run` per op.
+`CompileLoop` prints the live heap after each run (after a full GC), and `-Dcompilerlab.histoAt=<runs>` writes class histograms, to diff what survives. From scratch per op, it stays flat (scalaz: 110 MB over 8 runs); with `-Dcompilerlab.resident` it grows by a whole `Run` per op.
 
 ## Future work
 
