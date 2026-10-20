@@ -97,7 +97,7 @@ def cell_row(spec, corpus, variant, cell):
     when = os.path.getmtime(res_f)
     version = specs.of_cell(cell)
     ver_html = f' <span class="when ver" title="spec version">spec {esc(version)}</span>' if version else ""
-    cells = [esc(corpus), f"{name}{ver_html}", f"{num(p['score'])} ± {num(p['scoreError'], p['score'])}",
+    cells = [esc(corpus), f"{name}{ver_html}", num(p['score']) + (f" ± {num(p['scoreError'], p['score'])}" if isinstance(p.get("scoreError"), (int, float)) else ""),  # JMH writes "NaN" for too few iterations
              si(cyc) if cyc else "", si(ins) if ins else "", alloc_html,
              f"<code>{esc(flags)}</code>" if flags else "", f'<span class="when">{stamp(when)}</span>']
     detail = (f'<div class="cellg">{f"<span class={chr(34)}btns{chr(34)}>{tl}</span>" if tl else ""}{graphs}</div>') if tl or graphs else ""

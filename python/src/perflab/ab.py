@@ -270,7 +270,8 @@ def run(spec, dry):
 def summary(r):
     m, p = r.get("secondaryMetrics", {}), r["primaryMetric"]
     get = lambda k: m[k]["score"] if k in m else None
-    return {"ms": p["score"], "err": p["scoreError"], "unit": p.get("scoreUnit", ""), "alloc": get("gc.alloc.rate.norm"), "gc": get("gc.time"),
+    return {"ms": p["score"], "err": p["scoreError"] if isinstance(p.get("scoreError"), (int, float)) else float("nan"),  # JMH writes "NaN" for too few iterations
+            "unit": p.get("scoreUnit", ""), "alloc": get("gc.alloc.rate.norm"), "gc": get("gc.time"),
             "cyc": get("xctrace.CORE_ACTIVE_CYCLE"), "ipc": get("xctrace.IPC.bench"), "inst": get("xctrace.INST_ALL")}
 
 
