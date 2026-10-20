@@ -51,13 +51,20 @@ Out of scope: the flame graph pages themselves (retronym/async-profiler's jfrcon
 ### Steps
 
 1. DONE `site.py`: a run with an empty result.json (interrupted) no longer stops the site build.
-2. TODO `ui.py`: shared tokens, base CSS and the lightbox; index, timeline, site and compare inline it. No visual change beyond dark-mode badges and the viewport meta.
-3. TODO Index cards: run and campaign headers with link buttons; facts line; results tables without empty columns, params folded into the benchmark cell, `µs/op`; campaign cell tables likewise; anchors per card.
-4. TODO Index chrome: filter bar grouped (corpus / show / age / text) with matching labels; the graph-kind legend into a `?` popover and link tooltips; the timeline picker shows each run or cell as its name only, with its status as a chip ("following the running fork since 15:57:48").
-5. TODO Lightbox: flame graph and diff links on the index and the site open in it; the compare page's widgets get `⤢` (overlay) and `↗` (new tab).
-6. TODO Timeline drawing (`timeline.js`): measurement in the legend; start/exit as a hatched bar distinct from warmup; every bar labelled with score and unit where it fits; a gap between iterations drawn as a labelled span (profiler attach when the profile is xctrace); the exit bar labelled with the profiler's share; "none" in empty lanes; a zero line and mid gridline per counter lane, and the scale's unit.
-7. TODO Timeline page (`timeline.py`): titled by run name, benchmark, profile and date; one line of help plus `?`.
-8. TODO Site landing: the same cards and buttons as the index; overview table styled to match.
+2. DONE `ui.py`: shared tokens (light and dark), base CSS, `?` popovers and the lightbox; every page inlines it and has a viewport meta.
+3. DONE Index cards: run and campaign headers with link buttons; facts line; tables without empty columns, params folded into the benchmark cell, units in headers (`µs/op`); a campaign cell's timeline and graphs on a row beneath it; anchors per card (`#run-<name>`, `#c-<name>`); summary and cells tables captioned; spec versions collapsed.
+4. DONE Index chrome: filter bar grouped (corpus / show / updated / text); the graph-kind legend in a `?` popover and the buttons' tooltips; the timeline picker names runs and cells alike (grouped), with the running fork as a status chip ("running since 16:16:01", or "<name> running" to jump to it).
+5. DONE Lightbox: timelines, flame graphs and diffs on the index and the site open in it; a refresh of the index keeps opened details; the compare page's widgets have `↗` and `⤢`.
+6. DONE Timeline drawing: measurement in the legend; start/exit hatched and labelled; every bar labelled where it fits (unit under the lane name); gaps between iterations dashed and named (xctrace attaching); the exit bar says it includes xctrace saving the trace; "none" in empty lanes; baseline, mid line and scale per counter lane; fits a phone.
+7. DONE Timeline page: titled by run (or cell) name, with benchmark, parameters, profile and date; one line of help plus `?`.
+8. DONE Site landing: runs as cards with buttons; graph totals in short form; PMU table styled to match; one number format everywhere (scores to four significant digits with separators, counts per op as K/M/G).
+
+Deferred, with reasons:
+
+- **Lanes that share a scale.** No two counter lanes share one today: each is scaled to its own peak, since a shared scale would flatten GC and JIT against the benchmark thread. The `?` says each lane has its own scale; a shared-scale mode is future work if a comparison across lanes is wanted.
+- **The exit bar drawn differently from JVM time.** The fork's files don't separate the JVM's exit from xctrace saving its trace; the bar is labelled as both. Splitting it needs xctrace's end time recorded in iterations.tsv.
+- **Live timeline of an xctrace run.** The index's panel fetches `timeline.tsv`, but xctrace runs write `<trace>.timeline.tsv` per fork, so live counters show only on the static page (pre-existing, not a UI change).
+- **Linked controls in the lightbox.** The compare page relays a graph's toolbar state to its siblings; the lightbox shows one graph at a time, so it doesn't.
 
 ### Follow-ups for retronym/async-profiler (integration-kperf-flamegraph)
 
