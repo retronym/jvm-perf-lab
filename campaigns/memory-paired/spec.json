@@ -1,0 +1,9 @@
+{
+  "name": "memory-paired",
+  "benchmark": "MemoryBenchmark",
+  "profile": "xctrace:mem-l1d",
+  "rounds": 2,
+  "corpora": {"4194304": "-wi 4 -i 8 -w 1 -r 1"},
+  "paired": {"sequential": "sequential", "shuffled": "shuffled"},
+  "gcLog": true
+}

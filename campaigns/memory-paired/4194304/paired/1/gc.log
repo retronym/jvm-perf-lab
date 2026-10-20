@@ -1,0 +1,4 @@
+[2026-10-20T16:06:41.721+1000][0.009s] Using G1
+[2026-10-20T16:07:08.904+1000][27.193s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 103M->8M(1024M) 13.923ms
+[2026-10-20T16:07:08.986+1000][27.274s] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 57M->12M(1024M) 3.101ms
+[2026-10-20T16:07:09.044+1000][27.333s] GC(2) Pause Young (Normal) (G1 Evacuation Pause) 85M->15M(1024M) 1.462ms

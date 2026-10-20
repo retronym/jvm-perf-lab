@@ -1,0 +1,29 @@
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   544 /   173.3 /    8
+  WARMUP        2:    75 /    83.1 /    5
+  WARMUP        3:     9 /     1.1 /    0
+  MEASUREMENT   4:    35 /    18.9 /    0
+  MEASUREMENT   5:    10 /     0.9 /    0
+  MEASUREMENT   6:    13 /     2.7 /    0
+  MEASUREMENT   7:     9 /     0.5 /    1
+  MEASUREMENT   8:     3 /     0.2 /    0
+[jit] compiled while measuring:
+     2  java.lang.StringLatin1.compareTo (tier 3)
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.BufferedReader.ensureOpen (tier 4)
+     1  java.io.CharArrayWriter.write (tier 4)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.Byte.valueOf (tier 3)
+     1  java.lang.CharacterDataLatin1.toLowerCase (tier 4)
+     1  java.lang.Math.max (tier 3)
+     1  java.lang.String.compareTo (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+[jit] deoptimized while measuring:
+     1  java.util.concurrent.locks.ReentrantLock$Sync.lock (c2: unstable_if, reinterpret)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-chase-91673.txt

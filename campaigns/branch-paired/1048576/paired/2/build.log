@@ -1,0 +1,117 @@
+[xctrace] Starting recording with the perflab-ipc-1235755819864988770.template template. Attaching to: java (80358). 
+[xctrace] Ctrl-C to stop the recording
+[perflab] paired paired. (us/op): sorted 291.8 random 2391 (+720.56% ± 40.45, median +725.68%, 4 pairs)
+[perflab] paired paired.gcFree. (us/op): sorted 291.8 random 2391 (+720.56% ± 40.45, median +725.68%, 4 pairs)
+[perflab] paired paired.alloc. (B/op): sorted 4.378 random 50.21 (+1024.55% ± 607.98, median +1012.85%, 4 pairs)
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   532 /   158.0 /    9
+  WARMUP        2:    77 /    37.1 /    2
+  WARMUP        3:    21 /     6.8 /    1
+  WARMUP        4:    16 /     7.5 /    0
+  MEASUREMENT   5:    28 /     3.4 /    0
+  MEASUREMENT   6:    12 /     4.5 /    0
+  MEASUREMENT   7:     6 /     1.2 /    0
+  MEASUREMENT   8:    14 /     3.4 /    0
+  MEASUREMENT   9:     3 /     1.1 /    0
+  MEASUREMENT  10:     3 /     0.4 /    0
+  MEASUREMENT  11:    12 /     1.9 /    0
+  MEASUREMENT  12:    16 /     1.5 /    0
+[jit] compiled while measuring:
+     2  java.nio.ByteBuffer.wrap (tier 3)
+     1  java.io.ObjectOutputStream$HandleTable.assign (tier 3)
+     1  java.io.ObjectOutputStream.writeClassDesc (tier 3)
+     1  java.io.ObjectOutputStream.writeHandle (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectOutputStream.writeOrdinaryObject (tier 3)
+     1  java.io.ObjectStreamClass.getClassDataLayout (tier 3)
+     1  java.io.ObjectStreamClass.isExternalizable (tier 3)
+     1  java.io.ObjectStreamClass.isRecord (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.ClassLoader.findBootstrapClassOrNull (tier 3)
+     1  java.lang.Double.doubleValue (tier 1)
+     1  java.lang.Long.stringSize (tier 4)
+     1  java.lang.Math.max (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-sumAbove-80358.txt
+[xctrace] code map: 3336 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Run issues were detected (trace is still ready to be viewed):
+[xctrace] * [Warning] Lost events were detected. Data rate might be too high. Trying with another recording mode might solve this issue.
+[xctrace] 
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: sumAbove-80358.trace
+
+== INST_ALL (bench threads)
+   99.9%  sample.BranchBenchmark.sumAbove
+    0.0%  _sigtramp
+    0.0%  <unknown 0x1205d517d>
+    0.0%  <unknown 0x1205dded1>
+    0.0%  <unknown 0x120610b01>
+    0.0%  java.lang.invoke.LambdaForm$MH/0x0000009001081c00.invoke
+    0.0%  <unknown 0x120821f49>
+    0.0%  <unknown 0x1205e63c9>
+    0.0%  <unknown 0x1205e36e9>
+    0.0%  <unknown 0x1205dcd85>
+    0.0%  <unknown 0x1205dde05>
+    0.0%  InstanceKlass::find_method_index(Array<Method*> const*, Symbol const*, Symbol const*, Klass::OverpassLookupMode, Klass::StaticLookupMode, Klass::PrivateLookupMode)
+
+== INST_BRANCH (bench threads)
+   99.9%  sample.BranchBenchmark.sumAbove
+    0.0%  _sigtramp
+    0.0%  <unknown 0x1205d517d>
+    0.0%  <unknown 0x1205dded1>
+    0.0%  <unknown 0x120610b01>
+    0.0%  java.lang.invoke.LambdaForm$MH/0x0000009001081c00.invoke
+    0.0%  <unknown 0x120821f49>
+    0.0%  <unknown 0x1205e36e9>
+    0.0%  <unknown 0x1205e63c9>
+    0.0%  <unknown 0x1205dcd85>
+    0.0%  <unknown 0x1205dde05>
+    0.0%  InstanceKlass::find_method_index(Array<Method*> const*, Symbol const*, Symbol const*, Klass::OverpassLookupMode, Klass::StaticLookupMode, Klass::PrivateLookupMode)
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   99.9%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x120610b01>
+    0.0%  <unknown 0x1205e63c9>
+    0.0%  _sigtramp
+    0.0%  <unknown 0x1205e36e9>
+    0.0%  <unknown 0x1205d517d>
+    0.0%  <unknown 0x1205dcd85>
+    0.0%  <unknown 0x120821f49>
+    0.0%  <unknown 0x1205dde05>
+    0.0%  java.lang.invoke.LambdaForm$MH/0x0000009001081c00.invoke
+    0.0%  <unknown 0x1205dded1>
+    0.0%  InstanceKlass::find_method_index(Array<Method*> const*, Symbol const*, Symbol const*, Klass::OverpassLookupMode, Klass::StaticLookupMode, Klass::PrivateLookupMode)
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   99.9%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x120610b01>
+    0.0%  <unknown 0x1205e36e9>
+    0.0%  <unknown 0x1205e63c9>
+    0.0%  <unknown 0x1205dcd85>
+    0.0%  <unknown 0x1205dde05>
+    0.0%  InstanceKlass::find_method_index(Array<Method*> const*, Symbol const*, Symbol const*, Klass::OverpassLookupMode, Klass::StaticLookupMode, Klass::PrivateLookupMode)
+    0.0%  java.lang.invoke.LambdaForm$MH/0x0000009001081c00.invoke
+    0.0%  <unknown 0x120821f49>
+    0.0%  _sigtramp
+    0.0%  <unknown 0x1205d517d>
+    0.0%  <unknown 0x1205dded1>
+
+== samples (bench threads)
+   99.8%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x120610b01>
+    0.0%  java.lang.invoke.LambdaForm$MH/0x0000009001081c00.invoke
+    0.0%  <unknown 0x1205d517d>
+    0.0%  _sigtramp
+    0.0%  <unknown 0x1205e63c9>
+    0.0%  <unknown 0x1205dded1>
+    0.0%  <unknown 0x120821f49>
+    0.0%  <unknown 0x1205dde05>
+    0.0%  InstanceKlass::find_method_index(Array<Method*> const*, Symbol const*, Symbol const*, Klass::OverpassLookupMode, Klass::StaticLookupMode, Klass::PrivateLookupMode)
+    0.0%  <unknown 0x1205dcd85>
+    0.0%  <unknown 0x1205e36e9>
+[perflab] paired xctrace.INST_ALL. (#/op): sorted 5.509e+06 random 5.825e+06 (+6.37% ± 12.52, median +1.42%, 4 pairs)
+[perflab] paired xctrace.INST_BRANCH. (#/op): sorted 1.483e+06 random 1.568e+06 (+6.37% ± 12.52, median +1.41%, 4 pairs)
+[perflab] paired xctrace.CORE_ACTIVE_CYCLE. (#/op): sorted 9.663e+05 random 8.514e+06 (+784.70% ± 88.43, median +742.26%, 4 pairs)
+[perflab] paired xctrace.BRANCH_MISPRED_NONSPEC. (#/op): sorted 222.4 random 4.324e+05 (+195297.10% ± 20165.55, median +187526.99%, 4 pairs)

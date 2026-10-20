@@ -1,0 +1,319 @@
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>memory-paired · 4194304 · paired #2: timeline</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--fg:#1d232b;--muted:#5d6875;--line:#dde2e8;--line2:#eef1f4;--link:#2f6fb2;--link-bg:#e8f0fa;
+  --ok:#22663a;--ok-bg:#e3f1e7;--warn:#7a5200;--warn-bg:#fdf0d5;--bad:#9b1c1c;--bad-bg:#fbe3e3;--shadow:0 1px 2px rgba(20,30,40,.06)}
+@media (prefers-color-scheme: dark){:root{--bg:#14181d;--panel:#1b2027;--fg:#e3e8ee;--muted:#94a0ad;--line:#2c333c;--line2:#232931;
+  --link:#6ea8e6;--link-bg:#1f2d3d;--ok:#7fd3a0;--ok-bg:#183326;--warn:#f0c46a;--warn-bg:#3a2d12;--bad:#ff9b9b;--bad-bg:#3d1c1f;
+  --shadow:none;color-scheme:dark}}
+
+:root{--brand:#f76707;--ink:#10161d;--ink2:#1c2632;--ink-line:#2b3744;--ink-fg:#e9eef3;--ink-muted:#93a1b0}
+.band{background:var(--ink);color:var(--ink-fg)} .band a{color:var(--ink-fg)}
+.band .in{max-width:1400px;margin:0 auto;padding:0 20px}
+.brand{display:flex;align-items:center;gap:12px;padding:14px 0 4px} .mark{width:34px;height:34px;flex:none}
+.brand .name{font-weight:700;font-size:19px;line-height:1.15;letter-spacing:-.01em;color:#fff}
+.brand .name a{color:#fff} .brand .proj{color:var(--ink-muted);font-weight:500}
+.brand .tag{color:var(--ink-muted);font-size:12.5px;margin-top:2px}
+.brand .links{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.brand .links a{border:1px solid var(--ink-line);border-radius:6px;padding:3px 10px;font-size:12.5px;display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+.brand .links a:hover{background:var(--ink2);text-decoration:none}
+.band.slim .brand{padding:8px 0} .band.slim .mark{width:24px;height:24px} .band.slim .name{font-size:15px}
+.framed .band.slim{display:none}
+@media (max-width:700px){.brand .tag{display:none} .band .in{padding:0 12px} .brand .name{font-size:16px} .brand .proj{display:block;font-size:14px}
+  .brand .links{flex-wrap:nowrap} .brand .links a{padding:3px 7px}}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.5 -apple-system,system-ui,"Segoe UI",sans-serif}
+a{color:var(--link);text-decoration:none} a:hover{text-decoration:underline}
+code{font:11.5px ui-monospace,SFMono-Regular,Menlo,monospace}
+.k{color:var(--muted);font-size:12px} .when{color:var(--muted);font-weight:normal;font-size:12px;white-space:nowrap}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:0 0 14px;box-shadow:var(--shadow)}
+.card-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin:0 0 6px}
+.card-h h2{font-size:15px;margin:0;overflow-wrap:anywhere} .card-h .btns{margin-left:auto}
+.kind{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px;line-height:16px}
+.btns{display:inline-flex;flex-wrap:wrap;gap:4px}
+.btn{display:inline-block;font-size:12px;line-height:18px;border:1px solid var(--line);border-radius:6px;padding:1px 8px;background:var(--panel);color:var(--link);white-space:nowrap}
+.btn:hover{background:var(--link-bg);text-decoration:none} .btn.pending{color:var(--muted);border-style:dashed}
+.badge{display:inline-block;font-size:11.5px;font-weight:500;border-radius:999px;padding:0 8px;line-height:19px;white-space:nowrap}
+.badge.running,.badge.partial{background:var(--warn-bg);color:var(--warn)} .badge.finished,.badge.done{background:var(--ok-bg);color:var(--ok)}
+.badge.failed,.badge.interrupted{background:var(--bad-bg);color:var(--bad)}
+.facts{color:var(--muted);margin:0 0 8px;overflow-wrap:anywhere} .facts b{color:var(--fg);font-weight:600} .facts code{color:var(--fg)}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;
+  /* edge shadows while there is more to scroll to */
+  background:linear-gradient(to right,var(--panel) 30%,transparent),linear-gradient(to left,var(--panel) 30%,transparent) right,
+    radial-gradient(farthest-side at 0 50%,rgba(0,0,0,.2),transparent),radial-gradient(farthest-side at 100% 50%,rgba(0,0,0,.2),transparent) right;
+  background-repeat:no-repeat;background-size:40px 100%,40px 100%,12px 100%,12px 100%;background-attachment:local,local,scroll,scroll;background-color:var(--panel)}
+table.t{border-collapse:collapse;font-variant-numeric:tabular-nums;margin:4px 0 8px}
+table.t th{font-weight:600;font-size:12px;color:var(--muted);text-align:left;border-bottom:1px solid var(--line);padding:4px 10px;white-space:nowrap}
+table.t td{border-bottom:1px solid var(--line2);padding:4px 10px;text-align:left;vertical-align:top}
+table.t tr:last-child td{border-bottom:0} table.t .n{text-align:right;white-space:nowrap}
+details.help{display:inline-block;position:relative} details.help>summary{list-style:none;cursor:pointer;display:inline-block;width:18px;height:18px;
+  line-height:16px;text-align:center;border:1px solid var(--line);border-radius:50%;color:var(--muted);font-size:11px;font-weight:600}
+details.help>summary::-webkit-details-marker{display:none}
+details.help[open]>div{position:absolute;z-index:20;top:24px;left:0;width:min(420px,80vw);background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;padding:8px 12px;box-shadow:0 6px 24px rgba(0,0,0,.18);font-size:12px;font-weight:normal;color:var(--fg)}
+details.help.right[open]>div{left:auto;right:0}
+.chip{font:inherit;font-size:12px;line-height:18px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:999px;padding:1px 10px;cursor:pointer}
+.chip.on,.chip[aria-pressed=true]{background:var(--link);border-color:var(--link);color:var(--panel)}
+.graphs{display:grid;grid-template-columns:max-content 1fr;gap:2px 10px;align-items:baseline;margin:4px 0}
+.graphs .ev{font-weight:600;font-size:12px} .graphs .btns{gap:3px}
+
+:root { --life:#8a96a3; --v0:#2f6fb2; --v1:#c2571a; --v2:#2e8a57; --v3:#8a4fbf; --v4:#b8860b; --v5:#3a9aa6; --pause:#d33; --grey:#c3c9d1; }
+@media (prefers-color-scheme: dark) { :root { --v0:#6ea8e6; --v1:#e58a4e; --v2:#5cc08a; --v3:#b58ae6; --v4:#e0b84a; --v5:#6cc6d1;
+  --pause:#ff6b6b; --grey:#46505c; --life:#7d8996; } }
+svg.timeline { background:var(--panel); border:1px solid var(--line); border-radius:8px; width:100%; touch-action:none; cursor:grab; display:block; }
+svg.timeline text { fill:var(--fg); font-size:11px; } svg.timeline .lab { fill:var(--muted); } svg.timeline text.on { fill:var(--panel); } svg.timeline text.halo { paint-order:stroke; stroke:var(--panel); stroke-width:3px; }
+svg.timeline .grid { stroke:var(--line); } svg.timeline .axis { stroke:var(--muted); opacity:.5; }
+.tl-legend { margin:2px 0 6px; } .tl-legend span { display:inline-block; margin-right:14px; font-size:12px; color:var(--muted); }
+.tl-legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+.tl-tip { position:fixed; pointer-events:none; background:var(--panel); border:1px solid var(--line); border-radius:6px;
+  padding:4px 8px; font-size:12px; display:none; max-width:360px; z-index:5; box-shadow:0 4px 16px rgba(0,0,0,.15); }
+main{padding:16px;max-width:1600px;margin:0 auto} h1{font-size:17px;margin:0;overflow-wrap:anywhere}</style>
+<div class="band slim"><div class="in"><div class="brand"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1c2632"/><rect x="5" y="21" width="22" height="5" rx="1.5" fill="#f59f00"/><rect x="5" y="14.5" width="15" height="5" rx="1.5" fill="#f76707"/><rect x="21.5" y="14.5" width="5.5" height="5" rx="1.5" fill="#ffd43b"/><rect x="5" y="8" width="8" height="5" rx="1.5" fill="#e03131"/></svg><div><div class="name"><a href="../../../../index.html">jvm-perf-lab</a></div></div><span class="links"><a href="https://github.com/retronym/jvm-perf-lab"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.51-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg> GitHub</a><a href="https://github.com/retronym/jvm-perf-lab/tree/main/doc">Docs</a></span></div></div></div><script>if (window !== window.top) document.documentElement.classList.add('framed')</script><main><div class="card-h"><span class="kind">timeline</span><h1>memory-paired · 4194304 · paired #2</h1></div>
+<p class="facts"><b>MemoryBenchmark</b> · <code>size=4194304</code> · <code>variants=sequential=sequential|shuffled=shuffled</code> · profile <code>xctrace:mem-l1d</code> · Tue 20 Oct 2026 16:31</p>
+<div class="card-h" style="margin:0"><span class="k">Each fork from JVM start to exit, on the wall clock.</span><details class="help right"><summary title="What is this?">?</summary><div>Startup is JVM boot and benchmark setup; exit runs from the last iteration to the JVM's exit (with xctrace, it includes saving the trace). GC pauses come from the fork's GC log. With xctrace, counter lanes cover the measurement iterations, which is what xctrace records; cycles are per second, so one busy performance core is about 4–4.5 G. Each counter lane has its own scale. Wheel or pinch to zoom, drag to pan, double-click to reset.</div></details></div>
+<div class="tl-legend" id="legend"></div><svg class="timeline" id="chart"></svg></main><div class="tl-tip" id="tip"></div>
+<script>// A benchmark fork's timeline: its iterations (coloured by variant when variants alternate within the fork) and, on the
+// same wall-clock axis, what the machine did meanwhile. Reads a cell's files as written by the fork and `perflab ab`:
+//   iterations.tsv  every iteration as it finishes: index, kind, variant, start_ms, end_ms, score, ops, gc_ms, pid, unit, alloc_bytes;
+//                   all forks of a run append to it; kind "startup" (JVM start to the first iteration) and "exit"
+//                   (the last iteration to JVM exit) give each fork's lifetime
+//   timeline.tsv    per 50 ms: cycles and instructions of the benchmark thread, JIT, GC, other threads of the fork and
+//                   other processes (from xctrace, so only once the fork has finished)
+//   gc.log          -Xlog:gc with wall-clock `time` decorations: pauses (a run's forks' logs concatenated)
+//   load.tsv        the load gate's 5 s samples of other processes' CPU, in cores
+//   profile.txt     the run's profile (e.g. xctrace:ipc), to name the gaps a profiler leaves between iterations
+// Used by timeline.py (a page per cell) and index.py (a live panel in index.html).
+const BenchTimeline = (() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const BIN_MS = 50;
+
+  function tsv(text) {
+    if (!text) return [];
+    const lines = text.split('\n').filter(l => l.trim());
+    if (!lines.length) return [];
+    const head = lines[0].split('\t');
+    return lines.slice(1).map(l => Object.fromEntries(l.split('\t').map((v, i) => [head[i], v])));
+  }
+
+  function parse(f) {
+    const iters = tsv(f.iterations).map(r => ({i: +r.index, kind: r.kind, variant: r.variant, s: +r.start_ms, e: +r.end_ms,
+      score: +r.score, gc: r.gc_ms === '' || r.gc_ms == null ? null : +r.gc_ms, pid: r.pid || '', unit: r.unit || 'ms/op'}));
+    // forks in the order they ran, numbered from 1
+    const pids = [...new Set(iters.slice().sort((a, b) => a.s - b.s).map(i => i.pid))];
+    for (const it of iters) it.fork = pids.indexOf(it.pid) + 1;
+    const series = tsv(f.timeline).map(b => ({t: +b.bin_ms, bench_c: +b.bench_cycles, bench_i: +b.bench_inst, jit_c: +b.jit_cycles,
+      gc_c: +b.gc_cycles, other_c: +b.other_cycles, processes_c: +b.processes_cycles}));
+    const pauses = [];
+    for (const line of (f.gc || '').split('\n')) {
+      const m = line.match(/^\[([^\]]+)\]\[[^\]]+\].*?(Pause[^(]*(?:\([^)]*\))*).*?([\d.]+)ms\s*$/);
+      if (!m) continue;
+      const end = Date.parse(m[1].replace(/([+-]\d\d)(\d\d)$/, '$1:$2'));
+      if (!isNaN(end)) pauses.push({s: end - +m[3], e: end, what: m[2].trim()});
+    }
+    const load = (f.load || '').split('\n').map(l => l.split('\t')).filter(p => p.length >= 2 && p[0])
+      .map(p => ({t: +p[0] * 1000, cores: +p[1], top: p[2] || ''}));
+    return {iters, series, pauses, load, profile: (f.profile || '').trim()};
+  }
+
+  async function fetchCell(base) {
+    const get = async n => { try { const r = await fetch(base + n, {cache: 'no-store'}); return r.ok ? await r.text() : ''; } catch (e) { return ''; } };
+    const [iterations, timeline, gc, load, profile] = await Promise.all(['iterations.tsv', 'timeline.tsv', 'gc.log', 'load.tsv', 'profile.txt'].map(get));
+    return parse({iterations, timeline, gc, load, profile});
+  }
+
+  function mount(svg, legend, tip) {
+    let D = {iters: [], series: [], pauses: [], load: [], profile: ''}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
+    let L = 150;
+    const R = 16;
+    const counterRows = [
+      {name: 'iterations', h: 46},
+      {name: 'benchmark thread', h: 80, key: 'bench_c', unit: 'G cycles/s'},
+      {name: 'IPC (benchmark)', h: 56, ipc: true},
+      {name: 'GC threads', h: 70, key: 'gc_c', unit: 'G cycles/s', pauses: true},
+      {name: 'JIT threads', h: 56, key: 'jit_c', unit: 'G cycles/s'},
+      {name: 'other in fork', h: 46, key: 'other_c', unit: 'G cycles/s'},
+      {name: 'other processes', h: 86, key: 'processes_c', unit: 'G cycles/s', load: true},
+    ];
+    // without counters (no xctrace): iterations and GC pauses only, plus the load gate's samples when there are any
+    const plainRows = [{name: 'iterations', h: 46}, {name: 'GC pauses', h: 34, pauses: true}];
+    let rows = counterRows, height = 0;
+    const layout = () => {
+      rows = D.series.length ? counterRows : plainRows.concat(D.load.length ? [{name: 'other processes', h: 60, load: true}] : []);
+      height = rows.reduce((a, r) => a + r.h + 8, 8) + 24;
+    };
+    let variants = [];
+    const color = v => v ? `var(--v${variants.indexOf(v) % 6})` : 'var(--v0)';
+    const unitOf = u => (u || '').replace('us/', 'µs/');
+    const fmt = x => Math.abs(x) >= 1000 ? Math.round(x).toLocaleString('en-US') : x.toPrecision(4);
+    const xctrace = () => D.profile.startsWith('xctrace');
+    // time between a fork's iterations that is in none of them: the profiler attaching (xctrace records only measurement)
+    function gaps() {
+      const out = [];
+      const byFork = {};
+      for (const it of D.iters) (byFork[it.fork] = byFork[it.fork] || []).push(it);
+      for (const its of Object.values(byFork)) {
+        its.sort((a, b) => a.s - b.s);
+        for (let i = 1; i < its.length; i++) {
+          const g = its[i].s - its[i - 1].e;
+          if (g > 250 && g > 0.2 * (its[i].e - its[i].s)) out.push({s: its[i - 1].e, e: its[i].s,
+            what: xctrace() && its[i - 1].kind === 'warmup' && its[i].kind === 'measure' ? 'xctrace attaching' : 'between iterations'});
+        }
+      }
+      return out;
+    }
+    function defs() {
+      const d = el('defs', {});
+      const p = el('pattern', {id: 'tl-hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)'}, d);
+      el('rect', {width: 6, height: 6, fill: 'var(--life)', opacity: 0.35}, p);
+      el('line', {x1: 0, y1: 0, x2: 0, y2: 6, stroke: 'var(--life)', 'stroke-width': 3}, p);
+    }
+    function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; }
+
+    function draw() {
+      svg.innerHTML = '';
+      const W = svg.clientWidth || 900;
+      L = W < 600 ? 106 : 150;
+      const X = t => L + (t - x0) / (x1 - x0) * (W - L - R);
+      defs();
+      if (!D.iters.length && !D.series.length) {
+        svg.setAttribute('height', 40);
+        el('text', {x: 12, y: 24, class: 'lab'}).textContent = 'No iterations yet.';
+        return;
+      }
+      layout();
+      svg.setAttribute('height', height);
+      let y = 8;
+      const ticks = W < 600 ? 6 : 12;
+      const span = x1 - x0, step = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 60000].find(s => span / s < ticks) || 120000;
+      for (let t = Math.ceil((x0 - t0) / step) * step; t0 + t <= x1; t += step) {
+        el('line', {x1: X(t0 + t), x2: X(t0 + t), y1: 0, y2: height - 22, class: 'grid'});
+        el('text', {x: X(t0 + t) + 2, y: height - 8, class: 'lab'}).textContent = (t / 1000).toFixed(step < 1000 ? 1 : 0) + ' s';
+      }
+      for (const r of rows) {
+        el('text', {x: 6, y: y + 14}).textContent = r.name;
+        const u = r.name === 'iterations' ? unitOf((D.iters.find(i => i.kind === 'measure' || i.kind === 'warmup') || {}).unit) : r.unit;
+        if (u) el('text', {x: 6, y: y + 28, class: 'lab'}).textContent = u;
+        el('line', {x1: L, x2: W - R, y1: y + r.h, y2: y + r.h, class: 'grid'});
+        if (r.name === 'iterations') {
+          const forks = Math.max(0, ...D.iters.map(i => i.fork));
+          const label = (a, b, texts, cls) => {
+            // the longest text that fits the bar
+            const t = texts.find(t => t.length * 6.2 + 8 < b - a);
+            if (t) el('text', {x: a + 4, y: y + r.h / 2 + 4, class: cls || ''}).textContent = t;
+          };
+          for (const g of gaps()) {
+            if (g.e < x0 || g.s > x1) continue;
+            const a = Math.max(X(g.s), L), b = Math.min(X(g.e), W - R);
+            const rect = el('rect', {x: a + 1, y: y + 10, width: Math.max(1, b - a - 2), height: r.h - 20, rx: 2, fill: 'none',
+              stroke: 'var(--life)', 'stroke-dasharray': '3 3'});
+            rect.dataset.tip = `${g.what}: ${((g.e - g.s) / 1000).toFixed(2)} s, in no iteration`;
+            label(a, b, [g.what, xctrace() ? 'attach' : 'gap'], 'lab');
+          }
+          for (const it of D.iters) {
+            if (it.e < x0 || it.s > x1) continue;
+            const a = Math.max(X(it.s), L), b = Math.min(X(it.e), W - R);
+            const life = it.kind === 'startup' || it.kind === 'exit';
+            const fork = forks > 1 ? `fork ${it.fork}: ` : '';
+            const secs = ((it.e - it.s) / 1000).toFixed(2) + ' s';
+            const rect = el('rect', {x: a, y: y + (life ? 12 : 6), width: Math.max(1, b - a - 1), height: life ? r.h - 24 : r.h - 12, rx: 2,
+              fill: life ? 'url(#tl-hatch)' : it.kind === 'warmup' ? 'var(--grey)' : color(it.variant)});
+            const exitWhat = xctrace() ? 'last iteration to JVM exit, and xctrace saving its trace' : 'last iteration to JVM exit';
+            rect.dataset.tip = life
+              ? `${fork}${it.kind === 'startup' ? 'JVM start to first iteration (JVM boot, benchmark setup)' : exitWhat}: ${secs}`
+              : `${fork}#${it.i} ${it.kind} ${it.variant || ''}: ${fmt(it.score)} ${unitOf(it.unit)}` + (it.gc != null ? `, GC pauses ${it.gc} ms` : '');
+            if (life) label(a, b, it.kind === 'startup' ? ['JVM start ' + secs, 'start']
+                                                        : [(xctrace() ? 'JVM exit + xctrace saving trace ' : 'JVM exit ') + secs, 'JVM exit', 'exit'], 'lab halo');
+            else label(a, b, [`${fmt(it.score)} ${unitOf(it.unit)}`, fmt(it.score)], it.kind === 'warmup' ? '' : 'on');
+          }
+          // each fork's start, labelled when there are several
+          if (forks > 1) for (let f = 1; f <= forks; f++) {
+            const s = Math.min(...D.iters.filter(i => i.fork === f).map(i => i.s));
+            if (s < x0 || s > x1) continue;
+            el('line', {x1: X(s), x2: X(s), y1: 0, y2: height - 22, stroke: 'var(--fg)', 'stroke-width': 1, opacity: 0.35});
+            el('text', {x: X(s) + 2, y: y + r.h + 1, class: 'lab'}).textContent = `fork ${f}`;
+          }
+        } else if (!r.key && !r.ipc) {
+          // pauses / load only
+        } else {
+          const pts = r.ipc ? D.series.map(s => ({t: s.t, v: s.bench_c ? s.bench_i / s.bench_c : null}))
+                            : D.series.map(s => ({t: s.t, v: s[r.key] / (BIN_MS / 1000) / 1e9}));
+          const vis = pts.filter(p => p.t >= x0 - BIN_MS && p.t <= x1 && p.v != null);
+          const max = r.ipc ? Math.max(4, ...vis.map(p => p.v)) : Math.max(0.5, ...vis.map(p => p.v));
+          const Y = v => y + r.h - 4 - v / max * (r.h - 10);
+          // a baseline, a mid line, and the lane's own scale at both
+          el('line', {x1: L, x2: W - R, y1: Y(0), y2: Y(0), class: 'axis'});
+          el('line', {x1: L, x2: W - R, y1: Y(max / 2), y2: Y(max / 2), class: 'grid', 'stroke-dasharray': '2 4'});
+          // on a narrow chart the scale goes inside the plot, the label column being too narrow for it
+          const sx = L < 150 ? {x: L + 3, 'text-anchor': 'start', class: 'lab halo'} : {x: L - 4, 'text-anchor': 'end', class: 'lab'};
+          el('text', {...sx, y: Y(max) + 8}).textContent = max.toFixed(1);
+          el('text', {...sx, y: Y(max / 2) + 4}).textContent = (max / 2).toFixed(max / 2 < 1 ? 2 : 1);
+          if (!vis.length) el('text', {x: L + 6, y: y + r.h / 2 + 4, class: 'lab'}).textContent = 'no samples in view';
+          let d = '', prev = null;
+          // a new segment after a gap (between forks, or between xctrace's recordings)
+          for (const p of vis) { d += (prev == null || p.t - prev > 2 * BIN_MS ? 'M' : 'L') + X(p.t + BIN_MS / 2).toFixed(1) + ',' + Y(p.v).toFixed(1); prev = p.t; }
+          if (d) el('path', {d, fill: 'none', stroke: r.ipc ? 'var(--v2)' : 'var(--v0)', 'stroke-width': 1.2});
+        }
+        if (r.pauses && !r.key && !D.pauses.some(p => p.e >= x0 && p.s <= x1))
+          el('text', {x: L + 6, y: y + r.h / 2 + 4, class: 'lab'}).textContent = D.pauses.length ? 'none in view' : 'none';
+        if (r.pauses) for (const p of D.pauses) {
+          if (p.e < x0 || p.s > x1) continue;
+          const m = el('rect', {x: X(p.s), y: y + 2, width: Math.max(2, X(p.e) - X(p.s)), height: r.h - 4, fill: 'var(--pause)', opacity: 0.55});
+          m.dataset.tip = `${p.what}: ${(p.e - p.s).toFixed(1)} ms`;
+        }
+        if (r.load && D.load.length) {
+          const lmax = Math.max(2, ...D.load.map(l => l.cores));
+          el('text', {x: W - R - 2, y: y + 12, 'text-anchor': 'end', class: 'lab'}).textContent = `load.tsv: other processes, cores (max ${lmax.toFixed(1)})`;
+          let ld = '';
+          for (const l of D.load) {
+            if (l.t < x0 - 5000 || l.t > x1 + 5000) continue;
+            const yy = y + r.h - 4 - l.cores / lmax * (r.h - 10);
+            const clamp = x => Math.min(Math.max(x, L), W - R);
+            ld += (ld ? 'L' : 'M') + clamp(X(l.t - 5000)).toFixed(1) + ',' + yy.toFixed(1) + 'L' + clamp(X(l.t)).toFixed(1) + ',' + yy.toFixed(1);
+          }
+          if (ld) el('path', {d: ld, fill: 'none', stroke: 'var(--v1)', 'stroke-width': 1.2, 'stroke-dasharray': '4 3'});
+        }
+        y += r.h + 8;
+      }
+    }
+
+    function set(data) {
+      D = data;
+      variants = [...new Set(D.iters.map(i => i.variant).filter(v => v))];
+      const ts = [...D.iters.flatMap(i => [i.s, i.e]), ...D.series.map(s => s.t), ...D.series.map(s => s.t + BIN_MS)];
+      const n0 = ts.length ? Math.min(...ts) : 0, n1 = ts.length ? Math.max(...ts) : 1;
+      // keep a zoomed view where it is as data arrives; otherwise follow the whole range
+      if (!zoomed) { x0 = n0; x1 = Math.max(n1, n0 + 1); }
+      t0 = n0; t1 = Math.max(n1, n0 + 1);
+      const sw = (bg, text, extra) => `<span><i style="background:${bg}${extra || ''}"></i>${text}</span>`;
+      if (legend) legend.innerHTML = sw('var(--grey)', 'warmup')
+        + (variants.length ? variants.map(v => sw(color(v), v)).join('') : sw('var(--v0)', 'measurement'))
+        + (D.iters.some(i => i.kind === 'startup') ? sw('repeating-linear-gradient(45deg,var(--life) 0 2px,transparent 2px 4px)', 'JVM start / exit', ';outline:1px solid var(--life)') : '')
+        + (gaps().length ? sw('transparent', xctrace() ? 'xctrace attaching' : 'between iterations', ';outline:1px dashed var(--life)') : '')
+        + (D.pauses.length ? sw('var(--pause)', 'GC pause') : '');
+      draw();
+    }
+
+    svg.addEventListener('wheel', e => { e.preventDefault(); const W = svg.clientWidth, f = Math.exp(e.deltaY * 0.002);
+      const at = x0 + (e.offsetX - L) / (W - L - R) * (x1 - x0); x0 = Math.max(t0, at - (at - x0) * f); x1 = Math.min(t1, at + (x1 - at) * f); zoomed = true; draw(); }, {passive: false});
+    let drag = null;
+    svg.addEventListener('pointerdown', e => { drag = {x: e.clientX, x0, x1}; svg.setPointerCapture(e.pointerId); });
+    svg.addEventListener('pointermove', e => {
+      const t = e.target.dataset && e.target.dataset.tip;
+      if (tip && t && !drag) { tip.textContent = t; tip.style.display = 'block'; tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 12) + 'px'; }
+      else if (tip && !drag) tip.style.display = 'none';
+      if (!drag) return;
+      const W = svg.clientWidth, dt = (e.clientX - drag.x) / (W - L - R) * (drag.x1 - drag.x0), w = drag.x1 - drag.x0;
+      x0 = Math.min(Math.max(t0, drag.x0 - dt), t1 - w); x1 = x0 + w; zoomed = true; draw();
+    });
+    svg.addEventListener('pointerup', () => drag = null);
+    svg.addEventListener('dblclick', () => { zoomed = false; x0 = t0; x1 = t1; draw(); });
+    window.addEventListener('resize', draw);
+    return {set, reset() { zoomed = false; }};
+  }
+
+  return {parse, fetchCell, mount};
+})();
+
+BenchTimeline.mount(document.getElementById('chart'), document.getElementById('legend'), document.getElementById('tip'))
+  .set(BenchTimeline.parse({"iterations": "index\tkind\tvariant\tstart_ms\tend_ms\tscore\tops\tgc_ms\tpid\tunit\talloc_bytes\n-1\tstartup\t\t1792476430015\t1792476430444\t\t\t\t79028\tus/op\t\n0\twarmup\tsequential\t1792476430444\t1792476431701\t1913.4712\t526\t0\t79028\tus/op\t4836480\n1\twarmup\tshuffled\t1792476431713\t1792476432967\t626347.2085\t2\t0\t79028\tus/op\t663624\n2\twarmup\tshuffled\t1792476432968\t1792476434207\t412463.9307\t3\t0\t79028\tus/op\t101568\n3\twarmup\tsequential\t1792476434208\t1792476435211\t1430.9746\t701\t0\t79028\tus/op\t23808\n4\tmeasure\tsequential\t1792476437110\t1792476438115\t1320.1345\t761\t0\t79028\tus/op\t37144\n5\tmeasure\tshuffled\t1792476438117\t1792476439157\t86624.7083\t12\t0\t79028\tus/op\t40312\n6\tmeasure\tshuffled\t1792476439158\t1792476440299\t95118.1875\t12\t0\t79028\tus/op\t15608\n7\tmeasure\tsequential\t1792476440300\t1792476441304\t1430.7596\t701\t0\t79028\tus/op\t15056\n8\tmeasure\tsequential\t1792476441304\t1792476442312\t1336.0251\t754\t0\t79028\tus/op\t17888\n9\tmeasure\tshuffled\t1792476442313\t1792476443410\t136881.2605\t8\t0\t79028\tus/op\t6824\n10\tmeasure\tshuffled\t1792476443415\t1792476444635\t302745.8543\t4\t0\t79028\tus/op\t19024\n11\tmeasure\tsequential\t1792476444640\t1792476445657\t1491.8573\t677\t0\t79028\tus/op\t8976\n-1\texit\t\t1792476445657\t1792476453036\t\t\t\t79028\tus/op\t\n", "timeline": "bin_ms\tbench_cycles\tbench_inst\tjit_cycles\tjit_inst\tgc_cycles\tgc_inst\tother_cycles\tother_inst\tprocesses_cycles\tprocesses_inst\n1792476437050\t0\t0\t0\t0\t0\t0\t0\t0\t0\t0\n1792476437100\t160838527\t846295669\t1799590\t4086688\t0\t0\t136638\t40011\t70445114\t175834286\n1792476437150\t196474896\t566894531\t0\t0\t0\t0\t0\t0\t102258741\t154260112\n1792476437200\t196983057\t613984887\t0\t0\t0\t0\t46607\t6445\t79826561\t120814376\n1792476437250\t198302174\t1040288144\t0\t0\t0\t0\t0\t0\t42757908\t63004621\n1792476437300\t197889690\t972817129\t0\t0\t0\t0\t0\t0\t128234872\t186628608\n1792476437350\t205119585\t1068769657\t0\t0\t0\t0\t0\t0\t70694775\t119186333\n1792476437400\t204659717\t906385616\t313296\t583861\t0\t0\t535976\t225295\t119391666\t256729200\n1792476437450\t202360077\t1065377189\t0\t0\t0\t0\t0\t0\t70171576\t123030640\n1792476437500\t208564334\t952157293\t0\t0\t0\t0\t0\t0\t90508243\t210264803\n1792476437550\t204043463\t941475747\t0\t0\t0\t0\t0\t0\t53793974\t104274670\n1792476437600\t206037379\t1080064060\t0\t0\t0\t0\t0\t0\t72938370\t171356580\n1792476437650\t206695546\t1081378032\t0\t0\t0\t0\t0\t0\t45821409\t76854808\n1792476437700\t203392858\t1065340173\t0\t0\t0\t0\t0\t0\t35351687\t73391272\n1792476437750\t202171643\t894408536\t0\t0\t0\t0\t0\t0\t47912685\t99374177\n1792476437800\t200847285\t1057828006\t0\t0\t0\t0\t0\t0\t28845594\t55953928\n1792476437850\t205551189\t1077350079\t0\t0\t0\t0\t0\t0\t58654426\t113251574\n1792476437900\t200326875\t927363648\t0\t0\t0\t0\t0\t0\t97925164\t146500740\n1792476437950\t198022315\t884871001\t0\t0\t0\t0\t0\t0\t114485582\t255962583\n1792476438000\t198298644\t1035106917\t0\t0\t0\t0\t0\t0\t104059221\t228936363\n1792476438050\t196321595\t998445117\t0\t0\t0\t0\t0\t0\t22585032\t85555594\n1792476438100\t198558999\t320882384\t1842700\t3546506\t0\t0\t4443889\t3535647\t319569832\t546193824\n1792476438150\t209535213\t13232845\t0\t0\t0\t0\t0\t0\t37941468\t32353473\n1792476438200\t202396896\t17323017\t0\t0\t0\t0\t0\t0\t74082160\t44607762\n1792476438250\t203360900\t17146370\t0\t0\t0\t0\t0\t0\t26495699\t14002159\n1792476438300\t199513027\t16328108\t0\t0\t0\t0\t0\t0\t36438123\t21730714\n1792476438350\t198383531\t12981458\t0\t0\t0\t0\t0\t0\t60466341\t61841579\n1792476438400\t200199335\t16676288\t0\t0\t0\t0\t346115\t133924\t61665353\t52815266\n1792476438450\t202876150\t14759775\t0\t0\t0\t0\t0\t0\t55109701\t36026492\n1792476438500\t195120348\t15437521\t0\t0\t0\t0\t0\t0\t35901078\t24066759\n1792476438550\t201383755\t15784378\t0\t0\t0\t0\t0\t0\t55164346\t31936802\n1792476438600\t213173625\t17953689\t0\t0\t0\t0\t0\t0\t32794400\t30683063\n1792476438650\t211010319\t17332368\t0\t0\t0\t0\t0\t0\t20120066\t17347569\n1792476438700\t209490312\t17081979\t0\t0\t0\t0\t0\t0\t31852168\t26973857\n1792476438750\t209452107\t16015355\t0\t0\t0\t0\t0\t0\t34678692\t36670649\n1792476438800\t208218736\t17286728\t0\t0\t0\t0\t0\t0\t14056562\t11286448\n1792476438850\t205178287\t16886014\t0\t0\t0\t0\t0\t0\t38653420\t27620358\n1792476438900\t204151868\t17257740\t0\t0\t0\t0\t0\t0\t23470838\t15255257\n1792476438950\t201862189\t14721517\t0\t0\t0\t0\t0\t0\t33566788\t28500072\n1792476439000\t190062479\t6164144\t0\t0\t0\t0\t0\t0\t238122206\t379146776\n1792476439050\t207227271\t8259130\t0\t0\t0\t0\t0\t0\t784717673\t2076542665\n1792476439100\t210223365\t10550379\t0\t0\t0\t0\t0\t0\t104759027\t482012505\n1792476439150\t191471177\t12644095\t512051\t454193\t0\t0\t30932\t18785\t331654583\t895270435\n1792476439200\t201410832\t13415087\t0\t0\t0\t0\t51648\t16611\t57624622\t39475687\n1792476439250\t201648026\t16585474\t0\t0\t0\t0\t0\t0\t22961166\t15032913\n1792476439300\t200679964\t16181022\t0\t0\t0\t0\t0\t0\t28339086\t19256731\n1792476439350\t195756050\t15616541\t0\t0\t0\t0\t0\t0\t58559020\t47449902\n1792476439400\t192423534\t14282758\t0\t0\t0\t0\t732573\t998138\t72514781\t64122514\n1792476439450\t200922296\t16071506\t0\t0\t0\t0\t0\t0\t26999108\t25459343\n1792476439500\t212191662\t16434904\t0\t0\t0\t0\t0\t0\t30701537\t18336406\n1792476439550\t210441989\t17712493\t0\t0\t0\t0\t0\t0\t36305795\t42119479\n1792476439600\t206737034\t13851699\t0\t0\t0\t0\t0\t0\t127523984\t202639842\n1792476439650\t207443701\t16106589\t0\t0\t0\t0\t0\t0\t38851292\t30145739\n1792476439700\t203743142\t17300124\t0\t0\t0\t0\t0\t0\t27431383\t18258750\n1792476439750\t206222517\t17222651\t0\t0\t0\t0\t0\t0\t20379074\t12076218\n1792476439800\t196376169\t10056559\t0\t0\t0\t0\t0\t0\t80707516\t59086956\n1792476439850\t200876933\t15180389\t0\t0\t0\t0\t0\t0\t270330618\t827603241\n1792476439900\t212536411\t13715456\t0\t0\t0\t0\t0\t0\t67372529\t76929279\n1792476439950\t201370714\t14953732\t0\t0\t0\t0\t0\t0\t251083893\t392252825\n1792476440000\t188231774\t5932206\t0\t0\t0\t0\t0\t0\t314197957\t572225975\n1792476440050\t204049271\t12893015\t0\t0\t0\t0\t0\t0\t103016645\t214718126\n1792476440100\t202933247\t10348972\t0\t0\t0\t0\t0\t0\t65035633\t89333252\n1792476440150\t202977201\t6414158\t0\t0\t0\t0\t0\t0\t587342506\t1328677431\n1792476440200\t182247433\t4764381\t0\t0\t0\t0\t0\t0\t470491017\t1191432754\n1792476440250\t194758954\t9338641\t2579\t1144\t0\t0\t94422\t47812\t274863251\t797132595\n1792476440300\t200695724\t994591387\t1104227\t2133006\t0\t0\t0\t0\t29651926\t58950317\n1792476440350\t196327310\t798806613\t0\t0\t0\t0\t0\t0\t775765234\t1697353501\n1792476440400\t187516298\t781139889\t5541318\t10636769\t0\t0\t1231944\t2106790\t796981407\t1761461838\n1792476440450\t164853514\t744893961\t0\t0\t0\t0\t0\t0\t1630280809\t4680448609\n1792476440500\t187983863\t989011556\t0\t0\t0\t0\t0\t0\t303600009\t1086140819\n1792476440550\t116359773\t526566882\t0\t0\t0\t0\t0\t0\t214247563\t542210207\n1792476440600\t129725887\t668069047\t0\t0\t0\t0\t0\t0\t407662402\t1283424209\n1792476440650\t142434612\t742012030\t0\t0\t0\t0\t0\t0\t603711371\t2255538546\n1792476440700\t172430026\t852138099\t0\t0\t0\t0\t0\t0\t438768925\t1141898933\n1792476440750\t181747660\t629681833\t0\t0\t0\t0\t0\t0\t939356631\t2206589152\n1792476440800\t205269938\t1070206668\t0\t0\t0\t0\t0\t0\t25843202\t69135757\n1792476440850\t199116377\t965267020\t0\t0\t0\t0\t0\t0\t332862366\t730281457\n1792476440900\t174008168\t823732626\t0\t0\t0\t0\t0\t0\t904513530\t3236651449\n1792476440950\t208092094\t734731127\t0\t0\t0\t0\t0\t0\t127354977\t568686762\n1792476441000\t206598543\t1049984028\t0\t0\t0\t0\t0\t0\t108826414\t204809882\n1792476441050\t201892621\t503542820\t0\t0\t0\t0\t0\t0\t165073687\t330621282\n1792476441100\t209580545\t932273542\t0\t0\t0\t0\t0\t0\t68397009\t145143509\n1792476441150\t209140422\t697177609\t0\t0\t0\t0\t0\t0\t47682667\t59089321\n1792476441200\t207721354\t1085931859\t0\t0\t0\t0\t52816\t14842\t21194692\t33558313\n1792476441250\t205764404\t760716378\t0\t0\t0\t0\t0\t0\t37386157\t49311555\n1792476441300\t186246410\t800390014\t1367535\t2470632\t0\t0\t377469\t171316\t87165495\t130405036\n1792476441350\t197795311\t1041447524\t0\t0\t0\t0\t0\t0\t64511633\t105043495\n1792476441400\t195513086\t1029883083\t0\t0\t0\t0\t165538\t67601\t57574334\t180656093\n1792476441450\t212529769\t1118300626\t0\t0\t0\t0\t0\t0\t16608792\t15705898\n1792476441500\t211375322\t1107889202\t0\t0\t0\t0\t0\t0\t48896752\t38777835\n1792476441550\t209917137\t1098615816\t0\t0\t0\t0\t0\t0\t27090505\t47868120\n1792476441600\t208921593\t1101117027\t0\t0\t0\t0\t0\t0\t23324300\t41324243\n1792476441650\t206893742\t915629064\t0\t0\t0\t0\t0\t0\t23533539\t42976114\n1792476441700\t205887506\t913430002\t0\t0\t0\t0\t0\t0\t29814819\t48859522\n1792476441750\t205006559\t1082601234\t0\t0\t0\t0\t0\t0\t22385184\t48190084\n1792476441800\t203108604\t1068926127\t0\t0\t0\t0\t0\t0\t26310132\t65955952\n1792476441850\t201867357\t1060370488\t0\t0\t0\t0\t0\t0\t27424741\t80765709\n1792476441900\t201009150\t1049527259\t0\t0\t0\t0\t0\t0\t31511614\t84799046\n1792476441950\t203979287\t760435997\t0\t0\t0\t0\t0\t0\t383440633\t951760636\n1792476442000\t189724005\t745392978\t0\t0\t0\t0\t0\t0\t1700512730\t4271398883\n1792476442050\t199605495\t1044569853\t0\t0\t0\t0\t0\t0\t171058893\t514726744\n1792476442100\t202920177\t1030206186\t0\t0\t0\t0\t0\t0\t307025375\t1091950380\n1792476442150\t203805997\t617507238\t0\t0\t0\t0\t0\t0\t31896252\t33367815\n1792476442200\t207387071\t577702159\t0\t0\t0\t0\t0\t0\t215141399\t713327583\n1792476442250\t207674929\t927268765\t0\t0\t0\t0\t0\t0\t28845893\t48322259\n1792476442300\t202511564\t248384591\t6019\t572\t0\t0\t303561\t157122\t26750754\t37806479\n1792476442350\t206883784\t18152265\t0\t0\t0\t0\t0\t0\t31313324\t27678905\n1792476442400\t209049968\t18095149\t663302\t519557\t0\t0\t233364\t48565\t78149319\t95608341\n1792476442450\t179324698\t11494279\t0\t0\t0\t0\t0\t0\t512162075\t1043869264\n1792476442500\t207813446\t16020469\t0\t0\t0\t0\t0\t0\t33566985\t48279797\n1792476442550\t206062744\t9734953\t0\t0\t0\t0\t0\t0\t55501312\t102367185\n1792476442600\t205342705\t15939161\t0\t0\t0\t0\t0\t0\t48210047\t120091247\n1792476442650\t205743805\t17924174\t0\t0\t0\t0\t0\t0\t341613429\t1092066354\n1792476442700\t203647288\t12979636\t0\t0\t0\t0\t0\t0\t244527041\t1001051521\n1792476442750\t204113221\t8588055\t0\t0\t0\t0\t0\t0\t90098292\t146362251\n1792476442800\t202338884\t11090064\t0\t0\t0\t0\t0\t0\t49331957\t124758132\n1792476442850\t209463708\t8768021\t0\t0\t0\t0\t0\t0\t70026440\t159296974\n1792476442900\t206553306\t8120126\t0\t0\t0\t0\t0\t0\t275841386\t900744835\n1792476442950\t209330115\t7710060\t0\t0\t0\t0\t0\t0\t13994869\t9881861\n1792476443000\t192603365\t5026382\t0\t0\t0\t0\t0\t0\t602997187\t1540781209\n1792476443050\t198031788\t4076795\t0\t0\t0\t0\t0\t0\t429413583\t1180722873\n1792476443100\t173110156\t3773399\t0\t0\t0\t0\t0\t0\t1292259591\t2214055108\n1792476443150\t158030297\t3519403\t0\t0\t0\t0\t0\t0\t615849799\t1184512082\n1792476443200\t168091350\t78759166\t0\t0\t0\t0\t0\t0\t1743004613\t3065323604\n1792476443250\t162736132\t77043179\t0\t0\t0\t0\t0\t0\t1241153650\t2206698966\n1792476443300\t155328689\t2385997\t0\t0\t0\t0\t0\t0\t1458288015\t2579763977\n1792476443350\t114757828\t2132960\t0\t0\t0\t0\t0\t0\t1324541356\t1041892984\n1792476443450\t594047540\t363788773\t0\t0\t0\t0\t0\t0\t6054540636\t5641962613\n1792476443500\t116610004\t2194599\t0\t0\t0\t0\t0\t0\t2274526587\t2486942701\n1792476443550\t143833493\t3004523\t0\t0\t0\t0\t0\t0\t3519753816\t3595589632\n1792476443600\t127320574\t2961538\t0\t0\t0\t0\t0\t0\t1741439173\t2135397899\n1792476443650\t89120324\t1965259\t0\t0\t0\t0\t0\t0\t2587232015\t3613568470\n1792476443700\t21630628\t372375\t0\t0\t0\t0\t0\t0\t1820618153\t2018649420\n1792476443900\t979321103\t527340860\t0\t0\t0\t0\t0\t0\t2698623770\t1876931617\n1792476443950\t165566784\t3756891\t0\t0\t0\t0\t0\t0\t17476637201\t15182806835\n1792476444000\t200118847\t4283965\t0\t0\t0\t0\t0\t0\t848546539\t952661231\n1792476444050\t173922252\t3391775\t0\t0\t0\t0\t0\t0\t2510213887\t3828453812\n1792476444100\t202965531\t4916739\t0\t0\t0\t0\t0\t0\t263637469\t586631586\n1792476444150\t199013840\t4702681\t0\t0\t0\t0\t0\t0\t467290295\t1043409521\n1792476444200\t207401825\t6241575\t0\t0\t0\t0\t0\t0\t537100356\t1477807480\n1792476444250\t207193401\t6798604\t0\t0\t0\t0\t0\t0\t62337035\t164970948\n1792476444300\t203129402\t4979018\t0\t0\t0\t0\t0\t0\t531069689\t1702326744\n1792476444350\t193023782\t5088208\t0\t0\t0\t0\t0\t0\t1642202176\t1841911576\n1792476444400\t136622365\t3169568\t0\t0\t0\t0\t0\t0\t3078040785\t5024977843\n1792476444450\t171134040\t4228602\t0\t0\t0\t0\t157657\t16410\t916896830\t1869302345\n1792476444500\t156213352\t3796038\t0\t0\t0\t0\t0\t0\t990394755\t2025624616\n1792476444550\t136828824\t2144764\t0\t0\t0\t0\t0\t0\t1075937785\t1968574429\n1792476444600\t113662315\t36465155\t14479\t572\t0\t0\t0\t0\t1176832593\t951329635\n1792476444650\t131990157\t577583921\t278843\t137418\t0\t0\t0\t0\t2712182376\t2881236507\n1792476444700\t83268774\t427986105\t0\t0\t0\t0\t0\t0\t1179607596\t1027510558\n1792476444750\t113202745\t468672653\t0\t0\t0\t0\t0\t0\t3977372530\t4733825379\n1792476444800\t168123894\t716945634\t0\t0\t0\t0\t0\t0\t3192193925\t3376175711\n1792476444850\t182457765\t791369704\t0\t0\t0\t0\t0\t0\t2854446757\t2623735595\n1792476444900\t195137522\t794969898\t0\t0\t0\t0\t0\t0\t2096557576\t2618959572\n1792476444950\t110716280\t530061764\t0\t0\t0\t0\t0\t0\t7716097284\t12284424371\n1792476445000\t114139108\t600236110\t0\t0\t0\t0\t0\t0\t670283995\t1564305262\n1792476445050\t183204471\t958332058\t0\t0\t0\t0\t0\t0\t448937617\t1007326146\n1792476445100\t190182935\t976007656\t0\t0\t0\t0\t0\t0\t313272326\t836447318\n1792476445150\t191708607\t928822539\t0\t0\t0\t0\t0\t0\t645686792\t2097164175\n1792476445200\t208927247\t1087541160\t0\t0\t0\t0\t0\t0\t373619146\t1234926911\n1792476445250\t210683691\t1094631264\t0\t0\t0\t0\t0\t0\t310339050\t946823486\n1792476445300\t177024785\t704042484\t0\t0\t0\t0\t0\t0\t507718574\t1381897820\n1792476445350\t195518177\t1027701032\t0\t0\t0\t0\t0\t0\t736156292\t1718458265\n1792476445400\t237780216\t746679626\t0\t0\t0\t0\t0\t0\t1936095096\t4307158311\n1792476445450\t264497365\t998954146\t0\t0\t0\t0\t40778143\t103102059\t905123504\t1961285661\n1792476445500\t145943260\t592491206\t0\t0\t0\t0\t0\t0\t1776254866\t4536568549\n1792476445550\t104554891\t421873316\t0\t0\t0\t0\t0\t0\t3657243282\t12275955513\n1792476445600\t56341267\t88783620\t0\t0\t0\t0\t0\t0\t2349292717\t5786886254\n1792476445650\t4719473\t17554051\t5964322\t9985764\t0\t0\t1331272\t1119375\t225312606\t501341268\n1792476445700\t0\t0\t0\t0\t0\t0\t0\t0\t305394649\t748741486\n1792476445800\t0\t0\t0\t0\t0\t0\t0\t0\t95669722\t252993532\n1792476445850\t0\t0\t0\t0\t0\t0\t0\t0\t463115103\t1479099028\n1792476445900\t0\t0\t0\t0\t0\t0\t0\t0\t453722382\t1351848142\n1792476445950\t0\t0\t0\t0\t0\t0\t0\t0\t585519251\t2081375968\n1792476446000\t0\t0\t0\t0\t0\t0\t0\t0\t47208193\t64108220\n1792476446050\t0\t0\t0\t0\t0\t0\t0\t0\t456890640\t1740330668\n1792476446150\t0\t0\t0\t0\t0\t0\t0\t0\t143782405\t232207129\n1792476446200\t0\t0\t0\t0\t0\t0\t0\t0\t1879557217\t5303079237\n1792476446250\t0\t0\t0\t0\t0\t0\t0\t0\t38933469\t77339057\n1792476446300\t0\t0\t0\t0\t0\t0\t0\t0\t714794725\t2044734122\n1792476446350\t0\t0\t0\t0\t0\t0\t0\t0\t720022920\t1942326248\n1792476446400\t0\t0\t0\t0\t0\t0\t0\t0\t237275831\t549596190\n1792476446450\t0\t0\t0\t0\t0\t0\t985911\t1653590\t948423454\t2360971682\n1792476446500\t0\t0\t0\t0\t0\t0\t0\t0\t29529035\t118338610\n1792476446550\t0\t0\t0\t0\t0\t0\t0\t0\t193099663\t762291454\n1792476446600\t0\t0\t0\t0\t0\t0\t0\t0\t143221040\t307265414\n1792476446650\t0\t0\t0\t0\t0\t0\t0\t0\t287280650\t777678266\n1792476446700\t0\t0\t0\t0\t0\t0\t0\t0\t1095977906\t2770533549\n1792476446950\t0\t0\t0\t0\t0\t0\t0\t0\t1525497230\t3683440011\n1792476447000\t0\t0\t0\t0\t0\t0\t0\t0\t1210603804\t2925368298\n1792476447050\t0\t0\t0\t0\t0\t0\t0\t0\t2456994512\t5911672421\n1792476447100\t0\t0\t0\t0\t0\t0\t0\t0\t2492241230\t6118142877\n1792476447150\t0\t0\t64238619\t123647807\t0\t0\t47340280\t67798936\t16681930725\t39528213761\n1792476447200\t0\t0\t82958455\t188191696\t0\t0\t48606794\t232449677\t625819377\t1841348362\n", "gc": "[2026-10-20T16:07:10.000+1000][0.007s] Using G1\n[2026-10-20T16:07:32.920+1000][22.927s] GC(0) Pause Young (Normal) (G1 Evacuation Pause) 103M->8M(1024M) 2.111ms\n[2026-10-20T16:07:32.976+1000][22.983s] GC(1) Pause Young (Normal) (G1 Evacuation Pause) 57M->11M(1024M) 1.534ms\n[2026-10-20T16:07:33.008+1000][23.015s] GC(2) Pause Young (Normal) (G1 Evacuation Pause) 88M->14M(1024M) 0.987ms\n", "load": "", "profile": "xctrace:mem-l1d\n"}));
+</script>

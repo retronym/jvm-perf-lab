@@ -1,0 +1,31 @@
+
+[perflab] WordCountBenchmark(100000) in pid 89271, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-async, -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-async/gc-%p.log:time,uptime, -XX:+UnlockDiagnosticVMOptions, -XX:+DebugNonSafepoints, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh13458709839800695795compilecommand]
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   803 /   206.5 /   11
+  WARMUP        2:    45 /    85.1 /    2
+  WARMUP        3:    20 /    11.5 /    0
+  MEASUREMENT   4:    40 /     6.6 /    0
+  MEASUREMENT   5:    11 /     4.0 /    0
+  MEASUREMENT   6:     6 /     8.5 /    0
+  MEASUREMENT   7:    15 /     8.4 /    1
+  MEASUREMENT   8:    10 /     1.0 /    0
+[jit] compiled while measuring:
+     2  java.lang.ThreadLocal.get (tier 4)
+     2  java.util.BitSet.set (tier 4)
+     2  jdk.internal.misc.Unsafe.getLongUnaligned (tier 4)
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.BufferedReader.ensureOpen (tier 4)
+     1  java.io.BufferedReader.implRead (tier 4)
+     1  java.io.CharArrayWriter.write (tier 4)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+[jit] deoptimized while measuring:
+     1  jdk.internal.misc.Unsafe.getLongUnaligned (c2: speculate_null_check, make_not_entrant)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-89271.txt

@@ -1,0 +1,53 @@
+[xctrace] Starting recording with the perflab-ipc-11680364964715917156.template template. Attaching to: java (70148). 
+[xctrace] Ctrl-C to stop the recording
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   542 /   139.4 /    9
+  WARMUP        2:    89 /    78.2 /    2
+  WARMUP        3:     8 /     1.5 /    1
+  MEASUREMENT   4:     3 /     0.6 /    0
+  MEASUREMENT   5:     9 /     3.2 /    0
+  MEASUREMENT   6:    21 /     1.4 /    0
+  MEASUREMENT   7:     6 /     0.5 /    0
+  MEASUREMENT   8:     7 /     1.9 /    0
+[jit] compiled while measuring:
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.String.<init> (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.String.isASCII (tier 3)
+     1  java.lang.System$2.getBytesNoRepl (tier 3)
+     1  java.lang.System$2.getCarrierThreadLocal (tier 3)
+     1  java.lang.ThreadLocal.get (tier 3)
+     1  java.lang.ThreadLocal.getCarrierThreadLocal (tier 3)
+     1  java.lang.ThreadLocal.getMap (tier 3)
+     1  java.lang.invoke.Invokers$Holder.linkToTargetMethod (tier 4)
+     1  java.lang.invoke.LambdaForm$MH.0x000000a801008000.invoke (tier 3)
+     1  java.lang.invoke.VarHandleByteArrayAsShorts$ArrayHandle.index (tier 4)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-sumAbove-70148.txt
+[xctrace] code map: 3307 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: sumAbove-70148.trace
+
+== INST_ALL (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x124e10b0d>
+
+== INST_BRANCH (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x124e10b0d>
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x124e10b0d>
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x124e10b0d>
+
+== samples (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x124e10b0d>

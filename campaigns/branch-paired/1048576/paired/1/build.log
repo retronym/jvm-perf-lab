@@ -1,0 +1,77 @@
+[xctrace] Starting recording with the perflab-ipc-263145345478241976.template template. Attaching to: java (79739). 
+[xctrace] Ctrl-C to stop the recording
+[perflab] paired paired. (us/op): sorted 274.3 random 2383 (+768.26% ± 80.51, median +740.25%, 4 pairs)
+[perflab] paired paired.gcFree. (us/op): sorted 274.3 random 2383 (+768.26% ± 80.51, median +740.25%, 4 pairs)
+[perflab] paired paired.alloc. (B/op): sorted 4.134 random 47.39 (+1049.31% ± 540.87, median +1191.10%, 4 pairs)
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   550 /   204.2 /    9
+  WARMUP        2:    79 /    89.0 /    2
+  WARMUP        3:    18 /     8.9 /    1
+  WARMUP        4:    15 /     1.1 /    0
+  MEASUREMENT   5:    21 /     2.6 /    0
+  MEASUREMENT   6:    17 /     2.6 /    0
+  MEASUREMENT   7:     6 /     2.9 /    0
+  MEASUREMENT   8:    11 /     0.9 /    0
+  MEASUREMENT   9:     8 /     1.6 /    0
+  MEASUREMENT  10:     2 /     0.4 /    0
+  MEASUREMENT  11:     9 /     1.3 /    0
+  MEASUREMENT  12:    17 /     1.6 /    0
+[jit] compiled while measuring:
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$HandleTable.assign (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeClassDesc (tier 3)
+     1  java.io.ObjectOutputStream.writeHandle (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectOutputStream.writeOrdinaryObject (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.getClassDataLayout (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.io.ObjectStreamClass.isExternalizable (tier 3)
+     1  java.io.ObjectStreamClass.isRecord (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.ClassLoader.findBootstrapClassOrNull (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-sumAbove-79739.txt
+[xctrace] code map: 3395 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Run issues were detected (trace is still ready to be viewed):
+[xctrace] * [Warning] Lost events were detected. Data rate might be too high. Trying with another recording mode might solve this issue.
+[xctrace] 
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: sumAbove-79739.trace
+
+== INST_ALL (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x12f2a1c01>
+    0.0%  <unknown 0x12f265099>
+    0.0%  <unknown 0x12f267a8d>
+
+== INST_BRANCH (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x12f2a1c01>
+    0.0%  <unknown 0x12f265099>
+    0.0%  <unknown 0x12f267a8d>
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x12f265099>
+    0.0%  <unknown 0x12f267a8d>
+    0.0%  <unknown 0x12f2a1c01>
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   99.9%  sample.BranchBenchmark.sumAbove
+    0.1%  <unknown 0x12f265099>
+    0.0%  <unknown 0x12f267a8d>
+    0.0%  <unknown 0x12f2a1c01>
+
+== samples (bench threads)
+   99.9%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x12f265099>
+    0.0%  <unknown 0x12f267a8d>
+    0.0%  <unknown 0x12f2a1c01>
+[perflab] paired xctrace.INST_ALL. (#/op): sorted 6.278e+06 random 6.340e+06 (+0.63% ± 24.96, median +2.48%, 4 pairs)
+[perflab] paired xctrace.INST_BRANCH. (#/op): sorted 1.690e+06 random 1.675e+06 (-1.22% ± 23.71, median +2.48%, 4 pairs)
+[perflab] paired xctrace.CORE_ACTIVE_CYCLE. (#/op): sorted 1.068e+06 random 8.347e+06 (+680.19% ± 166.31, median +751.63%, 4 pairs)
+[perflab] paired xctrace.BRANCH_MISPRED_NONSPEC. (#/op): sorted 249.3 random 4.089e+05 (+163617.29% ± 36337.30, median +175931.03%, 4 pairs)

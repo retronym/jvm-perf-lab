@@ -1,0 +1,27 @@
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   552 /   166.1 /    5
+  WARMUP        2:    81 /    75.8 /    6
+  WARMUP        3:     8 /     0.8 /    0
+  MEASUREMENT   4:    35 /    11.7 /    0
+  MEASUREMENT   5:    11 /     0.7 /    0
+  MEASUREMENT   6:    12 /     2.1 /    0
+  MEASUREMENT   7:     7 /     0.5 /    0
+  MEASUREMENT   8:     2 /     0.1 /    0
+[jit] compiled while measuring:
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.BufferedReader.ensureOpen (tier 4)
+     1  java.io.BufferedReader.implRead (tier 4)
+     1  java.io.CharArrayWriter.write (tier 4)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.Byte.valueOf (tier 3)
+     1  java.lang.CharacterDataLatin1.toLowerCase (tier 4)
+     1  java.lang.Long.longValue (tier 1)
+     1  java.lang.Math.max (tier 3)
+     1  java.lang.Math.min (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-sumAbove-92905.txt

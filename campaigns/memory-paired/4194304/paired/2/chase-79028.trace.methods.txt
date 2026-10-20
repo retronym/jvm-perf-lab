@@ -1,0 +1,50 @@
+
+== INST_ALL (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x1225da8a9>
+    0.0%  <unknown 0x1225dcd85>
+    0.0%  Unsafe_CompareAndSetReference(JNIEnv_*, _jobject*, _jobject*, long, _jobject*, _jobject*)
+    0.0%  <unknown 0x1225e2659>
+    0.0%  <unknown 0x1225de039>
+    0.0%  java.lang.String.length
+    0.0%  <unknown 0x1225daa01>
+
+== L1D_CACHE_MISS_LD_NONSPEC (bench threads)
+   99.9%  sample.MemoryBenchmark.chase
+    0.0%  Unsafe_CompareAndSetReference(JNIEnv_*, _jobject*, _jobject*, long, _jobject*, _jobject*)
+    0.0%  <unknown 0x1225e2659>
+    0.0%  <unknown 0x1225daa01>
+    0.0%  <unknown 0x1225de039>
+    0.0%  java.lang.String.length
+    0.0%  <unknown 0x1225da8a9>
+    0.0%  <unknown 0x1225dcd85>
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x1225e2659>
+    0.0%  Unsafe_CompareAndSetReference(JNIEnv_*, _jobject*, _jobject*, long, _jobject*, _jobject*)
+    0.0%  <unknown 0x1225da8a9>
+    0.0%  <unknown 0x1225daa01>
+    0.0%  <unknown 0x1225de039>
+    0.0%  java.lang.String.length
+    0.0%  <unknown 0x1225dcd85>
+
+== LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS (bench threads)
+   99.9%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x1225e2659>
+    0.0%  Unsafe_CompareAndSetReference(JNIEnv_*, _jobject*, _jobject*, long, _jobject*, _jobject*)
+    0.0%  <unknown 0x1225daa01>
+    0.0%  <unknown 0x1225de039>
+    0.0%  java.lang.String.length
+    0.0%  <unknown 0x1225da8a9>
+    0.0%  <unknown 0x1225dcd85>
+
+== samples (bench threads)
+   99.9%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x1225de039>
+    0.0%  Unsafe_CompareAndSetReference(JNIEnv_*, _jobject*, _jobject*, long, _jobject*, _jobject*)
+    0.0%  <unknown 0x1225daa01>
+    0.0%  java.lang.String.length
+    0.0%  <unknown 0x1225dcd85>
+    0.0%  <unknown 0x1225da8a9>
+    0.0%  <unknown 0x1225e2659>

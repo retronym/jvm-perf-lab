@@ -1,0 +1,8 @@
+{
+  "name": "maps-async",
+  "profile": "async:cpu,alloc",
+  "rounds": 1,
+  "corpora": {"100000": "-wi 4 -i 6 -w 1 -r 1"},
+  "variants": {"hash": "", "tree": ""},
+  "variantJmhArgs": {"hash": "-p map=hash", "tree": "-p map=tree"}
+}

@@ -1,0 +1,26 @@
+
+[perflab] WordCountBenchmark(10000) in pid 71933, JDK 21.0.12.1, options [-javaagent:~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/../../perflab-agent/target/perflab-agent-0.1.0-SNAPSHOT.jar=spec=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/campaigns/normalize.audit,out=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/audit-normalize/audit-{pid}.json, -Xms1G, -Xmx1G, -Dperflab.cell=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/audit-normalize, -Xlog:gc:file=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/audit-normalize/gc-%p.log:time,uptime, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh15753087766230319894compilecommand]
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:  1169 /   703.6 /   36
+  MEASUREMENT   2:    32 /    29.8 /    2
+[jit] compiled while measuring:
+     2  jdk.jfr.internal.consumer.ObjectFactory$1.createTyped (tier 3)
+     1  java.lang.String.valueOf (tier 4)
+     1  java.util.BitSet.ensureCapacity (tier 3)
+     1  java.util.BitSet.set (tier 4)
+     1  java.util.RegularEnumSet.contains (tier 4)
+     1  java.util.Spliterator.getExactSizeIfKnown (tier 4)
+     1  java.util.concurrent.locks.AbstractQueuedSynchronizer.compareAndSetState (tier 4)
+     1  java.util.concurrent.locks.ReentrantLock$Sync.lock (tier 4)
+     1  java.util.concurrent.locks.ReentrantLock.lock (tier 4)
+     1  java.util.concurrent.locks.ReentrantLock.unlock (tier 4)
+     1  java.util.stream.AbstractPipeline.copyIntoWithCancel (tier 4)
+     1  java.util.stream.AbstractPipeline.evaluate (tier 3)
+     1  java.util.stream.ReferencePipeline$2$1.begin (tier 4)
+     1  java.util.stream.ReferencePipeline.collect (tier 4)
+     1  java.util.stream.ReferencePipeline.forEachWithCancel (tier 3)
+[jit] deoptimized while measuring:
+     1  java.util.regex.Matcher.search (c2: unstable_if, reinterpret)
+     1  java.util.regex.Pattern$BmpCharPropertyGreedy.match (c2: predicate, maybe_recompile)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-71933.txt

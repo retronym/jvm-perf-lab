@@ -1,0 +1,30 @@
+
+== INST_ALL (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x12f2a1c01>
+    0.0%  <unknown 0x12f265099>
+    0.0%  <unknown 0x12f267a8d>
+
+== INST_BRANCH (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x12f2a1c01>
+    0.0%  <unknown 0x12f265099>
+    0.0%  <unknown 0x12f267a8d>
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x12f265099>
+    0.0%  <unknown 0x12f267a8d>
+    0.0%  <unknown 0x12f2a1c01>
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   99.9%  sample.BranchBenchmark.sumAbove
+    0.1%  <unknown 0x12f265099>
+    0.0%  <unknown 0x12f267a8d>
+    0.0%  <unknown 0x12f2a1c01>
+
+== samples (bench threads)
+   99.9%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x12f265099>
+    0.0%  <unknown 0x12f267a8d>
+    0.0%  <unknown 0x12f2a1c01>

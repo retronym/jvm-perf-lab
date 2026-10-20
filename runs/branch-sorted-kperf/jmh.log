@@ -1,0 +1,132 @@
+# JMH version: 1.37
+# VM version: JDK 21.0.12.1, OpenJDK 64-Bit Server VM, 21.0.12.1+1-LTS
+# VM invoker: ~/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java
+# VM options: -XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -XX:+PreserveFramePointer -Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-sorted-kperf -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-sorted-kperf/gc-%p.log:time,uptime
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: sample.BranchBenchmark.sumAbove
+# Parameters: (data = sorted, size = 1048576, variants = )
+
+# Run progress: 0.00% complete, ETA 00:00:08
+# Fork: 1 of 1
+# Preparing profilers: AsyncProfiler 
+# Warmup Iteration   1: [INFO] kperf: cycles (CORE_ACTIVE_CYCLE) every 1000000 on PMC2
+[INFO] kperf: branch-misses (BRANCH_MISPRED_NONSPEC) every 10000 on PMC5, precise PC
+312.810 us/op
+# Warmup Iteration   2: 275.138 us/op
+# Warmup Iteration   3: [INFO] kperf: cycles: 13828 samples, 0 with precise PC, 0 used as leaf
+[INFO] kperf: branch-misses: 2119 samples, 2118 with precise PC, 1072 used as lea277.776 us/op
+f
+Iteration   1: [INFO] kperf: cycles (CORE_ACTIVE_CYCLE) every 1000000 on PMC2
+[INFO] kperf: branch-misses (BRANCH_MISPRED_NONSPEC) every 10000 on PMC5, precise PC
+279.478 us/op
+                 gc.alloc.rate:      0.278 MB/sec
+                 gc.alloc.rate.norm: 81.483 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 291.554 us/op
+                 gc.alloc.rate:      0.059 MB/sec
+                 gc.alloc.rate.norm: 18.088 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 280.193 us/op
+                 gc.alloc.rate:      0.027 MB/sec
+                 gc.alloc.rate.norm: 7.891 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 278.147 us/op
+                 gc.alloc.rate:      0.032 MB/sec
+                 gc.alloc.rate.norm: 9.430 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: [INFO] kperf: cycles: 20585 samples, 0 with precise PC, 0 used as leaf
+[INFO] kperf: branch-misses: 706 samples, 704 with precise PC, 564 used as leaf
+274.942 us/op
+                 async:                       (text only)
+                 gc.alloc.rate:               0.439 MB/sec
+                 gc.alloc.rate.norm:          317.591 B/op
+                 gc.count:                    ≈ 0 counts
+                 jit.compilations:            52.000 #
+                 jit.compileTime:             13.412 ms
+                 jit.deopts:                  ≈ 0 #
+                 jit.lastWarmup.compilations: 26.000 #
+                 jit.lastWarmup.deopts:       ≈ 0 #
+
+# Processing profiler results: AsyncProfiler 
+
+
+Result "sample.BranchBenchmark.sumAbove":
+  280.863 ±(99.9%) 24.285 us/op [Average]
+  (min, avg, max) = (274.942, 280.863, 291.554), stdev = 6.307
+  CI (99.9%): [256.578, 305.148] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:async":
+Async profiler results:
+  ~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-sorted-kperf/sample.BranchBenchmark.sumAbove-AverageTime-data-sorted-size-1048576-variants-/jfr-cycles+branch-misses.jfr
+
+Secondary result "sample.BranchBenchmark.sumAbove:gc.alloc.rate":
+  0.167 ±(99.9%) 0.709 MB/sec [Average]
+  (min, avg, max) = (0.027, 0.167, 0.439), stdev = 0.184
+  CI (99.9%): [≈ 0, 0.877] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:gc.alloc.rate.norm":
+  86.896 ±(99.9%) 510.217 B/op [Average]
+  (min, avg, max) = (7.891, 86.896, 317.591), stdev = 132.502
+  CI (99.9%): [≈ 0, 597.113] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:gc.count":
+  ≈ 0 counts
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.compilations":
+  52.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 10.400, 52.000), stdev = 23.255
+  CI (99.9%): [52.000, 52.000] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.compileTime":
+  13.412 ±(99.9%) 0.001 ms [Maximum]
+  (min, avg, max) = (≈ 0, 2.682, 13.412), stdev = 5.998
+  CI (99.9%): [13.412, 13.412] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.deopts":
+  ≈ 0 #
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.lastWarmup.compilations":
+  26.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 5.200, 26.000), stdev = 11.628
+  CI (99.9%): [26.000, 26.000] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.lastWarmup.deopts":
+  ≈ 0 #
+
+
+# Run complete. Total time: 00:00:10
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                             (data)   (size)  (variants)  Mode  Cnt    Score     Error   Units
+BranchBenchmark.sumAbove                              sorted  1048576              avgt    5  280.863 ±  24.285   us/op
+BranchBenchmark.sumAbove:async                        sorted  1048576              avgt           NaN               ---
+BranchBenchmark.sumAbove:gc.alloc.rate                sorted  1048576              avgt    5    0.167 ±   0.709  MB/sec
+BranchBenchmark.sumAbove:gc.alloc.rate.norm           sorted  1048576              avgt    5   86.896 ± 510.217    B/op
+BranchBenchmark.sumAbove:gc.count                     sorted  1048576              avgt    5      ≈ 0            counts
+BranchBenchmark.sumAbove:jit.compilations             sorted  1048576              avgt    5   52.000                 #
+BranchBenchmark.sumAbove:jit.compileTime              sorted  1048576              avgt    5   13.412                ms
+BranchBenchmark.sumAbove:jit.deopts                   sorted  1048576              avgt    5      ≈ 0                 #
+BranchBenchmark.sumAbove:jit.lastWarmup.compilations  sorted  1048576              avgt    5   26.000                 #
+BranchBenchmark.sumAbove:jit.lastWarmup.deopts        sorted  1048576              avgt    5      ≈ 0                 #
+
+Benchmark result is saved to ~/code/retronym/jvm-perf-lab/examples/sample/out/runs/branch-sorted-kperf/result.json

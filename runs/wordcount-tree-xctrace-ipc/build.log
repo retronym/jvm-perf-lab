@@ -1,0 +1,90 @@
+
+[perflab] WordCountBenchmark(100000) in pid 68614, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Dperflab.cell=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/wordcount-tree-xctrace-ipc, -Xlog:gc:file=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/wordcount-tree-xctrace-ipc/gc-%p.log:time,uptime, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh16535090483994639768compilecommand]
+[xctrace] Starting recording with the perflab-ipc-7020066784952668887.template template. Attaching to: java (68614). 
+[xctrace] Ctrl-C to stop the recording
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   790 /   274.1 /   14
+  WARMUP        2:    25 /    25.7 /    2
+  WARMUP        3:    12 /     3.4 /    1
+  MEASUREMENT   4:     4 /     0.5 /    0
+  MEASUREMENT   5:    13 /     1.9 /    0
+  MEASUREMENT   6:    13 /     1.0 /    0
+  MEASUREMENT   7:     5 /     1.7 /    0
+  MEASUREMENT   8:     6 /    11.4 /    0
+[jit] compiled while measuring:
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.String.<init> (tier 3)
+     1  java.lang.StringBuilder.charAt (tier 3)
+     1  java.lang.ThreadLocal$ThreadLocalMap.getEntry (tier 3)
+     1  java.lang.invoke.Invokers$Holder.linkToTargetMethod (tier 4)
+     1  java.util.ArrayList.addAll (tier 3)
+     1  java.util.BitSet.ensureCapacity (tier 3)
+     1  java.util.Collections$1.<init> (tier 3)
+     1  java.util.Collections$1.next (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-68614.txt
+[xctrace] code map: 3451 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: countAndLookUp-68614.trace
+
+== INST_ALL (bench threads)
+   86.7%  java.util.TreeMap.merge
+   10.0%  sample.WordCount.count
+    2.3%  sample.WordCountBenchmark.countAndLookUp
+    0.5%  java.util.TreeMap.rotateRight
+    0.4%  java.util.TreeMap.rotateLeft
+    0.0%  java.util.TreeMap.containsKey
+    0.0%  pthread_jit_write_protect_np
+    0.0%  G1AllocRegion::retire_internal(HeapRegion*, bool)
+    0.0%  <unknown 0x124dda8a9>
+
+== INST_BRANCH (bench threads)
+   86.7%  java.util.TreeMap.merge
+   10.0%  sample.WordCount.count
+    2.3%  sample.WordCountBenchmark.countAndLookUp
+    0.5%  java.util.TreeMap.rotateRight
+    0.4%  java.util.TreeMap.rotateLeft
+    0.0%  java.util.TreeMap.containsKey
+    0.0%  pthread_jit_write_protect_np
+    0.0%  G1AllocRegion::retire_internal(HeapRegion*, bool)
+    0.0%  <unknown 0x124dda8a9>
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   86.7%  java.util.TreeMap.merge
+    9.9%  sample.WordCount.count
+    2.3%  sample.WordCountBenchmark.countAndLookUp
+    0.5%  java.util.TreeMap.rotateRight
+    0.4%  java.util.TreeMap.rotateLeft
+    0.0%  java.util.TreeMap.containsKey
+    0.0%  pthread_jit_write_protect_np
+    0.0%  G1AllocRegion::retire_internal(HeapRegion*, bool)
+    0.0%  <unknown 0x124dda8a9>
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   86.6%  java.util.TreeMap.merge
+   10.0%  sample.WordCount.count
+    2.3%  sample.WordCountBenchmark.countAndLookUp
+    0.6%  java.util.TreeMap.rotateRight
+    0.4%  java.util.TreeMap.rotateLeft
+    0.0%  pthread_jit_write_protect_np
+    0.0%  java.util.TreeMap.containsKey
+    0.0%  G1AllocRegion::retire_internal(HeapRegion*, bool)
+    0.0%  <unknown 0x124dda8a9>
+
+== samples (bench threads)
+   86.6%  java.util.TreeMap.merge
+    9.9%  sample.WordCount.count
+    2.5%  sample.WordCountBenchmark.countAndLookUp
+    0.5%  java.util.TreeMap.rotateRight
+    0.4%  java.util.TreeMap.rotateLeft
+    0.0%  pthread_jit_write_protect_np
+    0.0%  java.util.TreeMap.containsKey
+    0.0%  <unknown 0x124dda8a9>
+    0.0%  G1AllocRegion::retire_internal(HeapRegion*, bool)

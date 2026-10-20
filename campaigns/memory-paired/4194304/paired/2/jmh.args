@@ -1,0 +1,23 @@
+-o
+~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/memory-paired/4194304/paired/2/jmh.log
+-rf
+json
+-rff
+~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/memory-paired/4194304/paired/2/result.json
+-prof
+io.github.retronym.perflab.xctrace.XctraceProfiler:template=mem-l1d;dir=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/memory-paired/4194304/paired/2
+-jvmArgsAppend
+-Xms1G -Xmx1G -Xlog:gc:file=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/memory-paired/4194304/paired/2/gc.log:time,uptime -Dperflab.cell=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/memory-paired/4194304/paired/2
+-p
+size=4194304
+-wi
+4
+-i
+8
+-w
+1
+-r
+1
+-p
+variants=sequential=sequential|shuffled=shuffled
+MemoryBenchmark

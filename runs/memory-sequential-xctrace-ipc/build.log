@@ -1,0 +1,48 @@
+[xctrace] Starting recording with the perflab-ipc-10042228660432570897.template template. Attaching to: java (69625). 
+[xctrace] Ctrl-C to stop the recording
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   538 /   143.0 /   12
+  WARMUP        2:    81 /    93.8 /    2
+  WARMUP        3:    13 /     9.1 /    1
+  MEASUREMENT   4:     6 /     2.0 /    0
+  MEASUREMENT   5:     8 /     1.4 /    0
+  MEASUREMENT   6:    19 /     1.2 /    0
+  MEASUREMENT   7:     4 /     0.3 /    0
+  MEASUREMENT   8:    15 /     2.0 /    0
+[jit] compiled while measuring:
+     2  jdk.internal.misc.Unsafe.putIntUnaligned (tier 3)
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.String.<init> (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+     1  java.lang.StringBuilder.charAt (tier 3)
+     1  java.lang.System$2.getBytesNoRepl (tier 3)
+     1  java.lang.System$2.getCarrierThreadLocal (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-chase-69625.txt
+[xctrace] code map: 3296 compiled methods
+[xctrace] Stopping recording...
+[xctrace] Recording completed. Saving output file...
+[xctrace] Output file saved as: chase-69625.trace
+
+== INST_ALL (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+
+== INST_BRANCH (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+
+== samples (bench threads)
+  100.0%  sample.MemoryBenchmark.chase

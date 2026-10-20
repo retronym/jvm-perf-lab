@@ -1,0 +1,13 @@
+cycles%  instructions/op  group  thread
+ 98.49%          0.050G  bench  Java: sample.WordCountBenchmark.countAndLookUp-jmh-worker-1 (java, pid: 77501)
+  0.58%          0.000G  jit    Java: C2 CompilerThread0 (java, pid: 77501)
+  0.44%          0.000G  other  java (java, pid: 77501)
+  0.32%          0.000G  gc     Java: GC Thread#N (java, pid: 77501)
+  0.10%          0.000G  jit    Java: C1 CompilerThread0 (java, pid: 77501)
+  0.04%          0.000G  jit    Java: C1 CompilerThread1 (java, pid: 77501)
+  0.02%          0.000G  other  Java: VM Thread (java, pid: 77501)
+  0.01%          0.000G  other  Java: JFR Recorder Thread (java, pid: 77501)
+  0.01%          0.000G  other  Java: JFR Event Stream 1 (java, pid: 77501)
+  0.00%          0.000G  other  Java: JFR Periodic Tasks (java, pid: 77501)
+  0.00%          0.000G  other  Java: VM Periodic Task Thread (java, pid: 77501)
+  0.00%          0.000G  other  Java: process reaper (java, pid: 77501)

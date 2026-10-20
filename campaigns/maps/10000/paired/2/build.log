@@ -1,0 +1,40 @@
+
+[perflab] WordCountBenchmark(10000) in pid 76092, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Xlog:gc:file=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/maps/10000/paired/2/gc.log:time,uptime, -Dperflab.cell=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/maps/10000/paired/2, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh3836733156608414057compilecommand]
+[perflab] paired paired. (us/op): hash 203.1 linked 197.2 (-1.53% ± 16.53, median -1.53%, 2 pairs) tree 454.7 (+127.66% ± 45.62, median +127.66%, 2 pairs)
+[perflab] paired paired.gcFree. (us/op): hash 202.6 linked 196.8 (-1.46% ± 16.75, median -1.46%, 2 pairs) tree 454.2 (+128.05% ± 46.17, median +128.05%, 2 pairs)
+[perflab] paired paired.alloc. (B/op): hash 3.485e+05 linked 3.664e+05 (+5.14% ± 0.00, median +5.14%, 2 pairs) tree 3.336e+05 (-4.29% ± 0.01, median -4.29%, 2 pairs)
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   804 /   197.2 /    8
+  WARMUP        2:    61 /    73.1 /   15
+  WARMUP        3:    61 /   112.2 /   12
+  WARMUP        4:    10 /     0.6 /    0
+  WARMUP        5:    14 /     2.8 /    0
+  WARMUP        6:    17 /     1.7 /    0
+  MEASUREMENT   7:    16 /     1.8 /    0
+  MEASUREMENT   8:    18 /     3.2 /    0
+  MEASUREMENT   9:     6 /     1.1 /    0
+  MEASUREMENT  10:     7 /     0.4 /    0
+  MEASUREMENT  11:     9 /     1.5 /    0
+  MEASUREMENT  12:    25 /     3.7 /    5
+[jit] compiled while measuring:
+     2  java.nio.ByteBuffer.wrap (tier 3)
+     1  java.io.ObjectOutputStream$HandleTable.assign (tier 3)
+     1  java.io.ObjectOutputStream.writeClassDesc (tier 3)
+     1  java.io.ObjectOutputStream.writeOrdinaryObject (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.getClassDataLayout (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.CharacterData.of (tier 3)
+     1  java.lang.ClassLoader.findBootstrapClassOrNull (tier 3)
+     1  java.lang.Double.doubleValue (tier 1)
+     1  java.lang.Math.min (tier 3)
+     1  java.lang.Math.multiplyHigh (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+[jit] deoptimized while measuring:
+     3  java.util.TreeMap.compare (c2: class_check, maybe_recompile)
+     1  java.util.TreeMap.rotateLeft (c2: unstable_if, reinterpret)
+     1  java.util.TreeMap.rotateRight (c2: unstable_if, reinterpret)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-76092.txt

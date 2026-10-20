@@ -1,0 +1,15 @@
+
+== INST_ALL (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+
+== INST_BRANCH (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+
+== CORE_ACTIVE_CYCLE (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+
+== samples (bench threads)
+  100.0%  sample.MemoryBenchmark.chase

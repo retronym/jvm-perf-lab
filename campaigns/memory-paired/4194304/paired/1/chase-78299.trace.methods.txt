@@ -1,0 +1,50 @@
+
+== INST_ALL (bench threads)
+   99.8%  sample.MemoryBenchmark.chase
+    0.1%  <unknown 0x1205dde05>
+    0.0%  <unknown 0x1205d7a41>
+    0.0%  <unknown 0x1205d5099>
+    0.0%  __psynch_cvbroad
+    0.0%  <unknown 0x1206137c1>
+    0.0%  <unknown 0x1205e5ea9>
+    0.0%  <unknown 0x1205e4145>
+
+== L1D_CACHE_MISS_LD_NONSPEC (bench threads)
+   99.9%  sample.MemoryBenchmark.chase
+    0.0%  __psynch_cvbroad
+    0.0%  <unknown 0x1205d7a41>
+    0.0%  <unknown 0x1206137c1>
+    0.0%  <unknown 0x1205dde05>
+    0.0%  <unknown 0x1205d5099>
+    0.0%  <unknown 0x1205e5ea9>
+    0.0%  <unknown 0x1205e4145>
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   99.9%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x1205dde05>
+    0.0%  <unknown 0x1205d5099>
+    0.0%  __psynch_cvbroad
+    0.0%  <unknown 0x1205d7a41>
+    0.0%  <unknown 0x1206137c1>
+    0.0%  <unknown 0x1205e5ea9>
+    0.0%  <unknown 0x1205e4145>
+
+== LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS (bench threads)
+  100.0%  sample.MemoryBenchmark.chase
+    0.0%  __psynch_cvbroad
+    0.0%  <unknown 0x1206137c1>
+    0.0%  <unknown 0x1205d7a41>
+    0.0%  <unknown 0x1205e5ea9>
+    0.0%  <unknown 0x1205dde05>
+    0.0%  <unknown 0x1205d5099>
+    0.0%  <unknown 0x1205e4145>
+
+== samples (bench threads)
+   99.9%  sample.MemoryBenchmark.chase
+    0.0%  <unknown 0x1205dde05>
+    0.0%  <unknown 0x1205d7a41>
+    0.0%  <unknown 0x1206137c1>
+    0.0%  <unknown 0x1205e5ea9>
+    0.0%  <unknown 0x1205e4145>
+    0.0%  __psynch_cvbroad
+    0.0%  <unknown 0x1205d5099>

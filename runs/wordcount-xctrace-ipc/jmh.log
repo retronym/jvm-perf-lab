@@ -1,0 +1,236 @@
+# JMH version: 1.37
+# VM version: JDK 21.0.12.1, OpenJDK 64-Bit Server VM, 21.0.12.1+1-LTS
+# VM invoker: ~/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java
+# VM options: -Xms1G -Xmx1G -Dperflab.cell=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/wordcount-xctrace-ipc -Xlog:gc:file=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/wordcount-xctrace-ipc/gc-%p.log:time,uptime
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: sample.WordCountBenchmark.countAndLookUp
+# Parameters: (map = hash, size = 100000, variants = )
+
+# Run progress: 0.00% complete, ETA 00:00:08
+# Fork: 1 of 1
+# Warmup Iteration   1: 3407.669 us/op
+# Warmup Iteration   2: 3230.798 us/op
+# Warmup Iteration   3: 3284.727 us/op
+Iteration   1: 3386.753 us/op
+                 gc.alloc.rate:      950.699 MB/sec
+                 gc.alloc.rate.norm: 3378640.539 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   2: 3211.146 us/op
+                 gc.alloc.rate:      1002.799 MB/sec
+                 gc.alloc.rate.norm: 3378625.231 B/op
+                 gc.count:           1.000 counts
+                 gc.time:            1.000 ms
+
+Iteration   3: 3484.300 us/op
+                 gc.alloc.rate:      924.187 MB/sec
+                 gc.alloc.rate.norm: 3378633.689 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   4: 3202.192 us/op
+                 gc.alloc.rate:      1005.635 MB/sec
+                 gc.alloc.rate.norm: 3378606.879 B/op
+                 gc.count:           2.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 3195.343 us/op
+                 gc.alloc.rate:                        401.997 MB/sec
+                 gc.alloc.rate.norm:                   3381139.847 B/op
+                 gc.count:                             1.000 counts
+                 gc.time:                              1.000 ms
+                 jit.compilations:                     48.000 #
+                 jit.compileTime:                      6.718 ms
+                 jit.deopts:                           ≈ 0 #
+                 jit.lastWarmup.compilations:          10.000 #
+                 jit.lastWarmup.deopts:                1.000 #
+                 xctrace.BRANCH_MISPRED_NONSPEC:       175351.229 #/op
+                 xctrace.BRANCH_MISPRED_NONSPEC/kinst: 4.476 #/kinst
+                 xctrace.CORE_ACTIVE_CYCLE:            13451816.836 #/op
+                 xctrace.INST_ALL:                     39177348.824 #/op
+                 xctrace.INST_BRANCH:                  7861725.967 #/op
+                 xctrace.INST_BRANCH/kinst:            200.670 #/kinst
+                 xctrace.IPC.bench:                    2.912 insts/clk
+                 xctrace.IPC.gc:                       1.854 insts/clk
+                 xctrace.IPC.jit:                      2.581 insts/clk
+                 xctrace.IPC.other:                    3.731 insts/clk
+                 xctrace.bench.oncpu:                  4.961 s
+                 xctrace.cycles%.bench:                97.163 %
+                 xctrace.cycles%.gc:                   0.448 %
+                 xctrace.cycles%.jit:                  1.643 %
+                 xctrace.cycles%.other:                0.747 %
+
+
+
+Result "sample.WordCountBenchmark.countAndLookUp":
+  3295.947 ±(99.9%) 508.755 us/op [Average]
+  (min, avg, max) = (3195.343, 3295.947, 3484.300), stdev = 132.122
+  CI (99.9%): [2787.192, 3804.702] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.alloc.rate":
+  857.063 ±(99.9%) 988.631 MB/sec [Average]
+  (min, avg, max) = (401.997, 857.063, 1005.635), stdev = 256.744
+  CI (99.9%): [≈ 0, 1845.695] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.alloc.rate.norm":
+  3379129.237 ±(99.9%) 4328.262 B/op [Average]
+  (min, avg, max) = (3378606.879, 3379129.237, 3381139.847), stdev = 1124.036
+  CI (99.9%): [3374800.975, 3383457.499] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.count":
+  8.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (1.000, 1.600, 2.000), stdev = 0.548
+  CI (99.9%): [8.000, 8.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.time":
+  8.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (1.000, 1.600, 2.000), stdev = 0.548
+  CI (99.9%): [8.000, 8.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.compilations":
+  48.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 9.600, 48.000), stdev = 21.466
+  CI (99.9%): [48.000, 48.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.compileTime":
+  6.718 ±(99.9%) 0.001 ms [Maximum]
+  (min, avg, max) = (≈ 0, 1.344, 6.718), stdev = 3.004
+  CI (99.9%): [6.718, 6.718] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.deopts":
+  ≈ 0 #
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.lastWarmup.compilations":
+  10.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 2.000, 10.000), stdev = 4.472
+  CI (99.9%): [10.000, 10.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.lastWarmup.deopts":
+  1.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 0.200, 1.000), stdev = 0.447
+  CI (99.9%): [1.000, 1.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC":
+  175351.229 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 35070.246, 175351.229), stdev = 78419.454
+  CI (99.9%): [175351.229, 175351.229] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC/kinst":
+  4.476 ±(99.9%) 0.001 #/kinst [Maximum]
+  (min, avg, max) = (≈ 0, 0.895, 4.476), stdev = 2.002
+  CI (99.9%): [4.476, 4.476] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE":
+  13451816.836 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 2690363.367, 13451816.836), stdev = 6015835.373
+  CI (99.9%): [13451816.836, 13451816.836] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_ALL":
+  39177348.824 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 7835469.765, 39177348.824), stdev = 17520643.030
+  CI (99.9%): [39177348.824, 39177348.824] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH":
+  7861725.967 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 1572345.193, 7861725.967), stdev = 3515870.736
+  CI (99.9%): [7861725.967, 7861725.967] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH/kinst":
+  200.670 ±(99.9%) 0.001 #/kinst [Maximum]
+  (min, avg, max) = (≈ 0, 40.134, 200.670), stdev = 89.742
+  CI (99.9%): [200.670, 200.670] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.IPC.bench":
+  2.912 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.582, 2.912), stdev = 1.302
+  CI (99.9%): [2.912, 2.912] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.IPC.gc":
+  1.854 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.371, 1.854), stdev = 0.829
+  CI (99.9%): [1.854, 1.854] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.IPC.jit":
+  2.581 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.516, 2.581), stdev = 1.154
+  CI (99.9%): [2.581, 2.581] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.IPC.other":
+  3.731 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.746, 3.731), stdev = 1.669
+  CI (99.9%): [3.731, 3.731] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.bench.oncpu":
+  4.961 ±(99.9%) 0.001 s [Maximum]
+  (min, avg, max) = (≈ 0, 0.992, 4.961), stdev = 2.219
+  CI (99.9%): [4.961, 4.961] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.cycles%.bench":
+  97.163 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 19.433, 97.163), stdev = 43.453
+  CI (99.9%): [97.163, 97.163] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.cycles%.gc":
+  0.448 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.090, 0.448), stdev = 0.200
+  CI (99.9%): [0.448, 0.448] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.cycles%.jit":
+  1.643 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.329, 1.643), stdev = 0.735
+  CI (99.9%): [1.643, 1.643] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:xctrace.cycles%.other":
+  0.747 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.149, 0.747), stdev = 0.334
+  CI (99.9%): [0.747, 0.747] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:18
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                               (map)  (size)  (variants)  Mode  Cnt         Score      Error      Units
+WordCountBenchmark.countAndLookUp                                        hash  100000              avgt    5      3295.947 ±  508.755      us/op
+WordCountBenchmark.countAndLookUp:gc.alloc.rate                          hash  100000              avgt    5       857.063 ±  988.631     MB/sec
+WordCountBenchmark.countAndLookUp:gc.alloc.rate.norm                     hash  100000              avgt    5   3379129.237 ± 4328.262       B/op
+WordCountBenchmark.countAndLookUp:gc.count                               hash  100000              avgt    5         8.000                counts
+WordCountBenchmark.countAndLookUp:gc.time                                hash  100000              avgt    5         8.000                    ms
+WordCountBenchmark.countAndLookUp:jit.compilations                       hash  100000              avgt    5        48.000                     #
+WordCountBenchmark.countAndLookUp:jit.compileTime                        hash  100000              avgt    5         6.718                    ms
+WordCountBenchmark.countAndLookUp:jit.deopts                             hash  100000              avgt    5           ≈ 0                     #
+WordCountBenchmark.countAndLookUp:jit.lastWarmup.compilations            hash  100000              avgt    5        10.000                     #
+WordCountBenchmark.countAndLookUp:jit.lastWarmup.deopts                  hash  100000              avgt    5         1.000                     #
+WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC         hash  100000              avgt    5    175351.229                  #/op
+WordCountBenchmark.countAndLookUp:xctrace.BRANCH_MISPRED_NONSPEC/kinst   hash  100000              avgt    5         4.476               #/kinst
+WordCountBenchmark.countAndLookUp:xctrace.CORE_ACTIVE_CYCLE              hash  100000              avgt    5  13451816.836                  #/op
+WordCountBenchmark.countAndLookUp:xctrace.INST_ALL                       hash  100000              avgt    5  39177348.824                  #/op
+WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH                    hash  100000              avgt    5   7861725.967                  #/op
+WordCountBenchmark.countAndLookUp:xctrace.INST_BRANCH/kinst              hash  100000              avgt    5       200.670               #/kinst
+WordCountBenchmark.countAndLookUp:xctrace.IPC.bench                      hash  100000              avgt    5         2.912             insts/clk
+WordCountBenchmark.countAndLookUp:xctrace.IPC.gc                         hash  100000              avgt    5         1.854             insts/clk
+WordCountBenchmark.countAndLookUp:xctrace.IPC.jit                        hash  100000              avgt    5         2.581             insts/clk
+WordCountBenchmark.countAndLookUp:xctrace.IPC.other                      hash  100000              avgt    5         3.731             insts/clk
+WordCountBenchmark.countAndLookUp:xctrace.bench.oncpu                    hash  100000              avgt    5         4.961                     s
+WordCountBenchmark.countAndLookUp:xctrace.cycles%.bench                  hash  100000              avgt    5        97.163                     %
+WordCountBenchmark.countAndLookUp:xctrace.cycles%.gc                     hash  100000              avgt    5         0.448                     %
+WordCountBenchmark.countAndLookUp:xctrace.cycles%.jit                    hash  100000              avgt    5         1.643                     %
+WordCountBenchmark.countAndLookUp:xctrace.cycles%.other                  hash  100000              avgt    5         0.747                     %
+
+Benchmark result is saved to ~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/wordcount-xctrace-ipc/result.json

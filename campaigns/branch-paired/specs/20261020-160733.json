@@ -1,0 +1,14 @@
+{
+  "name": "branch-paired",
+  "benchmark": "BranchBenchmark",
+  "profile": "xctrace:ipc",
+  "rounds": 2,
+  "corpora": {
+    "1048576": "-wi 4 -i 8 -w 1 -r 1"
+  },
+  "paired": {
+    "sorted": "sorted",
+    "random": "random"
+  },
+  "gcLog": true
+}

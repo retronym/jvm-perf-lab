@@ -1,0 +1,32 @@
+[perflab] paired paired. (us/op): sorted 276.6 random 2327 (+741.42% ± 27.32, median +726.59%, 3 pairs)
+[perflab] paired paired.gcFree. (us/op): sorted 276.6 random 2327 (+741.42% ± 27.32, median +726.59%, 3 pairs)
+[perflab] paired paired.alloc. (B/op): sorted 25.65 random 82.15 (+815.02% ± 701.96, median +840.59%, 3 pairs)
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   464 /   115.7 /    7
+  WARMUP        2:    97 /    87.8 /    6
+  WARMUP        3:    23 /     3.9 /    1
+  WARMUP        4:    12 /     2.6 /    0
+  MEASUREMENT   5:    31 /     9.6 /    0
+  MEASUREMENT   6:    23 /     3.9 /    0
+  MEASUREMENT   7:    10 /     1.7 /    0
+  MEASUREMENT   8:     4 /     0.3 /    0
+  MEASUREMENT   9:     1 /     0.0 /    0
+  MEASUREMENT  10:    33 /     3.1 /    0
+[jit] compiled while measuring:
+     2  java.nio.ByteBuffer.wrap (tier 3)
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.ClassLoader.findBootstrapClassOrNull (tier 3)
+     1  java.lang.ClassValue$ClassValueMap.loadFromCache (tier 3)
+     1  java.lang.ClassValue$ClassValueMap.probeHomeLocation (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-sumAbove-93652.txt

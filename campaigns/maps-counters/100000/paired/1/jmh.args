@@ -1,0 +1,23 @@
+-o
+~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/maps-counters/100000/paired/1/jmh.log
+-rf
+json
+-rff
+~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/maps-counters/100000/paired/1/result.json
+-prof
+io.github.retronym.perflab.xctrace.XctraceProfiler:template=ipc;dir=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/maps-counters/100000/paired/1
+-jvmArgsAppend
+-Xms1G -Xmx1G -Xlog:gc:file=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/maps-counters/100000/paired/1/gc.log:time,uptime -Dperflab.cell=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/maps-counters/100000/paired/1
+-p
+size=100000
+-wi
+6
+-i
+9
+-w
+1
+-r
+1
+-p
+variants=hash=hash|linked=linked|tree=tree
+WordCountBenchmark

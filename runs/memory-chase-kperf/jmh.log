@@ -1,0 +1,134 @@
+# JMH version: 1.37
+# VM version: JDK 21.0.12.1, OpenJDK 64-Bit Server VM, 21.0.12.1+1-LTS
+# VM invoker: ~/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java
+# VM options: -XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -XX:+PreserveFramePointer -Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/memory-chase-kperf -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/memory-chase-kperf/gc-%p.log:time,uptime
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: sample.MemoryBenchmark.chase
+# Parameters: (layout = shuffled, size = 4194304, variants = )
+
+# Run progress: 0.00% complete, ETA 00:00:08
+# Fork: 1 of 1
+# Preparing profilers: AsyncProfiler 
+# Warmup Iteration   1: [INFO] kperf: cycles (CORE_ACTIVE_CYCLE) every 1000000 on PMC2
+[INFO] kperf: cache-misses (L1D_CACHE_MISS_LD_NONSPEC) every 10000 on PMC5, precise PC
+115751.008 us/op
+# Warmup Iteration   2: 295818.646 us/op
+# Warmup Iteration   3: [INFO] kperf: cycles: 15124 samples, 0 with precise PC, 0 used as leaf
+[INFO] kperf: cache-misses: 10735 245729.575 us/op
+samples, 10732 with pIteration   1: recise PC, 9233 used as leaf
+[INFO] kperf: cycles (CORE_ACTIVE_CYCLE) every 1000000 on PMC2
+[INFO] kperf: cache-misses (L1D_CACHE_MISS_LD_NONSPEC) every 10000 on PMC5, precise PC
+245632.250 us/op
+                 gc.alloc.rate:      0.191 MB/sec
+                 gc.alloc.rate.norm: 49286.400 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 336492.375 us/op
+                 gc.alloc.rate:      0.055 MB/sec
+                 gc.alloc.rate.norm: 19493.333 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 201159.200 us/op
+                 gc.alloc.rate:      0.025 MB/sec
+                 gc.alloc.rate.norm: 5300.800 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 361225.597 us/op
+                 gc.alloc.rate:      0.026 MB/sec
+                 gc.alloc.rate.norm: 9688.000 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: [INFO] kperf: cycles: 22198 samples, 0 with precise PC, 0 used as leaf
+[INFO] kperf: cache-misses: 8066 samples, 8064 with precise PC, 7914 used as leaf
+405109.764 us/op
+                 async:                       (text only)
+                 gc.alloc.rate:               0.408 MB/sec
+                 gc.alloc.rate.norm:          389288.000 B/op
+                 gc.count:                    ≈ 0 counts
+                 jit.compilations:            50.000 #
+                 jit.compileTime:             12.339 ms
+                 jit.deopts:                  1.000 #
+                 jit.lastWarmup.compilations: 15.000 #
+                 jit.lastWarmup.deopts:       ≈ 0 #
+
+# Processing profiler results: AsyncProfiler 
+
+
+Result "sample.MemoryBenchmark.chase":
+  309923.837 ±(99.9%) 324239.727 us/op [Average]
+  (min, avg, max) = (201159.200, 309923.837, 405109.764), stdev = 84204.027
+  CI (99.9%): [≈ 0, 634163.564] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:async":
+Async profiler results:
+  ~/code/retronym/jvm-perf-lab/examples/sample/out/runs/memory-chase-kperf/sample.MemoryBenchmark.chase-AverageTime-layout-shuffled-size-4194304-variants-/jfr-cycles+cache-misses.jfr
+
+Secondary result "sample.MemoryBenchmark.chase:gc.alloc.rate":
+  0.141 ±(99.9%) 0.632 MB/sec [Average]
+  (min, avg, max) = (0.025, 0.141, 0.408), stdev = 0.164
+  CI (99.9%): [≈ 0, 0.773] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:gc.alloc.rate.norm":
+  94611.307 ±(99.9%) 637743.089 B/op [Average]
+  (min, avg, max) = (5300.800, 94611.307, 389288.000), stdev = 165619.855
+  CI (99.9%): [≈ 0, 732354.395] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:gc.count":
+  ≈ 0 counts
+
+Secondary result "sample.MemoryBenchmark.chase:jit.compilations":
+  50.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 10.000, 50.000), stdev = 22.361
+  CI (99.9%): [50.000, 50.000] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:jit.compileTime":
+  12.339 ±(99.9%) 0.001 ms [Maximum]
+  (min, avg, max) = (≈ 0, 2.468, 12.339), stdev = 5.518
+  CI (99.9%): [12.339, 12.339] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:jit.deopts":
+  1.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 0.200, 1.000), stdev = 0.447
+  CI (99.9%): [1.000, 1.000] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:jit.lastWarmup.compilations":
+  15.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 3.000, 15.000), stdev = 6.708
+  CI (99.9%): [15.000, 15.000] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:jit.lastWarmup.deopts":
+  ≈ 0 #
+
+
+# Run complete. Total time: 00:00:12
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                          (layout)   (size)  (variants)  Mode  Cnt       Score        Error   Units
+MemoryBenchmark.chase                              shuffled  4194304              avgt    5  309923.837 ± 324239.727   us/op
+MemoryBenchmark.chase:async                        shuffled  4194304              avgt              NaN                  ---
+MemoryBenchmark.chase:gc.alloc.rate                shuffled  4194304              avgt    5       0.141 ±      0.632  MB/sec
+MemoryBenchmark.chase:gc.alloc.rate.norm           shuffled  4194304              avgt    5   94611.307 ± 637743.089    B/op
+MemoryBenchmark.chase:gc.count                     shuffled  4194304              avgt    5         ≈ 0               counts
+MemoryBenchmark.chase:jit.compilations             shuffled  4194304              avgt    5      50.000                    #
+MemoryBenchmark.chase:jit.compileTime              shuffled  4194304              avgt    5      12.339                   ms
+MemoryBenchmark.chase:jit.deopts                   shuffled  4194304              avgt    5       1.000                    #
+MemoryBenchmark.chase:jit.lastWarmup.compilations  shuffled  4194304              avgt    5      15.000                    #
+MemoryBenchmark.chase:jit.lastWarmup.deopts        shuffled  4194304              avgt    5         ≈ 0                    #
+
+Benchmark result is saved to ~/code/retronym/jvm-perf-lab/examples/sample/out/runs/memory-chase-kperf/result.json

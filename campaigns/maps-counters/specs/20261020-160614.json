@@ -1,0 +1,14 @@
+{
+  "name": "maps-counters",
+  "profile": "xctrace:ipc",
+  "rounds": 1,
+  "corpora": {
+    "100000": "-wi 6 -i 9 -w 1 -r 1"
+  },
+  "paired": {
+    "hash": "hash",
+    "linked": "linked",
+    "tree": "tree"
+  },
+  "gcLog": true
+}

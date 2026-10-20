@@ -1,0 +1,70 @@
+
+== INST_ALL (bench threads)
+   47.2%  java.util.HashMap.merge
+   42.5%  sample.WordCountBenchmark.countAndLookUp
+    6.2%  java.util.HashMap.resize
+    3.9%  java.lang.String.hashCode
+    0.0%  pthread_jit_write_protect_np
+    0.0%  sample.WordCount.contains
+    0.0%  <unknown 0x126a6de05>
+    0.0%  <unknown 0x126aa3645>
+    0.0%  <unknown 0x126aa368d>
+    0.0%  java.lang.String.equals
+    0.0%  Klass::check_array_allocation_length(int, int, JavaThread*)
+    0.0%  HeapRegionType::get_trace_type()
+
+== INST_BRANCH (bench threads)
+   47.2%  java.util.HashMap.merge
+   42.5%  sample.WordCountBenchmark.countAndLookUp
+    6.1%  java.util.HashMap.resize
+    3.9%  java.lang.String.hashCode
+    0.0%  pthread_jit_write_protect_np
+    0.0%  sample.WordCount.contains
+    0.0%  <unknown 0x126a6de05>
+    0.0%  <unknown 0x126aa3645>
+    0.0%  java.lang.String.equals
+    0.0%  <unknown 0x126aa368d>
+    0.0%  Klass::check_array_allocation_length(int, int, JavaThread*)
+    0.0%  HeapRegionType::get_trace_type()
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   47.0%  java.util.HashMap.merge
+   42.5%  sample.WordCountBenchmark.countAndLookUp
+    6.4%  java.util.HashMap.resize
+    3.9%  java.lang.String.hashCode
+    0.0%  pthread_jit_write_protect_np
+    0.0%  sample.WordCount.contains
+    0.0%  <unknown 0x126aa3645>
+    0.0%  <unknown 0x126a6de05>
+    0.0%  <unknown 0x126aa368d>
+    0.0%  HeapRegionType::get_trace_type()
+    0.0%  Klass::check_array_allocation_length(int, int, JavaThread*)
+    0.0%  java.lang.String.equals
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   46.5%  java.util.HashMap.merge
+   42.3%  sample.WordCountBenchmark.countAndLookUp
+    7.0%  java.util.HashMap.resize
+    4.0%  java.lang.String.hashCode
+    0.0%  pthread_jit_write_protect_np
+    0.0%  sample.WordCount.contains
+    0.0%  <unknown 0x126aa3645>
+    0.0%  Klass::check_array_allocation_length(int, int, JavaThread*)
+    0.0%  <unknown 0x126aa368d>
+    0.0%  <unknown 0x126a6de05>
+    0.0%  java.lang.String.equals
+    0.0%  HeapRegionType::get_trace_type()
+
+== samples (bench threads)
+   47.4%  java.util.HashMap.merge
+   42.1%  sample.WordCountBenchmark.countAndLookUp
+    6.4%  java.util.HashMap.resize
+    3.8%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.0%  pthread_jit_write_protect_np
+    0.0%  <unknown 0x126a6de05>
+    0.0%  MemAllocator::mem_allocate_inside_tlab_slow(MemAllocator::Allocation&) const
+    0.0%  <unknown 0x126a72641>
+    0.0%  Klass::check_array_allocation_length(int, int, JavaThread*)
+    0.0%  HeapRegionType::get_trace_type()
+    0.0%  <unknown 0x126aa368d>

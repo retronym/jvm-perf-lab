@@ -1,0 +1,126 @@
+# JMH version: 1.37
+# VM version: JDK 21.0.12.1, OpenJDK 64-Bit Server VM, 21.0.12.1+1-LTS
+# VM invoker: ~/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java
+# VM options: -Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/memory-chase-async -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/memory-chase-async/gc-%p.log:time,uptime
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: sample.MemoryBenchmark.chase
+# Parameters: (layout = shuffled, size = 4194304, variants = )
+
+# Run progress: 0.00% complete, ETA 00:00:08
+# Fork: 1 of 1
+# Preparing profilers: AsyncProfiler 
+# Warmup Iteration   1: 163745.976 us/op
+# Warmup Iteration   2: 219177.408 us/op
+# Warmup Iteration   3: 302549.167 us/op
+Iteration   1: 91669.958 us/op
+                 gc.alloc.rate:      0.202 MB/sec
+                 gc.alloc.rate.norm: 19397.818 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 78918.260 us/op
+                 gc.alloc.rate:      0.077 MB/sec
+                 gc.alloc.rate.norm: 6378.462 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 71604.229 us/op
+                 gc.alloc.rate:      0.027 MB/sec
+                 gc.alloc.rate.norm: 2039.429 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 64107.810 us/op
+                 gc.alloc.rate:      0.023 MB/sec
+                 gc.alloc.rate.norm: 1568.000 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 64808.734 us/op
+                 async:                       (text only)
+                 gc.alloc.rate:               0.431 MB/sec
+                 gc.alloc.rate.norm:          72188.500 B/op
+                 gc.count:                    ≈ 0 counts
+                 jit.compilations:            59.000 #
+                 jit.compileTime:             19.811 ms
+                 jit.deopts:                  ≈ 0 #
+                 jit.lastWarmup.compilations: 12.000 #
+                 jit.lastWarmup.deopts:       1.000 #
+
+# Processing profiler results: AsyncProfiler 
+
+
+Result "sample.MemoryBenchmark.chase":
+  74221.798 ±(99.9%) 44082.946 us/op [Average]
+  (min, avg, max) = (64107.810, 74221.798, 91669.958), stdev = 11448.201
+  CI (99.9%): [30138.852, 118304.745] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:async":
+Async profiler results:
+  ~/code/retronym/jvm-perf-lab/examples/sample/out/runs/memory-chase-async/sample.MemoryBenchmark.chase-AverageTime-layout-shuffled-size-4194304-variants-/jfr-cpu.jfr
+
+Secondary result "sample.MemoryBenchmark.chase:gc.alloc.rate":
+  0.152 ±(99.9%) 0.662 MB/sec [Average]
+  (min, avg, max) = (0.023, 0.152, 0.431), stdev = 0.172
+  CI (99.9%): [≈ 0, 0.814] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:gc.alloc.rate.norm":
+  20314.442 ±(99.9%) 115059.129 B/op [Average]
+  (min, avg, max) = (1568.000, 20314.442, 72188.500), stdev = 29880.490
+  CI (99.9%): [≈ 0, 135373.571] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:gc.count":
+  ≈ 0 counts
+
+Secondary result "sample.MemoryBenchmark.chase:jit.compilations":
+  59.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 11.800, 59.000), stdev = 26.386
+  CI (99.9%): [59.000, 59.000] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:jit.compileTime":
+  19.811 ±(99.9%) 0.001 ms [Maximum]
+  (min, avg, max) = (≈ 0, 3.962, 19.811), stdev = 8.860
+  CI (99.9%): [19.811, 19.811] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:jit.deopts":
+  ≈ 0 #
+
+Secondary result "sample.MemoryBenchmark.chase:jit.lastWarmup.compilations":
+  12.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 2.400, 12.000), stdev = 5.367
+  CI (99.9%): [12.000, 12.000] (assumes normal distribution)
+
+Secondary result "sample.MemoryBenchmark.chase:jit.lastWarmup.deopts":
+  1.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 0.200, 1.000), stdev = 0.447
+  CI (99.9%): [1.000, 1.000] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:10
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                          (layout)   (size)  (variants)  Mode  Cnt      Score        Error   Units
+MemoryBenchmark.chase                              shuffled  4194304              avgt    5  74221.798 ±  44082.946   us/op
+MemoryBenchmark.chase:async                        shuffled  4194304              avgt             NaN                  ---
+MemoryBenchmark.chase:gc.alloc.rate                shuffled  4194304              avgt    5      0.152 ±      0.662  MB/sec
+MemoryBenchmark.chase:gc.alloc.rate.norm           shuffled  4194304              avgt    5  20314.442 ± 115059.129    B/op
+MemoryBenchmark.chase:gc.count                     shuffled  4194304              avgt    5        ≈ 0               counts
+MemoryBenchmark.chase:jit.compilations             shuffled  4194304              avgt    5     59.000                    #
+MemoryBenchmark.chase:jit.compileTime              shuffled  4194304              avgt    5     19.811                   ms
+MemoryBenchmark.chase:jit.deopts                   shuffled  4194304              avgt    5        ≈ 0                    #
+MemoryBenchmark.chase:jit.lastWarmup.compilations  shuffled  4194304              avgt    5     12.000                    #
+MemoryBenchmark.chase:jit.lastWarmup.deopts        shuffled  4194304              avgt    5      1.000                    #
+
+Benchmark result is saved to ~/code/retronym/jvm-perf-lab/examples/sample/out/runs/memory-chase-async/result.json

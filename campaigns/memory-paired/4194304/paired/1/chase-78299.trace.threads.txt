@@ -1,0 +1,12 @@
+cycles%  instructions/op  group  thread
+ 97.48%          0.020G  bench  Java: sample.MemoryBenchmark.chase-jmh-worker-1 (java, pid: 78299)
+  1.41%          0.000G  jit    Java: C2 CompilerThread0 (java, pid: 78299)
+  0.64%          0.000G  other  java (java, pid: 78299)
+  0.46%          0.000G  jit    Java: C1 CompilerThread0 (java, pid: 78299)
+  0.00%          0.000G  other  Java: JFR Event Stream 1 (java, pid: 78299)
+  0.00%          0.000G  other  Java: JFR Recorder Thread (java, pid: 78299)
+  0.00%          0.000G  other  Java: JFR Periodic Tasks (java, pid: 78299)
+  0.00%          0.000G  jit    Java: C1 CompilerThread1 (java, pid: 78299)
+  0.00%          0.000G  other  Java: VM Thread (java, pid: 78299)
+  0.00%          0.000G  other  Java: VM Periodic Task Thread (java, pid: 78299)
+  0.00%          0.000G  other  Java: Monitor Deflation Thread (java, pid: 78299)

@@ -1,0 +1,23 @@
+-o
+~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/branch-paired/1048576/paired/1/jmh.log
+-rf
+json
+-rff
+~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/branch-paired/1048576/paired/1/result.json
+-prof
+io.github.retronym.perflab.xctrace.XctraceProfiler:template=ipc;dir=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/branch-paired/1048576/paired/1
+-jvmArgsAppend
+-Xms1G -Xmx1G -Xlog:gc:file=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/branch-paired/1048576/paired/1/gc.log:time,uptime -Dperflab.cell=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/branch-paired/1048576/paired/1
+-p
+size=1048576
+-wi
+4
+-i
+8
+-w
+1
+-r
+1
+-p
+variants=sorted=sorted|random=random
+BranchBenchmark

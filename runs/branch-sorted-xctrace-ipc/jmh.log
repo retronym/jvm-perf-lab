@@ -1,0 +1,209 @@
+# JMH version: 1.37
+# VM version: JDK 21.0.12.1, OpenJDK 64-Bit Server VM, 21.0.12.1+1-LTS
+# VM invoker: ~/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java
+# VM options: -Xms1G -Xmx1G -Dperflab.cell=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/branch-sorted-xctrace-ipc -Xlog:gc:file=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/branch-sorted-xctrace-ipc/gc-%p.log:time,uptime
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: sample.BranchBenchmark.sumAbove
+# Parameters: (data = sorted, size = 1048576, variants = )
+
+# Run progress: 0.00% complete, ETA 00:00:08
+# Fork: 1 of 1
+# Warmup Iteration   1: 269.413 us/op
+# Warmup Iteration   2: 256.305 us/op
+# Warmup Iteration   3: 257.710 us/op
+Iteration   1: 258.804 us/op
+                 gc.alloc.rate:      0.044 MB/sec
+                 gc.alloc.rate.norm: 11.979 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   2: 257.157 us/op
+                 gc.alloc.rate:      0.023 MB/sec
+                 gc.alloc.rate.norm: 6.218 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   3: 255.432 us/op
+                 gc.alloc.rate:      0.027 MB/sec
+                 gc.alloc.rate.norm: 7.238 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   4: 264.260 us/op
+                 gc.alloc.rate:      0.032 MB/sec
+                 gc.alloc.rate.norm: 8.998 B/op
+                 gc.count:           ≈ 0 counts
+
+Iteration   5: 266.832 us/op
+                 gc.alloc.rate:                        0.316 MB/sec
+                 gc.alloc.rate.norm:                   221.532 B/op
+                 gc.count:                             ≈ 0 counts
+                 jit.compilations:                     46.000 #
+                 jit.compileTime:                      7.498 ms
+                 jit.deopts:                           ≈ 0 #
+                 jit.lastWarmup.compilations:          8.000 #
+                 jit.lastWarmup.deopts:                1.000 #
+                 xctrace.BRANCH_MISPRED_NONSPEC:       251.387 #/op
+                 xctrace.BRANCH_MISPRED_NONSPEC/kinst: 0.039 #/kinst
+                 xctrace.CORE_ACTIVE_CYCLE:            1083875.343 #/op
+                 xctrace.INST_ALL:                     6382023.025 #/op
+                 xctrace.INST_BRANCH:                  1717825.081 #/op
+                 xctrace.INST_BRANCH/kinst:            269.166 #/kinst
+                 xctrace.IPC.bench:                    5.888 insts/clk
+                 xctrace.IPC.jit:                      2.522 insts/clk
+                 xctrace.IPC.other:                    3.829 insts/clk
+                 xctrace.bench.oncpu:                  5.013 s
+                 xctrace.cycles%.bench:                97.742 %
+                 xctrace.cycles%.jit:                  1.621 %
+                 xctrace.cycles%.other:                0.637 %
+
+
+
+Result "sample.BranchBenchmark.sumAbove":
+  260.497 ±(99.9%) 18.663 us/op [Average]
+  (min, avg, max) = (255.432, 260.497, 266.832), stdev = 4.847
+  CI (99.9%): [241.834, 279.160] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:gc.alloc.rate":
+  0.089 ±(99.9%) 0.490 MB/sec [Average]
+  (min, avg, max) = (0.023, 0.089, 0.316), stdev = 0.127
+  CI (99.9%): [≈ 0, 0.579] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:gc.alloc.rate.norm":
+  51.193 ±(99.9%) 366.765 B/op [Average]
+  (min, avg, max) = (6.218, 51.193, 221.532), stdev = 95.248
+  CI (99.9%): [≈ 0, 417.958] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:gc.count":
+  ≈ 0 counts
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.compilations":
+  46.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 9.200, 46.000), stdev = 20.572
+  CI (99.9%): [46.000, 46.000] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.compileTime":
+  7.498 ±(99.9%) 0.001 ms [Maximum]
+  (min, avg, max) = (≈ 0, 1.500, 7.498), stdev = 3.353
+  CI (99.9%): [7.498, 7.498] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.deopts":
+  ≈ 0 #
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.lastWarmup.compilations":
+  8.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 1.600, 8.000), stdev = 3.578
+  CI (99.9%): [8.000, 8.000] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:jit.lastWarmup.deopts":
+  1.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 0.200, 1.000), stdev = 0.447
+  CI (99.9%): [1.000, 1.000] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC":
+  251.387 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 50.277, 251.387), stdev = 112.424
+  CI (99.9%): [251.387, 251.387] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC/kinst":
+  0.039 ±(99.9%) 0.001 #/kinst [Maximum]
+  (min, avg, max) = (≈ 0, 0.008, 0.039), stdev = 0.018
+  CI (99.9%): [0.039, 0.039] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE":
+  1083875.343 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 216775.069, 1083875.343), stdev = 484723.789
+  CI (99.9%): [1083875.343, 1083875.343] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_ALL":
+  6382023.025 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 1276404.605, 6382023.025), stdev = 2854127.463
+  CI (99.9%): [6382023.025, 6382023.025] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_BRANCH":
+  1717825.081 ±(99.9%) 0.001 #/op [Maximum]
+  (min, avg, max) = (≈ 0, 343565.016, 1717825.081), stdev = 768234.731
+  CI (99.9%): [1717825.081, 1717825.081] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.INST_BRANCH/kinst":
+  269.166 ±(99.9%) 0.001 #/kinst [Maximum]
+  (min, avg, max) = (≈ 0, 53.833, 269.166), stdev = 120.375
+  CI (99.9%): [269.166, 269.166] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.IPC.bench":
+  5.888 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 1.178, 5.888), stdev = 2.633
+  CI (99.9%): [5.888, 5.888] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.IPC.jit":
+  2.522 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.504, 2.522), stdev = 1.128
+  CI (99.9%): [2.522, 2.522] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.IPC.other":
+  3.829 ±(99.9%) 0.001 insts/clk [Maximum]
+  (min, avg, max) = (≈ 0, 0.766, 3.829), stdev = 1.712
+  CI (99.9%): [3.829, 3.829] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.bench.oncpu":
+  5.013 ±(99.9%) 0.001 s [Maximum]
+  (min, avg, max) = (≈ 0, 1.003, 5.013), stdev = 2.242
+  CI (99.9%): [5.013, 5.013] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.cycles%.bench":
+  97.742 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 19.548, 97.742), stdev = 43.712
+  CI (99.9%): [97.742, 97.742] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.cycles%.jit":
+  1.621 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.324, 1.621), stdev = 0.725
+  CI (99.9%): [1.621, 1.621] (assumes normal distribution)
+
+Secondary result "sample.BranchBenchmark.sumAbove:xctrace.cycles%.other":
+  0.637 ±(99.9%) 0.001 % [Maximum]
+  (min, avg, max) = (≈ 0, 0.127, 0.637), stdev = 0.285
+  CI (99.9%): [0.637, 0.637] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:00:17
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                      (data)   (size)  (variants)  Mode  Cnt        Score     Error      Units
+BranchBenchmark.sumAbove                                       sorted  1048576              avgt    5      260.497 ±  18.663      us/op
+BranchBenchmark.sumAbove:gc.alloc.rate                         sorted  1048576              avgt    5        0.089 ±   0.490     MB/sec
+BranchBenchmark.sumAbove:gc.alloc.rate.norm                    sorted  1048576              avgt    5       51.193 ± 366.765       B/op
+BranchBenchmark.sumAbove:gc.count                              sorted  1048576              avgt    5          ≈ 0               counts
+BranchBenchmark.sumAbove:jit.compilations                      sorted  1048576              avgt    5       46.000                    #
+BranchBenchmark.sumAbove:jit.compileTime                       sorted  1048576              avgt    5        7.498                   ms
+BranchBenchmark.sumAbove:jit.deopts                            sorted  1048576              avgt    5          ≈ 0                    #
+BranchBenchmark.sumAbove:jit.lastWarmup.compilations           sorted  1048576              avgt    5        8.000                    #
+BranchBenchmark.sumAbove:jit.lastWarmup.deopts                 sorted  1048576              avgt    5        1.000                    #
+BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC        sorted  1048576              avgt    5      251.387                 #/op
+BranchBenchmark.sumAbove:xctrace.BRANCH_MISPRED_NONSPEC/kinst  sorted  1048576              avgt    5        0.039              #/kinst
+BranchBenchmark.sumAbove:xctrace.CORE_ACTIVE_CYCLE             sorted  1048576              avgt    5  1083875.343                 #/op
+BranchBenchmark.sumAbove:xctrace.INST_ALL                      sorted  1048576              avgt    5  6382023.025                 #/op
+BranchBenchmark.sumAbove:xctrace.INST_BRANCH                   sorted  1048576              avgt    5  1717825.081                 #/op
+BranchBenchmark.sumAbove:xctrace.INST_BRANCH/kinst             sorted  1048576              avgt    5      269.166              #/kinst
+BranchBenchmark.sumAbove:xctrace.IPC.bench                     sorted  1048576              avgt    5        5.888            insts/clk
+BranchBenchmark.sumAbove:xctrace.IPC.jit                       sorted  1048576              avgt    5        2.522            insts/clk
+BranchBenchmark.sumAbove:xctrace.IPC.other                     sorted  1048576              avgt    5        3.829            insts/clk
+BranchBenchmark.sumAbove:xctrace.bench.oncpu                   sorted  1048576              avgt    5        5.013                    s
+BranchBenchmark.sumAbove:xctrace.cycles%.bench                 sorted  1048576              avgt    5       97.742                    %
+BranchBenchmark.sumAbove:xctrace.cycles%.jit                   sorted  1048576              avgt    5        1.621                    %
+BranchBenchmark.sumAbove:xctrace.cycles%.other                 sorted  1048576              avgt    5        0.637                    %
+
+Benchmark result is saved to ~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/branch-sorted-xctrace-ipc/result.json

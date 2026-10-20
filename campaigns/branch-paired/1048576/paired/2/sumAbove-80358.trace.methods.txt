@@ -1,0 +1,70 @@
+
+== INST_ALL (bench threads)
+   99.9%  sample.BranchBenchmark.sumAbove
+    0.0%  _sigtramp
+    0.0%  <unknown 0x1205d517d>
+    0.0%  <unknown 0x1205dded1>
+    0.0%  <unknown 0x120610b01>
+    0.0%  java.lang.invoke.LambdaForm$MH/0x0000009001081c00.invoke
+    0.0%  <unknown 0x120821f49>
+    0.0%  <unknown 0x1205e63c9>
+    0.0%  <unknown 0x1205e36e9>
+    0.0%  <unknown 0x1205dcd85>
+    0.0%  <unknown 0x1205dde05>
+    0.0%  InstanceKlass::find_method_index(Array<Method*> const*, Symbol const*, Symbol const*, Klass::OverpassLookupMode, Klass::StaticLookupMode, Klass::PrivateLookupMode)
+
+== INST_BRANCH (bench threads)
+   99.9%  sample.BranchBenchmark.sumAbove
+    0.0%  _sigtramp
+    0.0%  <unknown 0x1205d517d>
+    0.0%  <unknown 0x1205dded1>
+    0.0%  <unknown 0x120610b01>
+    0.0%  java.lang.invoke.LambdaForm$MH/0x0000009001081c00.invoke
+    0.0%  <unknown 0x120821f49>
+    0.0%  <unknown 0x1205e36e9>
+    0.0%  <unknown 0x1205e63c9>
+    0.0%  <unknown 0x1205dcd85>
+    0.0%  <unknown 0x1205dde05>
+    0.0%  InstanceKlass::find_method_index(Array<Method*> const*, Symbol const*, Symbol const*, Klass::OverpassLookupMode, Klass::StaticLookupMode, Klass::PrivateLookupMode)
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   99.9%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x120610b01>
+    0.0%  <unknown 0x1205e63c9>
+    0.0%  _sigtramp
+    0.0%  <unknown 0x1205e36e9>
+    0.0%  <unknown 0x1205d517d>
+    0.0%  <unknown 0x1205dcd85>
+    0.0%  <unknown 0x120821f49>
+    0.0%  <unknown 0x1205dde05>
+    0.0%  java.lang.invoke.LambdaForm$MH/0x0000009001081c00.invoke
+    0.0%  <unknown 0x1205dded1>
+    0.0%  InstanceKlass::find_method_index(Array<Method*> const*, Symbol const*, Symbol const*, Klass::OverpassLookupMode, Klass::StaticLookupMode, Klass::PrivateLookupMode)
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   99.9%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x120610b01>
+    0.0%  <unknown 0x1205e36e9>
+    0.0%  <unknown 0x1205e63c9>
+    0.0%  <unknown 0x1205dcd85>
+    0.0%  <unknown 0x1205dde05>
+    0.0%  InstanceKlass::find_method_index(Array<Method*> const*, Symbol const*, Symbol const*, Klass::OverpassLookupMode, Klass::StaticLookupMode, Klass::PrivateLookupMode)
+    0.0%  java.lang.invoke.LambdaForm$MH/0x0000009001081c00.invoke
+    0.0%  <unknown 0x120821f49>
+    0.0%  _sigtramp
+    0.0%  <unknown 0x1205d517d>
+    0.0%  <unknown 0x1205dded1>
+
+== samples (bench threads)
+   99.8%  sample.BranchBenchmark.sumAbove
+    0.0%  <unknown 0x120610b01>
+    0.0%  java.lang.invoke.LambdaForm$MH/0x0000009001081c00.invoke
+    0.0%  <unknown 0x1205d517d>
+    0.0%  _sigtramp
+    0.0%  <unknown 0x1205e63c9>
+    0.0%  <unknown 0x1205dded1>
+    0.0%  <unknown 0x120821f49>
+    0.0%  <unknown 0x1205dde05>
+    0.0%  InstanceKlass::find_method_index(Array<Method*> const*, Symbol const*, Symbol const*, Klass::OverpassLookupMode, Klass::StaticLookupMode, Klass::PrivateLookupMode)
+    0.0%  <unknown 0x1205dcd85>
+    0.0%  <unknown 0x1205e36e9>

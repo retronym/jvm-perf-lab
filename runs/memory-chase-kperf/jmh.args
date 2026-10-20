@@ -1,0 +1,23 @@
+-o
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/memory-chase-kperf/jmh.log
+-rf
+json
+-rff
+~/code/retronym/jvm-perf-lab/examples/sample/out/runs/memory-chase-kperf/result.json
+-prof
+async:output=jfr;dir=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/memory-chase-kperf;libPath=~/code/retronym/jvm-perf-lab/examples/sample/../../tools/build/async-profiler/build/lib/libasyncProfiler.dylib;rawCommand=kperf=/tmp/asprof-kperf.sock,jfrsync=~/code/retronym/jvm-perf-lab/python/src/perflab/perflab.jfc;event=cycles+cache-misses
+-jvmArgsPrepend
+-XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -XX:+PreserveFramePointer
+-jvmArgsAppend
+-Xms1G -Xmx1G -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/memory-chase-kperf -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/memory-chase-kperf/gc-%p.log:time,uptime
+-wi
+3
+-i
+5
+-w
+1
+-r
+1
+-p
+layout=shuffled
+MemoryBenchmark

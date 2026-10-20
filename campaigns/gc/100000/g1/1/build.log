@@ -1,0 +1,31 @@
+
+[perflab] WordCountBenchmark(100000) in pid 72804, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Dperflab.cell=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/gc/100000/g1/1, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh13784870089538617739compilecommand]
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   695 /   269.8 /   14
+  WARMUP        2:    53 /   142.6 /    6
+  WARMUP        3:    10 /    21.7 /    1
+  WARMUP        4:    16 /    21.2 /    0
+  WARMUP        5:    11 /     2.4 /    0
+  MEASUREMENT   6:     7 /     0.8 /    0
+  MEASUREMENT   7:    10 /     0.8 /    0
+  MEASUREMENT   8:     9 /     0.8 /    0
+  MEASUREMENT   9:     7 /     0.3 /    0
+  MEASUREMENT  10:    19 /     2.3 /    0
+[jit] compiled while measuring:
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.forClass (tier 3)
+     1  java.io.ObjectStreamClass.getClassDataLayout (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.io.ObjectStreamClass.isExternalizable (tier 3)
+     1  java.io.ObjectStreamClass.isRecord (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.Integer.stringSize (tier 3)
+     1  java.lang.String.getBytesNoRepl (tier 3)
+     1  java.lang.String.isASCII (tier 3)
+     1  java.lang.StringBuilder.append (tier 3)
+     1  java.lang.System$2.getBytesNoRepl (tier 3)
+     1  java.lang.System$2.getCarrierThreadLocal (tier 3)
+     1  java.lang.ThreadLocal.get (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-72804.txt

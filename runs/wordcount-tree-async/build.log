@@ -1,0 +1,29 @@
+
+[perflab] WordCountBenchmark(100000) in pid 90036, JDK 21.0.12.1, options [-Xms1G, -Xmx1G, -Dperflab.cell=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-tree-async, -Xlog:gc:file=~/code/retronym/jvm-perf-lab/examples/sample/out/runs/wordcount-tree-async/gc-%p.log:time,uptime, -XX:+UnlockDiagnosticVMOptions, -XX:+DebugNonSafepoints, -XX:+UnlockDiagnosticVMOptions, -XX:+UnlockExperimentalVMOptions, -DcompilerBlackholesEnabled=true, -XX:CompileCommandFile=/var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/jmh5555715434081174578compilecommand]
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   851 /   243.6 /   11
+  WARMUP        2:    48 /    34.7 /    2
+  WARMUP        3:    14 /     3.3 /    0
+  MEASUREMENT   4:    34 /     5.9 /    0
+  MEASUREMENT   5:    10 /     5.5 /    0
+  MEASUREMENT   6:     7 /     2.4 /    0
+  MEASUREMENT   7:    12 /     3.8 /    0
+  MEASUREMENT   8:    11 /     9.9 /    0
+[jit] compiled while measuring:
+     2  java.util.TreeMap.put (tier 3)
+     2  jdk.jfr.internal.consumer.ConstantMap.resolve (tier 3)
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.BufferedReader.ensureOpen (tier 4)
+     1  java.io.CharArrayWriter.write (tier 4)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream.writeHandle (tier 3)
+     1  java.io.ObjectOutputStream.writeObject0 (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.Byte.valueOf (tier 3)
+     1  java.lang.Integer.stringSize (tier 3)
+     1  java.lang.Long.longValue (tier 1)
+     1  java.lang.String.getChars (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-countAndLookUp-90036.txt

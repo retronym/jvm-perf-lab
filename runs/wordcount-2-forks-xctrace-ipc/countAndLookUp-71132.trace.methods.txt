@@ -1,0 +1,70 @@
+
+== INST_ALL (bench threads)
+   48.0%  java.util.HashMap.merge
+   42.3%  sample.WordCountBenchmark.countAndLookUp
+    5.3%  java.util.HashMap.resize
+    4.1%  java.lang.String.hashCode
+    0.1%  pthread_jit_write_protect_np
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  CardTableBarrierSet::on_slowpath_allocation_exit(JavaThread*, oopDesc*)
+    0.0%  <unknown 0x121ddb945>
+    0.0%  sample.WordCount.contains
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  _platform_memset
+    0.0%  DYLD-STUB$$bzero
+
+== INST_BRANCH (bench threads)
+   48.0%  java.util.HashMap.merge
+   42.4%  sample.WordCountBenchmark.countAndLookUp
+    5.3%  java.util.HashMap.resize
+    4.1%  java.lang.String.hashCode
+    0.1%  pthread_jit_write_protect_np
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  CardTableBarrierSet::on_slowpath_allocation_exit(JavaThread*, oopDesc*)
+    0.0%  <unknown 0x121ddb945>
+    0.0%  sample.WordCount.contains
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  DYLD-STUB$$bzero
+    0.0%  _platform_memset
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   47.9%  java.util.HashMap.merge
+   42.2%  sample.WordCountBenchmark.countAndLookUp
+    5.5%  java.util.HashMap.resize
+    4.0%  java.lang.String.hashCode
+    0.1%  pthread_jit_write_protect_np
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  CardTableBarrierSet::on_slowpath_allocation_exit(JavaThread*, oopDesc*)
+    0.0%  <unknown 0x121ddb945>
+    0.0%  _platform_memset
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  ObjArrayAllocator::initialize(HeapWordImpl**) const
+    0.0%  OptoRuntime::new_array_C(Klass*, int, JavaThread*)
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   47.7%  java.util.HashMap.merge
+   41.9%  sample.WordCountBenchmark.countAndLookUp
+    6.0%  java.util.HashMap.resize
+    4.0%  java.lang.String.hashCode
+    0.1%  pthread_jit_write_protect_np
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  ObjArrayAllocator::initialize(HeapWordImpl**) const
+    0.0%  _platform_memset
+    0.0%  OptoRuntime::new_array_C(Klass*, int, JavaThread*)
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  VMError::is_error_reported()
+    0.0%  <unknown 0x121e1368d>
+
+== samples (bench threads)
+   47.9%  java.util.HashMap.merge
+   42.2%  sample.WordCountBenchmark.countAndLookUp
+    5.5%  java.util.HashMap.resize
+    4.0%  java.lang.String.hashCode
+    0.1%  pthread_jit_write_protect_np
+    0.0%  G1FromCardCache::clear(unsigned int)
+    0.0%  G1NUMA::is_enabled() const
+    0.0%  <unknown 0x121e1368d>
+    0.0%  _platform_memset
+    0.0%  VMError::is_error_reported()
+    0.0%  OptoRuntime::new_array_C(Klass*, int, JavaThread*)
+    0.0%  DYLD-STUB$$bzero

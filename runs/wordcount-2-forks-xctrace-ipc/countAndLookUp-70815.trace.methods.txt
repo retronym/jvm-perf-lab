@@ -1,0 +1,70 @@
+
+== INST_ALL (bench threads)
+   46.9%  java.util.HashMap.merge
+   43.0%  sample.WordCountBenchmark.countAndLookUp
+    6.1%  java.util.HashMap.resize
+    3.7%  java.lang.String.hashCode
+    0.1%  <unknown 0x12261368d>
+    0.1%  sample.WordCount.contains
+    0.0%  MemAllocator::allocate() const
+    0.0%  CardTableBarrierSet::on_slowpath_allocation_exit(JavaThread*, oopDesc*)
+    0.0%  <unknown 0x1225db945>
+    0.0%  <unknown 0x1225dde05>
+    0.0%  org.openjdk.jmh.infra.Blackhole.consume
+    0.0%  OptoRuntime::new_instance_C(Klass*, JavaThread*)
+
+== INST_BRANCH (bench threads)
+   46.9%  java.util.HashMap.merge
+   43.0%  sample.WordCountBenchmark.countAndLookUp
+    6.0%  java.util.HashMap.resize
+    3.7%  java.lang.String.hashCode
+    0.1%  <unknown 0x12261368d>
+    0.1%  sample.WordCount.contains
+    0.0%  MemAllocator::allocate() const
+    0.0%  CardTableBarrierSet::on_slowpath_allocation_exit(JavaThread*, oopDesc*)
+    0.0%  <unknown 0x1225db945>
+    0.0%  <unknown 0x1225dde05>
+    0.0%  org.openjdk.jmh.infra.Blackhole.consume
+    0.0%  OptoRuntime::new_instance_C(Klass*, JavaThread*)
+
+== CORE_ACTIVE_CYCLE (bench threads)
+   46.9%  java.util.HashMap.merge
+   42.7%  sample.WordCountBenchmark.countAndLookUp
+    6.2%  java.util.HashMap.resize
+    3.7%  java.lang.String.hashCode
+    0.1%  <unknown 0x12261368d>
+    0.1%  sample.WordCount.contains
+    0.0%  MemAllocator::allocate() const
+    0.0%  CardTableBarrierSet::on_slowpath_allocation_exit(JavaThread*, oopDesc*)
+    0.0%  <unknown 0x1225dde05>
+    0.0%  org.openjdk.jmh.infra.Blackhole.consume
+    0.0%  <unknown 0x1225db945>
+    0.0%  HSpaceCounters::update_used(unsigned long)
+
+== BRANCH_MISPRED_NONSPEC (bench threads)
+   46.4%  java.util.HashMap.merge
+   42.5%  sample.WordCountBenchmark.countAndLookUp
+    7.0%  java.util.HashMap.resize
+    3.6%  java.lang.String.hashCode
+    0.1%  <unknown 0x12261368d>
+    0.0%  CardTableBarrierSet::on_slowpath_allocation_exit(JavaThread*, oopDesc*)
+    0.0%  sample.WordCount.contains
+    0.0%  HSpaceCounters::update_used(unsigned long)
+    0.0%  MemAllocator::allocate() const
+    0.0%  G1AllocRegion::new_alloc_region_and_allocate(unsigned long, bool)
+    0.0%  OptoRuntime::new_instance_C(Klass*, JavaThread*)
+    0.0%  <unknown 0x1225dde05>
+
+== samples (bench threads)
+   47.4%  java.util.HashMap.merge
+   42.3%  sample.WordCountBenchmark.countAndLookUp
+    6.1%  java.util.HashMap.resize
+    3.7%  java.lang.String.hashCode
+    0.1%  sample.WordCount.contains
+    0.1%  <unknown 0x12261368d>
+    0.1%  MemAllocator::allocate() const
+    0.0%  <unknown 0x1225dde05>
+    0.0%  CardTableBarrierSet::on_slowpath_allocation_exit(JavaThread*, oopDesc*)
+    0.0%  <unknown 0x1225db945>
+    0.0%  <unknown 0x1225e2665>
+    0.0%  CodeCache::find_blob(void*)

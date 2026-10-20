@@ -1,0 +1,12 @@
+{
+  "name": "gc",
+  "rounds": 2,
+  "corpora": {
+    "10000": "-wi 5 -i 5 -w 1 -r 1",
+    "100000": "-wi 5 -i 5 -w 1 -r 1"
+  },
+  "variants": {
+    "g1": "",
+    "parallel": "-XX:+UseParallelGC"
+  }
+}

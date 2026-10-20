@@ -1,0 +1,32 @@
+[perflab] paired paired. (us/op): sequential 1332 shuffled 2.432e+05 (+18061.14% ± 4538.99, median +19749.30%, 3 pairs)
+[perflab] paired paired.gcFree. (us/op): sequential 1332 shuffled 2.432e+05 (+18061.14% ± 4538.99, median +19749.30%, 3 pairs)
+[perflab] paired paired.alloc. (B/op): sequential 118.2 shuffled 7636 (+20456.63% ± 23345.59, median +10168.95%, 3 pairs)
+
+[jit] per iteration: compilations / compile ms / deopts
+  WARMUP        1:   472 /   111.9 /   12
+  WARMUP        2:    83 /    98.5 /    5
+  WARMUP        3:    25 /     4.3 /    0
+  WARMUP        4:    11 /     2.5 /    0
+  MEASUREMENT   5:    35 /    10.3 /    0
+  MEASUREMENT   6:    27 /     6.8 /    0
+  MEASUREMENT   7:     5 /     0.4 /    0
+  MEASUREMENT   8:     4 /     0.4 /    0
+  MEASUREMENT   9:     3 /     4.1 /    0
+  MEASUREMENT  10:    39 /     6.4 /    0
+[jit] compiled while measuring:
+     2  java.nio.ByteBuffer.wrap (tier 3)
+     2  java.util.TreeMap.put (tier 3)
+     2  jdk.jfr.internal.consumer.ConstantMap.resolve (tier 3)
+     1  java.io.BufferedOutputStream.growIfNeeded (tier 3)
+     1  java.io.BufferedOutputStream.implWrite (tier 3)
+     1  java.io.BufferedOutputStream.write (tier 3)
+     1  java.io.ObjectOutputStream$BlockDataOutputStream.writeInt (tier 3)
+     1  java.io.ObjectOutputStream$ReplaceTable.lookup (tier 3)
+     1  java.io.ObjectOutputStream.defaultWriteFields (tier 3)
+     1  java.io.ObjectStreamClass.checkDefaultSerialize (tier 3)
+     1  java.io.ObjectStreamClass.hasWriteObjectMethod (tier 3)
+     1  java.lang.AbstractStringBuilder.append (tier 3)
+     1  java.lang.AbstractStringBuilder.charAt (tier 3)
+     1  java.lang.CharacterData.of (tier 3)
+     1  java.lang.ClassLoader.findBootstrapClassOrNull (tier 3)
+[jit] report: /var/folders/j5/lj9_5wkj7kd8tyxph4ctc8000000gn/T/perflab-jit-chase-93465.txt

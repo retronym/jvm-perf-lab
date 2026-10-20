@@ -1,0 +1,21 @@
+-o
+~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/memory-chase-xctrace-ipc/jmh.log
+-rf
+json
+-rff
+~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/memory-chase-xctrace-ipc/result.json
+-prof
+io.github.retronym.perflab.xctrace.XctraceProfiler:template=ipc;dir=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/memory-chase-xctrace-ipc
+-jvmArgsAppend
+-Xms1G -Xmx1G -Dperflab.cell=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/memory-chase-xctrace-ipc -Xlog:gc:file=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/runs/memory-chase-xctrace-ipc/gc-%p.log:time,uptime
+-wi
+3
+-i
+5
+-w
+1
+-r
+1
+-p
+layout=shuffled
+MemoryBenchmark

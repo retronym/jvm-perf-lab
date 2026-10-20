@@ -1,0 +1,131 @@
+# JMH version: 1.37
+# VM version: JDK 21.0.12.1, OpenJDK 64-Bit Server VM, 21.0.12.1+1-LTS
+# VM invoker: ~/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java
+# VM options: -Xms1G -Xmx1G -XX:+UseParallelGC -Dperflab.cell=~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/gc/100000/parallel/2
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: sample.WordCountBenchmark.countAndLookUp
+# Parameters: (map = hash, size = 100000, variants = )
+
+# Run progress: 0.00% complete, ETA 00:00:10
+# Fork: 1 of 1
+# Warmup Iteration   1: 3558.484 us/op
+# Warmup Iteration   2: 3536.778 us/op
+# Warmup Iteration   3: 3192.500 us/op
+# Warmup Iteration   4: 3196.112 us/op
+# Warmup Iteration   5: 3169.509 us/op
+Iteration   1: 3500.395 us/op
+                 gc.alloc.rate:      919.685 MB/sec
+                 gc.alloc.rate.norm: 3378626.230 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   2: 3228.122 us/op
+                 gc.alloc.rate:      997.474 MB/sec
+                 gc.alloc.rate.norm: 3378599.511 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   3: 3176.118 us/op
+                 gc.alloc.rate:      1013.811 MB/sec
+                 gc.alloc.rate.norm: 3378616.785 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   4: 3331.205 us/op
+                 gc.alloc.rate:      966.660 MB/sec
+                 gc.alloc.rate.norm: 3378595.576 B/op
+                 gc.count:           3.000 counts
+                 gc.time:            2.000 ms
+
+Iteration   5: 3796.539 us/op
+                 gc.alloc.rate:               339.497 MB/sec
+                 gc.alloc.rate.norm:          3382272.513 B/op
+                 gc.count:                    3.000 counts
+                 gc.time:                     2.000 ms
+                 jit.compilations:            48.000 #
+                 jit.compileTime:             5.045 ms
+                 jit.deopts:                  ≈ 0 #
+                 jit.lastWarmup.compilations: 11.000 #
+                 jit.lastWarmup.deopts:       ≈ 0 #
+
+
+
+Result "sample.WordCountBenchmark.countAndLookUp":
+  3406.476 ±(99.9%) 965.565 us/op [Average]
+  (min, avg, max) = (3176.118, 3406.476, 3796.539), stdev = 250.754
+  CI (99.9%): [2440.911, 4372.041] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.alloc.rate":
+  847.425 ±(99.9%) 1102.032 MB/sec [Average]
+  (min, avg, max) = (339.497, 847.425, 1013.811), stdev = 286.194
+  CI (99.9%): [≈ 0, 1949.457] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.alloc.rate.norm":
+  3379342.123 ±(99.9%) 6308.070 B/op [Average]
+  (min, avg, max) = (3378595.576, 3379342.123, 3382272.513), stdev = 1638.186
+  CI (99.9%): [3373034.053, 3385650.193] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.count":
+  15.000 ±(99.9%) 0.001 counts [Sum]
+  (min, avg, max) = (3.000, 3.000, 3.000), stdev = 0.001
+  CI (99.9%): [15.000, 15.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:gc.time":
+  10.000 ±(99.9%) 0.001 ms [Sum]
+  (min, avg, max) = (2.000, 2.000, 2.000), stdev = 0.001
+  CI (99.9%): [10.000, 10.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.compilations":
+  48.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 9.600, 48.000), stdev = 21.466
+  CI (99.9%): [48.000, 48.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.compileTime":
+  5.045 ±(99.9%) 0.001 ms [Maximum]
+  (min, avg, max) = (≈ 0, 1.009, 5.045), stdev = 2.256
+  CI (99.9%): [5.045, 5.045] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.deopts":
+  ≈ 0 #
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.lastWarmup.compilations":
+  11.000 ±(99.9%) 0.001 # [Maximum]
+  (min, avg, max) = (≈ 0, 2.200, 11.000), stdev = 4.919
+  CI (99.9%): [11.000, 11.000] (assumes normal distribution)
+
+Secondary result "sample.WordCountBenchmark.countAndLookUp:jit.lastWarmup.deopts":
+  ≈ 0 #
+
+
+# Run complete. Total time: 00:00:11
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                                      (map)  (size)  (variants)  Mode  Cnt        Score      Error   Units
+WordCountBenchmark.countAndLookUp                               hash  100000              avgt    5     3406.476 ±  965.565   us/op
+WordCountBenchmark.countAndLookUp:gc.alloc.rate                 hash  100000              avgt    5      847.425 ± 1102.032  MB/sec
+WordCountBenchmark.countAndLookUp:gc.alloc.rate.norm            hash  100000              avgt    5  3379342.123 ± 6308.070    B/op
+WordCountBenchmark.countAndLookUp:gc.count                      hash  100000              avgt    5       15.000             counts
+WordCountBenchmark.countAndLookUp:gc.time                       hash  100000              avgt    5       10.000                 ms
+WordCountBenchmark.countAndLookUp:jit.compilations              hash  100000              avgt    5       48.000                  #
+WordCountBenchmark.countAndLookUp:jit.compileTime               hash  100000              avgt    5        5.045                 ms
+WordCountBenchmark.countAndLookUp:jit.deopts                    hash  100000              avgt    5          ≈ 0                  #
+WordCountBenchmark.countAndLookUp:jit.lastWarmup.compilations   hash  100000              avgt    5       11.000                  #
+WordCountBenchmark.countAndLookUp:jit.lastWarmup.deopts         hash  100000              avgt    5          ≈ 0                  #
+
+Benchmark result is saved to ~/code/.worktrees/jvm-perf-lab/repo-activity-compiler-lab-7b2d9f/examples/sample/out/campaigns/gc/100000/parallel/2/result.json
