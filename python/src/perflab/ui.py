@@ -205,7 +205,8 @@ BRAND_CSS = """
 .brand .links a:hover{background:var(--ink2);text-decoration:none}
 .band.slim .brand{padding:8px 0} .band.slim .mark{width:24px;height:24px} .band.slim .name{font-size:15px}
 .framed .band.slim{display:none}
-@media (max-width:700px){.brand .tag{display:none} .band .in{padding:0 12px}}
+@media (max-width:700px){.brand .tag{display:none} .band .in{padding:0 12px} .brand .name{font-size:16px} .brand .proj{display:block;font-size:14px}
+  .brand .links{flex-wrap:nowrap} .brand .links a{padding:3px 7px}}
 """
 
 FRAMED_JS = "<script>if (window !== window.top) document.documentElement.classList.add('framed')</script>"

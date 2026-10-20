@@ -501,7 +501,8 @@ table.t tr.has-sub td{border-bottom:0} table.t tr.sub td{padding-top:0} .cellg{d
 #tl .card-h{gap:6px 12px} #tl select{font:inherit;max-width:100%;padding:2px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
 #tl label{white-space:nowrap} #tl .help{margin-left:auto} #tl[hidden]{display:none}
 footer{max-width:1400px;margin:0 auto;padding:0 20px 30px;color:var(--muted);font-size:12px}
-@media (max-width:700px){main{padding:12px 12px 24px} .filterbar .in,.tabsrow .in{padding-left:12px;padding-right:12px} #q{width:100%;margin-left:0}
+.ftoggle{display:none}
+@media (max-width:700px){.ftoggle{display:inline-block} .filterbar:not(.open) .fg{display:none} main{padding:12px 12px 24px} .filterbar .in,.tabsrow .in{padding-left:12px;padding-right:12px} #q{width:100%;margin-left:0}
   .nav{position:static} .card{padding:10px 12px}}
 """
 
@@ -651,7 +652,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   {ui.style(ui.BASE, ui.LIGHTBOX_CSS, CSS, INTRO_CSS, timeline.CSS)}
   {ui.masthead(title)}
   <div class="nav"><div class="tabsrow"><div class="in"><nav class="tabs">{tabs}</nav>{help_html}</div></div>
-  <div class="filterbar"><div class="in">{groups}
+  <div class="filterbar"><div class="in"><button class="chip ftoggle" onclick="this.closest('.filterbar').classList.toggle('open')">Filter ▾</button>{groups}
   <span class="fg"><span class="fl">show</span><button class="chip" data-f="show" data-v="profiled">profiled</button><button class="chip" data-f="show" data-v="notes">with notes</button></span>
   <span class="fg"><span class="fl">updated</span><button class="chip" data-f="age" data-v="10800">last 3 h</button><button class="chip" data-f="age" data-v="86400">last 24 h</button></span>
   <input id="q" type="search" placeholder="filter: name, flags, notes…"></div></div></div>

@@ -35,8 +35,10 @@ def copy_tree(src, dest, with_raw):
                     text = fh.read()
                 with open(out, "w") as fh:
                     fh.write(text.replace(home, "~"))
+                # the page dates results by their files' times
+                shutil.copystat(os.path.join(dirpath, f), out)
             else:
-                shutil.copy(os.path.join(dirpath, f), out)
+                shutil.copy2(os.path.join(dirpath, f), out)
 
 
 REDIRECT = ('<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=../index.html">'
