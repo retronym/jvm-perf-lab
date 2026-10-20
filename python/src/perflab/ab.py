@@ -303,11 +303,14 @@ def delta_summary(ds):
 
 def report_paired(spec):
     """One row per corpus and variant: its mean per fork, and the paired difference against the first variant (the
-    mean within each fork, then the mean and spread of those over forks)."""
+    mean within each fork, then the mean and spread of those over forks); then each fork's own difference, with that
+    fork's median, in a table of its own. No percent change where the values are about zero."""
+    from . import ui
     names = list(spec.paired)
     print(f"### {spec.name} (paired within forks: {', '.join(names)})\n")
-    print("| corpus | variant | forks | " + " | ".join(f"{m} | Δ (paired) | Δ per fork (median)" for m, *_ in PAIRED_METRICS) + " |")
-    print("|---|---|---|" + "---|---|---|" * len(PAIRED_METRICS))
+    print("| corpus | variant | forks | " + " | ".join(f"{m} | Δ (paired)" for m, *_ in PAIRED_METRICS) + " |")
+    print("|---|---|---|" + "---|---|" * len(PAIRED_METRICS))
+    per_fork = []
     for corpus in spec.corpora:
         cells = []
         for r in range(1, spec.rounds + 1):
@@ -320,15 +323,24 @@ def report_paired(spec):
             continue
         for v in names:
             tds = []
-            for _, key, scale, fmt in PAIRED_METRICS:
+            for label, key, scale, fmt in PAIRED_METRICS:
+                kind = ui.kind_of(label)
                 m, ds, meds = paired_metric(cells, key.format(v))
-                tds.append(fmt.format(m / scale) if m is not None else "–")
-                if ds:
-                    per = " ".join(f"{x:+.2f}" + (f" ({md:+.2f})" if meds else "") for x, md in zip(ds, meds or ds))
-                    tds += [delta_summary(ds), per]
+                b, _, _ = paired_metric(cells, key.format(names[0]))
+                show = ui.size if kind == "alloc" else ui.si if kind == "count" else ui.num
+                tds.append((show(m) or "0") if m is not None else "–")
+                if ds and ui.delta_ok(b, kind) and ui.delta_ok(m, kind):
+                    tds.append(delta_summary(ds))
+                    per_fork.append((corpus, v, label, " · ".join(f"{x:+.2f}%" + (f" (median {md:+.2f}%)" if meds else "")
+                                                                  for x, md in zip(ds, meds or ds))))
                 else:
-                    tds += ["", ""]
+                    tds.append("–" if ds else "")
             print(f"| {corpus} | {v} | {len(cells)} | " + " | ".join(tds) + " |")
+    if per_fork:
+        print(f"\nΔ per fork against {names[0]}: each fork's mean difference over its iteration pairs (and their median).\n")
+        print("| corpus | variant | metric | per fork |\n|---|---|---|---|")
+        for row in per_fork:
+            print("| " + " | ".join(row) + " |")
 
 
 def report(spec):
