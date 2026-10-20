@@ -53,7 +53,7 @@ Whether `-Yprofile-defs-listener` should load a class named by an option is a qu
 - TODO perflab defaults for `perflab.toml` boilerplate (`[agent] jar`, `[index] flags`, `[benchmark] corpus/variants`).
 - TODO Publish a tagged perflab (JitPack). Until then the labs build only where `mise run install` has run, which is the real blocker to sharing.
 - TODO `OutputDigest` and a `perflab-phases.toml` for Scala 2.
-- TODO After pushing: delete the old branches (scala3 `bench-lab-harness`, `bench-lab-perflab`, `bench-lab-curation-plan`, `claude/scalalib-bench-lab-d2e828`'s lab merge; scala `compiler-lab`, `compiler-lab-builds`, `compiler-lab-step5`, `compiler-lab-multi-global`, `claude/compiler-lab-601e68`), and close draft PR retronym/scala3#14.
+- DONE Old lab branches deleted from the forks and locally; each is a tag `archive/<branch>` (scala3: `bench-lab-harness`, `bench-lab-perflab`, `bench-lab-curation-plan`, `scala3-counters-lab-dc0f98`; scala: `compiler-lab`, `compiler-lab-builds`, `compiler-lab-step5`, `compiler-lab-multi-global`, `compiler-lab-601e68`). Draft PRs retronym/scala3#14 and retronym/scala#144 are closed. Their worktrees are detached, not removed: they still hold results in `out/` and uncommitted experiment specs (`cc-fields-memo*.json`, `not-a-member-msg*.json`, `perf-integration-opt*.json`).
 
 ## Risks
 
