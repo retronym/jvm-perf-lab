@@ -37,29 +37,7 @@ def table(heads, rows, cls="t"):
             + "".join(tr(*r) for r in rows) + "</table></div>")
 
 
-def unit(u):
-    return (u or "").replace("us/", "µs/")
-
-
-def num(x, like=None):
-    """A score: four significant digits, whole numbers with separators from 1,000; an error `like` its score, to the
-    score's decimals."""
-    if like is None:
-        return f"{x:,.0f}" if abs(x) >= 1000 else f"{x:.4g}"
-    shown = num(like)
-    return f"{x:,.{len(shown.partition('.')[2]) if 'e' not in shown else 2}f}"
-
-
-def si(x):
-    """A count per op: 3 significant digits with K, M or G."""
-    for scale, suffix in ((1e9, "G"), (1e6, "M"), (1e3, "K")):
-        if x >= scale:
-            return f"{x / scale:.3g}{suffix}"
-    return f"{x:.3g}"
-
-
-def size(b):
-    return "" if not b else f"{b / 1e6:.1f}MB" if b >= 1e5 else f"{b / 1e3:.1f}KB" if b >= 1e3 else f"{b:.0f}B"
+unit, num, si, size = ui.unit, ui.num, ui.si, ui.size
 
 
 def flame_graphs(cell):
@@ -92,13 +70,15 @@ def cell_row(spec, corpus, variant, cell):
     if not os.path.exists(res_f):
         return None
     n = os.path.basename(cell)
+    # a paired cell is one fork alternating the variants
+    name = f"fork {esc(n)}" if variant == "paired" else f"{esc(variant)} #{esc(n)}"
     attrs = f' data-corpus="{esc(corpus)}" data-lb-group="{esc(f"{spec} · {corpus} · {variant} #{n}")}"'
     try:
         r = json.load(open(res_f))[0]
         p = r["primaryMetric"]
     except (OSError, ValueError, IndexError, KeyError):
         # JMH writes result.json when the fork ends, so an empty or partial one is a cell still running
-        return ((f' data-running="1"{attrs} data-profiled="0"', [esc(corpus), f"{esc(variant)} #{esc(n)}", '<span class="badge running">running</span>']
+        return ((f' data-running="1"{attrs} data-profiled="0"', [esc(corpus), name, '<span class="badge running">running</span>']
                  + [""] * 5, f'<div class="cellg"><span class="btns">{timeline_link(cell)}</span></div>' if os.path.exists(os.path.join(cell, "timeline.html")) else ""),
                 time.time(), corpus, None)
     m = r.get("secondaryMetrics", {})
@@ -108,7 +88,7 @@ def cell_row(spec, corpus, variant, cell):
     # a paired cell's -prof gc mixes its variants, so show each variant's own
     paired_alloc = [(k.removeprefix("paired.alloc."), x["score"]) for k, x in m.items()
                     if k.startswith("paired.alloc.") and ".delta%" not in k]
-    alloc_html = (" · ".join(f"{esc(v)} {size(x) or 0}" for v, x in paired_alloc) if paired_alloc else size(alloc))
+    alloc_html = ("".join(f'<span class="pv">{esc(v)} <b>{size(x) or 0}</b></span>' for v, x in paired_alloc) if paired_alloc else size(alloc))
     scalac = r.get("params", {}).get("scalacOptions", "")
     pattern = re.compile(config.get().get("index", "flags"))
     flags = " ".join([a for a in r["jvmArgs"] if pattern.search(a) and not a.startswith("-Dperflab.")] + ([scalac] if scalac else []))
@@ -116,13 +96,18 @@ def cell_row(spec, corpus, variant, cell):
     tl = timeline_link(cell) if os.path.exists(os.path.join(cell, "timeline.html")) else ""
     when = os.path.getmtime(res_f)
     version = specs.of_cell(cell)
-    ver_html = f' <span class="when" title="spec version">spec {esc(version)}</span>' if version else ""
-    cells = [esc(corpus), f"{esc(variant)} #{esc(n)}{ver_html}", f"{num(p['score'])} ± {num(p['scoreError'], p['score'])}",
+    ver_html = f' <span class="when ver" title="spec version">spec {esc(version)}</span>' if version else ""
+    cells = [esc(corpus), f"{name}{ver_html}", f"{num(p['score'])} ± {num(p['scoreError'], p['score'])}",
              si(cyc) if cyc else "", si(ins) if ins else "", alloc_html,
              f"<code>{esc(flags)}</code>" if flags else "", f'<span class="when">{stamp(when)}</span>']
     detail = (f'<div class="cellg">{f"<span class={chr(34)}btns{chr(34)}>{tl}</span>" if tl else ""}{graphs}</div>') if tl or graphs else ""
     return ((f'{attrs} data-profiled="{1 if graphs else 0}"', cells, detail), when, corpus,
             (variant, p["score"], cyc, ins, version, alloc, m, p.get("scoreUnit", "")))
+
+
+def score_head(units, suffix=""):
+    """The score column's name: its unit (µs/op), else "score"."""
+    return (esc(unit(next(iter(units)))) if len(units) == 1 and next(iter(units)) else "score") + suffix
 
 
 def summary(name, cells):
@@ -146,22 +131,38 @@ def summary(name, cells):
             mean = sum(xs) / len(xs)
             sd = (sum((x - mean) ** 2 for x in xs) / (len(xs) - 1)) ** 0.5 if len(xs) > 1 else 0.0
             return mean, sd
-        cols = ((1, num), (2, si), (3, si), (5, size))
-        base = {i: stats([c[i] for c in vs[names[0]]])[0] for i, _ in cols}
+        cols = ((1, num, "score"), (2, si, "count"), (3, si, "count"), (5, size, "alloc"))
+        base = {i: stats([c[i] for c in vs[names[0]]]) for i, _, _ in cols}
         for v in names:
             cs = vs[v]
             tds = [f"{esc(corpus)}{mixed(vs) if v == names[0] else ''}", esc(v), str(len(cs))]
-            for i, fmt in cols:
+            for i, fmt, kind in cols:
                 mean, sd = stats([c[i] for c in cs])
                 if mean is None:
                     tds += ["", ""]; continue
-                rel_sd = f" ± {100 * sd / mean:.1f}%" if len(cs) > 1 else ""
-                tds += [f"{fmt(mean)}{rel_sd}", "" if v == names[0] or not base[i] else f"{100 * (mean / base[i] - 1):+.2f}%"]
+                rel_sd = f' <span class="pm">± {100 * sd / mean:.1f}%</span>' if len(cs) > 1 else ""
+                b, bsd = base[i]
+                # the spread of the difference: both variants' relative spreads over rounds
+                spread = 100 * ((sd / mean) ** 2 + (bsd / b) ** 2) ** 0.5 if b and len(cs) > 1 and len(vs[names[0]]) > 1 else None
+                tds += [f"{fmt(mean)}{rel_sd}", "" if v == names[0] or not b else delta(100 * (mean / b - 1), spread, ui.delta_ok(b, kind))]
             out.append(("", tds))
-    score = esc(unit(units.pop())) if len(units) == 1 else "score"
-    heads = [("corpus", False), ("variant", False), ("n", False), (score, False), ("Δ", False), ("cycles/op", False), ("Δ", False),
+    heads = [("corpus", False), ("variant", False), ("rounds", False), (score_head(units), False), ("Δ", False), ("cycles/op", False), ("Δ", False),
              ("instructions/op", False), ("Δ", False), ("alloc/op", False), ("Δ", False)]
     return table(heads, out, "t summary") if out else ""
+
+
+def delta(d, spread=None, ok=True):
+    """A percent change as html: green or red when the spread over rounds or forks doesn't cross zero (lower is better
+    for every metric here), grey when it does or is unknown; a dash when the base is about zero."""
+    if d is None:
+        return ""
+    if not ok:
+        return '<span class="d na" title="the values are about zero: no percent change">–</span>'
+    cls = "flat" if spread is None or abs(d) <= spread else "worse" if d > 0 else "better"
+    title = {"flat": "inconclusive: within the spread" if spread is not None else "one round: no spread",
+             "worse": "higher, beyond the spread", "better": "lower, beyond the spread"}[cls]
+    return (f'<span class="d {cls}" title="{title}">{d:+.2f}%' + (f' <span class="pm">± {spread:.2f}</span>' if spread is not None else "")
+            + "</span>")
 
 
 def mixed(variants):
@@ -176,17 +177,25 @@ def paired_summary(names, cells):
     variant, the variant's own metrics (`ab.PAIRED_METRICS`) as means over forks, and the paired difference against
     the first variant, as the mean and spread over forks of each fork's difference."""
     out = []
+    units = {c[7] for vs in cells.values() for cs in vs.values() for c in cs}
     for corpus in sorted(cells):
         forks = [c[6] for cs in cells[corpus].values() for c in cs]
         for v in names:
             tds = [f"{esc(corpus)}{mixed(cells[corpus]) if v == names[0] else ''}", esc(v), str(len(forks))]
             for label, key, scale, fmt in ab.PAIRED_METRICS:
+                kind = ui.kind_of(label)
                 m, ds, _ = ab.paired_metric(forks, key.format(v))
-                show = size if label.startswith("alloc") else si if label.endswith("/op") else num
-                tds += [(show(m) or "0") if m is not None else "", ab.delta_summary(ds) if ds else ""]
+                b, _, _ = ab.paired_metric(forks, key.format(names[0]))
+                show = size if kind == "alloc" else si if kind == "count" else num
+                d = sd = None
+                if ds:
+                    d = sum(ds) / len(ds)
+                    sd = (sum((x - d) ** 2 for x in ds) / (len(ds) - 1)) ** 0.5 if len(ds) > 1 else None
+                tds += [(show(m) or "0") if m is not None else "", delta(d, sd, ui.delta_ok(b, kind) and ui.delta_ok(m, kind))]
             out.append(("", tds))
     heads = [("corpus", False), ("variant", False), ("forks", False)]
-    heads += [h for label, *_ in ab.PAIRED_METRICS for h in ((esc(label), False), ("Δ (paired)", False))]
+    heads += [h for label, *_ in ab.PAIRED_METRICS
+              for h in ((score_head(units, label[5:]) if label.startswith("score") else esc(label), False), ("Δ (paired)", False))]
     return table(heads, out, "t summary") if out else ""
 
 
@@ -202,6 +211,9 @@ def spec_history(spec_dir, counts, sid):
         items.append(f'<li><b>{esc(v)}</b> <span class="when">{when} · {counts.get(v, 0)} cells</span>{body}</li>')
     if counts.get(None):
         items.append(f'<li><i>unversioned</i> <span class="when">{counts[None]} cells (before spec versions were recorded)</span></li>')
+    if len(items) == 1 and hist:
+        v = hist[0][0]
+        return f'<p class="specs k" title="spec version {esc(v)}">spec of {time.strftime("%a %d %b %H:%M", time.strptime(v[:15], "%Y%m%d-%H%M%S"))}</p>'
     return (f'<details class="specs" id="{sid}-specs"><summary>Spec versions <span class="k">({len(items)})</span></summary>'
             f'<ul>{"".join(items)}</ul></details>')
 
@@ -432,24 +444,28 @@ def progress_badge(prog, name):
 
 CSS = """
 main{max-width:1400px;margin:0 auto;padding:0 20px 24px}
-.bar{position:sticky;top:0;z-index:10;background:var(--bg);display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;padding:10px 0;
+.bar{position:sticky;top:0;z-index:10;background:var(--bg);display:flex;flex-wrap:nowrap;gap:8px 16px;align-items:center;padding:10px 0;
   border-bottom:1px solid var(--line);margin-bottom:14px}
 .bar h1{font-size:17px;margin:0;display:flex;gap:8px;align-items:center}
-.fg{display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center} .fl{color:var(--muted);font-size:12px;margin-right:2px}
-#q{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:6px;padding:4px 8px;font:inherit;min-width:220px;margin-left:auto}
+.bar h1{white-space:nowrap;flex:none} .filters{display:flex;gap:6px 16px;align-items:center;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.filters::-webkit-scrollbar{display:none} .fg{display:inline-flex;flex:none;gap:4px;align-items:center} .fl{color:var(--muted);font-size:12px;margin-right:2px}
+#q{border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:6px;padding:4px 8px;font:inherit;width:200px;flex:none}
 .card .notes{border-left:3px solid var(--link);padding:0 12px;margin:8px 0 12px} .notes h3{margin:6px 0;font-size:13px}
 #campaigns>.notes{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--link);border-radius:10px;padding:4px 16px;margin:0 0 14px}
 .mixed{color:var(--warn);font-size:11px} details.specs{margin:2px 0 6px;font-size:12px} details.specs summary{cursor:pointer;color:var(--muted)}
 details.specs ul{margin:2px 0 6px;padding-left:20px}
 .diffs{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin:4px 0 8px}
 table.summary td:nth-child(n+3),table.summary th:nth-child(n+3){text-align:right;white-space:nowrap}
-tr[data-running] td{color:var(--muted)} table.t td:nth-child(2){white-space:nowrap}
+tr[data-running] td{color:var(--muted)} .single-ver .ver{display:none} p.specs{margin:0 0 4px}
+details.cells{margin:10px 0 0} details.cells>summary{cursor:pointer;font-size:12.5px} .pv{display:block;white-space:nowrap} .pv b{font-weight:normal}
+.d{white-space:nowrap} .pm{font-size:11px;color:var(--muted)} .d.better{color:var(--ok)} .d.worse{color:var(--bad)} .d.flat,.d.na{color:var(--muted)}
+table.t td{white-space:nowrap} table.t td:nth-child(2){white-space:nowrap}
 table.t tr.has-sub td{border-bottom:0} table.t tr.sub td{padding-top:0} .cellg{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:baseline}
 .cellg .graphs{margin:0} h3.sub{font-size:12.5px;margin:12px 0 0;font-weight:600}
 .hidden{display:none!important} section.card{scroll-margin-top:80px}
 #tl .card-h{gap:6px 12px} #tl select{font:inherit;max-width:100%;padding:2px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
 #tl label{white-space:nowrap} #tl .help{margin-left:auto}
-@media (max-width:700px){main{padding:0 12px 16px} .bar{position:static} #q{min-width:0;width:100%;margin-left:0} .card{padding:10px 12px}}
+@media (max-width:700px){main{padding:0 12px 16px} .bar{position:static;flex-wrap:wrap} .filters{flex-wrap:wrap;overflow:visible} #q{width:100%} .card{padding:10px 12px}}
 """
 
 
@@ -501,10 +517,23 @@ def build(campaigns, runs=None):
       buttons = link(os.path.join(spec_dir, "report.md"), "report.md") if os.path.exists(os.path.join(spec_dir, "report.md")) else ""
       units = {c[7] for vs in cells.values() for cs in vs.values() for c in cs}
       heads = [(esc(unit(units.pop())) if len(units) == 1 else "score", n) if h == "{unit}" else (h, n) for h, n in CELL_HEADS]
-      sections.append((last, f'<section class="card campaign" id="{sid}" data-last="{last:.0f}" data-notes="{1 if has_notes else 0}">'
+      try:
+          paired = list(json.load(open(os.path.join(spec_dir, "spec.json"))).get("paired") or [])
+      except (OSError, ValueError):
+          paired = []
+      summ = summary(name, cells)
+      about = (f"means over forks, each alternating {', '.join(paired)}; Δ against {paired[0]} within each fork" if paired
+               else "means over rounds; Δ against the first variant")
+      # the cells: open while they are what there is to see (no summary yet, a cell running) or carry flame graphs
+      cells_open = not summ or any(' data-running="1"' in r[0] or ' data-profiled="1"' in r[0] for r in rows)
+      cells_html = (f'<details class="cells" id="{sid}-cells"{" open" if cells_open else ""}><summary><b>Cells</b> <span class="k">{len(rows)}: '
+                    f'{"forks of the paired run" if paired else "one per variant and round"}; timelines and flame graphs</span></summary>'
+                    f'{table(heads, rows)}</details>') if rows else ""
+      single = " single-ver" if len(counts) <= 1 else ""
+      sections.append((last, f'<section class="card campaign{single}" id="{sid}" data-last="{last:.0f}" data-notes="{1 if has_notes else 0}">'
                              f'{card_head("campaign", name, progress_badge(prog, name), when, buttons)}'
-                             f'{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{spec_history(spec_dir, counts, sid)}{sub("Summary", "means over rounds; Δ against the first variant") + summ if (summ := summary(name, cells)) else ""}'
-                             f'{sub("Cells", "one per variant and round") + table(heads, rows) if rows else ""}</section>'))
+                             f'{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{spec_history(spec_dir, counts, sid)}'
+                             f'{sub("Summary", esc(about)) + summ if summ else ""}{cells_html}</section>'))
   for run in glob.glob(os.path.join(runs, "*/")) if runs else []:
       sec = run_section(run)
       if sec:
@@ -530,10 +559,10 @@ def build(campaigns, runs=None):
   page = f"""{ui.HEAD}<title>Campaigns and runs</title>
   {ui.style(ui.BASE, ui.LIGHTBOX_CSS, CSS, timeline.CSS)}
   <main>
-  <header class="bar"><h1>Campaigns and runs {help_html}</h1>
+  <header class="bar"><h1>Campaigns and runs {help_html}</h1><div class="filters">
   {f'<span class="fg"><span class="fl">corpus</span>{chips}</span>' if chips else ''}
   <span class="fg"><span class="fl">show</span><button class="chip" data-kind="profiled">profiled</button><button class="chip" data-kind="timing">timing only</button><button class="chip" data-kind="notes">with notes</button></span>
-  <span class="fg"><span class="fl">updated</span><button class="chip" data-age="10800">last 3 h</button><button class="chip" data-age="86400">last 24 h</button></span>
+  <span class="fg"><span class="fl">updated</span><button class="chip" data-age="10800">last 3 h</button><button class="chip" data-age="86400">last 24 h</button></span></div>
   <input id="q" type="search" placeholder="filter: name, flags, notes…"></header>
   <section class="card" id="tl"><div class="card-h"><h2>Fork timeline</h2><select id="tl-cell">{options}</select>
   <label class="k"><input type="checkbox" id="tl-follow" checked> follow the running fork</label><span id="tl-status"></span>{tl_help}</div>

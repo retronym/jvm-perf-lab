@@ -133,6 +133,44 @@ const Lightbox = (() => {
 """
 
 
+# number formats shared by the pages and `perflab ab report`
+
+def unit(u):
+    return (u or "").replace("us/", "µs/")
+
+
+def num(x, like=None):
+    """A score: four significant digits, whole numbers with separators from 1,000; an error `like` its score, to the
+    score's decimals."""
+    if like is None:
+        return f"{x:,.0f}" if abs(x) >= 1000 else f"{x:.4g}"
+    shown = num(like)
+    return f"{x:,.{len(shown.partition('.')[2]) if 'e' not in shown else 2}f}"
+
+
+def si(x):
+    """A count per op: 3 significant digits with K, M or G."""
+    for scale, suffix in ((1e9, "G"), (1e6, "M"), (1e3, "K")):
+        if x >= scale:
+            return f"{x / scale:.3g}{suffix}"
+    return f"{x:.3g}"
+
+
+def size(b):
+    return "" if not b else f"{b / 1e6:.1f}MB" if b >= 1e5 else f"{b / 1e3:.1f}KB" if b >= 1e3 else f"{b:.0f}B"
+
+
+def delta_ok(base, kind="score"):
+    """Whether a percent change against `base` means anything: not for a count or size that is about zero."""
+    floor = {"alloc": 1024, "count": 1000}.get(kind, 0)
+    return base is not None and abs(base) > floor
+
+
+def kind_of(label):
+    """The kind of a metric by its column label: alloc (bytes), count (per op) or score."""
+    return "alloc" if label.startswith("alloc") else "count" if label.endswith("/op") else "score"
+
+
 def style(*parts):
     return "<style>" + TOKENS + "".join(parts) + "</style>"
 

@@ -208,9 +208,11 @@ class IndexTest(unittest.TestCase):
         json.dump({"name": "c", "rounds": 2, "corpora": {"k": ""}, "paired": {"base": "-Yx", "fast": ""}},
                   open(os.path.join(camp, "c", "spec.json"), "w"))
         page = open(index.build(camp)).read()
-        self.assertIn("<td>fast</td><td>2</td><td>98</td><td>-2.50% ± 0.71</td>", page)
-        self.assertIn("<td>86.5MB</td><td>-2.81% ± 0.79</td>", page)
-        self.assertIn("base 89.0MB · fast 87.0MB", page)
+        better = '<span class="d better" title="lower, beyond the spread">'
+        self.assertIn(f'<td>fast</td><td>2</td><td>98</td><td>{better}-2.50% <span class="pm">± 0.71</span></span></td>', page)
+        self.assertIn(f'<td>86.5MB</td><td>{better}-2.81% <span class="pm">± 0.79</span></span></td>', page)
+        self.assertIn('<span class="pv">base <b>89.0MB</b></span><span class="pv">fast <b>87.0MB</b></span>', page)
+        self.assertIn("<td>fork 1</td>", page)
         self.assertNotIn("1.0MB", page)  # -prof gc mixes the variants
 
 
