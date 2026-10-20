@@ -24,4 +24,6 @@ perflab ab run campaigns/memory-paired.json
 perflab run --profile async:cycles+instructions+cache-misses+branch-misses --kperf /tmp/asprof-kperf.sock -- -p size=100000 WordCountBenchmark
 ```
 
+`WordCountBenchmark` also marks each op's two parts, counting and looking up, as async-profiler spans with perflab-spans. With the lab's async-profiler build (`mise run tools:async-profiler`), its `bench` flame graphs have a span panel that splits the samples by part (`[async] spans` in `perflab.toml`).
+
 `site.sh` (`mise run site`) runs every benchmark under each profile and builds the static site.

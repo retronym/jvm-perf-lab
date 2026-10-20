@@ -21,3 +21,5 @@ lib = "../../tools/build/async-profiler/build/lib/libasyncProfiler.dylib"
 jfrconv = "../../tools/build/async-profiler/build/bin/jfrconv"
 # flame graphs per event: by call path, by leaf, and every thread by category (perflab regraph lists the kinds)
 graphs = ["bench", "reverse", "classify"]
+# the span panel on bench graphs: WordCountBenchmark marks each op's count and look-up as spans (perflab-spans)
+spans = true
