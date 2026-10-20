@@ -48,7 +48,7 @@ def write(d, out=None):
         "Each counter lane has its own scale. Wheel or pinch to zoom, drag to pan, double-click to reset.", right=True)
     page = f"""{ui.HEAD}<title>{html.escape(name)}: timeline</title>
 {ui.style(ui.BASE, CSS, "main{padding:16px;max-width:1600px;margin:0 auto} h1{font-size:17px;margin:0;overflow-wrap:anywhere}")}
-<main><div class="card-h"><span class="kind">timeline</span><h1>{html.escape(name)}</h1></div>
+{ui.masthead(home=ui.home_from(d), slim=True)}<main><div class="card-h"><span class="kind">timeline</span><h1>{html.escape(name)}</h1></div>
 <p class="facts">{facts}</p>
 <div class="card-h" style="margin:0"><span class="k">Each fork from JVM start to exit, on the wall clock.</span>{help_html}</div>
 <div class="tl-legend" id="legend"></div><svg class="timeline" id="chart"></svg></main><div class="tl-tip" id="tip"></div>

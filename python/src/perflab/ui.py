@@ -171,8 +171,67 @@ def kind_of(label):
     return "alloc" if label.startswith("alloc") else "count" if label.endswith("/op") else "score"
 
 
+# the brand: a mark (three flame-graph bars), the name, and the ink band it sits on
+
+NAME = "jvm-perf-lab"
+TAGLINE = "JMH profilers, PMU counters and paired campaigns for the JVM"
+REPO = "https://github.com/retronym/jvm-perf-lab"
+DOCS = "https://github.com/retronym/jvm-perf-lab/tree/main/doc"
+
+MARK = ('<svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1c2632"/>'
+        '<rect x="5" y="21" width="22" height="5" rx="1.5" fill="#f59f00"/><rect x="5" y="14.5" width="15" height="5" rx="1.5" fill="#f76707"/>'
+        '<rect x="21.5" y="14.5" width="5.5" height="5" rx="1.5" fill="#ffd43b"/><rect x="5" y="8" width="8" height="5" rx="1.5" fill="#e03131"/></svg>')
+
+GITHUB = ('<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 '
+          '6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 '
+          '1.23.83.72 1.23 1.88.87 2.34.67.07-.52.28-.87.51-1.07-1.78-.2-3.65-.89-3.65-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 '
+          '0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 '
+          '3.95.29.25.54.73.54 1.48v2.2c0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>')
+
+BRAND_CSS = """
+:root{--brand:#f76707;--ink:#10161d;--ink2:#1c2632;--ink-line:#2b3744;--ink-fg:#e9eef3;--ink-muted:#93a1b0}
+.band{background:var(--ink);color:var(--ink-fg)} .band a{color:var(--ink-fg)}
+.band .in{max-width:1400px;margin:0 auto;padding:0 20px}
+.brand{display:flex;align-items:center;gap:12px;padding:14px 0 4px} .mark{width:34px;height:34px;flex:none}
+.brand .name{font-weight:700;font-size:19px;line-height:1.15;letter-spacing:-.01em;color:#fff}
+.brand .name a{color:#fff} .brand .proj{color:var(--ink-muted);font-weight:500}
+.brand .tag{color:var(--ink-muted);font-size:12.5px;margin-top:2px}
+.brand .links{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.brand .links a{border:1px solid var(--ink-line);border-radius:6px;padding:3px 10px;font-size:12.5px;display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+.brand .links a:hover{background:var(--ink2);text-decoration:none}
+.band.slim .brand{padding:8px 0} .band.slim .mark{width:24px;height:24px} .band.slim .name{font-size:15px}
+.framed .band.slim{display:none}
+@media (max-width:700px){.brand .tag{display:none} .band .in{padding:0 12px}}
+"""
+
+FRAMED_JS = "<script>if (window !== window.top) document.documentElement.classList.add('framed')</script>"
+
+
+def masthead(title=None, home=None, slim=False, tagline=True):
+    """The brand band: mark, name (linking `home`), the project's title after it, tagline, GitHub and docs. Slim on the
+    pages the index links (timeline, compare, reports), where it is hidden inside the index's lightbox."""
+    import html
+    name = f'<a href="{html.escape(home)}">{NAME}</a>' if home else NAME
+    proj = f' <span class="proj">/ {html.escape(title)}</span>' if title else ""
+    tag = f'<div class="tag">{TAGLINE}</div>' if tagline and not slim else ""
+    return (f'<div class="band{" slim" if slim else ""}"><div class="in"><div class="brand">{MARK}<div><div class="name">{name}{proj}</div>{tag}</div>'
+            f'<span class="links"><a href="{REPO}">{GITHUB} GitHub</a><a href="{DOCS}">Docs</a></span></div></div></div>'
+            + (FRAMED_JS if slim else ""))
+
+
+def home_from(page_dir):
+    """The relative link from a page in `page_dir` to the project's index (<campaigns>/index.html), or None."""
+    import os
+    try:
+        from . import config
+        target = os.path.join(config.get().campaigns, "index.html")
+        return os.path.relpath(target, page_dir)
+    except (Exception, SystemExit):  # no perflab.toml
+        return None
+
+
 def style(*parts):
-    return "<style>" + TOKENS + "".join(parts) + "</style>"
+    return "<style>" + TOKENS + BRAND_CSS + "".join(parts) + "</style>"
 
 
 def lightbox_script():
