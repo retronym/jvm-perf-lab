@@ -186,7 +186,7 @@ public final class Audit {
         sb.append("\n  },\n  \"probes\": {");
         sep = "\n";
         for (Probe p : probes) {
-            if (p.spec.kind() == Spec.Kind.COUNT) continue;
+            if (p.spec.kind() == Spec.Kind.COUNT || p.spec.kind() == Spec.Kind.HOOK) continue;
             sb.append(sep).append("    ").append(str(p.spec.name())).append(": {\"kind\": ").append(str(p.spec.kind().name().toLowerCase()))
               .append(", \"hits\": ").append(p.hits.sum()).append(", \"sample\": ").append(p.spec.sample()).append(", \"sites\": {");
             String s2 = "\n";
