@@ -16,6 +16,18 @@ Observations from watching `mise run site` build the sample (live index at `perf
 - **Run card is sparse.** "timeline" is a bare link at the bottom, and the card is mostly whitespace. Put links (timeline, graphs, jmh.log) on one row as small buttons beside the title.
 - **Open flame graphs in a lightbox, not by navigating away.** Clicking a graph link and coming back with Back loses the reader's place on the index (scroll position, expanded cells, filters). Show the graph in an overlay on the index instead, with a small bar above it to cycle through the cell's other graphs (event × kind as chips or tabs: cpu bench / reverse / classify, alloc …, diffs), and an expand icon that opens the current graph in a new tab. Esc closes the overlay and leaves the index where it was. The same viewer would serve the run cards, the campaign cells and profdiff's compare page.
 
+## Campaigns (live index)
+
+- **Wrong unit in the summary (bug).** `maps-async` is in µs/op (`ab` logs `4493.5 ± 1180.1 us/op`), but the summary and cell tables head the column `ms/op`. Take the unit from the result, as the run cards do. The paired `maps` campaign heads the same metric `score` instead: one name, with its unit.
+- **Two stacked tables with different columns.** The summary (corpus, variant, n, ms/op, Δ, cycles/op, Δ, …) sits directly above the cell table (corpus, variant, ms/op, cycles/op (xctrace), …), mostly empty columns in both for an async campaign. Show only metrics the campaign has; make the cell table a collapsed "cells" section under the summary.
+- **Spec versions take space when there is one.** A one-entry "Spec versions" list on every campaign; show it only when there are several, or as one line ("spec 2026-10-20 16:05").
+- **Δ cells wrap.** `+3.19% ± 6.67` breaks across lines; keep it on one line (`white-space: nowrap`, smaller ± part), and colour the sign by better/worse with an "inconclusive" grey when the spread crosses zero.
+- **Paired cells are named `paired #1`, `paired #2`.** Say what a cell is: fork 1, fork 2 of the paired run, with the variants it alternates.
+- **Per-variant values are crammed into one cell.** `hash 0.3MB · linked 0.4MB · tree 0.3MB` in the alloc/op cell of a paired cell; use sub-rows or a small inline table.
+- **Percent changes of near-zero values.** `memory-paired`'s alloc/op is `0.0MB` for both variants and the Δ is `+22227% ± 13047`. Below a noise floor (or when both values round to zero), show the absolute values and no percentage.
+- **"Δ per fork (median)" is unreadable.** Cells like `+26071.78 (+25611.72) +10837.13 (+8346.75)` pack two forks' means and medians into one string. Show per-fork values as small dots on a strip, or in a tooltip, and keep the column to the paired mean ± spread.
+- **The header wraps once corpus chips appear.** The filter input drops to a second line under the chips; let the chips scroll or collapse into a menu so the sticky header stays one line.
+
 ## Flame graphs (async-profiler, integration branch)
 
 - **Harness frames dominate the bench graph.** Below `countAndLookUp` sit about 20 frames of JMH stub, reflection, executor and native thread start (`call_stub`, `JavaCalls::…`, `thread_start`), half the graph's height, and the interesting part is a sliver at the top. Open the bench graph zoomed to the benchmark method (or collapse frames below the `_jmhStub` frame into one "JMH harness" frame).
