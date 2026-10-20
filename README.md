@@ -69,6 +69,10 @@ Jmh / run / mainClass := Some("io.github.retronym.perflab.jmh.Main")
 
 [examples/sample](examples/sample) is a Maven project set up this way, with campaign and audit specs.
 
+## Compiler labs
+
+[labs/](labs/README.md) holds two labs built on perflab: [labs/scala3](labs/scala3/README.md) for a scala/scala3 checkout and [labs/scala2](labs/scala2/README.md) for a scala/scala checkout. Each is an sbt build that loads the compiler checkout as a source dependency, so the compiler branch being measured carries no lab commits.
+
 ## Building
 
 `mise run build` (Java 21 builds the Java 17 release), `mise run test`, `mise run install` for a snapshot in `~/.m2`, `mise run cli` to install `perflab`, `mise run site` and `mise run publish-site` for the sample results.

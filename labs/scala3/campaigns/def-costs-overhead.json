@@ -1,0 +1,21 @@
+{
+  "name": "def-costs-overhead",
+  "benchmark": "CompileBenchmark",
+  "profile": {
+    "xctrace": "ipc"
+  },
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M",
+  "rounds": 3,
+  "corpora": {
+    "scalaz": "-wi 9 -i 12 -w 3 -r 3"
+  },
+  "paired": {
+    "off": "",
+    "stack": "-Yprofile-defs-listener:dotty.tools.compilerlab.SpanCostListener",
+    "table": "-Yprofile-defs:/dev/null"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  }
+}

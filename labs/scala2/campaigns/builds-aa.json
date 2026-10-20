@@ -1,0 +1,15 @@
+{
+  "name": "builds-aa",
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:ipc",
+  "rounds": 2,
+  "corpora": {
+    "re2s": "-wi 12 -i 12 -w 3 -r 3"
+  },
+  "paired": {
+    "a": "@build=.",
+    "b": "@build=."
+  },
+  "gcLog": true,
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing"
+}
