@@ -37,9 +37,10 @@ object Corpus:
   def load(name: String): Corpus =
     if name == "scalaLibrary" then return scalaLibrary
     val absolute = Path.of(name).isAbsolute
-    val dir =
+    val dir = (
       if absolute then Path.of(name)
       else Path.of(sys.props.getOrElse("compilerlab.corpora", sys.error("-Dcompilerlab.corpora=<scala3-benchmarks>/bench-sources not set"))).resolve(name)
+    ).toRealPath()
     val exported = ExportedOptions.read(dir)
     val opts = options.get(dir.getFileName.toString) match
       case _ if exported.isDefined => exported.get

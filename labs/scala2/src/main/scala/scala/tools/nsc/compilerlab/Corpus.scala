@@ -49,15 +49,16 @@ object Corpus {
    */
   def load(name: String): Corpus = {
     val absolute = Paths.get(name).isAbsolute
-    val dir =
+    val dir = (
       if (absolute) Paths.get(name)
       else Paths.get(prop("compilerlab.corpora")).resolve(name).resolve("latest")
+    ).toRealPath()
+    val exported = exportedOptions(dir)
     val k = known.get(if (absolute) dir.getFileName.toString else name) match {
       case Some(k) => k
-      case None if absolute => Known()
+      case None if absolute || exported.isDefined => Known()
       case None => sys.error(s"unknown corpus $name; known: ${known.keys.toList.sorted.mkString(", ")}, or an absolute path")
     }
-    val exported = exportedOptions(dir)
     val root = new VirtualDirectory(s"memory-$name", None)
     val lib = dir.resolve("lib")
     val paths = Files.walk(dir, java.nio.file.FileVisitOption.FOLLOW_LINKS).iterator.asScala

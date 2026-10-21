@@ -50,7 +50,7 @@ lazy val lab: Project = checkout match {
     val library = ProjectRef(checkout, "library")
     val reflect = ProjectRef(checkout, "reflect")
     val compiler = ProjectRef(checkout, "compiler")
-    project.in(file("."))
+    Project("lab", file("."))
       .dependsOn(library, reflect, compiler)
       .enablePlugins(JmhPlugin)
       .settings(common)
@@ -70,7 +70,7 @@ lazy val lab: Project = checkout match {
       )
   case None =>
     val version = published.get
-    project.in(file("."))
+    Project("lab", file("."))
       .enablePlugins(JmhPlugin)
       .settings(common)
       .settings(

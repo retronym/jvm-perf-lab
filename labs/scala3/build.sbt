@@ -46,7 +46,7 @@ lazy val lab: Project = checkout match {
   case Some(checkout) =>
     val compiler = ProjectRef(checkout, "scala3-compiler-bootstrapped")
     val library = ProjectRef(checkout, "scala-library-bootstrapped")
-    project.in(file("."))
+    Project("lab", file("."))
       .dependsOn(compiler)
       .enablePlugins(JmhPlugin)
       .settings(common)
@@ -79,7 +79,7 @@ lazy val lab: Project = checkout match {
       )
   case None =>
     val version = published.get
-    project.in(file("."))
+    Project("lab", file("."))
       .enablePlugins(JmhPlugin)
       .settings(common)
       .settings(
