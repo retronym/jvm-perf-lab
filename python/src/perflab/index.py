@@ -428,12 +428,15 @@ def md(text):
     """Just enough Markdown for notes: paragraphs, `- ` bullets, **bold**, `code` and [text](url) links."""
     import re as _re
     def inline(t):
+        # code spans first, so that `**` or `[x](y)` inside one stays literal
+        parts = _re.split(r"(`[^`]+`)", t)
+        return "".join(f"<code>{esc(p[1:-1])}</code>" if i % 2 else rest(p) for i, p in enumerate(parts))
+    def rest(t):
         t = esc(t)
         t = _re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', t)
-        t = _re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", t)
-        return _re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
+        return _re.sub(r"\*\*([^*]+)\*\*", r"<b>\1</b>", t)
     out, items = [], []
-    for block in text.strip().split("\n\n"):
+    for block in filter(None, text.strip().split("\n\n")):
         lines = block.splitlines()
         if lines[0].startswith("### "):
             out.append(f"<h3>{inline(lines[0][4:])}</h3>")
@@ -443,6 +446,34 @@ def md(text):
         elif lines:
             out.append(f"<p>{inline(' '.join(lines))}</p>")
     return "".join(out)
+
+
+def md_text(v):
+    """A spec's Markdown: a string, or a list of lines (JSON has no multi-line strings)."""
+    return "\n".join(v) if isinstance(v, list) else (v or "")
+
+
+def variants_panel(spec_dir):
+    """The campaign's "description" and, per variant, its "variantDescriptions" entry beside what the variant is: the
+    checkout (`perflab trees`), JVM flags, JMH arguments or paired options. Nothing when the spec has neither."""
+    try:
+        s = json.load(open(os.path.join(spec_dir, "spec.json")))
+    except (OSError, ValueError):
+        return ""
+    descs = s.get("variantDescriptions") or {}
+    if not s.get("description") and not descs:
+        return ""
+    trees, jmh_args = s.get("trees") or {}, s.get("variantJmhArgs") or {}
+    names = list(s.get("paired") or s.get("variants") or {})
+    rows = []
+    for v in names + [v for v in descs if v not in names]:
+        what = ([f"checkout <code>{esc(trees[v])}</code>"] if v in trees else []) \
+            + ([f"options <code>{esc(s['paired'][v]) or '(none)'}</code>"] if s.get("paired") and v in s["paired"]
+               else [f"JVM flags <code>{esc(s['variants'][v])}</code>"] if (s.get("variants") or {}).get(v) else []) \
+            + ([f"JMH <code>{esc(jmh_args[v])}</code>"] if v in jmh_args else [])
+        rows.append(f'<tr><th>{esc(v)}</th><td>{md(md_text(descs.get(v)))}</td><td class="k">{"<br>".join(what)}</td></tr>')
+    return (f'<div class="about">{md(md_text(s.get("description")))}'
+            + (f'<table class="variants">{"".join(rows)}</table>' if rows else "") + "</div>")
 
 
 def notes(path):
@@ -490,7 +521,7 @@ nav.tabs .n{font-size:11px;color:var(--ink-muted);margin-left:5px;font-weight:no
 #q{border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;padding:4px 8px;font:inherit;width:220px;margin-left:auto}
 h2.sec{font-size:18px;margin:28px 0 10px;display:flex;align-items:baseline;gap:8px;scroll-margin-top:100px} h2.sec .k{font-weight:normal}
 h2.sec:first-child{margin-top:8px}
-.card .notes{border-left:3px solid var(--link);padding:0 12px;margin:8px 0 12px} .notes h3{margin:6px 0;font-size:13px}
+.about{margin:8px 0 12px} .about>p:first-child{margin-top:0} .about table.variants{border-collapse:collapse;width:100%} .about table.variants th{text-align:left;white-space:nowrap;padding:4px 12px 4px 0;vertical-align:top} .about table.variants td{padding:4px 12px 4px 0;vertical-align:top} .about table.variants td p{margin:0 0 4px} .about table.variants tr+tr{border-top:1px solid var(--line)}\n.card .notes{border-left:3px solid var(--link);padding:0 12px;margin:8px 0 12px} .notes h3{margin:6px 0;font-size:13px}
 #findings{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--brand);border-radius:10px;padding:4px 16px;margin:0 0 14px}
 .mixed{color:var(--warn);font-size:11px} details.specs{margin:2px 0 6px;font-size:12px} details.specs summary{cursor:pointer;color:var(--muted)}
 details.specs ul{margin:2px 0 6px;padding-left:20px}
@@ -612,7 +643,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
                                   f'data-benchmark="{esc(" ".join(sorted(benches)))}" data-tool="{esc(" ".join(sorted(tools)))}" '
                                   f'data-corpus="{esc(" ".join(sorted(corpora)))}" data-profiled="{1 if profiled else 0}">'
                                   f'{card_head("campaign", name, progress_badge(prog, name), when, buttons)}'
-                                  f'{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{spec_history(spec_dir, counts, sid)}'
+                                  f'{variants_panel(spec_dir)}{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{spec_history(spec_dir, counts, sid)}'
                                   f'{sub("Summary", esc(about)) + summ if summ else ""}{cells_html}</section>'))
   run_dirs = sorted(glob.glob(os.path.join(runs, "*/"))) if runs and os.path.isdir(runs) else []
   RUN_NAMES.clear(); RUN_NAMES.update(os.path.basename(r.rstrip("/")) for r in run_dirs)

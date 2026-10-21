@@ -22,7 +22,9 @@ A spec:
                                                          # iteration within each fork (doc/paired-ab.md)
     "loadgate": {"maxCores": 1.5, "quietSecs": 30},      # optional: wait for a quiet machine, rerun noisy cells
     "gcLog": true,                                       # optional: gc.log per cell, for its timeline
-    "historical": "<why>"                                # optional: kept for its results; `run` refuses it
+    "historical": "<why>",                               # optional: kept for its results; `run` refuses it
+    "description": "Does -Yx help? See [#123](<url>).",  # optional Markdown (a string, or a list of lines): the
+    "variantDescriptions": {"U": "uncached, from **#123**"}  # campaign and each variant, in a panel atop its card
   }
 
 Cells run round by round, corpus by corpus, variants interleaved within each, so drift hits every variant alike. Each
@@ -74,6 +76,7 @@ class Spec:
         self.loadgate = s.get("loadgate")
         self.gc_log = s.get("gcLog", False)
         self.historical = s.get("historical")
+        self.description, self.variant_descriptions = s.get("description"), s.get("variantDescriptions") or {}
         self.out = os.path.join(cfg.campaigns, self.name)
 
     def cells(self):
@@ -302,6 +305,17 @@ def delta_summary(ds):
     return f"{d:+.2f}% ± {sd:.2f}"
 
 
+def describe(spec):
+    """The spec's "description" and "variantDescriptions", as Markdown above the report's tables."""
+    from .index import md_text
+    if spec.description:
+        print(md_text(spec.description) + "\n")
+    for v, d in spec.variant_descriptions.items():
+        print(f"- **{v}**: {md_text(d)}")
+    if spec.variant_descriptions:
+        print()
+
+
 def report_paired(spec):
     """One row per corpus and variant: its mean per fork, and the paired difference against the first variant (the
     mean within each fork, then the mean and spread of those over forks); then each fork's own difference, with that
@@ -309,6 +323,7 @@ def report_paired(spec):
     from . import ui
     names = list(spec.paired)
     print(f"### {spec.name} (paired within forks: {', '.join(names)})\n")
+    describe(spec)
     print(f"| {spec.corpus_param} | variant | forks | " + " | ".join(f"{m} | Δ (paired)" for m, *_ in PAIRED_METRICS) + " |")
     print("|---|---|---|" + "---|---|" * len(PAIRED_METRICS))
     per_fork = []
@@ -348,6 +363,7 @@ def report(spec):
     if spec.paired:
         return report_paired(spec)
     print(f"### {spec.name}\n")
+    describe(spec)
     unit = next((summary(json.load(open(f))[0])["unit"] for f in glob.glob(os.path.join(spec.out, "*", "*", "*", "result.json"))), "score")
     print(f"| {spec.corpus_param} | variant | {unit} (per round) | mean | Δ | instructions/op (per round) | Δ | cycles/op | Δ | IPC | alloc/op | GC time |")
     print("|---|---|---|---|---|---|---|---|---|---|---|---|")

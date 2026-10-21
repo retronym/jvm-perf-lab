@@ -242,6 +242,33 @@ class IndexTest(unittest.TestCase):
         self.assertIn("<td>fork 1</td>", page)
         self.assertNotIn("1.0MB", page)  # -prof gc mixes the variants
 
+    def test_the_spec_describes_the_campaign_and_its_variants(self):
+        Project('[build]\njmh = "x"\n')
+        camp = config.get().campaigns
+        cell = os.path.join(camp, "c", "k", "new", "1")
+        os.makedirs(cell)
+        open(os.path.join(cell, "result.json"), "w").close()
+        json.dump({"name": "c", "rounds": 1, "corpora": {"k": ""}, "variants": {"base": "", "new": "-Dx=1"},
+                   "trees": {"base": "../base"}, "variantJmhArgs": {"new": "-p o=-Yy"},
+                   "description": ["Does `-Yy` help?", "", "- see [#1](https://e.org/1)"],
+                   "variantDescriptions": {"new": "with **#1**"}},
+                  open(os.path.join(camp, "c", "spec.json"), "w"))
+        page = open(index.build(camp)).read()
+        self.assertIn('<div class="about"><p>Does <code>-Yy</code> help?</p><ul><li>see <a href="https://e.org/1">#1</a></li></ul>', page)
+        self.assertIn("<tr><th>base</th><td></td><td class=\"k\">checkout <code>../base</code></td></tr>", page)
+        self.assertIn("<tr><th>new</th><td><p>with <b>#1</b></p></td><td class=\"k\">JVM flags <code>-Dx=1</code><br>JMH <code>-p o=-Yy</code></td></tr>", page)
+
+    def test_no_panel_without_descriptions(self):
+        Project('[build]\njmh = "x"\n')
+        camp = config.get().campaigns
+        os.makedirs(os.path.join(camp, "c", "k", "v", "1"))
+        open(os.path.join(camp, "c", "k", "v", "1", "result.json"), "w").close()
+        json.dump({"name": "c", "rounds": 1, "corpora": {"k": ""}, "variants": {"v": ""}}, open(os.path.join(camp, "c", "spec.json"), "w"))
+        self.assertNotIn('class="about"', open(index.build(camp)).read())
+
+    def test_markdown_inside_code_stays_literal(self):
+        self.assertEqual(index.md("`-opt-inline:**,!java.**` and **b**"), "<p><code>-opt-inline:**,!java.**</code> and <b>b</b></p>")
+
     def test_the_corpus_column_is_named_by_its_parameter(self):
         Project('[build]\njmh = "x"\n[benchmark]\ncorpus = "size"\n')
         camp = config.get().campaigns
