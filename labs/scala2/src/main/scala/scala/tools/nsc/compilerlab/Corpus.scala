@@ -158,7 +158,7 @@ object Corpus {
             if (on) matched = true
           case "//#else" => on = !matched
           case "//#fi" => on = true; matched = false
-          case other => sys.error(s"unknown filter line $other")
+          case _ => if (on) sb.append(line) // any other `//#...` comment, as in pekko's `//#ByteBufferSerializer`
         }
       } else if (on) sb.append(line)
     }
