@@ -22,6 +22,11 @@ public class Main {
         if (defaults)
             for (String p : DEFAULTS)
                 if (!given(args, p)) { extra.add("-prof"); extra.add(p); }
+        var tooLong = TrialNames.check(extra);
+        if (tooLong.isPresent()) {
+            System.err.println("ERROR: " + tooLong.get());
+            System.exit(1);
+        }
         org.openjdk.jmh.Main.main(extra.toArray(new String[0]));
     }
 

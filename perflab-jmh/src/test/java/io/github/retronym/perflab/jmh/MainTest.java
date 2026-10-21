@@ -23,4 +23,14 @@ class MainTest {
         assertEquals(List.of("-prof", "async:output=jfr;dir=out", "-p", "x=a&b"),
             Main.arguments(List.of("-prof", "async:output=jfr&dir=out", "-p", "x=a&b")));
     }
+
+    @Test
+    void trialIdMatchesJmhsDirectoryName() {
+        // the directory JMH 1.37's AsyncProfiler created for a scala3 lab run
+        var params = new java.util.TreeMap<>(java.util.Map.of("compiler", "fresh", "corpus", "/Users/u/rcg/wide-k200-m10-c1",
+            "gcBetweenIterations", "false", "scalacOptions", "-Yrefchecks-members:several", "variants", ""));
+        assertEquals("dotty.tools.compilerlab.CompileBenchmark.compile-AverageTime-compiler-fresh-corpus-_2FUsers_2Fu_2Frcg_2Fwide-k200-m10-c1"
+                + "-gcBetweenIterations-false-scalacOptions--Yrefchecks-members_3Aseveral-variants-",
+            TrialNames.id("dotty.tools.compilerlab.CompileBenchmark.compile", org.openjdk.jmh.annotations.Mode.AverageTime, params));
+    }
 }
