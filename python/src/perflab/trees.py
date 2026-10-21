@@ -50,7 +50,7 @@ def main(argv):
     out = os.path.join(config.get().campaigns, spec["name"])
     # one live view from the start: the combined campaign and its spec (so the index knows the planned cells) exist
     # before the first round, are served from this checkout, and gain each variant's cells as its round finishes
-    combined = {k: v for k, v in spec.items() if k != "trees"}
+    combined = dict(spec)  # "trees" kept for the index's variants panel; `ab` ignores it
     combined["variants"] = {v: spec.get("variants", {}).get(v, "") for v in trees}
     os.makedirs(out, exist_ok=True)
     path = os.path.join(out, "spec.json")
@@ -66,6 +66,7 @@ def main(argv):
             if run_in(tree, "ab", "run", tree_spec(spec, variant, r, tree), version=version) != 0:
                 sys.exit(f"perflab trees: {variant} round {r} failed ({tree})")
             gather(spec, trees, out)
+            json.dump(combined, open(path, "w"), indent=2)  # a tree that is this checkout writes its own spec.json over it
             try:
                 index.build(config.get().campaigns)
             except Exception as e:
