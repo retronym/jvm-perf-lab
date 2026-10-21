@@ -8,6 +8,7 @@
   timeline   timeline.html for one campaign cell
   regraph    flame graphs of async-profiler runs
   profdiff   two async-profiler runs compared per op
+  inlinetree JIT compilation units of async-profiler runs: what was inlined where, against a baseline
   frameweight, subtree   weight of frames, and of one frame's subtree, across runs
   analyze    hot methods and phase split of async-profiler runs
   auditfold  merge and fold caller-audit reports
@@ -20,7 +21,7 @@ Configuration: perflab.toml in the project (see perflab.config). `perflab <comma
 import importlib, sys
 
 COMMANDS = {"run": "jmh", "ab": "ab", "trees": "trees", "index": "index", "timeline": "timeline", "regraph": "regraph",
-            "profdiff": "profdiff", "frameweight": "frameweight", "subtree": "subtree", "analyze": "analyze",
+            "profdiff": "profdiff", "inlinetree": "inlinetree", "frameweight": "frameweight", "subtree": "subtree", "analyze": "analyze",
             "auditfold": "auditfold", "loadgate": "loadgate", "site": "site", "serve": "serve", "defcosts": "defcosts"}
 
 

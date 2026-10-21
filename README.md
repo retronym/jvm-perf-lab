@@ -52,6 +52,7 @@ java -javaagent:perflab-agent.jar=spec=envelope.audit,out=audit-{pid}.json ...
 | `perflab index`, `timeline` | rebuild the results page, or one run's or cell's timeline |
 | `perflab site` | the results page as a static site, with an intro, for publishing |
 | `perflab regraph`, `profdiff`, `frameweight`, `subtree`, `analyze` | flame graphs and analysis of async-profiler runs |
+| `perflab inlinetree <label>=<cell>...` | JIT compilation units of async-profiler runs against a baseline: what C2 inlined where, which callees became real calls, how compile boundaries moved; one page beside the campaign, linked from its card |
 | `perflab auditfold` | merging and folding audit reports |
 | `perflab defcosts` | cost per definition from a compiler's `-Yprofile-defs` table: histograms, outliers, comparisons |
 | `perflab loadgate` | waiting for a quiet machine; sampling competing load |

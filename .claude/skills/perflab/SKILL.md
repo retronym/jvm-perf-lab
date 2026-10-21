@@ -65,6 +65,8 @@ To compare things, write a spec under the project's `campaigns/` and run `perfla
 
 Say what the campaign asks and what each variant is: `"description"` and `"variantDescriptions"` (`{variant: ...}`) take Markdown (a string or a list of lines; links to PRs and issues welcome) and show in a panel atop the campaign's card and in `perflab ab report`.
 
+To explain a difference between builds or JIT flags at the level of C2's inlining, run `perflab inlinetree <label>=<cell>... [--baseline <label>] [--event cycles] [--notes notes.json] [--strip <package>]` over an async campaign's cells. It writes `<campaign>/inlinetree-<event>.html`, linked from the campaign's card: each top compiled method, the callees it reaches marked per build as inlined, a real call or both, and cards for the largest differences. `--notes` takes `{method: Markdown}` to annotate rows with what you have found.
+
 Let perflab choose output directories (`--out` is optional; cells go under `[paths] campaigns`). Don't write scripts that assume a directory exists.
 
 ## 7. Don't route around perflab

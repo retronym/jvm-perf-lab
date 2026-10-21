@@ -803,13 +803,19 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       diffs = sorted(f for d in glob.glob(os.path.join(spec_dir, "diff-*/"))
                      for f in ([os.path.join(d, "compare.html")] if os.path.exists(os.path.join(d, "compare.html"))
                                else glob.glob(os.path.join(d, "*.html"))))
+      # perflab inlinetree pages: the cells' compilation units compared, one per event
+      trees_ = sorted(glob.glob(os.path.join(spec_dir, "inlinetree*.html")))
       prog = progress(spec_dir)
-      if not rows and not diffs and not prog:
+      if not rows and not diffs and not trees_ and not prog:
           continue
       sid = "c-" + esc(name)
       diff_html = (f'<div class="diffs" data-lb-group="{esc(name)} · differential flame graphs"><span class="k">Differential flame graphs (a → b)</span>'
                    + "".join(link(d, os.path.basename(os.path.dirname(d)).removeprefix("diff-"), "diff|" + os.path.basename(os.path.dirname(d)).removeprefix("diff-"))
                              for d in diffs) + "</div>") if diffs else ""
+      ev_of = lambda f: os.path.basename(f)[:-5].removeprefix("inlinetree").lstrip("-") or "inline tree"
+      diff_html += (f'<div class="diffs" data-lb-group="{esc(name)} · inline trees"><span class="k">Inline trees (perflab inlinetree)</span>'
+                    + "".join(link(f, ev_of(f), "inlinetree|" + ev_of(f), "What the JIT inlined where, per build, against a baseline")
+                              for f in trees_) + "</div>") if trees_ else ""
       last = max(whens) if whens else os.path.getmtime(spec_dir)
       when = span(min(whens), last) if whens else stamp(last)
       has_notes = os.path.exists(os.path.join(spec_dir, "NOTES.md"))

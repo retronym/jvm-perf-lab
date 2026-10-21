@@ -1,7 +1,7 @@
 import json, os, re, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from perflab import ab, analyze, auditfold, compare, config, defcosts, index, jmh, jvmevents, regraph, serve, specs, timeline, trees  # noqa: E402
+from perflab import ab, analyze, auditfold, compare, config, defcosts, index, inlinetree, jmh, jvmevents, regraph, serve, specs, timeline, trees  # noqa: E402
 
 
 class Project:
@@ -291,6 +291,69 @@ class IndexTest(unittest.TestCase):
         heads = re.findall(r"<th[^>]*>([^<]*)", page)
         self.assertIn("size", heads)
         self.assertNotIn("corpus", heads)
+
+
+class InlineTreeTest(unittest.TestCase):
+    def test_a_stack_splits_into_compilation_units(self):
+        u = inlinetree.units(["Main.run_[j];a/A.f_[i];a/B.g_[j];a/C.h_[i] 10", "Main.run_[j];a/A.f_[i] 5",
+                              "Main.run_[j];Interp.x;a/C.h_[i] 2", "a/D.k_[1] 1"], inlinetree.shortener(["a"]))
+        run, g = u["Main.run [C2]"], u["B.g [C2]"]
+        self.assertEqual((run.incl, run.own, dict(run.calls)), (17, 7, {"B.g [C2]": 10}))
+        self.assertEqual((run.kids["A.f"].incl, run.kids["A.f"].own), (15, 5))
+        self.assertEqual((g.incl, g.own, g.kids["C.h"].own), (10, 10, 10))
+        self.assertNotIn("C.h", run.kids)  # an interpreted frame ends the unit; what is inlined above it has no unit
+        self.assertEqual(u["D.k [C1]"].own, 1)
+
+    def test_recursion_counts_once_per_sample(self):
+        u = inlinetree.units(["T.typed_[j];T.adapt_[i];T.typed_[j];T.adapt_[i];T.typed_[j] 4"])
+        t = u["T.typed [C2]"]
+        self.assertEqual((t.incl, t.own, dict(t.calls), t.kids["T.adapt"].incl), (4, 4, {"T.typed [C2]": 4}, 4))
+
+    def rows(self):
+        units = {"base": inlinetree.units(["R.run_[j];G.g_[i] 30", "R.run_[j] 10"]),
+                 "new": inlinetree.units(["R.run_[j];G.g_[j] 20", "R.run_[j];G.g_[i] 5", "R.run_[j] 10"])}
+        V, ops = ["base", "new"], {"base": 1, "new": 1}
+        return V, inlinetree.build_rows(V, units, ops, inlinetree.top_units(V, "base", units, ops, 5), 0)
+
+    def test_callees_are_marked_by_how_each_build_reaches_them(self):
+        V, rows = self.rows()
+        run = rows[0]
+        g = next(r for r in rows if r.parent == run.id and r.name == "G.g")
+        self.assertEqual(g.how, {"base": "inl", "new": "inl+call"})
+        self.assertEqual(g.incl, {"base": 30, "new": 25})  # inlined and called together
+        unit_g = next(r for r in rows if r.depth == 0 and r.name == "G.g [C2]")
+        self.assertEqual((unit_g.how, unit_g.own), ({"base": "", "new": "C2"}, {"base": None, "new": 20}))
+        cards = [t for t, _, _ in inlinetree.insights(rows, V, "base", {"base": 40, "new": 35}, "cycles", {})]
+        self.assertIn("Inlining flipped", cards)
+        self.assertIn("Compile boundaries moved", cards)
+
+    def test_page(self):
+        d = tempfile.mkdtemp()
+        loaded, cells = {}, {}
+        for v, stacks in (("base", "R.run_[j];G.g_[i] 3000000\n"), ("new<x>", "R.run_[j];G.g_[j] 2000000\n")):
+            cells[v] = os.path.join(d, v)
+            os.makedirs(cells[v])
+            json.dump([{"benchmark": "p.B.m", "jvm": "/j/bin/java", "jvmArgs": ["-XX:MaxInlineSize=70"], "primaryMetric": {"score": 5.0, "scoreError": 0.1, "scoreUnit": "ms/op"}}],
+                      open(os.path.join(cells[v], "result.json"), "w"))
+            open(os.path.join(d, v + ".collapsed"), "w").write(stacks)
+            loaded[v] = {"collapsed": os.path.join(d, v + ".collapsed"), "ops": 1, "total": 3e6}
+        page = inlinetree.page(["base", "new<x>"], "base", loaded, cells, notes={"G.g": "see `x`"})
+        self.assertIn("<b>-XX:MaxInlineSize=70</b>", page)
+        self.assertIn('<span class="h inl">inl</span>', page)
+        self.assertIn('<span class="h call">call</span>', page)
+        self.assertIn("new&lt;x&gt;", page)
+        self.assertNotIn("new<x>", page)
+        self.assertIn('<div class="notetxt">see <code>x</code></div>', page)
+        self.assertIn('<span class="z">—</span>', page)  # base does not reach G.g's own unit
+
+    def test_the_index_links_a_campaigns_inline_trees(self):
+        Project('[build]\njmh = "x"\n')
+        camp = config.get().campaigns
+        os.makedirs(os.path.join(camp, "c", "k", "v", "1"))
+        open(os.path.join(camp, "c", "k", "v", "1", "result.json"), "w").close()
+        json.dump({"name": "c", "rounds": 1, "corpora": {"k": ""}, "variants": {"v": ""}}, open(os.path.join(camp, "c", "spec.json"), "w"))
+        open(os.path.join(camp, "c", "inlinetree-cycles.html"), "w").close()
+        self.assertIn('<a class="btn" href="c/inlinetree-cycles.html" data-lb="inlinetree|cycles"', open(index.build(camp)).read())
 
 
 class CompareTest(unittest.TestCase):
