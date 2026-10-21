@@ -1,0 +1,25 @@
+{
+  "name": "perf-integration-pekko-pickling",
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/.integration/corpora/scala3 -Dcompilerlab.jdkModules=java.base,jdk.unsupported,java.naming",
+  "rounds": 2,
+  "corpora": {
+    "pekko-actor": "-p scalacOptions=-source:3.7 -wi 20 -i 12 -w 4 -r 4"
+  },
+  "paired": {
+    "parallel": "",
+    "serial": "-Yno-parallel-pickling"
+  },
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "description": "How much of the scala3-perf-integration compile of pekko-actor the pickler thread takes off the wall clock: pickling on its executor (as released) against `-Yno-parallel-pickling`, paired within each fork.",
+  "variantDescriptions": {
+    "parallel": "default: TASTy pickled on the pickler executor thread",
+    "serial": "`-Yno-parallel-pickling`: pickled on the compiler thread"
+  }
+}
