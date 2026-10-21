@@ -63,6 +63,8 @@ A value cannot contain `,` (JMH splits at it), so neither variants nor `paired` 
 
 To compare things, write a spec under the project's `campaigns/` and run `perflab ab run <spec>`, not a series of `perflab run`s or a shell loop alternating builds. A campaign interleaves variants round by round, is resumable, and checks each cell: fresh results, the JVM, every JVM argument, each variant's `-p` values, counters present. `perflab ab --help` documents the spec fields; `paired` alternates variants by iteration within one fork, which beats fork-to-fork noise (`doc/paired-ab.md`).
 
+Say what the campaign asks and what each variant is: `"description"` and `"variantDescriptions"` (`{variant: ...}`) take Markdown (a string or a list of lines; links to PRs and issues welcome) and show in a panel atop the campaign's card and in `perflab ab report`.
+
 Let perflab choose output directories (`--out` is optional; cells go under `[paths] campaigns`). Don't write scripts that assume a directory exists.
 
 ## 7. Don't route around perflab
