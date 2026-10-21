@@ -7,7 +7,7 @@ each cell, `perflab run` at its start and end, and the page refreshes itself.
 
   perflab index [<campaigns-dir> [<runs-dir>]]
 """
-import glob, html, json, os, re, sys, time
+import glob, html, json, math, os, re, sys, time
 
 from . import ab, config, regraph, runinfo, specs, timeline, ui
 
@@ -136,7 +136,7 @@ def summary(name, cells):
     if spec.get("paired"):
         return paired_summary(list(spec["paired"]), cells)
     order = list(spec.get("variants", {}))
-    out = []
+    out, data = [], []
     units = {c[7] for vs in cells.values() for cs in vs.values() for c in cs}
     for corpus in sorted(cells):
         vs = cells[corpus]
@@ -152,30 +152,37 @@ def summary(name, cells):
         base = {i: stats([c[i] for c in vs[names[0]]]) for i, _, _ in cols}
         for v in names:
             cs = vs[v]
-            tds = [f"{esc(corpus)}{mixed(vs) if v == names[0] else ''}", esc(v), str(len(cs))]
+            tds, ms = [f"{esc(corpus)}{mixed(vs) if v == names[0] else ''}", esc(v), str(len(cs))], []
             for i, fmt, kind in cols:
                 mean, sd = stats([c[i] for c in cs])
                 if mean is None:
-                    tds.append(""); continue
+                    tds.append(""); ms.append(None); continue
                 rel_sd = f' <span class="pm">± {100 * sd / mean:.1f}%</span>' if len(cs) > 1 else ""
                 b, bsd = base[i]
                 # the spread of the difference: both variants' relative spreads over rounds
                 spread = 100 * ((sd / mean) ** 2 + (bsd / b) ** 2) ** 0.5 if b and len(cs) > 1 and len(vs[names[0]]) > 1 else None
-                tds.append(with_delta(f"{fmt(mean)}{rel_sd}", "" if v == names[0] or not b else delta(100 * (mean / b - 1), spread, ui.delta_ok(b, kind))))
-            out.append(("", tds))
+                d = None if v == names[0] or not b else 100 * (mean / b - 1)
+                tds.append(with_delta(f"{fmt(mean)}{rel_sd}", "" if d is None else delta(d, spread, ui.delta_ok(b, kind))))
+                ms.append(view_metric(fmt(mean), mean, sd if len(cs) > 1 else None, d, spread, ui.delta_ok(b, kind)))
+            out.append(("", tds)); data.append({"c": corpus, "v": v, "n": len(cs), "m": ms})
     heads = [(esc(config.get().corpus_param), False), ("variant", False), ("rounds", False), (score_head(units), False), ("cycles/op", False),
              ("instructions/op", False), ("alloc/op", False)]
-    return table(heads, out, "t summary") if out else ""
+    return views(heads, out, ["score", "cycles/op", "instructions/op", "alloc/op"], data)
+
+
+def verdict(d, spread=None, ok=True):
+    """A percent change's class: better or worse when the spread over rounds or forks doesn't cross zero (lower is
+    better for every metric here), flat when it does or is unknown, na when the base is about zero."""
+    return "na" if not ok else "flat" if spread is None or abs(d) <= spread or abs(d) < 0.005 else "worse" if d > 0 else "better"
 
 
 def delta(d, spread=None, ok=True):
-    """A percent change as html: green or red when the spread over rounds or forks doesn't cross zero (lower is better
-    for every metric here), grey when it does or is unknown; a dash when the base is about zero."""
+    """A percent change as html, coloured by its `verdict`; a dash when the base is about zero."""
     if d is None:
         return ""
-    if not ok:
+    cls = verdict(d, spread, ok)
+    if cls == "na":
         return '<span class="d na" title="the values are about zero: no percent change">–</span>'
-    cls = "flat" if spread is None or abs(d) <= spread or abs(d) < 0.005 else "worse" if d > 0 else "better"
     title = {"flat": "inconclusive: within the spread" if spread is not None else "one round: no spread",
              "worse": "higher, beyond the spread", "better": "lower, beyond the spread"}[cls]
     return (f'<span class="d {cls}" title="{title}">{d:+.2f}%' + (f' <span class="pm">± {spread:.2f}</span>' if spread is not None else "")
@@ -185,6 +192,37 @@ def delta(d, spread=None, ok=True):
 def with_delta(value, d):
     """A summary cell: the value, and its Δ beneath."""
     return f"{value}<br>{d}" if d else value
+
+
+def view_metric(text, mean, sd, d, spread, ok):
+    """One metric of a summary row for the page's pivot and chart: [shown value, mean, sd over rounds, Δ%, spread of Δ,
+    verdict]; numbers JSON can't carry become null."""
+    fin = lambda x: x if x is not None and math.isfinite(x) else None
+    d = fin(d)
+    return [text, fin(mean), fin(sd), d, fin(spread), "" if d is None else verdict(d, spread, ok)]
+
+
+# the summary's views, as icons: a row per corpus and variant; corpora as columns; a chart
+VIEWS = (("table", "Table: a row per corpus and variant",
+          '<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M2.5 9.75h11"/>'),
+         ("pivot", "Pivot: corpora as columns, a row per variant and metric",
+          '<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M2.5 9.75h11M6.2 3v10M9.85 3v10"/>'),
+         ("chart", "Chart: Δ against the first variant with its spread, or the values themselves",
+          '<path d="M8 2v12"/><rect x="8" y="3.5" width="5.5" height="2.4" fill="currentColor" stroke="none"/>'
+          '<rect x="3" y="6.8" width="5" height="2.4" fill="currentColor" stroke="none"/><rect x="8" y="10.1" width="3" height="2.4" fill="currentColor" stroke="none"/>'))
+VIEW_TOGGLE = ('<span class="sv-tg" role="group" aria-label="summary view">'
+               + "".join(f'<button data-sv="{k}" title="{t}" aria-label="{t}" aria-pressed="false"><svg viewBox="0 0 16 16">{i}</svg></button>'
+                         for k, t, i in VIEWS) + "</span>")
+
+
+def views(heads, rows, keys, data):
+    """The summary: the table, and its data for the page to draw as a pivot or a chart (SUMMARY_JS). `keys` name the
+    metric columns (heads after corpus, variant and rounds) across campaigns, for the metric chips to remember."""
+    if not rows:
+        return ""
+    blob = json.dumps({"metrics": [{"k": k, "h": h} for k, (h, _) in zip(keys, heads[3:])], "rows": data}).replace("</", "<\\/")
+    return (f'<div class="summ"><div class="sv-table">{table(heads, rows, "t summary")}</div><div class="sv-alt"></div>'
+            f'<script type="application/json">{blob}</script></div>')
 
 
 def mixed(variants):
@@ -198,12 +236,12 @@ def paired_summary(names, cells):
     """A paired campaign's variants alternate within each fork (cell), so its JMH score mixes them: per corpus and
     variant, the variant's own metrics (`ab.PAIRED_METRICS`) as means over forks, and the paired difference against
     the first variant, as the mean and spread over forks of each fork's difference."""
-    out = []
+    out, data = [], []
     units = {c[7] for vs in cells.values() for cs in vs.values() for c in cs}
     for corpus in sorted(cells):
         forks = [c[6] for cs in cells[corpus].values() for c in cs]
         for v in names:
-            tds = [f"{esc(corpus)}{mixed(cells[corpus]) if v == names[0] else ''}", esc(v), str(len(forks))]
+            tds, ms = [f"{esc(corpus)}{mixed(cells[corpus]) if v == names[0] else ''}", esc(v), str(len(forks))], []
             for label, key, scale, fmt in ab.PAIRED_METRICS:
                 kind = ui.kind_of(label)
                 m, ds, _ = ab.paired_metric(forks, key.format(v))
@@ -213,12 +251,14 @@ def paired_summary(names, cells):
                 if ds:
                     d = sum(ds) / len(ds)
                     sd = (sum((x - d) ** 2 for x in ds) / (len(ds) - 1)) ** 0.5 if len(ds) > 1 else None
-                tds.append(with_delta((show(m) or "0") if m is not None else "", delta(d, sd, ui.delta_ok(b, kind) and ui.delta_ok(m, kind))))
-            out.append(("", tds))
+                ok = ui.delta_ok(b, kind) and ui.delta_ok(m, kind)
+                tds.append(with_delta((show(m) or "0") if m is not None else "", delta(d, sd, ok)))
+                ms.append(None if m is None else view_metric(show(m) or "0", m, None, d, sd, ok))
+            out.append(("", tds)); data.append({"c": corpus, "v": v, "n": len(forks), "m": ms})
     heads = [(esc(config.get().corpus_param), False), ("variant", False), ("forks", False)]
     heads += [h for label, *_ in ab.PAIRED_METRICS
               for h in ((score_head(units, label[5:]) if label.startswith("score") else esc(label), False),)]
-    return table(heads, out, "t summary") if out else ""
+    return views(heads, out, [label for label, *_ in ab.PAIRED_METRICS], data)
 
 
 def spec_history(spec_dir, counts, sid):
@@ -329,8 +369,8 @@ def short_jvm(jvm):
     return "~" + jvm[len(home):] if jvm.startswith(home + "/") else jvm
 
 
-def sub(title, note):
-    return f'<h3 class="sub">{title} <span class="k">{note}</span></h3>'
+def sub(title, note, extra=""):
+    return f'<h3 class="sub">{title} <span class="k">{note}</span>{extra}</h3>'
 
 
 def card_head(kind, name, badge, when, buttons=""):
@@ -538,9 +578,164 @@ table.t tr.has-sub td{border-bottom:0} table.t tr.sub td{padding-top:0} .cellg{d
 #tl .card-h{gap:6px 12px} #tl select{font:inherit;max-width:100%;padding:2px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
 #tl label{white-space:nowrap} #tl .help{margin-left:auto} #tl[hidden]{display:none}
 footer{max-width:1400px;margin:0 auto;padding:0 20px 30px;color:var(--muted);font-size:12px}
+.sv-tg{display:inline-flex;vertical-align:middle;margin-left:8px;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.sv-tg button{border:0;background:var(--panel);color:var(--muted);padding:2px 6px;cursor:pointer;display:grid;place-items:center}
+.sv-tg button+button{border-left:1px solid var(--line)} .sv-tg button:hover{color:var(--fg)}
+.sv-tg button[aria-pressed=true]{background:var(--link-bg);color:var(--link)}
+.sv-tg svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.3}
+.sv-ctl{display:flex;flex-wrap:wrap;gap:4px 18px;margin:8px 0 4px}
+table.pivot td{border-bottom:0} table.pivot tr.g0 td{border-top:1px solid var(--line2)} table.pivot tr:nth-child(2) td{border-top:0}
+table.pivot td.mk{color:var(--muted);font-size:12px} table.pivot td.dd{padding-left:2px;text-align:left} table.pivot td.gm{border-left:1px solid var(--line2)}
+.sv-charts{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:10px 28px;margin:6px 0 8px}
+.sv-charts figure{margin:0} .sv-charts figcaption{font-size:12px;font-weight:600;margin:0 0 2px} .sv-charts figcaption .k{font-weight:normal}
+.sv-abs{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px 16px}
+svg.sv-c{width:100%;height:auto;display:block;overflow:visible} svg.sv-c text{font-size:11px;fill:var(--muted)} svg.sv-c text.lab{fill:var(--fg)}
+svg.sv-c text.grp{fill:var(--fg);font-weight:600} svg.sv-c .ax{stroke:var(--line)} svg.sv-c .zero{stroke:var(--muted)}
+svg.sv-c rect.better{fill:var(--ok)} svg.sv-c rect.worse{fill:var(--bad)} svg.sv-c rect.flat,svg.sv-c rect.na,svg.sv-c rect.base{fill:var(--muted);opacity:.45}
+svg.sv-c .wh{stroke:var(--fg);stroke-width:1.2;opacity:.7}
 .ftoggle{display:none}
 @media (max-width:700px){.ftoggle{display:inline-block} .filterbar:not(.open) .fg{display:none} main{padding:12px 12px 24px} .filterbar .in,.tabsrow .in{padding-left:12px;padding-right:12px} #q{width:100%;margin-left:0}
   .nav{position:static} .card{padding:10px 12px}}
+"""
+
+# draws each campaign's summary (`views`) as the reader picked: the table as built, a pivot with the corpora as columns
+# and a row per variant and metric, or a chart per metric of Δ against the first variant with its spread as whiskers
+# (or of the values, a panel per corpus). The view, metrics and scale are remembered in this browser; `apply` redraws.
+SUMMARY_JS = r"""
+const SV = (() => { try { return JSON.parse(localStorage.getItem('perflab.summary')) || {}; } catch (e) { return {}; } })();
+SV.view = SV.view || 'table'; SV.metrics = SV.metrics || ['score']; SV.scale = SV.scale || 'delta';
+const svOff = {};  // per campaign: the variants switched off
+let svCorpora = new Set();
+const svEsc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
+const svPct = (d, sp) => `${d >= 0 ? '+' : ''}${d.toFixed(2)}%` + (sp != null ? ` <span class="pm">± ${sp.toFixed(2)}</span>` : '');
+const svDelta = x => x[5] === 'na' ? '<span class="d na" title="the values are about zero: no percent change">–</span>'
+  : `<span class="d ${x[5]}">${svPct(x[3], x[4])}</span>`;
+const svPm = x => x[2] != null && x[1] ? ` <span class="pm">± ${(100 * x[2] / x[1]).toFixed(1)}%</span>` : '';
+const chip = (attr, v, on, label, title) => `<button class="chip" ${attr}="${svEsc(v)}" aria-pressed="${on}"${title ? ` title="${title}"` : ''}>${label}</button>`;
+function drawSummaries(corpora) {
+  if (corpora) svCorpora = corpora;
+  document.querySelectorAll('.sv-tg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.sv === SV.view));
+  for (const el of document.querySelectorAll('.summ')) drawSummary(el);
+}
+function svModel(el) {
+  const data = el._d || (el._d = JSON.parse(el.querySelector('script').textContent));
+  const off = svOff[el.closest('section').id] = svOff[el.closest('section').id] || new Set();
+  const ms = data.metrics.map((m, i) => ({...m, i})).filter(m => data.rows.some(r => r.m[m.i]));
+  let sel = ms.filter(m => SV.metrics.includes(m.k)); if (!sel.length) sel = ms.slice(0, 1);
+  const variants = [...new Set(data.rows.map(r => r.v))];
+  const corpora = [...new Set(data.rows.map(r => r.c))].filter(c => !svCorpora.size || svCorpora.has(c));
+  const cell = (c, v) => (data.rows.find(r => r.c === c && r.v === v) || {m: []}).m;
+  return {ms, sel, variants, base: variants[0], vs: variants.filter(v => !off.has(v)), off, corpora, cell};
+}
+function drawSummary(el) {
+  el.querySelector('.sv-table').hidden = SV.view !== 'table';
+  const alt = el.querySelector('.sv-alt');
+  if (SV.view === 'table') { alt.innerHTML = ''; return; }
+  const m = svModel(el);
+  let ctl = `<span class="fg"><span class="fl">metric</span>${m.ms.map(x => chip('data-sm', x.k, m.sel.includes(x), x.h)).join('')}</span>`;
+  if (m.variants.length > 2)
+    ctl += `<span class="fg"><span class="fl">variant</span>${m.variants.map(v => chip('data-svv', v, !m.off.has(v), svEsc(v))).join('')}</span>`;
+  if (SV.view === 'chart')
+    ctl += `<span class="fg"><span class="fl">scale</span>${chip('data-sc', 'delta', SV.scale === 'delta', 'Δ %', 'against ' + svEsc(m.base))}${chip('data-sc', 'abs', SV.scale === 'abs', 'abs', 'the values, from zero')}</span>`;
+  alt.innerHTML = `<div class="sv-ctl">${ctl}</div>` + (!m.corpora.length ? '<p class="k">No corpus matches the filter.</p>'
+    : SV.view === 'pivot' ? svPivot(m) : `<div class="sv-charts">${m.sel.map(x => SV.scale === 'abs' ? svAbs(m, x) : svBars(m, x)).join('')}</div>`);
+}
+// a row per variant and metric, the metrics of a variant aligned beneath each other; per corpus its value and Δ
+function svPivot({sel, vs, base, corpora, cell}) {
+  const multi = sel.length > 1, geo = corpora.length >= 3;
+  let h = '<div class="scroll"><table class="t pivot"><tr><th>variant</th>' + (multi ? '<th>metric</th>' : '')
+    + corpora.map(c => `<th class="n">${svEsc(c)}</th><th></th>`).join('')
+    + (geo ? `<th class="n" title="the geometric mean over the corpora shown of each corpus's ratio to ${svEsc(base)}">geomean Δ</th>` : '') + '</tr>';
+  for (const v of vs) sel.forEach((m, j) => {
+    h += `<tr class="${j ? '' : 'g0'}">` + (j ? '' : `<td rowspan="${sel.length}">${svEsc(v)}</td>`) + (multi ? `<td class="mk">${m.h}</td>` : '');
+    const logs = [];
+    for (const c of corpora) {
+      const x = cell(c, v)[m.i], b = cell(c, base)[m.i];
+      h += `<td class="n">${x ? x[0] + svPm(x) : ''}</td><td class="dd">${x && x[3] != null ? svDelta(x) : ''}</td>`;
+      if (x && b && x[1] > 0 && b[1] > 0) logs.push(Math.log(x[1] / b[1]));
+    }
+    if (geo) h += `<td class="n gm">${v !== base && logs.length ? svPct(100 * (Math.exp(logs.reduce((a, y) => a + y, 0) / logs.length) - 1)) : ''}</td>`;
+    h += '</tr>';
+  });
+  return h + '</table></div>';
+}
+const svStep = span => { const p = Math.pow(10, Math.floor(Math.log10(span / 4))), r = span / 4 / p; return p * (r >= 5 ? 5 : r >= 2 ? 2 : 1); };
+// Δ% against the first variant per corpus and variant, whiskers the spread; coloured only when the spread doesn't cross zero
+function svBars({vs, base, corpora, cell}, m) {
+  const others = vs.filter(v => v !== base);
+  const cap = `<figcaption>${m.h} <span class="k">Δ against ${svEsc(base)}, lower is better</span></figcaption>`;
+  if (!others.length) return `<figure>${cap}<p class="k">Only the baseline is shown.</p></figure>`;
+  const xs = corpora.flatMap(c => others.map(v => cell(c, v)[m.i]).filter(x => x && x[3] != null && x[5] !== 'na'));
+  // the axis spans the data and zero, so one-sided changes use the whole width
+  let lo = Math.min(0, ...xs.map(x => x[3] - (x[4] || 0))), hi = Math.max(0, ...xs.map(x => x[3] + (x[4] || 0)));
+  if (hi - lo < 2) { const c = (hi + lo) / 2; lo = Math.min(0, c - 1); hi = Math.max(0, c + 1); }
+  const pad = (hi - lo) * 0.05; lo -= lo < 0 ? pad : 0; hi += hi > 0 ? pad : 0;
+  const step = svStep(hi - lo);
+  const W = 440, L = 110, R = 52, G = lo < 0 ? 44 : 4, RH = 17, GH = 16, k = (W - L - G - R) / (hi - lo), X = d => L + G + (d - lo) * k, mid = X(0);
+  let y = 4, bars = '';
+  for (const c of corpora) {
+    bars += `<text class="grp" x="0" y="${y + 11}">${svEsc(c)}</text>`; y += GH;
+    for (const v of others) {
+      const x = cell(c, v)[m.i];
+      bars += `<text class="lab" x="${L - 8}" y="${y + 11}" text-anchor="end">${svEsc(v)}</text>`;
+      if (x && x[3] != null && x[5] !== 'na') {
+        const d = x[3], sp = x[4], x0 = Math.min(X(0), X(d)), lo = d - (sp || 0), hi = d + (sp || 0);
+        bars += `<rect class="${x[5]}" x="${x0}" y="${y + 3}" width="${Math.max(1, Math.abs(X(d) - X(0)))}" height="${RH - 6}" rx="1.5"><title>${svEsc(c)} · ${svEsc(v)}: ${d.toFixed(2)}%${sp != null ? ' ± ' + sp.toFixed(2) : ''}</title></rect>`;
+        if (sp != null) bars += `<path class="wh" d="M${X(lo)} ${y + RH / 2}H${X(hi)}M${X(lo)} ${y + 5}v${RH - 10}M${X(hi)} ${y + 5}v${RH - 10}"/>`;
+        const out = d < 0 ? Math.min(X(lo), X(d)) - 4 : Math.max(X(hi), X(d)) + 4;
+        bars += `<text x="${out}" y="${y + 11}" text-anchor="${d < 0 ? 'end' : 'start'}">${d >= 0 ? '+' : ''}${d.toFixed(1)}%</text>`;
+      } else bars += `<text x="${mid + 4}" y="${y + 11}">${x ? '–' : 'no data'}</text>`;
+      y += RH;
+    }
+    y += 4;
+  }
+  let grid = '';
+  for (let t = Math.ceil(lo / step) * step; t <= hi + 1e-9; t += step) {
+    const z = Math.abs(t) < 1e-9;
+    grid += `<line class="${z ? 'zero' : 'ax'}" x1="${X(t)}" x2="${X(t)}" y1="0" y2="${y}"${z ? '' : ' stroke-dasharray="2 3"'}/>`
+      + `<text x="${X(t)}" y="${y + 12}" text-anchor="middle">${z ? '0' : (t > 0 ? '+' : '') + +t.toFixed(2) + '%'}</text>`;
+  }
+  return `<figure>${cap}<svg class="sv-c" viewBox="0 0 ${W} ${y + 16}">${grid}${bars}</svg></figure>`;
+}
+// the values from zero, a panel per corpus (their scales differ), whiskers ± the standard deviation over rounds
+function svAbs({vs, base, corpora, cell}, m) {
+  const W = 220, L = 64, R = 58, RH = 17;
+  const panels = corpora.map(c => {
+    const xs = vs.map(v => cell(c, v)[m.i]), mx = Math.max(...xs.map(x => x && x[1] != null ? x[1] + (x[2] || 0) : 0)) || 1;
+    const X = n => L + n / mx * (W - L - R);
+    let s = `<text class="grp" x="0" y="11">${svEsc(c)}</text>`, y = 16;
+    vs.forEach((v, i) => {
+      const x = xs[i];
+      s += `<text class="lab" x="${L - 6}" y="${y + 11}" text-anchor="end">${svEsc(v)}</text>`;
+      if (x && x[1] != null) {
+        s += `<rect class="${v === base ? 'base' : x[5]}" x="${L}" y="${y + 3}" width="${Math.max(1, X(x[1]) - L)}" height="${RH - 6}" rx="1.5"><title>${svEsc(c)} · ${svEsc(v)}: ${svEsc(x[0])}</title></rect>`;
+        if (x[2]) s += `<path class="wh" d="M${X(x[1] - x[2])} ${y + RH / 2}H${X(x[1] + x[2])}M${X(x[1] - x[2])} ${y + 5}v${RH - 10}M${X(x[1] + x[2])} ${y + 5}v${RH - 10}"/>`;
+        s += `<text x="${X(x[1] + (x[2] || 0)) + 4}" y="${y + 11}">${svEsc(x[0].replace(/<[^>]*>/g, ''))}</text>`;
+      }
+      y += RH;
+    });
+    return `<svg class="sv-c" viewBox="0 0 ${W} ${y + 4}"><line class="ax" x1="${L}" x2="${L}" y1="16" y2="${y}"/>${s}</svg>`;
+  });
+  return `<figure><figcaption>${m.h} <span class="k">from zero; coloured by Δ against ${svEsc(base)}</span></figcaption><div class="sv-abs">${panels.join('')}</div></figure>`;
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-sv],[data-sm],[data-svv],[data-sc]');
+  if (!b) return;
+  const el = b.closest('section') && b.closest('section').querySelector('.summ');
+  if (b.dataset.sv) SV.view = b.dataset.sv;
+  else if (b.dataset.sc) SV.scale = b.dataset.sc;
+  else if (b.dataset.sm) {
+    // this campaign's metrics after the click (never none), kept beside those of campaigns with other metrics
+    const m = svModel(el), now = new Set(m.sel.map(x => x.k)), k = b.dataset.sm;
+    if (now.has(k)) { if (now.size > 1) now.delete(k); } else now.add(k);
+    SV.metrics = [...SV.metrics.filter(x => !m.ms.some(y => y.k === x)), ...m.ms.map(y => y.k).filter(x => now.has(x))];
+  } else {
+    const m = svModel(el), v = b.dataset.svv;
+    if (m.off.has(v)) m.off.delete(v); else if (m.vs.length > 1) m.off.add(v);
+  }
+  try { localStorage.setItem('perflab.summary', JSON.stringify(SV)); } catch (e) {}
+  drawSummaries();
+});
 """
 
 # what the page's intro may use: a lead paragraph, idea cards, numbered steps and a glossary (see examples/sample/site-intro.html)
@@ -644,7 +839,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
                                   f'data-corpus="{esc(" ".join(sorted(corpora)))}" data-profiled="{1 if profiled else 0}">'
                                   f'{card_head("campaign", name, progress_badge(prog, name), when, buttons)}'
                                   f'{variants_panel(spec_dir)}{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{spec_history(spec_dir, counts, sid)}'
-                                  f'{sub("Summary", esc(about)) + summ if summ else ""}{cells_html}</section>'))
+                                  f'{sub("Summary", esc(about), VIEW_TOGGLE) + summ if summ else ""}{cells_html}</section>'))
   run_dirs = sorted(glob.glob(os.path.join(runs, "*/"))) if runs and os.path.isdir(runs) else []
   RUN_NAMES.clear(); RUN_NAMES.update(os.path.basename(r.rstrip("/")) for r in run_dirs)
   for run in run_dirs:
@@ -709,6 +904,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   {newest(run_sections) or '<p class="k">No runs yet: <code>perflab run</code>.</p>'}
   </div></main>{f'<footer>{footer}</footer>' if footer else ''}
   <script>{timeline.script()}</script>{ui.lightbox_script()}
+  <script>{SUMMARY_JS}</script>
   <script>
   const RUNNING = {json.dumps(running_json)};
   const chips = [...document.querySelectorAll('.filterbar .chip')];
@@ -730,6 +926,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       for (const tr of card.querySelectorAll('tr[data-corpus]')) tr.classList.toggle('hidden', sel.corpus.size > 0 && !sel.corpus.has(tr.dataset.corpus));
     }}
     for (const tr of document.querySelectorAll('#counters-card tr[data-tool]')) tr.classList.toggle('hidden', !match(tr));
+    drawSummaries(sel.corpus);
     const n = s => document.querySelectorAll(`#live section.card.${{s}}:not(.hidden)`).length;
     for (const [id, s] of [['n-campaigns', 'campaign'], ['n-runs', 'run']]) {{ const e = document.getElementById(id); if (e) e.textContent = n(s); }}
   }}

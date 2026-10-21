@@ -103,3 +103,9 @@ Feedback on the rebuilt sample site: the landing page is plain, with no branding
 4. DONE Intro: site-intro.html restructured, with styles for its blocks.
 5. DONE Layout: scroll shadows, Δ under value in summaries, and the 800px fixes. Also fix a Δ of +0.00% ± 0.00 shown red (gc campaign).
 6. DONE Campaign reports: render `report.md` as an HTML page in the page's style, opened in the lightbox, with the .md kept as a download link. (The Δ mojibake was the server's missing charset, fixed separately in 57126fb.)
+
+## Summary views: table, pivot, chart
+
+A campaign's summary has three views, picked by icons beside its heading and remembered in the browser for every campaign. The table is the one built with the page. The pivot puts the corpora in columns, each value with its Δ beside it, and gives each variant a row per selected metric, so the metrics line up across corpora; with three or more corpora a last column has the geometric mean of the ratios to the first variant. The chart draws, per selected metric, Δ against the first variant with the spread as whiskers, coloured only when the spread doesn't cross zero (the same verdict as the tables), or with `abs` the values from zero in a panel per corpus, since their scales differ. Metric chips select several at once; variant chips show when there are more than two; the page's corpus filter applies.
+
+From JMH viewers (JMH Visualizer, JMH's own `score ± error`): never a value without its uncertainty, one metric per chart, units in headers, bars from zero. The geomean is our addition and is labelled as what it is.
