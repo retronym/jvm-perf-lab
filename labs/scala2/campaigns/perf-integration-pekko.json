@@ -6,7 +6,7 @@
   "jvmArgs": "-Xms4G -Xmx4G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/.integration/corpora/scala2 -Dcompilerlab.jdkModules=java.base,jdk.unsupported,java.naming",
   "rounds": 3,
   "corpora": {
-    "pekko-actor": "-wi 15 -i 10 -w 3 -r 3"
+    "pekko-actor": "-wi 20 -i 12 -w 4 -r 4"
   },
   "trees": {
     "rel": "../../../pi-s2-rel/labs/scala2",
