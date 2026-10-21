@@ -30,7 +30,7 @@ object InMemoryClasspath:
       super.getSubDir(packageDirName.stripSuffix(java.io.File.separator))
 
   /** The sources in an in-memory directory, as `-sourcepath` would find them on disk (`DirectorySourcePath`). */
-  private final class SourcePath(protected override val dir: AbstractFile) extends ClassPath with DirectoryLookup[SourceFileEntry]:
+  private final class SourcePath(override val dir: AbstractFile) extends ClassPath with DirectoryLookup[SourceFileEntry]:
     type F = AbstractFile
     protected def getSubDir(packageDirName: String): Option[AbstractFile] =
       dir.lookupPath(packageDirName.stripSuffix(java.io.File.separator), java.io.File.separatorChar, directory = true)
