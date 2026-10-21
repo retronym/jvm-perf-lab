@@ -4,3 +4,4 @@ project/target/
 project/project/
 versions.properties
 .lab-version
+local-idle.sbt

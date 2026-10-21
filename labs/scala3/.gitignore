@@ -4,3 +4,4 @@ target/
 project/target/
 project/project/
 .lab-version
+local-idle.sbt
