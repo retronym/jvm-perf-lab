@@ -6,7 +6,6 @@
   "jvmArgs": "-Xms4G -Xmx4G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/.integration/corpora/scala2 -Dcompilerlab.jdkModules=java.base,jdk.unsupported,java.naming",
   "rounds": 3,
   "corpora": {
-    "pekko-actor": "-wi 20 -i 12 -w 4 -r 4",
     "pekko-actor-plain": "-wi 20 -i 12 -w 4 -r 4"
   },
   "trees": {
@@ -23,9 +22,9 @@
     "quietSecs": 30
   },
   "description": [
-    "Released Scala 2.13.18 (Maven Central) against the scala2-perf-integration branch (upstream/2.13.x + retronym's open perf PRs, built as released: setupPublishBuild publishLocal, optimizer on), both published jars, compiling pekko-actor (203 Scala + 28 Java files, exported from the zinc integration campaigns, with its own -opt:l:inline options) in memory.",
-    "Directional, not absolute: one fork per cell, 3 rounds, JDK 21.",
-    "`pekko-actor-plain` is the same sources with only `-encoding UTF-8 -feature -unchecked -deprecation -language:higherKinds -release 17`: no `-opt:l:inline` and no `-Xlint`/`-Ywarn-unused`, which the Scala 3 build of pekko does not have either."
+    "Released Scala 2.13.18 (Maven Central) against the scala2-perf-integration branch (upstream/2.13.x + retronym's open perf PRs, built as released: setupPublishCore, optimizer on), both published jars, compiling pekko-actor (203 Scala + 28 Java files, exported from the zinc integration campaigns) in memory.",
+    "Like for like with the Scala 3 campaign: `pekko-actor-plain` compiles the sources with `-encoding UTF-8 -feature -unchecked -deprecation -language:higherKinds -release 17`, the option set pekko's Scala 3 build uses, not pekko's Scala 2 `-opt:l:inline` and `-Xlint`/`-Ywarn-unused` (those cells, `pekko-actor`, are kept from the first rounds but are not comparable).",
+    "Directional, not absolute: one fork per cell, 3 rounds, JDK 21."
   ],
   "variantDescriptions": {
     "rel": "org.scala-lang:scala-compiler:2.13.18",
