@@ -82,7 +82,7 @@ lazy val lab: Project = checkout match {
         ),
         Jmh / run / javaOptions ++= {
           val jars = (Compile / dependencyClasspath).value.map(_.data)
-            .filter(f => Seq("scala-library-", "scala-reflect-", "scala-compiler-").exists(f.getName.startsWith))
+            .filter(f => f.getName.matches("(scala-library|scala-reflect|scala-compiler)(-[^/]*)?\\.jar")) // Maven's name-version.jar, Ivy's name.jar
           if (jars.size < 3) sys.error(s"expected the scala-library, scala-reflect and scala-compiler jars on the dependency classpath, found $jars")
           Seq(
             s"-Dcompilerlab.corpora=${corpora(baseDirectory.value / ".." / ".." / "..")}",

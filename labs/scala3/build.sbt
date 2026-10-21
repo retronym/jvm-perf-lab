@@ -88,7 +88,7 @@ lazy val lab: Project = checkout match {
         // the standard library as the published compiler ships it: scala3-library_3 and the scala-library it depends on
         Jmh / run / javaOptions ++= {
           val jars = (Compile / dependencyClasspath).value.map(_.data)
-            .filter(f => f.getName.startsWith("scala3-library_3-") || f.getName.startsWith("scala-library-"))
+            .filter(f => f.getName.matches("(scala3-library_3|scala-library)(-[^/]*)?\\.jar")) // Maven's name-version.jar, Ivy's name.jar
           if (jars.isEmpty) sys.error("no scala3-library_3 / scala-library jar on the dependency classpath")
           Seq(
             s"-Dcompilerlab.scalaLibrary=${jars.mkString(java.io.File.pathSeparator)}",
