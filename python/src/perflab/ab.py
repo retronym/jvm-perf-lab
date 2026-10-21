@@ -396,7 +396,7 @@ EVENT_GRAPHS = ["bench", "reverse", "bench-classify", "reverse-classify", "threa
 def graphs(spec):
     """For async runs: every flame graph of every cell (re)rendered by regraph, and <campaign>/index.html linking them."""
     from . import regraph
-    events = [label for label, _ in regraph.events_of(spec.profile)]
+    events = [label for label, _ in regraph.events_of(spec.profile, bool(spec.kperf))]
     cells = []
     for corpus in spec.corpora:
         for variant, flags in spec.variants.items():

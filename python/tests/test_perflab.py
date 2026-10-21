@@ -67,6 +67,14 @@ class RunTest(unittest.TestCase):
         self.assertEqual(regraph.events_of(out), [("hw-cycles", ["--hw", "cycles"]), ("hw-cache-misses", ["--hw", "cache-misses"])])
         self.assertEqual([l for l, _ in regraph.events_of("async:cpu,alloc")], ["cpu", "alloc"])
 
+    def test_a_single_kperf_event_is_a_hardware_event(self):
+        out = os.path.join(self.p.dir, "run")
+        jmh.prepare(out, "async:cycles@10000000", ["B"], kperf="/tmp/k.sock", lib="/x/lib.dylib")
+        self.assertEqual(regraph.events_of(out), [("hw-cycles", ["--hw", "cycles"])])
+        self.assertEqual(regraph.events_of("async:cycles@10000000", kperf=True), [("hw-cycles", ["--hw", "cycles"])])
+        jmh.prepare(out, "async:cpu", ["B"], lib="/x/lib.dylib")
+        self.assertEqual(regraph.events_of(out), [("cpu", ["--cpu"])])
+
     def test_async_records_the_jdk_events_by_jfrsync(self):
         out = os.path.join(self.p.dir, "run")
         jmh.prepare(out, "async:cpu", ["B"], lib="/x/lib.dylib")

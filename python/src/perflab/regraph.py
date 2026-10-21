@@ -66,15 +66,19 @@ def kinds(explicit=None):
     return ks
 
 
-def events_of(profile):
+def events_of(profile, kperf=False):
     """The events of an async profile, from a profile string (`async:cycles+instructions`, `async:cpu,alloc`) or a run's
-    directory (its profile.txt, written by `perflab run`): [("hw-cycles", ["--hw", "cycles"]), ...] or cpu, alloc, ..."""
+    directory (its profile.txt, written by `perflab run`): [("hw-cycles", ["--hw", "cycles"]), ...] or cpu, alloc, ...
+    A kperf recording's events are hardware events even when there is only one (`async:cycles@10000000`): `kperf` says
+    so for a profile string; a run's directory says so in its jmh.args."""
     f = os.path.join(profile, "profile.txt")
     if os.path.isdir(profile) and os.path.exists(f):
+        args = os.path.join(profile, "jmh.args")
+        kperf = kperf or (os.path.exists(args) and "kperf=" in open(args).read())
         profile = open(f).read().strip()
     kind, _, spec = profile.partition(":")
     spec = spec if kind == "async" else "cpu"
-    if "+" in spec:
+    if "+" in spec or (kperf and kind == "async"):
         return [(f"hw-{e.split('@')[0]}", ["--hw", e.split("@")[0]]) for e in spec.split("+")]
     names = [e.split("@")[0] for e in re.split(r"[,-]", spec)]
     return [(e, [f"--{e}"]) for e in names if e in ("cpu", "wall", "alloc", "lock")] or [("cpu", ["--cpu"])]
