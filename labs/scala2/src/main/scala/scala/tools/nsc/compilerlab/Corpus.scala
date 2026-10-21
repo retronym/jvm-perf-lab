@@ -41,6 +41,11 @@ object Corpus {
 
   /** A corpus of a scala/compiler-benchmark checkout (`compilerlab.corpora` is its `corpus` directory), from
    *  `<name>/latest`, or, given an absolute path, the sources under that directory.
+   *
+   *  A directory exported from a build (as the zinc integration campaigns' `export-build` lays a module out) has
+   *  `src/` with Scala and Java sources, `lib/` with the jars of its classpath, and `incOptions.properties` with a
+   *  `scalac.options` line. Its options are used in place of the known ones, less those that would turn a warning
+   *  into an error; standard library jars in `lib/` are left out, since the compiler's own go on the classpath.
    */
   def load(name: String): Corpus = {
     val absolute = Paths.get(name).isAbsolute
@@ -52,8 +57,11 @@ object Corpus {
       case None if absolute => Known()
       case None => sys.error(s"unknown corpus $name; known: ${known.keys.toList.sorted.mkString(", ")}, or an absolute path")
     }
+    val exported = exportedOptions(dir)
     val root = new VirtualDirectory(s"memory-$name", None)
-    val paths = Files.walk(dir, java.nio.file.FileVisitOption.FOLLOW_LINKS).iterator.asScala.filter(p => isSource(p.toString)).toList.sorted
+    val lib = dir.resolve("lib")
+    val paths = Files.walk(dir, java.nio.file.FileVisitOption.FOLLOW_LINKS).iterator.asScala
+      .filter(p => !p.startsWith(lib) && isSource(p.toString)).toList.sorted
     if (paths.isEmpty) sys.error(s"no sources in $dir")
     val files = paths.map { p =>
       val rel = dir.relativize(p).toString
@@ -63,8 +71,38 @@ object Corpus {
       try out.write(filter(new String(Files.readAllBytes(p), UTF_8)).getBytes(UTF_8)) finally out.close()
       file
     }
-    Corpus(name, files, sharedOptions ++ k.options, deps(dir), jdkModules, k.withScala,
+    Corpus(name, files, exported.getOrElse(sharedOptions ++ k.options), deps(dir) ++ libJars(dir), jdkModules, k.withScala,
       if (k.sourcePath) Some(root.lookupName("library", directory = true)) else None)
+  }
+
+  /** `scalac.options` of `<dir>/incOptions.properties`, if there: `[basedir]` replaced by the directory, and without
+   *  the options that make warnings errors (`-Werror`, `-Xfatal-warnings`, `-Wconf`), which differ by compiler version.
+   */
+  private def exportedOptions(dir: Path): Option[List[String]] = {
+    val f = dir.resolve("incOptions.properties")
+    if (!Files.exists(f)) None
+    else {
+      val props = new java.util.Properties()
+      val in = Files.newInputStream(f)
+      try props.load(in) finally in.close()
+      val line = props.getProperty("scalac.options", "")
+      Some(line.split("\\s+").toList.filter(_.nonEmpty).map(_.replace("[basedir]", dir.toString))
+        .filterNot(o => o == "-Werror" || o == "-Xfatal-warnings" || o.startsWith("-Wconf")))
+    }
+  }
+
+  /** The jars in `<dir>/lib`, except the standard library's (the compiler's own are on the classpath). */
+  private def libJars(dir: Path): List[Path] = {
+    val lib = dir.resolve("lib")
+    if (!Files.isDirectory(lib)) Nil
+    else {
+      val list = Files.list(lib)
+      try list.iterator.asScala.filter { p =>
+        val n = p.getFileName.toString
+        n.endsWith(".jar") && !n.startsWith("scala-library-") && !n.startsWith("scala-reflect-") && !n.startsWith("scala3-library_3-")
+      }.toList.sorted
+      finally list.close()
+    }
   }
 
   private def prop(key: String): String = sys.props.getOrElse(key, sys.error(s"-D$key not set"))

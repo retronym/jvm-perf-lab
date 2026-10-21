@@ -43,8 +43,16 @@ object InMemoryClasspath:
     protected def isMatchingFile(f: AbstractFile): Boolean = !f.isDirectory && FileUtils.endsSourceExtension(f.name)
     override def sources(inPackage: String): Iterable[SourceFileEntry] = files(inPackage)
 
-  /** The snapshot for a corpus: `default`, or `jdkForLibrary` if the corpus has no scala-library on its classpath. */
-  def forCorpus(corpus: Corpus): InMemoryClasspath = if corpus.withScalaLibrary then default else jdkForLibrary
+  private val cache = java.util.concurrent.ConcurrentHashMap[(Boolean, List[Path]), InMemoryClasspath]()
+
+  /** The snapshot for a corpus: `default` plus its `deps`, or `jdkForLibrary` if the corpus has no scala-library on
+   *  its classpath; corpora that agree share one snapshot. */
+  def forCorpus(corpus: Corpus): InMemoryClasspath =
+    cache.computeIfAbsent((corpus.withScalaLibrary, corpus.deps), key =>
+      val (withLibrary, deps) = key
+      if !withLibrary then jdkForLibrary
+      else if deps.isEmpty then default
+      else load(scalaLibraryJars ::: deps, jdkModules))
 
   /** The JDK modules alone, for the standard library itself: those in `compilerlab.jdkModules` and `jdk.unsupported`
    *  (`sun.misc.Unsafe`, for `LazyVals`).
@@ -54,12 +62,16 @@ object InMemoryClasspath:
   private def jdkModules: List[String] =
     sys.props.getOrElse("compilerlab.jdkModules", "java.base").nn.split(",").toList.map(_.nn.trim.nn).filter(_.nonEmpty)
 
-  /** The scala-library jar (`compilerlab.scalaLibrary`) and the JDK modules in `compilerlab.jdkModules` (default `java.base`)
-   *  of the running JDK.
+  /** The standard library jars (`compilerlab.scalaLibrary`, path separated: the checkout's library, or a published
+   *  compiler's scala3-library_3 and scala-library). */
+  private def scalaLibraryJars: List[Path] =
+    sys.props.getOrElse("compilerlab.scalaLibrary", sys.error("-Dcompilerlab.scalaLibrary=<jar> not set")).nn
+      .split(java.io.File.pathSeparator).toList.filter(_.nonEmpty).map(Path.of(_).nn)
+
+  /** The standard library (`compilerlab.scalaLibrary`) and the JDK modules in `compilerlab.jdkModules` (default
+   *  `java.base`) of the running JDK.
    */
-  lazy val default: InMemoryClasspath =
-    val lib = sys.props.getOrElse("compilerlab.scalaLibrary", sys.error("-Dcompilerlab.scalaLibrary=<jar> not set"))
-    load(List(Path.of(lib).nn), jdkModules)
+  lazy val default: InMemoryClasspath = load(scalaLibraryJars, jdkModules)
 
   def load(jars: List[Path], jdkModules: List[String]): InMemoryClasspath =
     var files = 0
