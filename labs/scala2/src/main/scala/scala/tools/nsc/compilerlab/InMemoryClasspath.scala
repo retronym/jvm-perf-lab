@@ -48,7 +48,11 @@ object InMemoryClasspath {
 
   /** The snapshot for a corpus, shared by corpora with the same classpath. */
   def forCorpus(corpus: Corpus): InMemoryClasspath =
-    cache.computeIfAbsent(corpus.classpathKey, k => load(k.jdkModules, if (k.withScala) scalaClasspath else Nil, k.deps))
+    cache.computeIfAbsent(corpus.classpathKey, { k =>
+      // the quick build's class directories, or a published compiler's jars
+      val (scalaDirs, scalaJars) = (if (k.withScala) scalaClasspath else Nil).partition(Files.isDirectory(_))
+      load(k.jdkModules, scalaDirs, scalaJars ::: k.deps)
+    })
 
   /** The quick library, reflect and compiler class directories (`compilerlab.scalaClasspath`), as scala/compiler-benchmark
    *  puts the Scala jars on every corpus's classpath.
