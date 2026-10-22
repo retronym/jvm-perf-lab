@@ -1,0 +1,26 @@
+{
+  "name": "perf-integration-pekko-cpu-alloc",
+  "benchmark": "CompileBenchmark",
+  "profile": "async:cpu,alloc",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/.integration/corpora/scala3 -Dcompilerlab.jdkModules=java.base,jdk.unsupported,java.naming",
+  "rounds": 1,
+  "corpora": {
+    "pekko-actor": "-p 'scalacOptions=-source:3.7 -Yno-parallel-pickling' -wi 12 -i 12 -w 4 -r 4"
+  },
+  "variants": {
+    "main": ""
+  },
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "description": [
+    "CPU and allocation profile (async-profiler cpu,alloc, with the JDK's own events via jfrsync) of the scala3-perf-integration build compiling pekko-actor, as in perf-integration-pekko but with `-Yno-parallel-pickling` so the benchmark thread's flame graph includes pickling.",
+    "One fork; the profile covers the measured iterations."
+  ],
+  "variantDescriptions": {
+    "main": "scala3-perf-integration, BENCHMARKBUILD publishLocal (PERF-INTEGRATION.md on the branch)"
+  }
+}
