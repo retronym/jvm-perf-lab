@@ -75,3 +75,23 @@ Cross-cutting (inclusive, overlapping):
 Top self frames: Scala 3 `Symbol.denot` 1.4%, `Type.widen` 1.1%, `EqHashMap.lookup` 1.1%, `boxToInteger` 1.0%, `MegaPhase.transformTree` 0.9%, `Objects.equals` 0.8%, `Type.dealias` 0.8%, `goForward` 0.8%; Scala 2 `Objects.equals` 1.5%, `Symbol.rawInfo` 1.1%, `TypeRef.mapOver` 1.0%, `Scope.lookupEntry` 1.0%, `SymTree.symbol` 1.0%. Flat profiles in both: nothing above 2% self.
 
 Reading: typer is the same third of the compile in both; Scala 3 spends it on subtyping and denotation lookup, Scala 2 on namers and inference. Scala 3's transforms are cheaper as a whole (30.7% against ~45%) and its pickler is 6x the share of Scala 2's (TASTy vs ScalaSignature). The backends are level.
+
+## Allocation profiles (async-profiler cpu,alloc with jfrsync; campaign `perf-integration-pekko-cpu-alloc`)
+
+Bytes allocated by the benchmark thread, inclusive shares (`perflab frameweight --event alloc`; overlapping), per op 1265 MB (Scala 3 branch) and 1072 MB (Scala 2 branch). Flame graphs `jfr-cpu-alloc.html` beside the cpu ones.
+
+| where | Scala 3 branch | Scala 2 branch |
+|---|---|---|
+| parser | 4.3% | 3.7% |
+| typer | 26.0% (Namer 12.7, Applications 12.6, ProtoTypes 8.8, Implicits 2.5) | 28.2% (Namers 13.4, typedApply 20.4, Infer 9.5, Implicits 3.2) |
+| contexts (`Context.fresh` / `Contexts`) | 5.3% | 16.0% |
+| pickler | 16.5% (TreePickler 14.5, TastyBuffer 7.1, NameBuffer 2.1) | 1.8% |
+| transforms | 19.5% (erasure 7.0, patmat 2.9) | erasure 11.8, patmat 8.5, uncurry 3.1, specialize 3.1, explicitouter 2.1, mixin 2.3 |
+| backend | 22.3% (ASM 8.2, ClassfileWriter 2.0) | 22.3% (ASM 10.1, BCodeSkelBuilder 9.0, ClassfileWriter 3.4) |
+| member lookup / subtyping / asSeenFrom | 6.4 / 6.2 / 3.7% | 3.8 / 1.7 / 5.0% (TypeMap 10.0, BaseTypeSeqs 3.3) |
+| scopes | 4.7% | 11.5% |
+| TASTy unpickling / classfile parsing | 3.3 / 1.7% | – / 2.8% |
+
+By object type: Scala 3 `byte[]` 12.5%, `Object[]` 9.5%, `int[]` 8.9%, `::` 7.3%, `FreshContext` 5.3%, `Some` 3.4%; Scala 2 `byte[]` 11.1%, `::` 9.3%, `Contexts$Context` 7.1%, `ScopeEntry[]` 2.9%, `Object[]` 2.1%, `char[]` 2.0%, `ScopeEntry` 1.7%, `TermSymbol` 1.7%, `TypeHistory` 1.4%.
+
+Reading: the same shape in both. Typer and the backend each take about a quarter of the bytes, and the backend's quarter is class-file bytes and ASM's tables, so it is not reducible by the compiler. The typer context is the largest single object type in each (5% and 7%): both compilers allocate a fresh context per scope change, and Scala 2's is a heavier object (and brings a scope with it: scopes are 11.5% there against 4.7%). Scala 3's extra 18% per op over Scala 2 is the TASTy pickler (16.5%, of which 7% is the tree buffer itself, the target of the parked #58/#60) and the unpickler, i.e. the cost of TASTy as the interchange format rather than any hot spot. Lists (`::`) are 7 to 9% in both.
