@@ -1,0 +1,26 @@
+{
+  "name": "perf-integration-pekko-prof",
+  "benchmark": "CompileBenchmark",
+  "profile": "async:cpu",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/.integration/corpora/scala2 -Dcompilerlab.jdkModules=java.base,jdk.unsupported,java.naming",
+  "rounds": 1,
+  "corpora": {
+    "pekko-actor-plain": "-wi 12 -i 12 -w 4 -r 4"
+  },
+  "variants": {
+    "main": ""
+  },
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "description": [
+    "CPU profile (async-profiler) of the scala2-perf-integration build compiling pekko-actor with the plain option set, as in perf-integration-pekko.",
+    "One fork; the profile covers the measured iterations."
+  ],
+  "variantDescriptions": {
+    "main": "scala2-perf-integration, setupPublishCore publishLocal (PERF-INTEGRATION.md on the branch)"
+  }
+}
