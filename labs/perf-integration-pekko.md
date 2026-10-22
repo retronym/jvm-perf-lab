@@ -39,3 +39,39 @@ Apart: pekko's actual Scala 2 options (`-opt:l:inline -opt-inline-from:… -Xlin
 - `-source:3.7` for Scala 3: pekko's options are for 3.3 LTS, and `A with B` is an error from 3.8 on.
 - The Scala 2 branch was built and tested by a subagent (junit typechecker/patmat subset passed); the Scala 3 branch's merges compile (bootstrapped, published) but its test suite was not run.
 - sbt servers idle out at 10 minutes by default and `perflab trees` does not start them; each tree has an untracked `local-idle.sbt` (6 hours) for a campaign that waits on the JMH lock and the loadgate.
+
+## CPU profiles of the two perf-integration builds (async-profiler, cpu, benchmark thread)
+
+Campaign `perf-integration-pekko-prof` in each lab: one fork, 12 measured iterations profiled, same corpus and options as above; Scala 3 with `-Yno-parallel-pickling` so the benchmark thread includes pickling. Flame graphs (`jfr-cpu-cpu.html` benchmark thread, `-reverse`, `-classify` every thread) under `labs/scala3/out/ab/perf-integration-pekko-prof/pekko-actor/main/1/dotty…/` and `labs/scala2/out/ab/perf-integration-pekko-prof/pekko-actor-plain/main/1/scala…/`, linked from the dashboards. The Scala 3 cell's timing (1547 ± 341) ran under 1.45 cores of other load; the sample shares are what to read. Shares are inclusive, `perflab frameweight --event cpu`, of the benchmark thread's samples (52.6k Scala 3, 49.9k Scala 2).
+
+| phase | Scala 3 branch | Scala 2 branch |
+|---|---|---|
+| parser | 2.5% | 2.0% |
+| typer (Scala 2: incl. namers 12.6%, Infer 12.5%) | 31.5% | 31.5% |
+| posttyper / superaccessors + refchecks | 4.3% | 1.6% + 6.0% |
+| pickler | 8.3% (TreePickler 5.8%) | 1.4% |
+| inlining | 0.7% | – |
+| transforms (Scala 3: MegaPhase groups) | 30.7% | ~45% |
+| &nbsp;&nbsp;erasure | 10.0% | 13.3% |
+| &nbsp;&nbsp;pattern matcher | 2.8% | 5.4% |
+| &nbsp;&nbsp;uncurry / specialize / explicitouter | – | 5.6% / 3.7% / 3.8% |
+| &nbsp;&nbsp;lambdalift, mixin, fields/memoize, delambdafy, cleanup | 2.5%, 2.0%, –, –, – | 2.8%, 3.0%, 2.1%, 1.7%, 1.2% |
+| backend (genBCode) | 11.9% | 12.3% |
+
+Cross-cutting (inclusive, overlapping):
+
+| | Scala 3 branch | Scala 2 branch |
+|---|---|---|
+| subtyping (`TypeComparer` / `isSubType`) | 11.6% | 3.7% |
+| member lookup (`findMember` / `FindMembers`) | 9.4% | 6.2% |
+| denotation lookup (`Symbol.denot`, `SingleDenotation.current`) | 9.4% | – |
+| `asSeenFrom` | 5.3% | 6.4% |
+| implicits | 3.8% | 4.2% |
+| `Definitions` | 3.0% | 3.5% |
+| base type sequences | – | 3.0% |
+| TASTy unpickling / classfile parsing | 2.6% / 1.1% | – / 1.6% |
+| `pthread_jit_write_protect_np` (JIT W^X toggling on Apple Silicon; self) | 1.95% | 1.0% |
+
+Top self frames: Scala 3 `Symbol.denot` 1.4%, `Type.widen` 1.1%, `EqHashMap.lookup` 1.1%, `boxToInteger` 1.0%, `MegaPhase.transformTree` 0.9%, `Objects.equals` 0.8%, `Type.dealias` 0.8%, `goForward` 0.8%; Scala 2 `Objects.equals` 1.5%, `Symbol.rawInfo` 1.1%, `TypeRef.mapOver` 1.0%, `Scope.lookupEntry` 1.0%, `SymTree.symbol` 1.0%. Flat profiles in both: nothing above 2% self.
+
+Reading: typer is the same third of the compile in both; Scala 3 spends it on subtyping and denotation lookup, Scala 2 on namers and inference. Scala 3's transforms are cheaper as a whole (30.7% against ~45%) and its pickler is 6x the share of Scala 2's (TASTy vs ScalaSignature). The backends are level.
