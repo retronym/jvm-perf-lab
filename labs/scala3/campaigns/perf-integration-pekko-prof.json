@@ -6,7 +6,7 @@
   "jvmArgs": "-Xms4G -Xmx4G -Xss2M -XX:+UnlockDiagnosticVMOptions -XX:+DebugNonSafepoints -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/.integration/corpora/scala3 -Dcompilerlab.jdkModules=java.base,jdk.unsupported,java.naming",
   "rounds": 1,
   "corpora": {
-    "pekko-actor": "-p scalacOptions=-source:3.7 -Yno-parallel-pickling -wi 12 -i 12 -w 4 -r 4"
+    "pekko-actor": "-p 'scalacOptions=-source:3.7 -Yno-parallel-pickling' -wi 12 -i 12 -w 4 -r 4"
   },
   "variants": {
     "main": ""
