@@ -2,7 +2,8 @@
 interleaved, each run checked against the spec.
 
   perflab ab run    <spec.json> [--dry-run]   runs every missing cell; resumable
-  perflab ab report <spec.json>               markdown summary; for async profiles, an index of flame graphs
+  perflab ab report <spec.json> [--per-op]    markdown summary, per "perUnit" if the spec has one (--per-op: per op);
+                                              for async profiles, an index of flame graphs
 
 A spec:
 
@@ -22,6 +23,8 @@ A spec:
                                                          # iteration within each fork (doc/paired-ab.md)
     "loadgate": {"maxCores": 1.5, "quietSecs": 30},      # optional: wait for a quiet machine, rerun noisy cells
     "gcLog": true,                                       # optional: gc.log per cell, for its timeline
+    "perUnit": "files",                                  # optional: an aux counter of the benchmark; the summary and
+                                                         # report divide every count by its units per op (cycles/file)
     "historical": "<why>",                               # optional: kept for its results; `run` refuses it
     "description": "Does -Yx help? See [#123](<url>).",  # optional Markdown (a string, or a list of lines): the
     "variantDescriptions": {"U": "uncached, from **#123**"}  # campaign and each variant, in a panel atop its card
@@ -31,10 +34,19 @@ Cells run round by round, corpus by corpus, variants interleaved within each, so
 run is checked: fresh results, the JVM, every JVM argument of the spec (JMH's -jvmArgsAppend replaces the benchmark's
 @Fork(jvmArgsAppend), so every variant is given `jvmArgs`), each variant's `-p` parameters, xctrace counters present,
 and for kperf, that samples were not lost.
+
+The report and the index's summary show every metric a cell recorded (`metrics`): the score; the benchmark threads'
+cycles, instructions and IPC; allocation; each PMU counter of the xctrace template, or each kperf event of an async
+profile, per op and per 1,000 instructions or as % of cycles; JIT, GC and other threads' share of cycles and IPC, and
+the cycles, instructions and IPC of all threads. With "perUnit" (a JMH @AuxCounters events counter, such as "files"),
+every per-op count, allocation and the score are divided by the counter's units per op (its sum over the measurement
+iterations over their ops): with variants that do different amounts of work per op, Δ against the first variant
+compares the work, not the op. The index's summary toggles between per unit and per op; the report is per unit unless
+--per-op.
 """
 import atexit, glob, json, os, re, shlex, shutil, subprocess, sys, time
 
-from . import config, jmh, loadgate, specs
+from . import config, jmh, loadgate, metrics, specs
 
 JMH_LOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "jmh.lock")
 MAX_ATTEMPTS = 10
@@ -75,6 +87,7 @@ class Spec:
             self.variant_jmh_args = {"paired": "-p " + shlex.quote(f"{cfg.get('benchmark', 'variants')}={spec}")}
         self.loadgate = s.get("loadgate")
         self.gc_log = s.get("gcLog", False)
+        self.per_unit = s.get("perUnit")
         self.historical = s.get("historical")
         self.description, self.variant_descriptions = s.get("description"), s.get("variantDescriptions") or {}
         self.out = os.path.join(cfg.campaigns, self.name)
@@ -264,6 +277,8 @@ def run(spec, dry):
             from . import timeline
             timeline.write(dest)
         jmh.finish(dest, spec.profile, spec.lib)
+        if spec.kperf:
+            metrics.hw_events(dest, spec.profile, jmh.jfrconv(jmh.async_lib(spec.lib)))  # for the index's summary
         set_running(spec, None)
         s = summary(json.load(open(os.path.join(dest, "result.json")))[0])
         log(f"  {s['ms']:.1f} ± {s['err']:.1f} {s['unit']}" + (f", {s['cyc'] / 1e9:.2f}G cycles/op" if s.get("cyc") else "")
@@ -359,35 +374,57 @@ def report_paired(spec):
             print("| " + " | ".join(row) + " |")
 
 
-def report(spec):
+def report(spec, per_op=False):
+    """Per corpus, a row per metric (`metrics`) and a column per variant: the mean over rounds and Δ against the first
+    variant, ± the spread over rounds; the score of each round and the GC time beneath."""
     if spec.paired:
         return report_paired(spec)
     print(f"### {spec.name}\n")
     describe(spec)
-    unit = next((summary(json.load(open(f))[0])["unit"] for f in glob.glob(os.path.join(spec.out, "*", "*", "*", "result.json"))), "score")
-    print(f"| {spec.corpus_param} | variant | {unit} (per round) | mean | Δ | instructions/op (per round) | Δ | cycles/op | Δ | IPC | alloc/op | GC time |")
-    print("|---|---|---|---|---|---|---|---|---|---|---|---|")
+    if per_op:
+        spec.per_unit = None
+    jfrconv = jmh.jfrconv(jmh.async_lib(spec.lib)) if spec.kperf else None
     for corpus in spec.corpora:
-        base = None
+        results = {}
         for variant in spec.variants:
-            rs = []
             for r in range(1, spec.rounds + 1):
-                f = os.path.join(spec.cell_dir(corpus, variant, r), "result.json")
-                if os.path.exists(f):
-                    rs.append(summary(json.load(open(f))[0]))
-            if not rs:
-                continue
-            row = {k: mean(s[k] for s in rs) for k in ("ms", "cyc", "ipc", "alloc", "gc", "inst")}
-            base = base or row
-            pct = lambda k: f"{100 * (row[k] / base[k] - 1):+.1f}%" if row[k] and base[k] and row is not base else ""
-            fmt = lambda x, f: f.format(x) if x is not None else "–"
-            per = " / ".join(f"{s['ms']:.4g} ± {s['err']:.2g}" for s in rs)
-            insts = " / ".join(f"{s['inst'] / 1e9:.3f}G" for s in rs if s.get("inst"))
-            print(f"| {corpus} | {variant} | {per} | {row['ms']:.4g} | {pct('ms')} | {insts} | {pct('inst')} | {fmt(row['cyc'] and row['cyc'] / 1e9, '{:.2f}G')} | "
-                  f"{pct('cyc')} | {fmt(row['ipc'], '{:.2f}')} | {fmt(row['alloc'] and row['alloc'] / 1e6, '{:.0f} MB')} | "
-                  f"{fmt(row['gc'] and row['gc'] / 1e3, '{:.1f} s')} |")
+                cell = spec.cell_dir(corpus, variant, r)
+                try:
+                    res = json.load(open(os.path.join(cell, "result.json")))[0]
+                except (OSError, ValueError, IndexError):
+                    continue  # not run, or still running: JMH writes result.json when the fork ends
+                results.setdefault(variant, []).append((res, metrics.hw_events(cell, spec.profile, jfrconv) if jfrconv else {}))
+        if not results:
+            continue
+        cols, st = metrics.summarise({v: [metrics.of(res, spec.per_unit, hw) for res, hw in rs] for v, rs in results.items()}, spec.per_unit)
+        names = list(results)
+        missing = [v for v, rs in results.items() for res, _ in rs if spec.per_unit and metrics.units_per_op(res, spec.per_unit) is None]
+        print(f"#### {spec.corpus_param} {corpus}\n")
+        if spec.per_unit:
+            per = {v: mean(metrics.units_per_op(res, spec.per_unit) for res, _ in rs) for v, rs in results.items()}
+            print(f"Per {metrics.unit_name(spec.per_unit)}: per-op values divided by `{spec.per_unit}` per op ("
+                  + ", ".join(f"{v} {per[v]:.4g}" for v in names if per[v]) + ")."
+                  + (f" **No `{spec.per_unit}` counter in {', '.join(sorted(set(missing)))}.**" if missing else "") + "\n")
+        print("| metric | " + " | ".join(names) + " |\n|---|" + "---|" * len(names))
+        rounds = lambda v: " / ".join(f"{res['primaryMetric']['score']:.4g}" for res, _ in results[v])
+        print(f"| {results[names[0]][0][0]['primaryMetric'].get('scoreUnit', 'score')} per round | " + " | ".join(rounds(v) for v in names) + " |")
+        for k, label, kind, _ in cols:
+            tds = []
+            for v in names:
+                if k not in st[v]:
+                    tds.append("–"); continue
+                m, sd, d, spread, ok = st[v][k]
+                text = metrics.fmt(kind, m) + (f" ± {100 * sd / m:.1f}%" if sd is not None and m else "")
+                if d is not None:
+                    text += f" ({d:+.1f}%" + (f" ± {spread:.1f}" if spread is not None else "") + ")" if ok else " (–)"
+                tds.append(text)
+            print(f"| {label} | " + " | ".join(tds) + " |")
+        gc = {v: mean(res["secondaryMetrics"].get("gc.time", {}).get("score") for res, _ in results[v]) for v in names}
+        if any(gc.values()):
+            print("| GC time | " + " | ".join(f"{gc[v] / 1e3:.1f} s" if gc[v] is not None else "–" for v in names) + " |")
+        print()
     if "async" in spec.profile:
-        print("\n" + graphs(spec))
+        print(graphs(spec))
 
 
 EVENT_GRAPHS = ["bench", "reverse", "bench-classify", "reverse-classify", "threads", "classify"]
@@ -442,5 +479,5 @@ def main(argv):
     if argv[0] == "run":
         run(spec, "--dry-run" in argv)
     else:
-        report(spec)
+        report(spec, "--per-op" in argv)
     return 0

@@ -9,7 +9,7 @@ each cell, `perflab run` at its start and end, and the page refreshes itself.
 """
 import glob, html, json, math, os, re, sys, time
 
-from . import ab, config, regraph, runinfo, specs, timeline, ui
+from . import ab, config, metrics, regraph, runinfo, specs, timeline, ui
 
 root = None  # the directory of the page being built: its links are relative to it
 CAMPAIGNS = None
@@ -82,7 +82,7 @@ CELL_HEADS = [("{corpus}", False), ("variant", False), ("{unit}", True), ("cycle
 
 def cell_row(spec, corpus, variant, cell):
     """((tr attributes, cells), when, corpus, data) of a campaign cell, or None before it has started; data is None while
-    it runs, else (variant, score, cycles, instructions, spec version, alloc, secondary metrics, unit)."""
+    it runs, else (variant, score, cycles, instructions, spec version, alloc, secondary metrics, unit, result, cell)."""
     res_f = os.path.join(cell, "result.json")
     if not os.path.exists(res_f):
         return None
@@ -119,7 +119,7 @@ def cell_row(spec, corpus, variant, cell):
              f"<code>{esc(flags)}</code>" if flags else "", f'<span class="when">{stamp(when)}</span>']
     detail = (f'<div class="cellg">{f"<span class={chr(34)}btns{chr(34)}>{tl}</span>" if tl else ""}{graphs}</div>') if tl or graphs else ""
     return ((f'{attrs} data-profiled="{1 if graphs else 0}"', cells, detail), when, corpus,
-            (variant, p["score"], cyc, ins, version, alloc, m, p.get("scoreUnit", "")))
+            (variant, p["score"], cyc, ins, version, alloc, m, p.get("scoreUnit", ""), r, cell))
 
 
 def score_head(units, suffix=""):
@@ -128,46 +128,56 @@ def score_head(units, suffix=""):
 
 
 def summary(name, cells):
-    """Per corpus and variant: mean score, cycles/op, instructions/op and allocation/op over rounds, each against the
-    spec's first variant (in the order of the campaign's spec.json, else alphabetical). For a paired campaign, each
-    variant's own metrics and the paired differences within forks (`paired_summary`)."""
+    """Per corpus and variant: the means over rounds of the cells' `metrics` (score, the benchmark threads' cycles,
+    instructions and IPC, allocation, every PMU counter recorded, the thread groups' share of cycles), each against the
+    spec's first variant (in the order of the campaign's spec.json, else alphabetical); per unit of work with the spec's
+    "perUnit", toggled with per op on the card. The table shows the main metrics, the pivot and chart all of them. For a paired campaign, each variant's
+    own metrics and the paired differences within forks (`paired_summary`)."""
     spec_f = os.path.join(CAMPAIGNS, name, "spec.json")
     spec = json.load(open(spec_f)) if os.path.exists(spec_f) else {}
     if spec.get("paired"):
         return paired_summary(list(spec["paired"]), cells)
-    order = list(spec.get("variants", {}))
-    out, data = [], []
-    units = {c[7] for vs in cells.values() for cs in vs.values() for c in cs}
+    order, per_unit = list(spec.get("variants", {})), spec.get("perUnit")
+    if not per_unit:
+        return metric_summary(cells, order, None)
+    # per unit and per op, the page showing the one picked on the card's toggle (`norm_toggle`)
+    return metric_summary(cells, order, per_unit, "unit") + metric_summary(cells, order, None, "op")
+
+
+def metric_summary(cells, order, per_unit, norm=None):
+    """The summary of `summary`, per op or per unit of `per_unit`; `norm` (unit, op) names it for the toggle."""
+    rows, cols = [], {}
     for corpus in sorted(cells):
         vs = cells[corpus]
         names = [v for v in order if v in vs] + sorted(v for v in vs if v not in order)
-        def stats(xs):
-            xs = [x for x in xs if x]
-            if not xs:
-                return None, None
-            mean = sum(xs) / len(xs)
-            sd = (sum((x - mean) ** 2 for x in xs) / (len(xs) - 1)) ** 0.5 if len(xs) > 1 else 0.0
-            return mean, sd
-        cols = ((1, num, "score"), (2, si, "count"), (3, si, "count"), (5, size, "alloc"))
-        base = {i: stats([c[i] for c in vs[names[0]]]) for i, _, _ in cols}
+        cs, st = metrics.summarise({v: [metrics.of(c[8], per_unit, metrics.cached_hw_events(c[9])) for c in vs[v]] for v in names}, per_unit)
+        for c in cs:
+            cols.setdefault(c[0], c)
+        rows.append((corpus, vs, names, st))
+    cols = list(cols.values())
+    main = [c for c in cols if c[3]]
+    out, data = [], []
+    for corpus, vs, names, st in rows:
         for v in names:
-            cs = vs[v]
-            tds, ms = [f"{esc(corpus)}{mixed(vs) if v == names[0] else ''}", esc(v), str(len(cs))], []
-            for i, fmt, kind in cols:
-                mean, sd = stats([c[i] for c in cs])
-                if mean is None:
-                    tds.append(""); ms.append(None); continue
-                rel_sd = f' <span class="pm">± {100 * sd / mean:.1f}%</span>' if len(cs) > 1 else ""
-                b, bsd = base[i]
-                # the spread of the difference: both variants' relative spreads over rounds
-                spread = 100 * ((sd / mean) ** 2 + (bsd / b) ** 2) ** 0.5 if b and len(cs) > 1 and len(vs[names[0]]) > 1 else None
-                d = None if v == names[0] or not b else 100 * (mean / b - 1)
-                tds.append(with_delta(f"{fmt(mean)}{rel_sd}", "" if d is None else delta(d, spread, ui.delta_ok(b, kind))))
-                ms.append(view_metric(fmt(mean), mean, sd if len(cs) > 1 else None, d, spread, ui.delta_ok(b, kind)))
-            out.append(("", tds)); data.append({"c": corpus, "v": v, "n": len(cs), "m": ms})
-    heads = [(esc(config.get().corpus_param), False), ("variant", False), ("rounds", False), (score_head(units), False), ("cycles/op", False),
-             ("instructions/op", False), ("alloc/op", False)]
-    return views(heads, out, ["score", "cycles/op", "instructions/op", "alloc/op"], data)
+            tds = [f"{esc(corpus)}{mixed(vs) if v == names[0] else ''}", esc(v), str(len(vs[v]))]
+            ms = []
+            for k, _, kind, is_main in cols:
+                if k not in st[v]:
+                    ms.append(None)
+                    if is_main:
+                        tds.append("")
+                    continue
+                mean, sd, d, spread, ok = st[v][k]
+                shown = metrics.fmt(kind, mean)
+                ms.append(view_metric(shown, mean, sd, d, spread, ok))
+                if is_main:
+                    rel_sd = f' <span class="pm">± {100 * sd / mean:.1f}%</span>' if sd is not None and mean else ""
+                    tds.append(with_delta(f"{shown}{rel_sd}", "" if d is None else delta(d, spread, ok)))
+            out.append(("", tds)); data.append({"c": corpus, "v": v, "n": len(vs[v]), "m": ms})
+    units = {c[7] for vs in cells.values() for cs in vs.values() for c in cs}
+    head = lambda k, label: (esc(unit(label)) if per_unit else score_head(units)) if k == "score" else esc(label)
+    heads = [(esc(config.get().corpus_param), False), ("variant", False), ("rounds", False)] + [(head(k, label), False) for k, label, _, _ in main]
+    return views(heads, out, [(k, head(k, label)) for k, label, _, _ in cols], data, norm)
 
 
 def verdict(d, spread=None, ok=True):
@@ -215,14 +225,23 @@ VIEW_TOGGLE = ('<span class="sv-tg" role="group" aria-label="summary view">'
                          for k, t, i in VIEWS) + "</span>")
 
 
-def views(heads, rows, keys, data):
-    """The summary: the table, and its data for the page to draw as a pivot or a chart (SUMMARY_JS). `keys` name the
-    metric columns (heads after corpus, variant and rounds) across campaigns, for the metric chips to remember."""
+def views(heads, rows, metrics, data, norm=None):
+    """The summary: the table, and its data for the page to draw as a pivot or a chart (SUMMARY_JS). `metrics` are
+    (key, heading) of each metric in the data's rows: the table's columns after corpus, variant and rounds, and any
+    more; the keys are the same across campaigns, for the metric chips to remember. `norm` (unit, op) is its side
+    of the per-unit toggle."""
     if not rows:
         return ""
-    blob = json.dumps({"metrics": [{"k": k, "h": h} for k, (h, _) in zip(keys, heads[3:])], "rows": data}).replace("</", "<\\/")
-    return (f'<div class="summ"><div class="sv-table">{table(heads, rows, "t summary")}</div><div class="sv-alt"></div>'
+    blob = json.dumps({"metrics": [{"k": k, "h": h} for k, h in metrics], "rows": data}).replace("</", "<\\/")
+    return (f'<div class="summ"{f" data-norm={chr(34)}{norm}{chr(34)}" if norm else ""}><div class="sv-table">{table(heads, rows, "t summary")}</div><div class="sv-alt"></div>'
             f'<script type="application/json">{blob}</script></div>')
+
+
+def norm_toggle(per_unit):
+    """For a spec with "perUnit": per unit or per op, a toggle beside the view's."""
+    return ('<span class="sv-tg sv-norm" role="group" aria-label="per unit or per op">'
+            f'<button data-sn="unit" title="divided by the {esc(per_unit)} counter per op" aria-pressed="false">per {esc(metrics.unit_name(per_unit))}</button>'
+            '<button data-sn="op" title="per op, as JMH measured" aria-pressed="false">per op</button></span>')
 
 
 def mixed(variants):
@@ -258,7 +277,7 @@ def paired_summary(names, cells):
     heads = [(esc(config.get().corpus_param), False), ("variant", False), ("forks", False)]
     heads += [h for label, *_ in ab.PAIRED_METRICS
               for h in ((score_head(units, label[5:]) if label.startswith("score") else esc(label), False),)]
-    return views(heads, out, [label for label, *_ in ab.PAIRED_METRICS], data)
+    return views(heads, out, [(label, h) for (label, *_), (h, _) in zip(ab.PAIRED_METRICS, heads[3:])], data)
 
 
 def spec_history(spec_dir, counts, sid):
@@ -582,7 +601,7 @@ footer{max-width:1400px;margin:0 auto;padding:0 20px 30px;color:var(--muted);fon
 .sv-tg button{border:0;background:var(--panel);color:var(--muted);padding:2px 6px;cursor:pointer;display:grid;place-items:center}
 .sv-tg button+button{border-left:1px solid var(--line)} .sv-tg button:hover{color:var(--fg)}
 .sv-tg button[aria-pressed=true]{background:var(--link-bg);color:var(--link)}
-.sv-tg svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.3}
+.sv-tg svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.3} .sv-norm button{font:12px/16px inherit}
 .sv-ctl{display:flex;flex-wrap:wrap;gap:4px 18px;margin:8px 0 4px}
 table.pivot td{border-bottom:0} table.pivot tr.g0 td{border-top:1px solid var(--line2)} table.pivot tr:nth-child(2) td{border-top:0}
 table.pivot td.mk{color:var(--muted);font-size:12px} table.pivot td.dd{padding-left:2px;text-align:left} table.pivot td.gm{border-left:1px solid var(--line2)}
@@ -603,7 +622,7 @@ svg.sv-c .wh{stroke:var(--fg);stroke-width:1.2;opacity:.7}
 # (or of the values, a panel per corpus). The view, metrics and scale are remembered in this browser; `apply` redraws.
 SUMMARY_JS = r"""
 const SV = (() => { try { return JSON.parse(localStorage.getItem('perflab.summary')) || {}; } catch (e) { return {}; } })();
-SV.view = SV.view || 'table'; SV.metrics = SV.metrics || ['score']; SV.scale = SV.scale || 'delta';
+SV.view = SV.view || 'table'; SV.metrics = SV.metrics || ['score']; SV.scale = SV.scale || 'delta'; SV.norm = SV.norm || 'unit'; 
 const svOff = {};  // per campaign: the variants switched off
 let svCorpora = new Set();
 const svEsc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
@@ -614,8 +633,11 @@ const svPm = x => x[2] != null && x[1] ? ` <span class="pm">± ${(100 * x[2] / x
 const chip = (attr, v, on, label, title) => `<button class="chip" ${attr}="${svEsc(v)}" aria-pressed="${on}"${title ? ` title="${title}"` : ''}>${label}</button>`;
 function drawSummaries(corpora) {
   if (corpora) svCorpora = corpora;
-  document.querySelectorAll('.sv-tg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.sv === SV.view));
-  for (const el of document.querySelectorAll('.summ')) drawSummary(el);
+  document.querySelectorAll('.sv-tg button[data-sv]').forEach(b => b.setAttribute('aria-pressed', b.dataset.sv === SV.view));
+  // a campaign with a "perUnit" has its summary per unit and per op: the one picked shows
+  document.querySelectorAll('.sv-tg button[data-sn]').forEach(b => b.setAttribute('aria-pressed', b.dataset.sn === SV.norm));
+  for (const el of document.querySelectorAll('.summ[data-norm]')) el.hidden = el.dataset.norm !== SV.norm;
+  for (const el of document.querySelectorAll('.summ:not([hidden])')) drawSummary(el);
 }
 function svModel(el) {
   const data = el._d || (el._d = JSON.parse(el.querySelector('script').textContent));
@@ -719,10 +741,11 @@ function svAbs({vs, base, corpora, cell}, m) {
   return `<figure><figcaption>${m.h} <span class="k">from zero; coloured by Δ against ${svEsc(base)}</span></figcaption><div class="sv-abs">${panels.join('')}</div></figure>`;
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-sv],[data-sm],[data-svv],[data-sc]');
+  const b = e.target.closest('[data-sv],[data-sm],[data-svv],[data-sc],[data-sn]');
   if (!b) return;
-  const el = b.closest('section') && b.closest('section').querySelector('.summ');
+  const el = b.closest('section') && b.closest('section').querySelector('.summ:not([hidden])');
   if (b.dataset.sv) SV.view = b.dataset.sv;
+  else if (b.dataset.sn) SV.norm = b.dataset.sn;
   else if (b.dataset.sc) SV.scale = b.dataset.sc;
   else if (b.dataset.sm) {
     // this campaign's metrics after the click (never none), kept beside those of campaigns with other metrics
@@ -826,12 +849,15 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       heads = [(esc(unit(units.pop())) if len(units) == 1 else "score", n) if h == "{unit}" else (esc(config.get().corpus_param), n) if h == "{corpus}" else (h, n)
                for h, n in CELL_HEADS]
       try:
-          paired = list(json.load(open(os.path.join(spec_dir, "spec.json"))).get("paired") or [])
+          spec_json = json.load(open(os.path.join(spec_dir, "spec.json")))
       except (OSError, ValueError):
-          paired = []
+          spec_json = {}
+      paired, per_unit = list(spec_json.get("paired") or []), spec_json.get("perUnit")
       summ = summary(name, cells)
-      about = (f"means over forks, each alternating {', '.join(paired)}; Δ against {paired[0]} within each fork" if paired
-               else "means over rounds; Δ against the first variant")
+      about = (f"means over forks, each alternating {esc(', '.join(paired))}; Δ against {esc(paired[0])} within each fork" if paired
+               else "means over rounds; Δ against the first variant; counters of the benchmark threads"
+               + (f"; per {esc(metrics.unit_name(per_unit))}: counts, allocation and the score divided by the <code>{esc(per_unit)}</code> counter per op"
+                  if per_unit and not paired else ""))
       # the cells: open while they are what there is to see (no summary yet, a cell running) or carry flame graphs
       cells_open = not summ or any(' data-running="1"' in r[0] or ' data-profiled="1"' in r[0] for r in rows)
       cells_html = (f'<details class="cells" id="{sid}-cells"{" open" if cells_open else ""}><summary><b>Cells</b> <span class="k">{len(rows)}: '
@@ -845,7 +871,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
                                   f'data-corpus="{esc(" ".join(sorted(corpora)))}" data-profiled="{1 if profiled else 0}">'
                                   f'{card_head("campaign", name, progress_badge(prog, name), when, buttons)}'
                                   f'{variants_panel(spec_dir)}{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{spec_history(spec_dir, counts, sid)}'
-                                  f'{sub("Summary", esc(about), VIEW_TOGGLE) + summ if summ else ""}{cells_html}</section>'))
+                                  f'{sub("Summary", about, VIEW_TOGGLE + (norm_toggle(per_unit) if per_unit and not paired else "")) + summ if summ else ""}{cells_html}</section>'))
   run_dirs = sorted(glob.glob(os.path.join(runs, "*/"))) if runs and os.path.isdir(runs) else []
   RUN_NAMES.clear(); RUN_NAMES.update(os.path.basename(r.rstrip("/")) for r in run_dirs)
   for run in run_dirs:

@@ -67,6 +67,8 @@ Say what the campaign asks and what each variant is: `"description"` and `"varia
 
 To explain a difference between builds or JIT flags at the level of C2's inlining, run `perflab inlinetree <label>=<cell>... [--baseline <label>] [--event cycles] [--notes notes.json] [--strip <package>]` over an async campaign's cells. It writes `<campaign>/inlinetree-<event>.html`, linked from the campaign's card: each top compiled method, the callees it reaches marked per build as inlined, a real call or both, and cards for the largest differences. `--notes` takes `{method: Markdown}` to annotate rows with what you have found.
 
+When variants do different amounts of work per op, set `"perUnit"` to the benchmark's aux counter of that work (`"files"`): the summary and `perflab ab report` then compare per unit (cycles/file), not per op. The summary shows every counter the cells recorded; read it there rather than from `result.json`.
+
 Let perflab choose output directories (`--out` is optional; cells go under `[paths] campaigns`). Don't write scripts that assume a directory exists.
 
 ## 7. Don't route around perflab

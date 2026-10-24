@@ -1,7 +1,7 @@
 import json, os, re, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from perflab import ab, analyze, auditfold, compare, config, defcosts, index, inlinetree, jmh, jvmevents, regraph, serve, specs, timeline, trees  # noqa: E402
+from perflab import ab, analyze, auditfold, compare, config, defcosts, index, inlinetree, jmh, jvmevents, metrics, regraph, serve, specs, timeline, trees  # noqa: E402
 
 
 class Project:
@@ -354,6 +354,85 @@ class InlineTreeTest(unittest.TestCase):
         json.dump({"name": "c", "rounds": 1, "corpora": {"k": ""}, "variants": {"v": ""}}, open(os.path.join(camp, "c", "spec.json"), "w"))
         open(os.path.join(camp, "c", "inlinetree-cycles.html"), "w").close()
         self.assertIn('<a class="btn" href="c/inlinetree-cycles.html" data-lb="inlinetree|cycles"', open(index.build(camp)).read())
+
+
+class MetricsTest(unittest.TestCase):
+    # an xctrace mem-l1d cell, as XctraceProfiler and an aux counter report it: 6 iterations of one op, `files` summed
+    @staticmethod
+    def cell(files, cyc, ins, stall, jit):
+        s = lambda x, u="#": {"score": x, "scoreUnit": u}
+        m = {"files": s(files), "gc.alloc.rate.norm": s(5e9, "B/op"), "gc.time": s(700.0, "ms"),
+             "xctrace.CORE_ACTIVE_CYCLE": s(cyc, "#/op"), "xctrace.INST_ALL": s(ins, "#/op"), "xctrace.IPC.bench": s(ins / cyc, "insts/clk"),
+             "xctrace.L1D_CACHE_MISS_LD_NONSPEC": s(ins / 50, "#/op"), "xctrace.L1D_CACHE_MISS_LD_NONSPEC/kinst": s(20.0, "#/kinst"),
+             "xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS": s(cyc * stall / 100, "#/op"),
+             "xctrace.LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS/cycles": s(stall, "%"),
+             "xctrace.cycles%.bench": s(80.0 - jit, "%"), "xctrace.cycles%.jit": s(jit, "%"), "xctrace.cycles%.gc": s(10.0, "%"),
+             "xctrace.cycles%.other": s(10.0, "%"), "xctrace.IPC.jit": s(2.5, "insts/clk"), "xctrace.IPC.gc": s(1.5, "insts/clk"),
+             "xctrace.IPC.other": s(2.0, "insts/clk")}
+        return [{"mode": "avgt", "measurementIterations": 6, "measurementTime": "1 s", "jvmArgs": [], "secondaryMetrics": m,
+                 "primaryMetric": {"score": 4000.0, "scoreError": 1.0, "scoreUnit": "ms/op", "rawData": [[4000.0] * 6]}}]
+
+    def test_every_counter_per_op_and_per_unit(self):
+        r = self.cell(2922, 20e9, 66e9, 16.4, 7.5)[0]
+        per_op = {k: (label, x) for k, label, _, _, x in metrics.of(r)}
+        self.assertEqual(per_op["cycles"], ("cycles/op", 20e9))
+        self.assertEqual(per_op["ev:LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS/cycles"], ("LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS % of cycles", 16.4))
+        self.assertEqual(per_op["ev:L1D_CACHE_MISS_LD_NONSPEC/kinst"][1], 20.0)
+        self.assertEqual(per_op["cyc%:jit"], ("JIT % of cycles", 7.5))
+        self.assertAlmostEqual(per_op["cycles:all"][1], 20e9 / 0.725)
+        per_file = {k: (label, x) for k, label, _, _, x in metrics.of(r, "files")}
+        self.assertEqual(per_file["cycles"], ("cycles/file", 20e9 / 487))
+        self.assertEqual(per_file["score"], ("ms/file", 4000.0 / 487))
+        self.assertEqual(per_file["ipc"], per_op["ipc"])  # ratios stay
+
+    def test_ops_by_iteration_time(self):
+        r = self.cell(2922, 20e9, 66e9, 16.4, 7.5)[0]
+        self.assertEqual(metrics.ops({**r, "measurementTime": "1 min"}), 6 * 15)
+        with self.assertRaises(ValueError):
+            metrics.ops({**r, "measurementTime": "1 fortnight"})
+
+    def test_kperf_events_counting_cycles_are_a_share_of_cycles(self):
+        self.assertTrue(metrics.counts_cycles("LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS"))
+        self.assertFalse(metrics.counts_cycles("L1D_CACHE_MISS_LD_NONSPEC"))
+        if os.path.isdir(metrics.KPEP):  # by the description, where the name doesn't say
+            self.assertTrue(metrics.counts_cycles("LDST_UNIT_OLD_L1D_CACHE_MISS"))
+        r = self.cell(2922, 20e9, 66e9, 16.4, 7.5)[0]
+        hw = {"cycles": 2e9, "instructions": 6e9, "L1D_CACHE_MISS_LD_NONSPEC": 1.2e8, "LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS": 5e8}
+        r["secondaryMetrics"] = {"files": r["secondaryMetrics"]["files"]}
+        got = {k: x for k, _, _, _, x in metrics.of(r, hw=hw)}
+        self.assertEqual(got["ev:L1D_CACHE_MISS_LD_NONSPEC/kinst"], 20.0)
+        self.assertEqual(got["ev:LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS/cycles"], 25.0)
+        self.assertEqual(got["ipc"], 3.0)
+
+    def test_summary_and_report_per_unit_and_per_op(self):
+        Project('[build]\njmh = "x"\n')
+        camp = config.get().campaigns
+        for v, cell in (("shared", self.cell(2922, 20e9, 66e9, 16.4, 7.5)), ("independent", self.cell(4 * 2922, 80e9, 200e9, 27.5, 1.3))):
+            d = os.path.join(camp, "c", "k", v, "1")
+            os.makedirs(d)
+            json.dump(cell, open(os.path.join(d, "result.json"), "w"))
+        spec = os.path.join(camp, "c", "spec.json")
+        json.dump({"name": "c", "rounds": 1, "corpora": {"k": ""}, "variants": {"shared": "", "independent": ""}, "perUnit": "files", "benchmark": "B"},
+                  open(spec, "w"))
+        page = open(index.build(camp)).read()
+        self.assertIn('<button data-sn="unit" title="divided by the files counter per op" aria-pressed="false">per file</button>', page)
+        unit, op = re.findall(r'<div class="summ" data-norm="(\w+)">.*?<script type="application/json">(.*?)</script>', page)
+        self.assertEqual(unit[0], "unit")
+        data = json.loads(re.search(r'data-norm="unit">.*?<script type="application/json">(.*?)</script>', page).group(1))
+        self.assertIn({"k": "ev:LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS/cycles", "h": "LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS % of cycles"}, data["metrics"])
+        cycles = [m["k"] for m in data["metrics"]].index("cycles")
+        self.assertEqual(data["rows"][1]["m"][cycles][0], "41.1M")  # 80G / 1948: per file, the same cycles at 1.03x
+        self.assertAlmostEqual(data["rows"][1]["m"][cycles][3], 100 * (80e9 / 1948 / (20e9 / 487) - 1))
+        import contextlib, io
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            ab.report(ab.Spec(spec))
+        self.assertIn("| cycles/file | 41.1M | 41.1M (+0.0%) |", out.getvalue())
+        self.assertIn("| LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS % of cycles | 16.4% | 27.5% (+67.7%) |", out.getvalue())
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            ab.report(ab.Spec(spec), per_op=True)
+        self.assertIn("| cycles/op | 20G | 80G (+300.0%) |", out.getvalue())
 
 
 class CompareTest(unittest.TestCase):

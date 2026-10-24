@@ -46,7 +46,7 @@ java -javaagent:perflab-agent.jar=spec=envelope.audit,out=audit-{pid}.json ...
 | command | |
 |---|---|
 | `perflab run --profile <p> -- <jmh args>` | one run under a profile: `none`, `xctrace:<template>`, `async:<events>`, `audit:<spec>`; flame graphs or an audit report afterwards; serves the index first and shows the run there live |
-| `perflab ab run\|report <spec>` | campaigns: variants over corpora, interleaved by round or paired within forks, each run checked |
+| `perflab ab run\|report <spec>` | campaigns: variants over corpora, interleaved by round or paired within forks, each run checked; the summary shows every counter the cells recorded, per op or per unit of work |
 | `perflab trees <spec>` | campaigns across checkouts |
 | `perflab serve` | serve the results page (one server per checkout) on 127.0.0.1 and print its URL, the same every time; the page updates itself as results arrive and follows the running fork's timeline (`run` and `ab run` do this first) |
 | `perflab index`, `timeline` | rebuild the results page, or one run's or cell's timeline |
@@ -56,6 +56,8 @@ java -javaagent:perflab-agent.jar=spec=envelope.audit,out=audit-{pid}.json ...
 | `perflab auditfold` | merging and folding audit reports |
 | `perflab defcosts` | cost per definition from a compiler's `-Yprofile-defs` table: histograms, outliers, comparisons |
 | `perflab loadgate` | waiting for a quiet machine; sampling competing load |
+
+A campaign's summary (on its card in the index, and `perflab ab report`) shows what its cells recorded, without naming events: the score; the benchmark threads' cycles, instructions and IPC; allocation; every counter of the xctrace template or of an async kperf profile, per op and per 1,000 instructions or as % of cycles; the JIT, GC and other threads' share of cycles and IPC, and the cycles, instructions and IPC of all threads (in the pivot and chart). XctraceProfiler counts the benchmark threads only, so JIT and GC don't distort the per-op counts; their share shows beside them. When variants do different amounts of work per op (a benchmark that types the same files once per reader, say), name an `@AuxCounters` events counter of the benchmark in the spec, `"perUnit": "files"`: every count, allocation and the score are divided by its units per op (cycles/file), the card toggles between per file and per op, and `perflab ab report` is per file unless `--per-op`.
 
 ## In a build
 
