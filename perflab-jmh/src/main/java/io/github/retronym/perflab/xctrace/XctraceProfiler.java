@@ -64,6 +64,7 @@ public class XctraceProfiler implements InternalProfiler {
     private final String xctrace;
 
     private Process proc;
+    private boolean abandoned;  // an iteration failed: recording stopped, nothing to report
     private Path trace;
     private int seen;
     private long ops;
@@ -119,13 +120,26 @@ public class XctraceProfiler implements InternalProfiler {
     @Override
     public Collection<? extends Result> afterIteration(BenchmarkParams bp, IterationParams ip, IterationResult ir) {
         IterationLog.Entry last = IterationLog.last();
+        // no primary result when the benchmark threw: JMH reports that failure once the profilers return
+        boolean scored = !ir.getRawPrimaryResults().isEmpty();
+        long measuredOps = ir.getMetadata() == null ? 0 : ir.getMetadata().getMeasuredOps();
         iterationRows.add(String.join("\t", Integer.toString(iterationRows.size()), ip.getType() == IterationType.MEASUREMENT ? "measure" : "warmup",
                 last != null && IterationLog.paired() ? last.variant() : "", Long.toString(iterationStart), Long.toString(System.currentTimeMillis()),
-                String.format(Locale.ROOT, "%.4f", ir.getPrimaryResult().getScore()), Long.toString(ir.getMetadata().getMeasuredOps()),
+                scored ? String.format(Locale.ROOT, "%.4f", ir.getPrimaryResult().getScore()) : "NaN", Long.toString(measuredOps),
                 last != null && IterationLog.paired() ? Long.toString(last.gcMillis()) : ""));
-        if (ip.getType() != IterationType.MEASUREMENT || proc == null) return List.of();
-        ops += ir.getMetadata().getMeasuredOps();
-        if (IterationLog.paired() && last != null) opsByIteration.put(last.index(), ir.getMetadata().getMeasuredOps());
+        if (ip.getType() != IterationType.MEASUREMENT || proc == null || abandoned) return List.of();
+        if (!scored) {
+            // stop recording, so that xctrace lets go of this process and the fork can exit
+            abandoned = true;
+            try {
+                stop();
+            } catch (Exception e) {
+                System.err.println("[xctrace] stopping after a failed iteration: " + e);
+            }
+            return List.of();
+        }
+        ops += measuredOps;
+        if (IterationLog.paired() && last != null) opsByIteration.put(last.index(), measuredOps);
         if (++seen < ip.getCount()) return List.of();
         try {
             stop();
