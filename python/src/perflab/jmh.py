@@ -21,7 +21,7 @@ VM operation and JIT lanes from the JDK's events with async);
 afterwards flame graphs for async, a merged report for audits. The run is on the index (`perflab serve`, whose URL it prints first) as it goes: <out>/run.json holds
 its status.
 """
-import argparse, glob, json, os, shlex, shutil, subprocess, sys, threading, time
+import argparse, glob, json, os, shlex, shutil, signal, subprocess, sys, threading, time
 
 from . import config, launch, transcript
 
@@ -220,7 +220,23 @@ def run_build(cmd, log_path, every=None, tick=None, env=None, label=None):
     with open(log_path, "w") as log:
         log.write(f"$ {cmd}\n")
         proc = subprocess.Popen(cmd, shell=True, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True, errors="replace", bufsize=1, env={**os.environ, **env} if env else None)
+                                text=True, errors="replace", bufsize=1, env={**os.environ, **env} if env else None,
+                                start_new_session=True)  # its own process group, so stop() reaches what it starts
+
+        def stop():
+            """perflab is exiting early (SIGTERM, Ctrl-C, an error): the build and the JVMs it started go with it,
+            rather than running on, unwatched, with perflab waiting on them."""
+            if proc.poll() is not None:
+                return
+            for sig in (signal.SIGTERM, signal.SIGKILL):
+                try:
+                    os.killpg(proc.pid, sig)
+                    proc.wait(timeout=10)
+                    return
+                except ProcessLookupError:
+                    return
+                except subprocess.TimeoutExpired:
+                    pass
 
         def copy():
             for line in proc.stdout:
@@ -254,6 +270,7 @@ def run_build(cmd, log_path, every=None, tick=None, env=None, label=None):
                         tick()
                         next_tick = time.time() + every
         finally:
+            stop()
             done.set()
             for t in threads:
                 t.join(timeout=5)

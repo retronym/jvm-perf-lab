@@ -649,6 +649,22 @@ class TranscriptTest(unittest.TestCase):
         self.assertEqual(seen[0]["log"], os.path.relpath(os.path.join(out, "build.log"), os.path.dirname(state)))
         self.assertFalse(os.path.exists(state))  # gone when the build ends
 
+    def test_an_interrupted_build_stops_what_it_started(self):
+        out = os.path.join(self.p.dir, "run")
+        os.makedirs(out)
+        pids = os.path.join(out, "pids")
+
+        def interrupt():
+            raise SystemExit(143)  # as perflab's SIGTERM handler does
+        cmd = f"sleep 60 & echo $$ $! > {pids}; wait"
+        t0 = time.time()
+        with self.assertRaises(SystemExit):
+            jmh.run_build(cmd, os.path.join(out, "build.log"), every=1, tick=interrupt)
+        self.assertLess(time.time() - t0, 10)
+        for pid in map(int, open(pids).read().split()):  # the shell and its child, both gone
+            with self.assertRaises(ProcessLookupError):
+                os.kill(pid, 0)
+
     def test_follow_waits_for_a_line_to_end(self):
         import threading
         log = os.path.join(self.p.dir, "jmh.log")
