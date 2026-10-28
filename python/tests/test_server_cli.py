@@ -43,8 +43,98 @@ class AdoptTest(unittest.TestCase):
         j = self.adopted("cells", "4", "0.3", "3")
         self.assertEqual((j["state"], j["rc"]), ("failed", 3))
         self.assertEqual(json.load(open(os.path.join(j["dir"], "exit.json")))["rc"], 3)
+        self.assertTrue(os.path.exists(os.path.join(j["dir"], "lock")))  # its wrapper held it, and let go
+        self.assertFalse(server.job_alive(j))
         j = self.adopted("cells", "4", "0.3")
         self.assertEqual((j["state"], j["rc"]), ("done", 0))
+
+    def running_job(self, *argv, **kw):
+        """A job in the queue as running, as a server that stopped under it left it."""
+        q = server.Queue(os.path.join(self.home, "jobs.sqlite"))
+        p = q.register(self.root)
+        j = q.submit(p["id"], list(argv), self.root, self.env, module="perflab_fakejob", jobs_dir=os.path.join(self.home, "jobs"))
+        q.claim()
+        return q, q.update(j["id"], **kw) if kw else q.get(j["id"])
+
+    def legacy(self, *argv):
+        """A job started by the wrapper from before the lock (as the live server's job was), with no recorded start time."""
+        q, j = self.running_job(*argv)
+        env = {**os.environ, **self.env, control.ENV: os.path.join(j["dir"], "control"), server.JOB_ENV: str(j["id"])}
+        proc = subprocess.Popen([sys.executable, "-c", LEGACY_WRAPPER, os.path.join(j["dir"], "exit.json"), sys.executable,
+                                 "-m", "perflab_fakejob", "--transcript", j["transcript"], *argv], cwd=self.root, env=env,
+                                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, start_new_session=True)
+        self.addCleanup(proc.wait)
+        j = q.update(j["id"], pid=proc.pid)
+        wait_for(lambda: "cell 0" in server._tail(j["transcript"]), what="the legacy job to start")
+        return j
+
+    def ended(self, s, jid, timeout=20):
+        return wait_for(lambda: (lambda x: x if x["state"] in server.FINAL else None)(s.q.get(jid)), timeout, "the job to end")
+
+    def test_a_legacy_job_without_a_lock_is_adopted_by_its_pid(self):
+        j = self.legacy("cells", "4", "0.3", "3")
+        self.assertFalse(os.path.exists(os.path.join(j["dir"], "lock")))
+        self.assertTrue(server.job_alive(j))
+        s = self.start()
+        j = self.ended(s, j["id"])
+        self.assertEqual((j["state"], j["rc"]), ("failed", 3))
+        j = self.legacy("cells", "4", "0.3")
+        self.assertEqual((self.ended(s, j["id"])["state"]), "done")
+
+    def test_a_legacy_job_cancels_by_its_pid(self):
+        j = self.legacy("stubborn", "1", "60")
+        s = self.start()
+        wait_for(lambda: s.q.get(j["id"])["state"] == "running", what="adoption")
+        t = time.time()
+        server.cancel(s.q, j["id"])
+        self.assertEqual(self.ended(s, j["id"])["state"], "cancelled")
+        self.assertLess(time.time() - t, 15)  # SIGTERM after the 1 s grace, not the 60 s sleep
+
+    def test_a_pid_that_is_no_longer_the_jobs_is_never_signalled(self):
+        """The recorded pid is now someone else's process group: with the job's lock free, or (no lock) a start time
+        that does not match, the job is gone and the group is left alone, though a cancel asked for SIGTERM."""
+        for kw in ({"lock": True}, {"pid_start": "Thu Jan  1 00:00:00 1970"}):
+            other = subprocess.Popen(["sleep", "60"], start_new_session=True)
+            self.addCleanup(other.kill)
+            q, j = self.running_job("cells", "1", "0", pid=other.pid, cancel_requested=time.time() - 100,
+                                    pid_start=kw.get("pid_start"))
+            if kw.get("lock"):
+                open(os.path.join(j["dir"], "lock"), "w").close()
+            self.assertFalse(server.job_alive(j))
+            s = self.start()
+            self.assertEqual(self.ended(s, j["id"])["state"], "cancelled")
+            time.sleep(0.5)
+            self.assertIsNone(other.poll(), kw)  # not signalled
+            s.stop()
+            self.servers.remove(s)
+
+    def test_a_new_jobs_start_time_is_recorded(self):
+        s = self.start()
+        j = server.submit_local(s, {"argv": ["cells", "20", "0.1"], "cwd": self.root, "env": self.env}, module="perflab_fakejob")
+        j = wait_for(lambda: (lambda x: x if x["pid_start"] else None)(s.q.get(j["id"])), what="the start time")
+        self.assertEqual(j["pid_start"], server._started(j["pid"]))
+        wait_for(lambda: os.path.exists(os.path.join(j["dir"], "lock")), what="the lock")
+        self.assertTrue(server.job_alive(j))
+        server.cancel(s.q, j["id"])
+        self.ended(s, j["id"])
+
+
+# the job wrapper before <job dir>/lock (a job it started may still be running when a newer server adopts it)
+LEGACY_WRAPPER = r"""
+import json, os, signal, subprocess, sys, time
+for s in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+    signal.signal(s, lambda *_: None)
+out, cmd = sys.argv[1], sys.argv[2:]
+try:
+    rc = subprocess.Popen(cmd).wait()
+except OSError as e:
+    print(f"could not start {cmd[0]}: {e}", flush=True)
+    rc = 127
+with open(out + ".tmp", "w") as f:
+    json.dump({"rc": rc, "ended": time.time()}, f)
+os.replace(out + ".tmp", out)
+sys.exit(rc if rc >= 0 else 128 - rc)
+"""
 
 
 class SubmitsItselfTest(unittest.TestCase):

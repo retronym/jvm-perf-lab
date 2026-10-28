@@ -13,8 +13,14 @@ time, and serves a UI (the queue, storage admin) and every registered project's 
 A job is a perflab command line, `{argv, cwd, env}`: the server runs `python -m perflab --transcript
 <job dir>/transcript.txt <argv>` in `cwd`, in its own session and process group, with the submitting shell's toolchain
 variables (ENV_KEEP) and PERFLAB_CONTROL=<job dir>/control (perflab.control: pause and cancel at a cell boundary) and
-PERFLAB_JOB=<id>, under a small wrapper that writes its exit status to <job dir>/exit.json (read by a server that
-adopts the job after a restart). Cancel writes `cancel` there, and after a grace period sends SIGTERM to the job's process group.
+PERFLAB_JOB=<id>, under a small wrapper that holds an flock on <job dir>/lock while it lives and writes its exit status
+to <job dir>/exit.json (read by a server that adopts the job after a restart). Cancel writes `cancel` there, and after
+a grace period sends SIGTERM to the job's process group.
+
+A job's identity is its lock, not its pid: a server that can take the lock knows the job is gone (and that the pid may
+now be someone else's), and signals the job's process group only while the lock is held. A job whose wrapper took no
+lock (one started before the lock existed) is identified by its pid and, when it was recorded at spawn, the pid's start
+time.
 
 State is in ~/.perflab/server (PERFLAB_SERVER_HOME): jobs.sqlite, token (POSTs carry it as X-Perflab-Token), server.json
 (pid, port), jobs/<id>/. The port is 8690 unless --port or PERFLAB_SERVER_PORT says otherwise.
@@ -35,7 +41,7 @@ HTTP (JSON unless noted):
   GET  /, /admin                         the queue page, the storage page
   GET  /p/<project>/...                  the project's campaigns and runs (its index), as `perflab serve` serves them
 """
-import argparse, hashlib, json, os, re, secrets, signal, socket, sqlite3, subprocess, sys, threading, time, traceback
+import argparse, fcntl, hashlib, json, os, re, secrets, signal, socket, sqlite3, subprocess, sys, threading, time, traceback
 import http.server, urllib.error, urllib.parse, urllib.request
 
 from . import config, control, httpd, storage, transcript
@@ -69,15 +75,53 @@ def _alive(pid):
         return False
 
 
-def _exited(pid):
-    """Whether an adopted job's process has exited: reaped if it is this process's own child (a server restarted in
-    this process), else gone."""
+def _reap(pid):
+    """Reaps `pid` if it has exited and is this process's own child (a server restarted in this process); whether it was."""
     try:
-        if os.waitpid(int(pid), os.WNOHANG)[0]:
-            return True
+        return bool(os.waitpid(int(pid), os.WNOHANG)[0])
     except (ChildProcessError, ValueError, TypeError):
-        pass
-    return not _alive(pid)
+        return False
+
+
+def _started(pid):
+    """When `pid` started, as `ps` says (to the second), or None; with the pid, it tells a process from a later one
+    that reuses its pid."""
+    try:
+        r = subprocess.run(["ps", "-o", "lstart=", "-p", str(int(pid))], capture_output=True, text=True, timeout=10,
+                           env={**os.environ, "LC_ALL": "C"})
+    except (OSError, ValueError, TypeError, subprocess.TimeoutExpired):
+        return None
+    return r.stdout.strip() or None
+
+
+def _lock_held(path):
+    """Whether some process holds an flock on `path`; None if there is no such file."""
+    try:
+        fd = os.open(path, os.O_RDONLY)
+    except FileNotFoundError:
+        return None
+    except OSError:
+        return True  # unreadable: assume the job is there rather than give it up
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return False
+    except OSError:  # BlockingIOError: held
+        return True
+    finally:
+        os.close(fd)  # and with it our lock, if we took it
+
+
+def job_alive(job):
+    """Whether the job's wrapper is still running: its lock is held; or, for a job whose wrapper took no lock (started
+    before there was one, or not yet taken), its pid is alive and started when the server recorded at spawn."""
+    if job.get("dir"):
+        held = _lock_held(os.path.join(job["dir"], LOCK_NAME))
+        if held is not None:
+            return held
+    pid = job.get("pid")
+    if _reap(pid) or not _alive(pid):
+        return False
+    return job.get("pid_start") is None or _started(pid) == job["pid_start"]
 
 
 def _listening(port):
@@ -103,9 +147,12 @@ class Queue:
             db.executescript("""
               CREATE TABLE IF NOT EXISTS jobs(id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, argv TEXT, cwd TEXT,
                 env TEXT, python TEXT, module TEXT, state TEXT, priority INTEGER DEFAULT 0, seq REAL, created REAL,
-                started REAL, ended REAL, rc INTEGER, pid INTEGER, cancel_requested REAL, dir TEXT, transcript TEXT, note TEXT);
+                started REAL, ended REAL, rc INTEGER, pid INTEGER, cancel_requested REAL, dir TEXT, transcript TEXT, note TEXT,
+                pid_start TEXT);
               CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY, root TEXT UNIQUE, name TEXT, campaigns TEXT, runs TEXT,
                 registered REAL);""")
+            if "pid_start" not in {r[1] for r in db.execute("PRAGMA table_info(jobs)")}:  # a queue from before it
+                db.execute("ALTER TABLE jobs ADD COLUMN pid_start TEXT")
 
     def _db(self):
         db = sqlite3.connect(self.path, timeout=30)
@@ -323,7 +370,7 @@ class Worker(threading.Thread):
 
     def command(self, job):
         """The job's perflab command line, under WRAPPER, which records how it ended in <job dir>/exit.json."""
-        return [sys.executable, "-c", WRAPPER, os.path.join(job["dir"], EXIT_NAME),
+        return [sys.executable, "-c", WRAPPER, os.path.join(job["dir"], EXIT_NAME), os.path.join(job["dir"], LOCK_NAME),
                 job["python"] or sys.executable, "-m", job["module"] or "perflab", "--transcript", job["transcript"], *job["argv"]]
 
     def environment(self, job):
@@ -336,7 +383,7 @@ class Worker(threading.Thread):
 
     def spawn(self, job):
         os.makedirs(job["dir"], exist_ok=True)
-        for f in ("control", "control.ack", EXIT_NAME):
+        for f in ("control", "control.ack", EXIT_NAME, LOCK_NAME):
             control.write(os.path.join(job["dir"], f), None)
         with open(os.path.join(job["dir"], "output.log"), "ab") as out:
             return subprocess.Popen(self.command(job), cwd=job["cwd"], env=self.environment(job), stdin=subprocess.DEVNULL,
@@ -350,14 +397,21 @@ class Worker(threading.Thread):
             except OSError as e:
                 self.q.transition(jid, "failed", note=f"could not start: {e}")
                 return
-            self.q.update(jid, pid=proc.pid)
-            pid = proc.pid
-        else:
-            pid = job["pid"]
-        ctl = os.path.join(job["dir"], "control")
+            job = self.q.update(jid, pid=proc.pid, pid_start=_started(proc.pid))
+        pid = job["pid"]
+        ctl, exit_file = os.path.join(job["dir"], "control"), os.path.join(job["dir"], EXIT_NAME)
         term_at = None
         while True:
-            rc = proc.poll() if proc else ("gone" if _exited(pid) else None)
+            ended = _read_json(exit_file)
+            if proc:
+                rc = proc.poll()
+                if rc is None and ended:  # the wrapper has written its record and is exiting
+                    try:
+                        rc = proc.wait(5)
+                    except subprocess.TimeoutExpired:
+                        rc = "recorded"
+            else:
+                rc = "recorded" if ended else "gone" if not job_alive(job) else None
             if rc is not None:
                 break
             if self.stopping.is_set():  # the server is stopping: the job runs on, and the next server adopts it
@@ -368,27 +422,36 @@ class Worker(threading.Thread):
                 self.q.transition(jid, want)
             now = time.time()
             if j["cancel_requested"] and term_at is None and now - j["cancel_requested"] >= self.grace:
-                self._signal(pid, signal.SIGTERM)
+                self._signal_job(job, signal.SIGTERM)
                 term_at = now
             elif term_at and now - term_at >= self.kill_after:
-                self._signal(pid, signal.SIGKILL)
+                self._signal_job(job, signal.SIGKILL)
                 term_at = float("inf")
             self.wake.wait(0.5)
             self.wake.clear()
-        ended = _read_json(os.path.join(job["dir"], EXIT_NAME))
+        ended = _read_json(exit_file)
         if ended and isinstance(ended.get("rc"), int):  # the wrapper's record: all an adopted job leaves of its status
             rc = ended["rc"]
-        if rc == "gone":  # adopted, and its wrapper died without a record (SIGKILL)
+        if not isinstance(rc, int):  # adopted, and its wrapper died without a record (SIGKILL), or is not ours
             rc = None
             failed = "[perflab] failed:" in _tail(job["transcript"], 20)
         else:
             failed = rc != 0
-        self._signal(pid, signal.SIGTERM)  # anything it left behind in its group
+        if os.path.exists(os.path.join(job["dir"], LOCK_NAME)) or job["pid_start"]:
+            self._signal_job(job, signal.SIGTERM)  # the wrapper signals its group itself; this only while it lingers
+        else:  # a wrapper from before the lock does not: anything the job left behind in its group, as it always was
+            self._signal(pid, signal.SIGTERM)
         j = self.q.get(jid)
         state = "cancelled" if j["cancel_requested"] else "failed" if failed else "done"
         self.q.transition(jid, state, rc=rc)
         for f in ("control", "control.ack"):
             control.write(os.path.join(job["dir"], f), None)
+
+    @staticmethod
+    def _signal_job(job, sig):
+        """Signals the job's process group if the job is still there (job_alive): never a group that reuses its pid."""
+        if job_alive(job):
+            Worker._signal(job["pid"], sig)
 
     @staticmethod
     def _signal(pgid, sig):
@@ -398,20 +461,33 @@ class Worker(threading.Thread):
             pass
 
 
-EXIT_NAME = "exit.json"
-# The job's process group leader: it runs the job, outlives a SIGTERM to the group (the job's to act on) and writes how
-# the job ended to exit.json, so that a server adopting the job (restarted while it ran) knows its status. Inline, so
-# that it needs nothing but the server's Python. rc is Popen's: -N for a signal.
+EXIT_NAME, LOCK_NAME = "exit.json", "lock"
+# The job's process group leader: it holds an flock on <job dir>/lock for as long as it lives (the job's identity:
+# taken on lock.tmp and renamed, so that the lock file is there only once held), runs the job, outlives a SIGTERM to
+# the group (the job's to act on), sends SIGTERM to anything the job left in its group, and writes how the job ended
+# to exit.json, so that a server adopting the job (restarted while it ran) knows its status. Inline, so that it needs
+# nothing but the server's Python. The job does not inherit the lock's descriptor. rc is Popen's: -N for a signal.
 WRAPPER = r"""
-import json, os, signal, subprocess, sys, time
+import fcntl, json, os, signal, subprocess, sys, time
 for s in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
     signal.signal(s, lambda *_: None)
-out, cmd = sys.argv[1], sys.argv[2:]
+out, lock, cmd = sys.argv[1], sys.argv[2], sys.argv[3:]
+try:
+    fd = os.open(lock + ".tmp", os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    os.write(fd, str(os.getpid()).encode())
+    os.replace(lock + ".tmp", lock)
+except OSError:
+    pass  # no lock: the server falls back to the pid and its start time
 try:
     rc = subprocess.Popen(cmd).wait()
 except OSError as e:
     print(f"could not start {cmd[0]}: {e}", flush=True)
     rc = 127
+try:
+    os.killpg(0, signal.SIGTERM)  # anything the job left behind in its group (this process ignores it)
+except OSError:
+    pass
 with open(out + ".tmp", "w") as f:
     json.dump({"rc": rc, "ended": time.time()}, f)
 os.replace(out + ".tmp", out)
@@ -664,7 +740,8 @@ def _reindex(project):
                      env={**os.environ, "PYTHONPATH": os.pathsep.join(filter(None, [PKG, os.environ.get("PYTHONPATH")]))})
 
 
-def submit_local(server, body):
+def submit_local(server, body, python=None, module=None):
+    python, module = python or body.get("python"), module or body.get("module")
     cwd = os.path.abspath(body.get("cwd") or "")
     if not os.path.isdir(cwd):
         raise ValueError(f"no such directory: {cwd}")
@@ -673,8 +750,8 @@ def submit_local(server, body):
     env = body.get("env") or {}
     if not isinstance(env, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in env.items()):
         raise ValueError("env must map names to strings")
-    j = server.q.submit(project["id"], body.get("argv"), cwd, env, body.get("priority") or 0, body.get("python"),
-                        body.get("module") or "perflab", os.path.join(server.home, "jobs"))
+    j = server.q.submit(project["id"], body.get("argv"), cwd, env, body.get("priority") or 0, python,
+                        module or "perflab", os.path.join(server.home, "jobs"))
     server.worker.wake.set()
     j["position"] = next((i + 1 for i, q in enumerate(server.q.queued()) if q["id"] == j["id"]), None)
     j["index"] = project["index"]
