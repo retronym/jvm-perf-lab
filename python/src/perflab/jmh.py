@@ -200,11 +200,23 @@ def brief(cmd):
     return shlex.join(words) if len(words) > 1 else cmd
 
 
-def run_build(cmd, log_path, every=None, tick=None, env=None):
+BUILD_STATE = "build.json"  # in <campaigns> while a build step runs, for the index's build panel
+
+
+def run_build(cmd, log_path, every=None, tick=None, env=None, label=None):
     """Runs the build, logging to `log_path` and, line by line as it comes, to the transcript, followed by JMH's log
-    beside it; calls `tick` every `every` seconds while it runs. `env`: variables set for it."""
+    beside it; calls `tick` every `every` seconds while it runs. `env`: variables set for it. With a `label`, the index
+    shows it as a build in progress (<campaigns>/build.json: the label, the command and the log's last lines)."""
+    from . import loadgate
     root = config.get().root
     transcript.say(f"[perflab] command: {brief(cmd)}\n[perflab] its log: {log_path}")
+    state = label and {"pid": os.getpid(), "label": label, "cmd": brief(cmd), "log": os.path.relpath(os.path.abspath(log_path), os.path.dirname(loadgate.state_path(BUILD_STATE))),
+                       "started": time.time(), "updated": time.time(), "lines": 0, "tail": []}
+
+    def show():
+        state["updated"] = time.time()
+        loadgate.publish(state, BUILD_STATE)
+
     with open(log_path, "w") as log:
         log.write(f"$ {cmd}\n")
         proc = subprocess.Popen(cmd, shell=True, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -215,23 +227,39 @@ def run_build(cmd, log_path, every=None, tick=None, env=None):
                 log.write(line)
                 log.flush()
                 transcript.build_line(line)
+                if state:
+                    state["lines"] += 1
+                    state["tail"] = (state["tail"] + [transcript.ANSI.sub("", line).rstrip()])[-15:]
+                    if time.time() - state["updated"] > 1:
+                        show()
 
         done = threading.Event()
         threads = [threading.Thread(target=copy, daemon=True),
                    threading.Thread(target=transcript.follow, args=(os.path.join(os.path.dirname(log_path), "jmh.log"), done), daemon=True)]
         for t in threads:
             t.start()
+        # a build can be silent for minutes (a large compile): a heartbeat tells the index it is still running
+        beat = 5 if state else None
+        next_tick = time.time() + every if every else None
         try:
+            if state:
+                show()
             while True:
                 try:
-                    return proc.wait(timeout=every)
+                    return proc.wait(timeout=min(x for x in (beat, every) if x) if beat or every else None)
                 except subprocess.TimeoutExpired:
-                    tick()
+                    if state:
+                        show()
+                    if next_tick and time.time() >= next_tick:
+                        tick()
+                        next_tick = time.time() + every
         finally:
             done.set()
             for t in threads:
                 t.join(timeout=5)
             proc.stdout.close()
+            if state:
+                loadgate.publish(None, BUILD_STATE)
 
 
 def mark(out, status, **kw):
@@ -258,7 +286,7 @@ def mark(out, status, **kw):
 def refresh_index():
     from . import index
     try:
-        index.build(config.get().campaigns)
+        index.rebuild(config.get().campaigns)
     except Exception as e:  # the index is a convenience; never let it stop a run
         print(f"[perflab] index not rebuilt: {e}", flush=True)
 

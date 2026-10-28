@@ -9,7 +9,7 @@ each cell, `perflab run` at its start and end, and the page refreshes itself.
 """
 import glob, html, json, math, os, re, sys, time
 
-from . import ab, config, loadgate, metrics, regraph, runinfo, specs, timeline, ui
+from . import ab, config, jmh, loadgate, metrics, regraph, runinfo, specs, timeline, ui
 
 root = None  # the directory of the page being built: its links are relative to it
 CAMPAIGNS = None
@@ -596,6 +596,8 @@ table.t tr.has-sub td{border-bottom:0} table.t tr.sub td{padding-top:0} .cellg{d
 .hidden{display:none!important} section.card{scroll-margin-top:100px} #counters-card .k{margin:0 0 4px}
 #tl .card-h{gap:6px 12px} #tl select{font:inherit;max-width:100%;padding:2px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
 #tl label{white-space:nowrap} #tl .help{margin-left:auto} #tl[hidden]{display:none}
+#bd[hidden]{display:none} #bd .card-h{gap:6px 12px} #bd .help{margin-left:auto} #bd-cmd{margin:2px 0 6px;word-break:break-all}
+#bd pre{margin:0;max-height:16em;overflow:auto;font-size:12px;line-height:1.4;background:var(--line2);padding:6px 8px;border-radius:4px;white-space:pre-wrap;word-break:break-all}
 #lg[hidden]{display:none} #lg .card-h{gap:6px 12px} #lg .help{margin-left:auto} #lg-top{margin:2px 0 6px}
 #lg svg{display:block;width:100%;height:90px;overflow:visible} #lg .area{fill:var(--warn-bg)} #lg .ln{fill:none;stroke:var(--warn);stroke-width:1.5}
 #lg .lim{stroke:var(--bad);stroke-dasharray:4 3} #lg .q{fill:var(--ok-bg)} #lg text{fill:var(--muted);font-size:11px}
@@ -914,6 +916,9 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
           + f'<a href="#runs" data-sec="runs">Runs<span class="n" id="n-runs">{len(run_sections)}</span></a>')
   running_json = os.path.relpath(os.path.join(campaigns, ab.RUNNING_NAME), root)
   loadgate_json = os.path.relpath(os.path.join(campaigns, loadgate.STATE_NAME), root)
+  build_json = os.path.relpath(os.path.join(campaigns, jmh.BUILD_STATE), root)
+  bd_help = ui.help_popover("A run or campaign in launch mode builds once (per build of a campaign with <code>builds</code>) before its "
+                            "first cell: the build's command, how long it has run and the last lines of its log, as it writes them.", right=True)
   lg_help = ui.help_popover("A campaign with a <code>loadgate</code> waits before each cell until the load of other processes stays under "
                             "its limit for its quiet period. Other load in cores, sampled every 5 s; the dashed line is the limit, the green "
                             "band the quiet time so far.", right=True)
@@ -921,7 +926,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
                   f'<section class="card" id="counters-card"><p class="k">Misses per 1,000 instructions; top-down shares of issue slots when a run used the '
                   f'CPU Counters template. Each run name links to its card.</p>{counters_html}</section>') if counters_html else ""
 
-  page = f"""{ui.HEAD}<title>{esc(title)} · {ui.NAME}</title>
+  page = f"""{ui.HEAD}<meta name="perflab-code" content="{code_version()}"><title>{esc(title)} · {ui.NAME}</title>
   {ui.style(ui.BASE, ui.LIGHTBOX_CSS, CSS, INTRO_CSS, timeline.CSS)}
   {ui.masthead(title)}
   <div class="nav"><div class="tabsrow"><div class="in"><nav class="tabs">{tabs}</nav>{help_html}</div></div>
@@ -935,6 +940,8 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   <label class="k"><input type="checkbox" id="tl-follow" checked> follow the running fork</label><span id="tl-status"></span>{tl_help}</div>
   <div class="tl-legend" id="tl-legend"></div><svg class="timeline" id="tl-chart"></svg></section>
   <div class="tl-tip" id="tl-tip"></div>
+  <section class="card" id="bd" hidden><div class="card-h"><h2>Building <span id="bd-label"></span></h2><span id="bd-status"></span>{bd_help}</div>
+  <p class="k" id="bd-cmd"></p><pre id="bd-tail"></pre></section>
   <section class="card" id="lg" hidden><div class="card-h"><h2>Waiting for a quiet machine</h2><span id="lg-status"></span>{lg_help}</div>
   <p class="k" id="lg-top"></p><div class="bar" id="lg-bar"><i></i></div><svg id="lg-chart"></svg></section>
   <div id="live">
@@ -948,7 +955,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   <script>{timeline.script()}</script>{ui.lightbox_script()}
   <script>{SUMMARY_JS}</script>
   <script>
-  const RUNNING = {json.dumps(running_json)}, LOADGATE = {json.dumps(loadgate_json)};
+  const RUNNING = {json.dumps(running_json)}, LOADGATE = {json.dumps(loadgate_json)}, BUILD = {json.dumps(build_json)};
   const chips = [...document.querySelectorAll('.filterbar .chip')];
   chips.forEach(c => c.onclick = () => {{ c.classList.toggle('on'); apply(); }});
   document.getElementById('q').oninput = apply;
@@ -1020,8 +1027,25 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       + `<text x="${{pad}}" y="${{H - 2}}">${{esc(new Date(t0 * 1000).toLocaleTimeString([], {{hour: '2-digit', minute: '2-digit'}}))}}</text>`
       + `<text x="${{W - pad}}" y="${{H - 2}}" text-anchor="end">now</text>`;
   }}
+  // build.json, written while a launch-mode build step runs; its heartbeat (every 5 s) tells a killed build from a quiet one
+  const bd = document.getElementById('bd');
+  async function building() {{
+    let b = null;
+    try {{ const r = await fetch(BUILD, {{cache: 'no-store'}}); b = r.ok ? await r.json() : null; }} catch (e) {{}}
+    bd.hidden = !b || Date.now() / 1000 - b.updated > 30;
+    if (bd.hidden) return;
+    const esc = s => String(s).replace(/[&<>]/g, c => ({{'&': '&amp;', '<': '&lt;', '>': '&gt;'}})[c]), s = b.updated - b.started;
+    const log = BUILD.replace(/[^/]*$/, '') + b.log;
+    document.getElementById('bd-label').textContent = b.label;
+    document.getElementById('bd-status').innerHTML = `<span class="badge running">${{s >= 60 ? `${{Math.floor(s / 60)}} min ${{Math.round(s % 60)}} s` : `${{Math.round(s)}} s`}}</span>`
+      + ` <span class="k">${{b.lines}} lines · <a href="${{esc(log)}}">full log</a></span>`;
+    document.getElementById('bd-cmd').innerHTML = `<code>${{esc(b.cmd)}}</code>`;
+    const pre = document.getElementById('bd-tail'), end = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
+    pre.textContent = b.tail.join('\n');
+    if (end) pre.scrollTop = pre.scrollHeight;
+  }}
   async function tick() {{
-    gate();
+    gate(); building();
     try {{ const r = await fetch(RUNNING, {{cache: 'no-store'}}); running = r.ok ? await r.json() : null; }} catch (e) {{ running = null; }}
     panel.hidden = !running && !picked;
     if (panel.hidden) return;
@@ -1043,6 +1067,9 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       const r = await fetch(location.pathname.endsWith('/') ? 'index.html' : location.pathname, {{cache: 'no-store'}});
       if (!r.ok) return;
       const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+      // re-rendered by a newer perflab: its scripts and styles may have changed too
+      const code = d => (d.querySelector('meta[name=perflab-code]') || {{}}).content;
+      if (code(doc) && code(doc) !== code(document)) {{ location.reload(); return; }}
       // keep what the reader opened
       const open = new Map([...document.querySelectorAll('#live details[id]')].map(d => [d.id, d.open]));
       document.getElementById('live').innerHTML = doc.getElementById('live').innerHTML;
@@ -1061,6 +1088,28 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   with open(out, "w") as f:
       f.write(page)
   return out
+
+
+def code_version():
+    """A hash of perflab's own code (what renders this page): an open page reloads itself when it changes."""
+    import hashlib
+    h, here = hashlib.sha1(), os.path.dirname(os.path.abspath(__file__))
+    for dp, _, fs in sorted(os.walk(here)):
+        for f in sorted(fs):
+            if f.endswith((".py", ".js", ".css")):
+                with open(os.path.join(dp, f), "rb") as fh:
+                    h.update(fh.read())
+    return h.hexdigest()[:12]
+
+
+def rebuild(campaigns):
+    """build(campaigns) in a new process, so a long campaign renders the index with perflab's code as it is now, not as
+    it was when the campaign started: the UI can change while one runs. In this process if that fails."""
+    import subprocess, sys
+    r = subprocess.run([sys.executable, "-m", "perflab", "index", campaigns], cwd=config.get().root,
+                       capture_output=True, text=True)
+    if r.returncode:
+        build(campaigns)
 
 
 def main(argv):

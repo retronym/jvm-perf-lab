@@ -626,6 +626,18 @@ class TranscriptTest(unittest.TestCase):
         with open(os.path.join(out, "build.log")) as f:
             self.assertEqual(f.read(), f"$ {cmd}\n\x1b[0Jcompiling\ndone\n")  # the command atop its log
 
+    def test_a_labelled_build_is_shown_on_the_index_while_it_runs(self):
+        out = os.path.join(self.p.dir, "run")
+        os.makedirs(out)
+        seen = []
+        state = loadgate.state_path(jmh.BUILD_STATE)
+        tick = lambda: seen.append(json.load(open(state)) if os.path.exists(state) else None)
+        self.assertEqual(jmh.run_build("echo compiling; sleep 1.5", os.path.join(out, "build.log"), every=1, tick=tick, label="base"), 0)
+        self.assertEqual(seen[0]["label"], "base")
+        self.assertEqual(seen[0]["tail"], ["compiling"])
+        self.assertEqual(seen[0]["log"], os.path.relpath(os.path.join(out, "build.log"), os.path.dirname(state)))
+        self.assertFalse(os.path.exists(state))  # gone when the build ends
+
     def test_follow_waits_for_a_line_to_end(self):
         import threading
         log = os.path.join(self.p.dir, "jmh.log")

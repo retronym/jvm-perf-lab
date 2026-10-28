@@ -77,7 +77,7 @@ def main(argv):
             gather(spec, trees, out)
             json.dump(combined, open(path, "w"), indent=2)  # a tree that is this checkout writes its own spec.json over it
             try:
-                index.build(config.get().campaigns)
+                index.rebuild(config.get().campaigns)
             except Exception as e:
                 print(f"perflab trees: index not rebuilt: {e}", flush=True)
     from . import ab

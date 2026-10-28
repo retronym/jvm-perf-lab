@@ -145,7 +145,7 @@ def set_running(spec, dest):
         os.unlink(running)
     from . import index
     try:
-        index.build(config.get().campaigns)
+        index.rebuild(config.get().campaigns)
     except Exception as e:  # the index is a convenience; never let it stop a campaign
         log(f"  index not rebuilt: {e}")
 
@@ -253,12 +253,13 @@ def run(spec, dry):
         for v in dict.fromkeys(c[3] for c in todo):
             b = spec.builds.get(v)
             if b is None:
-                built[v] = built.get(None) or launch.build(os.path.join(spec.out, launch.BUILD_DIR))
+                built[v] = built.get(None) or launch.build(os.path.join(spec.out, launch.BUILD_DIR), label=spec.name)
                 built[None] = built[v]
             else:
                 env = {k: str(x).replace("{checkout}", b["checkout"] or "") for k, x in (b.get("env") or {}).items()}
                 log(f"build of {v}: {b['checkout'] or ''}")
-                built[v] = launch.build(os.path.join(spec.out, launch.BUILD_DIR, v), env)
+                built[v] = launch.build(os.path.join(spec.out, launch.BUILD_DIR, v), env,
+                                        label=f"{spec.name}: {v} ({b['checkout'] or ''})")
     for r, corpus, iters, variant, flags in todo:
         dest = spec.cell_dir(corpus, variant, r)
         cmd = spec.command(corpus, iters, variant, flags, dest, built.get(variant))

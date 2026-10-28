@@ -69,14 +69,14 @@ STATE_NAME = "loadgate.json"
 LIVE_ENV = "PERFLAB_LIVE_DIR"
 
 
-def state_path():
+def state_path(name=STATE_NAME):
     from . import config
-    return os.path.join(os.environ.get(LIVE_ENV) or config.get().campaigns, STATE_NAME)
+    return os.path.join(os.environ.get(LIVE_ENV) or config.get().campaigns, name)
 
 
-def publish(state):
-    """<campaigns>/loadgate.json while a wait lasts (the index draws it), removed when it ends."""
-    path = state_path()
+def publish(state, name=STATE_NAME):
+    """<campaigns>/<name> (loadgate.json while a wait lasts) for the index to draw; removed when `state` is None."""
+    path = state_path(name)
     try:
         if state is None:
             os.unlink(path)

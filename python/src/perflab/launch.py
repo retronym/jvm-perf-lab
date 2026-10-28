@@ -81,8 +81,9 @@ def snapshot(built, dir):
     return {**built, "classpath": cp, "javaOptions": opts, "snapshot": snap, "external": external, "built": built}
 
 
-def build(dir, env=None):
+def build(dir, env=None, label=None):
     """Runs [build] launch into `dir`, with the variables `env` set, and snapshots it there; the snapshot's launch.json.
+    `label` names the build on the index while it runs.
     An existing snapshot in `dir` is reused (a campaign that resumes measures the build it started with)."""
     from . import jmh
     path = os.path.join(dir, LAUNCH)
@@ -97,7 +98,8 @@ def build(dir, env=None):
     os.makedirs(staging)
     if env:
         transcript.say("[perflab] build with " + " ".join(f"{k}={v}" for k, v in env.items()))
-    rc = jmh.run_build(tpl.replace("{out}", staging), os.path.join(staging, "build.log"), env=env)
+    rc = jmh.run_build(tpl.replace("{out}", staging), os.path.join(staging, "build.log"), env=env,
+                      label=label or os.path.relpath(dir, config.get().campaigns))
     built_f = os.path.join(staging, LAUNCH)
     if rc or not os.path.exists(built_f):
         sys.exit(f"the build step failed (exit {rc}, see {staging}/build.log)")
