@@ -19,8 +19,8 @@ Design: [branch-explore.md](branch-explore.md). Test case: retronym/scala3 `scal
 
 ## Steps
 
-1. TODO `branch.py`: resolve the range (git), `branch.json`, the explore order (endpoints, then van der Corput; corpora in turn; later rounds reversed), with tests.
-2. TODO `ab.py`: a `"branch"` spec makes a variant and build per commit; one worktree per campaign; lazy builds keyed by tree + env + template; the explore order; an empty `result.json` is rerun; the between-cells control check (`PERFLAB_CONTROL`).
+1. DONE `branch.py`: resolve the range (git), `branch.json`, the explore order (endpoints, then van der Corput; corpora in turn; later rounds reversed), with tests.
+2. DONE `ab.py`: a `"branch"` spec makes a variant and build per commit; one worktree per campaign; lazy builds keyed by tree + env + template; the explore order; an empty `result.json` is rerun; the between-cells control check (`PERFLAB_CONTROL`).
 3. DONE index: the branch card. History rows with numbers, dots or both; Δ vs the previous row; the chart (score left, `gc.alloc.rate.norm` right, CI bars over a raw point cloud); selecting two rows to compare them; view state in the URL. `branchview.py` (`branch_view(campaign_dir)` is the data, tested in test_branchview.py); 99.9% CI from pooled `rawData` (t table in `metrics`), Δ spread from rounds' sd, else from the CIs; profdiff pages of a pair are linked when a `diff-*` name has both shas.
 4. TODO Profiles: a branch spec's `"profileCampaign"`; profile cells linked from rows; profdiff of a selected pair, cached; a "profile these two" action (needs the server).
 5. TODO `perflab server`: a SQLite queue, one job at a time, jobs as command lines in their own process group; pause, resume and cancel; the CLI submits when a server is running; the UI's queue panel.
