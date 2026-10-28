@@ -1,4 +1,4 @@
-import json, os, re, shlex, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
+import json, os, re, shlex, shutil, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from perflab import ab, analyze, auditfold, compare, config, defcosts, index, inlinetree, jmh, jvmevents, launch, loadgate, metrics, regraph, serve, specs, timeline, transcript, trees  # noqa: E402
@@ -498,6 +498,17 @@ class RunIndexTest(unittest.TestCase):
         for f in os.listdir(legacy):
             os.utime(os.path.join(legacy, f), (old, old))
         self.assertEqual(index.run_status(legacy)[0], "failed")
+
+    @unittest.skipUnless(shutil.which("node"), "needs node")
+    def test_the_index_scripts_parse(self):
+        Project('[build]\njmh = "x"\n')
+        page = open(index.build(config.get().campaigns)).read()
+        self.assertIn('<meta name="perflab-code"', page)
+        for i, js in enumerate(re.findall(r"<script>(.*?)</script>", page, re.S)):
+            f = os.path.join(config.get().root, f"s{i}.js")
+            open(f, "w").write(js)
+            r = subprocess.run(["node", "--check", f], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
 
     def test_index_lists_runs_with_scores_and_links(self):
         Project('[build]\njmh = "x"\n[index]\nflags = "^-XX"\n')
