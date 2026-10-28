@@ -36,6 +36,10 @@ A spec:
     "variantDescriptions": {"U": "uncached, from **#123**"}  # campaign and each variant, in a panel atop its card
   }
 
+A branch campaign ("branch", perflab.branch) has its commits as variants. Its profiles are a campaign of their own,
+"profileOf" it (written by `perflab branch profile`, perflab.branchprofile), whose variants are the commits profiled so
+far and whose builds are the branch campaign's.
+
 Cells run round by round, corpus by corpus, variants interleaved within each, so drift hits every variant alike. Each
 run is checked: fresh results, the JVM, every JVM argument of the spec (JMH's -jvmArgsAppend replaces the benchmark's
 @Fork(jvmArgsAppend), so every variant is given `jvmArgs`), each variant's `-p` parameters, xctrace counters present,
@@ -98,6 +102,17 @@ class Spec:
             self.branch = {**self.branch, "checkout": os.path.normpath(os.path.join(here, self.branch["checkout"]))}
             self.branch_info = branch.load(self.out, self.branch, write=False)
             self.builds = {c["variant"]: {"checkout": self.branch["checkout"], "commit": c} for c in self.branch_info["commits"]}
+        # "profileOf": the profiles of a branch campaign's commits (perflab.branchprofile), with its commits and builds
+        self.profile_of = s.get("profileOf")
+        self.build_out = self.out
+        if self.profile_of:
+            self.build_out = os.path.join(cfg.campaigns, self.profile_of)
+            self.branch_info = json.load(open(os.path.join(self.build_out, branch.BRANCH)))
+            of = json.load(open(os.path.join(self.build_out, "spec.json"))).get("branch") or {}
+            self.branch = {"checkout": self.branch_info["checkout"], "env": of.get("env") or {}}
+            commits = {c["variant"]: c for c in self.branch_info["commits"]}
+            self.builds = {v: {"checkout": self.branch["checkout"], "commit": commits[v]} for v in s.get("variants") or {}}
+        self.only = None  # the variants to run, of the spec's (`perflab branch profile <sha>...`)
         self.variants = {"paired": ""} if self.paired else s.get("variants") or {v: "" for v in self.builds}
         if self.builds and (self.paired or set(self.builds) != set(self.variants)):
             sys.exit(f"{path}: \"builds\" needs a build for each variant, and cannot be paired")
@@ -116,7 +131,8 @@ class Spec:
 
     def cells(self):
         if self.branch_info:
-            for r, corpus, variant in branch.cells(self.rounds, self.corpora, self.branch_info["order"]):
+            order = [v for v in self.branch_info["order"] if v in self.variants and (self.only is None or v in self.only)]
+            for r, corpus, variant in branch.cells(self.rounds, self.corpora, order):
                 yield r, corpus, self.corpora[corpus], variant, ""
             return
         for r in range(1, self.rounds + 1):
@@ -264,7 +280,7 @@ def run(spec, dry):
     built = {}
     if spec.builds:  # builds are snapshots: launch mode, for this campaign (and a dry run shows it)
         os.environ["PERFLAB_BUILD_MODE"] = "launch"
-    if spec.branch_info and not dry:
+    if spec.branch_info and not dry and not spec.profile_of:
         branch.save(spec.out, spec.branch_info)
     if launch.enabled() and todo and not dry and not spec.branch_info:  # a branch builds each commit before its first cell
         for v in dict.fromkeys(c[3] for c in todo):
@@ -346,12 +362,13 @@ def done(dest):
 
 def build_commit(spec, commit):
     """A branch commit's launch-mode build, in <campaign>/.build/<key>: checked out into the campaign's worktree and
-    built there, unless a build with the same key (tree, variables, build command) is already kept."""
+    built there, unless a build with the same key (tree, variables, build command) is already kept. A profile campaign
+    has its branch campaign's builds and worktree (`build_out`)."""
     tpl = branch.template()
-    probe = branch.env_for(spec.branch, os.path.join(spec.out, branch.WORKTREE))
-    dir = os.path.join(spec.out, launch.BUILD_DIR, branch.build_key(commit, probe, tpl))
+    probe = branch.env_for(spec.branch, os.path.join(spec.build_out, branch.WORKTREE))
+    dir = os.path.join(spec.build_out, launch.BUILD_DIR, branch.build_key(commit, probe, tpl))
     if not os.path.exists(os.path.join(dir, launch.LAUNCH)):
-        wt = branch.checkout(spec.out, spec.branch_info, commit)
+        wt = branch.checkout(spec.build_out, spec.branch_info, commit)
         log(f"build of {commit['short']} {commit['subject'][:60]}")
     else:
         wt = None

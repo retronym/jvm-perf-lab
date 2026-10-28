@@ -2,6 +2,7 @@
 
   run        one JMH run under a profile (none, xctrace:<template>, async:<events>, audit:<spec>)
   ab         campaigns: run and report variants over corpora, interleaved and checked
+  branch     a branch campaign's profiles and their diffs (`branch profile <spec> [<commit>...]`, `branch diff <spec> <a> <b>`)
   trees      campaigns across checkouts (builds) instead of flags
   index      index.html of the campaigns and runs, with a live timeline of the running fork
   serve      serve the index on 127.0.0.1 and print its URL (idempotent; `run` and `ab run` do it too)
@@ -34,9 +35,10 @@ from . import transcript
 COMMANDS = {"run": "jmh", "ab": "ab", "trees": "trees", "index": "index", "timeline": "timeline", "regraph": "regraph",
             "profdiff": "profdiff", "inlinetree": "inlinetree", "frameweight": "frameweight", "subtree": "subtree", "analyze": "analyze",
             "auditfold": "auditfold", "loadgate": "loadgate", "site": "site", "serve": "serve", "defcosts": "defcosts",
-            "server": "server", "submit": "server:submit_main", "jobs": "server:jobs_main"}
+            "server": "server", "submit": "server:submit_main", "jobs": "server:jobs_main",
+            "branch": "branchprofile"}
 # the commands that become a job of a running `perflab server`: command -> the subcommands that do (None: all)
-SUBMITS = {"run": None, "ab": {"run"}}
+SUBMITS = {"run": None, "ab": {"run"}, "branch": {"profile", "diff"}}
 LOCAL_ENV = "PERFLAB_LOCAL"  # server.LOCAL_ENV
 
 

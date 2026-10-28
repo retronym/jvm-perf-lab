@@ -145,14 +145,92 @@ def branch_view(campaign_dir, rel_to=None):
             cells[corpus] = per_v
     corpora = [c for c in corpora if c in cells] + [c for c in named if c not in cells]
     rel_to = rel_to or campaign_dir
-    diffs = [{"name": os.path.basename(os.path.dirname(f)).removeprefix("diff-"), "href": os.path.relpath(f, rel_to)}
-             for f in sorted(glob.glob(os.path.join(campaign_dir, "diff-*", "compare.html")))]
+    # profdiff outputs in the campaign itself (made by hand): a pair when the name is exactly <a>-<b> of two commits
+    forms = {f: v for v in variants for f in (v, v[:7])}
+    diffs = []
+    for f in sorted(glob.glob(os.path.join(campaign_dir, "diff-*", "compare.html"))):
+        name = os.path.basename(os.path.dirname(f)).removeprefix("diff-")
+        pair = [(forms[name[:i]], forms[name[i + 1:]]) for i, ch in enumerate(name) if ch == "-" and name[:i] in forms and name[i + 1:] in forms]
+        diffs.append({"name": name, "href": os.path.relpath(f, rel_to), "a": pair[0][0] if pair else None, "b": pair[0][1] if pair else None})
     return {"commits": [{"sha": c["sha"], "short": c["short"], "v": v, "subject": c.get("subject", ""), "author": c.get("author", ""),
                          "date": c.get("date", ""), "shown": date_shown(c.get("date")), "index": c.get("index", i),
                          "merged": c.get("merged") or []}
                         for i, (c, v) in reversed(list(enumerate(zip(commits, variants))))],
             "corpora": corpora, "metrics": [{"k": k, "h": label, "kind": kind} for k, label, kind, _ in cols.values()],
-            "cells": cells, "diffs": diffs, "range": branch.get("range", ""), "perUnit": per_unit}
+            "cells": cells, "diffs": diffs, "range": branch.get("range", ""), "perUnit": per_unit,
+            "profile": profiles(campaign_dir, variants, rel_to)}
+
+
+PROFILE_SUFFIX = ".profile"  # the profile campaign beside a branch campaign (perflab.branchprofile)
+
+
+def graph_links(cell, rel_to):
+    """A profile cell's rendered flame graphs, [[event, kind, href], ...], as the index's cell rows link them."""
+    from . import regraph
+    jfr = (glob.glob(os.path.join(cell, "**", "*.jfr"), recursive=True) or [None])[0]
+    events = regraph.events_of(cell)
+    if not jfr and events:  # a published copy leaves the recording out: its first event's bench graph names it
+        g = (glob.glob(os.path.join(cell, "**", f"*-{events[0][0]}.html"), recursive=True) or [None])[0]
+        jfr = g and g[:-len(f"-{events[0][0]}.html")] + ".jfr"
+    if not jfr:
+        return []
+    return [[label.removeprefix("hw-"), k, os.path.relpath(regraph.graph_path(jfr, label, k), rel_to)]
+            for label, _ in events for k in regraph.kinds() if os.path.exists(regraph.graph_path(jfr, label, k))]
+
+
+def profiles(campaign_dir, variants, rel_to):
+    """The branch campaign's profiles, from <campaign>.profile beside it, None without one:
+
+    {"campaign": its name, "corpora": [the corpora it profiles],
+     "cells": {corpus: {variant: {"state": "done" | "running", "graphs": [[event, kind, href], ...]}}},
+     "diffs": [{"a", "b" (variants), "corpus", "href" (compare.html), "events": [{"ev", "slots": [[view, href], ...]}]}]}
+
+    A diff is one `perflab branch diff` wrote (its pair.json names the commits and the corpus), so the view matches it
+    to a pair of rows exactly."""
+    from . import compare
+    pdir = os.path.normpath(campaign_dir) + PROFILE_SUFFIX
+    if not os.path.isdir(pdir):
+        return None
+    try:
+        spec = json.load(open(os.path.join(pdir, "spec.json")))
+    except (OSError, ValueError):
+        spec = {}
+    cells = {}
+    corpora = list(spec.get("corpora") or [])
+    for d in sorted(glob.glob(os.path.join(pdir, "*/"))):
+        corpus = os.path.basename(d.rstrip("/"))
+        if corpus.startswith(("diff-", ".")):
+            continue
+        for v in variants:
+            for cell in sorted(glob.glob(os.path.join(d, v, "*")), key=lambda c: (len(c), c)):
+                if not (os.path.isdir(cell) and os.path.basename(cell).isdigit()):
+                    continue
+                r = load_cell(cell)
+                if r == "running":
+                    cells.setdefault(corpus, {}).setdefault(v, {"state": "running", "graphs": []})
+                elif r is not None:
+                    cells.setdefault(corpus, {})[v] = {"state": "done", "graphs": graph_links(cell, rel_to)}
+                    break
+        if corpus in cells and corpus not in corpora:
+            corpora.append(corpus)
+    diffs = []
+    for pf in sorted(glob.glob(os.path.join(pdir, "diff-*", "pair.json"))):
+        d = os.path.dirname(pf)
+        try:
+            pair = json.load(open(pf))
+        except (OSError, ValueError):
+            continue
+        if not os.path.exists(os.path.join(d, "compare.html")):
+            continue
+        events = sorted(os.path.basename(f)[len("diff-"):-len(".html")] for f in glob.glob(os.path.join(d, "diff-*.html"))
+                        if not f.endswith("-inverse.html"))
+        diffs.append({"a": pair.get("a"), "b": pair.get("b"), "corpus": pair.get("corpus"),
+                      "href": os.path.relpath(os.path.join(d, "compare.html"), rel_to),
+                      "events": [{"ev": ev, "slots": [[view, os.path.relpath(os.path.join(d, name.format(event=ev)), rel_to)]
+                                                      for view, _, name, _ in compare.SLOTS
+                                                      if os.path.exists(os.path.join(d, name.format(event=ev)))]}
+                                 for ev in events]})
+    return {"campaign": os.path.basename(pdir), "corpora": corpora, "cells": cells, "diffs": diffs}
 
 
 def ci_shown(kind, ci, mean):
@@ -177,9 +255,12 @@ def section(campaign_dir, rel_to, corpus_param="corpus"):
         "score as a number (mean over rounds ± a 99.9% confidence interval over every measurement iteration of every fork), as a dot "
         "on a scale shared down the column, or both, and a second metric beside it.</p><p>Δ is against the previous (older) measured "
         "commit, coloured only when it is beyond the spread: the rounds' sd when both commits have two rounds or more, else their CIs.</p>"
-        "<p style='margin-bottom:0'><b>Chart</b>: commits oldest to newest, gaps where a commit is unmeasured; error bars are the CI, "
+        "<p><b>Chart</b>: commits oldest to newest, gaps where a commit is unmeasured; error bars are the CI, "
         "the cloud every iteration. Tick two rows (or one, against the commit before it) to compare them. The view is kept in the "
-        "page's URL.</p>", right=True)
+        "page's URL.</p><p style='margin-bottom:0'><b>Profiles</b> are runs of their own (a profiler perturbs the score), in the "
+        "campaign <i>&lt;name&gt;.profile</i> beside this one, from the same builds: <code>perflab branch profile</code>. A row's "
+        "<b>profile</b> badge opens its flame graphs; comparing two rows shows their differential flame graphs (<code>perflab branch "
+        "diff</code>), or offers to make them.</p>", right=True)
     return (f'<h3 class="sub">History <span class="k">{note}</span> {help_}</h3>'
             f'<div class="bh" data-campaign="{esc(name)}"><div class="bh-ctl"></div><div class="bh-chart"></div>'
             f'<div class="bh-table"></div><div class="bh-cmp"></div><script type="application/json">{blob}</script></div>')
@@ -217,6 +298,12 @@ svg.bh-g text.un{opacity:.45} svg.bh-g text.yl{font-size:10.5px}
 .bh-cmp{margin:8px 0 0} .bh-cmp:empty{display:none} .bh-ph{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;margin:0 0 2px}
 .bh-cmp h4{margin:0;font-size:12.5px} .bh-cmp table.t td{text-align:right} .bh-cmp table.t td:first-child,.bh-cmp table.t th:first-child{text-align:left}
 .bh-cmp .ab{display:block;font-size:11px;color:var(--muted)}
+.bh-pb{font:11px/15px inherit;border:1px solid var(--line);background:var(--panel);color:var(--brand);border-radius:999px;padding:0 6px;margin-left:4px;vertical-align:1px}
+a.bh-pb:hover{text-decoration:none;border-color:var(--brand)} .bh-pb.run{color:var(--muted)}
+.bh-pd{margin:8px 0 0} .bh-pd .diffs{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;margin:2px 0}
+.bh-pd .diffs>.k{min-width:60px} .bh-ev{font-weight:600;font-size:12px;margin-left:6px}
+.bh-pd a.btn.dd{color:var(--brand)} .bh-act{margin:4px 0;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
+.bh-cmd{background:var(--line2);border-radius:4px;padding:1px 6px;overflow-wrap:anywhere}
 @media (max-width:700px){table.bh-t td.cm,table.bh-t th.cm{min-width:150px;max-width:170px} .bh-subj,.bh-who{max-width:130px}}
 """
 
@@ -224,8 +311,8 @@ svg.bh-g text.un{opacity:.45} svg.bh-g text.yl{font-size:10.5px}
 JS = r"""
 const BH = (() => {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
-  const mem = {};  // per campaign, for this page only: the merges opened, the commit hovered
-  const memOf = el => mem[el.dataset.campaign] = mem[el.dataset.campaign] || {open: new Set(), hover: null};
+  const mem = {};  // per campaign, for this page only: the merges opened, the commit hovered, the jobs queued by pair
+  const memOf = el => mem[el.dataset.campaign] = mem[el.dataset.campaign] || {open: new Set(), hover: null, jobs: {}};
   let filter = new Set();
   const key = n => 'b.' + n;
   const data = el => el._d || (el._d = JSON.parse(el.querySelector('script').textContent));
@@ -327,6 +414,22 @@ const BH = (() => {
     const cs = d.corpora.filter(c => !filter.size || filter.has(c));
     return cs.length ? cs : d.corpora;
   }
+  // a commit's profile cells (in <campaign>.profile): a badge opening its flame graphs in the lightbox, every graph of
+  // every profiled corpus in its group
+  function profBadge(d, c) {
+    const P = d.profile;
+    if (!P) return '';
+    const per = P.corpora.map(cp => [cp, (P.cells[cp] || {})[c.v]]).filter(x => x[1]);
+    if (!per.length) return '';
+    const gs = per.flatMap(([cp, x]) => x.graphs.map(g => [per.length > 1 ? `${cp} · ${g[0]}` : g[0], g[1], g[2]]));
+    if (!gs.length)
+      return per.some(x => x[1].state === 'running') ? ' <span class="bh-pb run" title="its profile is running">profiling</span>'
+        : ' <span class="bh-pb" title="profiled; its flame graphs are not rendered yet">profiled</span>';
+    const tip = `flame graphs of its profile${per.length > 1 ? 's' : ''} (${esc(P.campaign)}: ${per.map(x => esc(x[0])).join(', ')})`;
+    return ` <span class="bh-pf" data-lb-group="${esc(P.campaign)} · ${esc(c.short.slice(0, 7))}">`
+      + gs.map((g, i) => `<a class="bh-pb"${i ? ' hidden' : ''} href="${esc(g[2])}" data-lb="${esc(g[0])}|${esc(g[1])}" title="${tip}">profile</a>`).join('')
+      + '</span>';
+  }
   function drawTable(el, d, st) {
     const cs = corpora(d), m2 = st.m2 !== 'none' ? metric(d, st.m2) : null, m1 = metric(d, 'score');
     const exts = {};
@@ -342,7 +445,7 @@ const BH = (() => {
         + `<span class="bh-c"><span class="bh-subj" title="${esc(c.subject)}">${sha(c, 7)} ${esc(c.subject)}</span>`
         + `<span class="bh-who" title="${esc(c.date)}">${esc(c.author)} · ${esc(c.shown)}`
         + (merged ? `<button class="bh-mg" data-bmerge="${esc(c.v)}" aria-expanded="${!!opened}" title="a merge of ${merged} commit${merged > 1 ? 's' : ''}: list them">+${merged}</button>` : '')
-        + '</span></span></div></td>';
+        + profBadge(d, c) + '</span></span></div></td>';
       for (const cp of cs) {
         const x = cellOf(d, cp, c.v), dd = x && x.d || {};
         h += `<td class="n gs">${value(d, st, cp, c.v, 'score', exts)}</td><td>${delta(dd.score)}</td>`;
@@ -452,12 +555,68 @@ const BH = (() => {
     h += rows ? '<div class="scroll"><table class="t"><tr><th>metric</th>'
       + cs.map(c => `<th class="n">${esc(c)}${one && base(c) ? ` <span class="k">vs ${sha(byV(base(c)), 7)}</span>` : ''}</th>`).join('') + `</tr>${rows}</table></div>`
       : '<p class="k">They have no results on the same corpus yet.</p>';
-    // profdiff outputs (diff-<name>/compare.html) whose name has both commits
-    const diffs = one ? [] : d.diffs.filter(x => [picked[0], b].every(c => x.name.includes(c.short.slice(0, 7))));
-    if (diffs.length)
-      h += `<div class="diffs" data-lb-group="${esc(el.dataset.campaign)} · differential flame graphs"><span class="k">Differential flame graphs</span>`
-        + diffs.map(x => `<a class="btn" href="${esc(x.href)}" data-lb="diff|${esc(x.name)}">${esc(x.name)}</a>`).join('') + '</div>';
+    // the profiles: of the two rows, or of the one and the commit before it in history
+    const a = one ? d.commits.find(c => c.index === b.index - 1) : picked[0];
+    if (a) h += profilePanel(el, d, a, b);
     box.innerHTML = h;
+  }
+  const same = (x, a, b) => (x.a === a.v && x.b === b.v) || (x.a === b.v && x.b === a.v);
+  const shq = s => /^[\w@%+=:,./-]+$/.test(s) ? s : `'${String(s).replace(/'/g, `'\\''`)}'`;
+  // profdiff of commits a (older) and b per profiled corpus: each event's graphs of a and b and the differential ones both
+  // ways, opening in the lightbox; for what is missing, the command that makes it, queued on the server when the page is
+  // the server's (it carries the server's token), else to copy
+  function profilePanel(el, d, a, b) {
+    const P = d.profile, name = el.dataset.campaign, A = sha(a, 7), B = sha(b, 7);
+    let h = `<div class="bh-pd"><div class="bh-ph"><h4>Profiles</h4><span class="k">${A} → ${B}, from ${esc(P ? P.campaign : name + '.profile')}`
+      + ' (a profiler perturbs the score, so these are runs of their own)</span></div>';
+    const found = P ? P.diffs.filter(x => same(x, a, b)) : [];
+    for (const x of found) {
+      const label = v => v === 'diff' ? 'DIFF' : v === 'inverse' ? 'DIFF⁻¹' : (v === 'a') === (x.a === a.v) ? a.short.slice(0, 7) : b.short.slice(0, 7);
+      const title = v => v === 'diff' ? `${x.a.slice(0, 7)} → ${x.b.slice(0, 7)}: red grew, blue shrank` : v === 'inverse' ? `${x.b.slice(0, 7)} → ${x.a.slice(0, 7)}` : 'its own flame graph';
+      h += `<div class="diffs" data-lb-group="${esc(name)} · ${esc(x.corpus)} · ${esc(a.short.slice(0, 7))} → ${esc(b.short.slice(0, 7))}">`
+        + `<span class="k">${esc(x.corpus)}</span>`
+        + x.events.map(e => `<span class="bh-ev">${esc(e.ev)}</span>` + ['a', 'diff', 'inverse', 'b'].map(v => e.slots.find(s => s[0] === v)).filter(Boolean)
+          .map(s => `<a class="btn${s[0] === 'diff' || s[0] === 'inverse' ? ' dd' : ''}" href="${esc(s[1])}" data-lb="${esc(e.ev)}|${esc(label(s[0]))}" title="${esc(title(s[0]))}">${esc(label(s[0]))}</a>`).join('')).join('')
+        + `<a class="btn" href="${esc(x.href)}" data-lb="all|tabs" title="every event's four graphs as tabs over one frame (1–4, [ ])">tabs</a></div>`;
+    }
+    // a profdiff output made by hand in the campaign itself, diff-<a>-<b>
+    const legacy = d.diffs.filter(x => x.a && same(x, a, b));
+    if (legacy.length)
+      h += `<div class="diffs" data-lb-group="${esc(name)} · differential flame graphs"><span class="k">by hand</span>`
+        + legacy.map(x => `<a class="btn" href="${esc(x.href)}" data-lb="diff|${esc(x.name)}">${esc(x.name)}</a>`).join('') + '</div>';
+    const corpora = P && P.corpora.length ? P.corpora : [''];
+    const missing = corpora.filter(c => !found.some(x => x.corpus === c));
+    if (missing.length && !(legacy.length && !P)) {
+      const has = v => P && missing.every(c => ((P.cells[c] || {})[v] || {}).state === 'done');
+      const profiled = has(a.v) && has(b.v);
+      const argv = profiled ? ['branch', 'diff', name, a.v, b.v] : ['branch', 'profile', name, a.v, b.v, '--diff'];
+      const cmd = 'perflab ' + argv.map(shq).join(' '), what = profiled ? 'Diff these two' : 'Profile & diff these two';
+      const why = profiled ? 'both are profiled; their diff is not made yet' : `${[a, b].filter(c => !has(c.v)).map(c => sha(c, 7)).join(' and ')} not profiled yet`;
+      const job = memOf(el).jobs[a.v + '-' + b.v];
+      h += `<div class="bh-act"><span class="k">${missing[0] ? esc(missing.join(', ')) + ': ' : ''}${why}.</span> `
+        + (job ? `<span class="k">${job}</span>`
+          : SERVER ? `<button class="chip on" data-bprof="${esc(JSON.stringify(argv))}" data-bkey="${esc(a.v + '-' + b.v)}" title="${esc(cmd)}">${what}</button>`
+          : `<code class="bh-cmd">${esc(cmd)}</code> <button class="chip" data-bcopy="${esc(cmd)}" title="copy the command">copy</button>`
+            + ' <span class="k">in the project, or queue it with <code>perflab submit --</code></span>')
+        + '</div>';
+    }
+    return h + '</div>';
+  }
+  // under `perflab server`, the project's index carries the server's token (its pages share the queue page's origin)
+  const SERVER = (() => { const m = document.querySelector('meta[name="perflab-token"]'); return m && location.pathname.startsWith('/p/') ? m.content : null; })();
+  async function queue(el, argv, key) {
+    const say = s => { memOf(el).jobs[key] = s; drawOne(el); };
+    try {
+      say('queueing…');
+      const id = decodeURIComponent(location.pathname.split('/')[2]);
+      const proj = (await (await fetch('/api/projects')).json()).find(p => String(p.id) === id);
+      if (!proj) throw new Error('this project is not registered with the server');
+      const r = await fetch('/api/jobs', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Perflab-Token': SERVER},
+                                          body: JSON.stringify({argv, cwd: proj.root})});
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || r.status);
+      say(`queued as <a href="/">job ${esc(j.id)}</a>${j.position ? ` (#${esc(j.position)} in the queue)` : ''}; the diff appears here when it is done`);
+    } catch (e) { say(`not queued: ${esc(e.message || e)}`); }
   }
   function drawOne(el) {
     const d = data(el), st = state(el), others = d.metrics.filter(m => m.k !== 'score');
@@ -486,12 +645,14 @@ const BH = (() => {
   function update(el, f) { const st = state(el); f(st); save(el, st); drawOne(el); }
   const toggle = (st, v) => { st.sel = st.sel.includes(v) ? st.sel.filter(x => x !== v) : [...st.sel, v].slice(-2); };
   document.addEventListener('click', e => {
-    const el = e.target.closest && e.target.closest('.bh'), t = el && e.target.closest('[data-bform],[data-bchart],[data-bc],[data-bmerge],[data-bhv],[data-bclear]');
+    const el = e.target.closest && e.target.closest('.bh'), t = el && e.target.closest('[data-bform],[data-bchart],[data-bc],[data-bmerge],[data-bhv],[data-bclear],[data-bprof],[data-bcopy]');
     if (!t) return;
     if (t.dataset.bform) update(el, st => { st.form = t.dataset.bform; });
     else if (t.dataset.bchart) update(el, st => { st.chart = !st.chart; });
     else if (t.dataset.bc) update(el, st => { st.c = t.dataset.bc; });
     else if (t.dataset.bclear) update(el, st => { st.sel = []; });
+    else if (t.dataset.bprof) queue(el, JSON.parse(t.dataset.bprof), t.dataset.bkey);
+    else if (t.dataset.bcopy) { if (navigator.clipboard) navigator.clipboard.writeText(t.dataset.bcopy).then(() => { t.textContent = 'copied'; }, () => {}); }
     else if (t.dataset.bhv) update(el, st => toggle(st, t.dataset.bhv));
     else {
       const o = memOf(el).open, v = t.dataset.bmerge;

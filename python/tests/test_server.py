@@ -247,7 +247,8 @@ class ServerTest(unittest.TestCase):
         open(os.path.join(camp, "c1", "report.md"), "w").write("Δ ±")
         req = urllib.request.Request(self.srv.url + f"p/{p['id']}/")
         with urllib.request.urlopen(req) as r:  # redirects to the index
-            self.assertEqual(r.read().decode(), "<p>the index</p>")
+            # with the token, for the index's own POSTs (a branch campaign's "profile these two")
+            self.assertEqual(r.read().decode(), f'<meta name="perflab-token" content="{self.srv.token}"><p>the index</p>')
             self.assertTrue(r.url.endswith(p["index"]))
         code, text = self.call("GET", f"/p/{p['id']}/ab/c1/report.md")
         self.assertEqual((code, text), (200, "Δ ±"))

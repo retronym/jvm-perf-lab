@@ -92,7 +92,8 @@ class BranchViewTest(unittest.TestCase):
         self.assertEqual(d["corpora"], ["a", "b"])
         self.assertEqual(d["metrics"][0]["k"], "score")
         self.assertIn("alloc", [m["k"] for m in d["metrics"]])
-        self.assertEqual(d["diffs"], [{"name": f"{self.v[3]}-{self.v[4]}", "href": f"diff-{self.v[3]}-{self.v[4]}/compare.html"}])
+        self.assertEqual(d["diffs"], [{"name": f"{self.v[3]}-{self.v[4]}", "href": f"diff-{self.v[3]}-{self.v[4]}/compare.html",
+                                       "a": self.v[3], "b": self.v[4]}])
 
     def test_cells_mean_sd_ci_and_raw(self):
         a = branchview.branch_view(self.camp)["cells"]["a"]

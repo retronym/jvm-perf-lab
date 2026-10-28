@@ -591,6 +591,13 @@ class Server:
                     self.send_header("Location", p + "/" + (f"?{query}" if query else ""))
                     self.end_headers()
                     return
+                if p == project["index"] and os.path.isfile(local):
+                    # the project's index can queue jobs (a branch campaign's "profile these two"): it gets the token the
+                    # queue page already carries, on the same origin
+                    page = open(local, encoding="utf-8").read()
+                    meta = f'<meta name="perflab-token" content="{server.token}">'
+                    at = page.index(">") + 1 if page[:9].lower() == "<!doctype" else 0
+                    return self._send(200, page[:at] + meta + page[at:], "text/html; charset=utf-8")
                 self.path = "/" + parts[3] + (f"?{query}" if query else "")
                 return super().do_GET() if self.command == "GET" else super().do_HEAD()
 
