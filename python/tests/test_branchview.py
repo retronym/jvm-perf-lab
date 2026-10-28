@@ -216,7 +216,10 @@ class BranchIndexTest(unittest.TestCase):
         self.assertIn('<div class="bh" data-campaign="br">', page)
         blob = re.search(r'<div class="bh" data-campaign="br">.*?<script type="application/json">(.*?)</script>', page, re.S).group(1)
         self.assertEqual(len(json.loads(blob)["commits"]), 5)
-        self.assertLess(page.index("History"), page.index("Summary"))
+        # the history is the first of the summary's views, and the one shown first
+        card = page[page.index('id="c-br"'):]
+        self.assertLess(card.index('data-sv="history"'), card.index('data-sv="table"'))
+        self.assertLess(card.index('class="sv-hist"'), card.index('class="summ"'))
 
     def test_a_branch_campaign_shows_before_any_cell(self):
         shutil.rmtree(os.path.join(self.camps, "br", "a"))

@@ -213,6 +213,9 @@ def view_metric(text, mean, sd, d, spread, ok):
 
 
 # the summary's views, as icons: a row per corpus and variant; corpora as columns; a chart
+HISTORY_VIEW = ("history", "History: a row per commit, newest first, a column per corpus",
+                '<path d="M4.5 2v12"/><circle cx="4.5" cy="4.5" r="1.6" fill="currentColor"/><circle cx="4.5" cy="11.5" r="1.6" fill="currentColor"/>'
+                '<path d="M8 4.5h5.5M8 11.5h5.5M8 8h3.5"/>')
 VIEWS = (("table", "Table: a row per corpus and variant",
           '<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M2.5 9.75h11"/>'),
          ("pivot", "Pivot: corpora as columns, a row per variant and metric",
@@ -220,9 +223,14 @@ VIEWS = (("table", "Table: a row per corpus and variant",
          ("chart", "Chart: Δ against the first variant with its spread, or the values themselves",
           '<path d="M8 2v12"/><rect x="8" y="3.5" width="5.5" height="2.4" fill="currentColor" stroke="none"/>'
           '<rect x="3" y="6.8" width="5" height="2.4" fill="currentColor" stroke="none"/><rect x="8" y="10.1" width="3" height="2.4" fill="currentColor" stroke="none"/>'))
-VIEW_TOGGLE = ('<span class="sv-tg" role="group" aria-label="summary view">'
-               + "".join(f'<button data-sv="{k}" title="{t}" aria-label="{t}" aria-pressed="false"><svg viewBox="0 0 16 16">{i}</svg></button>'
-                         for k, t, i in VIEWS) + "</span>")
+def view_toggle(views):
+    return ('<span class="sv-tg" role="group" aria-label="summary view">'
+            + "".join(f'<button data-sv="{k}" title="{t}" aria-label="{t}" aria-pressed="false"><svg viewBox="0 0 16 16">{i}</svg></button>'
+                      for k, t, i in views) + "</span>")
+
+
+VIEW_TOGGLE = view_toggle(VIEWS)
+BRANCH_TOGGLE = view_toggle((HISTORY_VIEW, *VIEWS))  # a branch campaign's: its history first
 
 
 def views(heads, rows, metrics, data, norm=None):
@@ -386,6 +394,18 @@ def short_jvm(jvm):
     home = os.path.expanduser("~")
     jvm = jvm.removesuffix("/bin/java")
     return "~" + jvm[len(home):] if jvm.startswith(home + "/") else jvm
+
+
+def summary_block(about, summ, history, norm=""):
+    """A campaign's Summary: its views (table, pivot, chart), and for a branch campaign its history (perflab.branchview)
+    as the first of them; each view's note in the heading."""
+    if not history:
+        return sub("Summary", about, VIEW_TOGGLE + norm) + summ if summ else ""
+    note, help_, body = history
+    if not summ:
+        return f'<h3 class="sub">History <span class="k">{note}</span> {help_}</h3>{body}'
+    return (f'<h3 class="sub">Summary <span class="k sv-n" data-for="history">{note} {help_}</span>'
+            f'<span class="k sv-n" data-for="summary">{about}</span>{BRANCH_TOGGLE}{norm}</h3><div class="sv-hist">{body}</div>{summ}')
 
 
 def sub(title, note, extra=""):
@@ -589,7 +609,7 @@ table.summary td:nth-child(n+3),table.summary th:nth-child(n+3){text-align:right
 tr[data-running] td{color:var(--muted)} .single-ver .ver{display:none} p.specs{margin:0 0 4px}
 details.cells{margin:10px 0 0} details.cells>summary,details.metrics>summary{cursor:pointer;font-size:12.5px} .pv{display:block;white-space:nowrap} .pv b{font-weight:normal}
 details.metrics{margin:2px 0 6px} details.metrics>summary{color:var(--muted)} table.m th{font-weight:normal;color:var(--fg);border:0;padding:2px 14px 2px 0} table.m td{border:0;padding:2px 10px}
-.d{white-space:nowrap;font-size:12px} .pm{font-size:11px;color:var(--muted)} .d.better{color:var(--ok)} .d.worse{color:var(--bad)} .d.flat,.d.na{color:var(--muted)}
+.summ.sv-off{display:none} .d{white-space:nowrap;font-size:12px} .pm{font-size:11px;color:var(--muted)} .d.better{color:var(--ok)} .d.worse{color:var(--bad)} .d.flat,.d.na{color:var(--muted)}
 table.t td{white-space:nowrap} p.about{color:var(--muted);margin:0 0 6px}
 table.t tr.has-sub td{border-bottom:0} table.t tr.sub td{padding-top:0} .cellg{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:baseline}
 .cellg .graphs{margin:0} h3.sub{font-size:12.5px;margin:12px 0 0;font-weight:600} .btn .k{font-size:11px} .btn.empty{color:var(--muted)}
@@ -631,7 +651,7 @@ svg.sv-c .wh{stroke:var(--fg);stroke-width:1.2;opacity:.7}
 # (or of the values, a panel per corpus). The view, metrics and scale are remembered in this browser; `apply` redraws.
 SUMMARY_JS = r"""
 const SV = (() => { try { return JSON.parse(localStorage.getItem('perflab.summary')) || {}; } catch (e) { return {}; } })();
-SV.view = SV.view || 'table'; SV.metrics = SV.metrics || ['score']; SV.scale = SV.scale || 'delta'; SV.norm = SV.norm || 'unit';
+SV.view = SV.view || 'table'; SV.bview = SV.bview || 'history'; SV.metrics = SV.metrics || ['score']; SV.scale = SV.scale || 'delta'; SV.norm = SV.norm || 'unit';
 const svOff = {};  // per campaign: the variants switched off
 let svCorpora = new Set();
 const svEsc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
@@ -640,9 +660,18 @@ const svDelta = x => x[5] === 'na' ? '<span class="d na" title="the values are a
   : `<span class="d ${x[5]}">${svPct(x[3], x[4])}</span>`;
 const svPm = x => x[2] != null && x[1] ? ` <span class="pm">± ${(100 * x[2] / x[1]).toFixed(1)}%</span>` : '';
 const chip = (attr, v, on, label, title) => `<button class="chip" ${attr}="${svEsc(v)}" aria-pressed="${on}"${title ? ` title="${title}"` : ''}>${label}</button>`;
+// a branch campaign's views (its history first) are picked apart from the other campaigns'
+const svBranch = el => !!(el.closest('section') && el.closest('section').querySelector('.sv-hist'));
+const svView = el => svBranch(el) ? SV.bview : SV.view === 'history' ? 'table' : SV.view;
 function drawSummaries(corpora) {
   if (corpora) svCorpora = corpora;
-  document.querySelectorAll('.sv-tg button[data-sv]').forEach(b => b.setAttribute('aria-pressed', b.dataset.sv === SV.view));
+  document.querySelectorAll('.sv-tg button[data-sv]').forEach(b => b.setAttribute('aria-pressed', b.dataset.sv === svView(b)));
+  for (const h of document.querySelectorAll('.sv-hist')) {
+    const on = SV.bview === 'history', sec = h.closest('section');
+    h.hidden = !on;
+    sec.querySelectorAll('.sv-n').forEach(n => n.hidden = (n.dataset.for === 'history') !== on);
+    sec.querySelectorAll('.summ').forEach(s => s.classList.toggle('sv-off', on));
+  }
   // a campaign with a "perUnit" has its summary per unit and per op: the one picked shows
   document.querySelectorAll('.sv-tg button[data-sn]').forEach(b => b.setAttribute('aria-pressed', b.dataset.sn === SV.norm));
   for (const el of document.querySelectorAll('.summ[data-norm]')) el.hidden = el.dataset.norm !== SV.norm;
@@ -659,17 +688,18 @@ function svModel(el) {
   return {ms, sel, variants, base: variants[0], vs: variants.filter(v => !off.has(v)), off, corpora, cell};
 }
 function drawSummary(el) {
-  el.querySelector('.sv-table').hidden = SV.view !== 'table';
+  const view = svView(el);
+  el.querySelector('.sv-table').hidden = view !== 'table';
   const alt = el.querySelector('.sv-alt');
-  if (SV.view === 'table') { alt.innerHTML = ''; return; }
+  if (view === 'table' || view === 'history') { alt.innerHTML = ''; return; }
   const m = svModel(el);
   let ctl = `<span class="fg"><span class="fl">metric</span>${m.ms.map(x => chip('data-sm', x.k, m.sel.includes(x), x.h)).join('')}</span>`;
   if (m.variants.length > 2)
     ctl += `<span class="fg"><span class="fl">variant</span>${m.variants.map(v => chip('data-svv', v, !m.off.has(v), svEsc(v))).join('')}</span>`;
-  if (SV.view === 'chart')
+  if (view === 'chart')
     ctl += `<span class="fg"><span class="fl">scale</span>${chip('data-sc', 'delta', SV.scale === 'delta', 'Δ %', 'against ' + svEsc(m.base))}${chip('data-sc', 'abs', SV.scale === 'abs', 'abs', 'the values, from zero')}</span>`;
   alt.innerHTML = `<div class="sv-ctl">${ctl}</div>` + (!m.corpora.length ? '<p class="k">No corpus matches the filter.</p>'
-    : SV.view === 'pivot' ? svPivot(m) : `<div class="sv-charts">${m.sel.map(x => SV.scale === 'abs' ? svAbs(m, x) : svBars(m, x)).join('')}</div>`);
+    : view === 'pivot' ? svPivot(m) : `<div class="sv-charts">${m.sel.map(x => SV.scale === 'abs' ? svAbs(m, x) : svBars(m, x)).join('')}</div>`);
 }
 // a row per variant and metric, the metrics of a variant aligned beneath each other; per corpus its value and Δ
 function svPivot({sel, vs, base, corpora, cell}) {
@@ -753,7 +783,8 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-sv],[data-sm],[data-svv],[data-sc],[data-sn]');
   if (!b) return;
   const el = b.closest('section') && b.closest('section').querySelector('.summ:not([hidden])');
-  if (b.dataset.sv) SV.view = b.dataset.sv;
+  if (b.dataset.sv && svBranch(b)) SV.bview = b.dataset.sv;
+  else if (b.dataset.sv) SV.view = b.dataset.sv;
   else if (b.dataset.sn) SV.norm = b.dataset.sn;
   else if (b.dataset.sc) SV.scale = b.dataset.sc;
   else if (b.dataset.sm) {
@@ -767,6 +798,7 @@ document.addEventListener('click', e => {
   }
   try { localStorage.setItem('perflab.summary', JSON.stringify(SV)); } catch (e) {}
   drawSummaries();
+  if (b.dataset.sv && svBranch(b) && typeof BH !== 'undefined') BH.draw(svCorpora);  // drawn at its width once shown
 });
 """
 
@@ -838,7 +870,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       # perflab inlinetree pages: the cells' compilation units compared, one per event
       trees_ = sorted(glob.glob(os.path.join(spec_dir, "inlinetree*.html")))
       prog = progress(spec_dir)
-      history = branchview.section(spec_dir, root, config.get().corpus_param)
+      history = branchview.parts(spec_dir, root, config.get().corpus_param)
       if not rows and not diffs and not trees_ and not prog and not history:
           continue
       sid = "c-" + esc(name)
@@ -881,7 +913,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
                                   f'data-corpus="{esc(" ".join(sorted(corpora)))}" data-profiled="{1 if profiled else 0}">'
                                   f'{card_head("campaign", name, progress_badge(prog, name), when, buttons)}'
                                   f'{variants_panel(spec_dir)}{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{spec_history(spec_dir, counts, sid)}'
-                                  f'{history}{sub("Summary", about, VIEW_TOGGLE + (norm_toggle(per_unit) if per_unit and not paired else "")) + summ if summ else ""}{cells_html}</section>'))
+                                  f'{summary_block(about, summ, history, norm_toggle(per_unit) if per_unit and not paired else "")}{cells_html}</section>'))
   run_dirs = sorted(glob.glob(os.path.join(runs, "*/"))) if runs and os.path.isdir(runs) else []
   RUN_NAMES.clear(); RUN_NAMES.update(os.path.basename(r.rstrip("/")) for r in run_dirs)
   for run in run_dirs:

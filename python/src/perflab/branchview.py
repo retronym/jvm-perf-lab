@@ -4,7 +4,7 @@ directory has the branch.json the runner writes (doc/branch-explore-PLAN.md has 
 commits' short shas, its cells where every campaign's are, <campaign>/<corpus>/<variant>/<round>/result.json.
 
 `branch_view` gathers what the page draws, `section` puts it on the campaign's card, and BRANCH_JS draws it: the
-history table (numbers, dots on a shared per-column scale, or both), the chart (score left, a second metric right, each
+history table (numbers, shaded by a bar on a scale shared down the column), the chart (score left, a second metric right, each
 commit's mean with its 99.9% CI over forks, its forks' means and every measurement iteration), and the comparison of two
 selected rows. The view's state is in the page's URL (`?b.<campaign>=...`), so a view can be linked and survives the
 index's refresh.
@@ -288,9 +288,16 @@ def ci_shown(kind, ci, mean):
 
 def section(campaign_dir, rel_to, corpus_param="corpus"):
     """The History section of a branch campaign's card, "" for any other campaign."""
+    p = parts(campaign_dir, rel_to, corpus_param)
+    return f'<h3 class="sub">History <span class="k">{p[0]}</span> {p[1]}</h3>{p[2]}' if p else ""
+
+
+def parts(campaign_dir, rel_to, corpus_param="corpus"):
+    """A branch campaign's history as (the note for its heading, its help popover, its body), None for any other
+    campaign: the index shows it as the first of the summary's views."""
     data = branch_view(campaign_dir, rel_to)
     if data is None:
-        return ""
+        return None
     name = os.path.basename(os.path.normpath(campaign_dir))
     data["corpusParam"] = corpus_param
     blob = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
@@ -300,7 +307,8 @@ def section(campaign_dir, rel_to, corpus_param="corpus"):
             "Mean over forks ± 99.9% CI over forks; Δ against the previous measured commit")
     help_ = ui.help_popover(
         "<p style='margin-top:0'>A row per first-parent commit; a merge's <b>+n</b> lists the commits it brought in. Per corpus, the "
-        "score as a number, as a dot on a scale shared down the column, or both, and a second metric beside it.</p>"
+        "score, shaded by a bar on a scale shared down the column (the lighter band at its end is the CI), and a second metric "
+        "beside it.</p>"
         "<p>The unit is the <b>fork</b>: each fork of each round counts once, as the mean of its measurement iterations (they vary "
         "far less within a fork than between forks, and are not independent). A value is the mean over forks ± a 99.9% confidence "
         "interval over forks. A commit with one fork has no spread of its own: † marks an interval from the fork-to-fork sd pooled "
@@ -314,8 +322,7 @@ def section(campaign_dir, rel_to, corpus_param="corpus"):
         "campaign <i>&lt;name&gt;.profile</i> beside this one, from the same builds: <code>perflab branch profile</code>. A row's "
         "<b>profile</b> badge opens its flame graphs; comparing two rows shows their differential flame graphs (<code>perflab branch "
         "diff</code>), or offers to make them.</p>", right=True)
-    return (f'<h3 class="sub">History <span class="k">{note}</span> {help_}</h3>'
-            f'<div class="bh" data-campaign="{esc(name)}"><div class="bh-ctl"></div><div class="bh-chart"></div>'
+    return (note, help_, f'<div class="bh" data-campaign="{esc(name)}"><div class="bh-ctl"></div><div class="bh-chart"></div>'
             f'<div class="bh-table"></div><div class="bh-cmp"></div><script type="application/json">{blob}</script></div>')
 
 
@@ -324,19 +331,23 @@ CSS = """
 .bh-ctl select{font:inherit;font-size:12px;padding:1px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
 table.bh-t td{vertical-align:middle} table.bh-t th{vertical-align:bottom} table.bh-t th.cg{text-align:center;color:var(--fg);border-bottom:1px solid var(--line2)}
 table.bh-t td.gs,table.bh-t th.gs{border-left:1px solid var(--line2)}
-table.bh-t td.cm,table.bh-t th.cm{position:sticky;left:0;z-index:1;background:var(--panel);white-space:normal;min-width:180px;max-width:360px}
+table.bh-t td.cm,table.bh-t th.cm{position:sticky;left:0;z-index:1;background:var(--panel);white-space:normal;min-width:180px;max-width:480px}
 .bh-cm{display:flex;gap:8px;align-items:flex-start} .bh-cm input{margin:3px 0 0}
-.bh-c{min-width:0} .bh-subj{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px}
-.bh-who{display:block;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px}
+.bh-c{min-width:0} .bh-subj{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:min(440px,34vw)}
+.bh-who{display:block;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(440px,34vw)}
 .bh-mg{font:11px/15px inherit;border:1px solid var(--line);background:var(--panel);color:var(--link);border-radius:999px;padding:0 6px;margin-left:4px;cursor:pointer;vertical-align:1px}
 table.bh-t tr.hl td{background:var(--line2)} table.bh-t tr.sel td{background:var(--link-bg)}
 table.bh-t tr.bh-sub td{padding-top:0;border-bottom:1px solid var(--line2)} table.bh-t tr.has-sub td{border-bottom:0}
 .bh-sub ul{margin:0;padding:0 0 0 26px;list-style:none;font-size:12px} .bh-sub li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px}
-.bh-v{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end} .bh-v .pm{white-space:nowrap}
+.bh-v{display:block;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;padding:3px 6px;margin:-3px -6px;border-radius:3px} .bh-v .pm{white-space:nowrap}
+.bh-v .mv{font-weight:500}
+.bh-v.bar{min-width:118px;background:linear-gradient(to right,transparent var(--c0,var(--w)),var(--bh-ci) var(--c0,var(--w)),var(--bh-ci) var(--c1,var(--w)),transparent var(--c1,var(--w))),linear-gradient(to right,var(--bh-bar) var(--w),var(--bh-rest) var(--w))}
+.bh-v.bar.pl{background:linear-gradient(to right,var(--bh-bar) var(--w),var(--bh-rest) var(--w))}
+.bh{--bh-bar:color-mix(in srgb,var(--link) 17%,transparent);--bh-ci:color-mix(in srgb,var(--link) 9%,transparent);--bh-rest:color-mix(in srgb,var(--link) 4%,transparent)}
+table.bh-t td .d{display:inline-block;padding:1px 5px;border-radius:3px;margin:0 -5px}
+table.bh-t td .d.better{background:color-mix(in srgb,var(--ok) 13%,transparent)} table.bh-t td .d.worse{background:color-mix(in srgb,var(--bad) 13%,transparent)}
 .bh-pend{color:var(--muted);font-size:11.5px}
 .bh-fail{color:var(--bad);font-size:11.5px}
-svg.bh-dot{display:block;overflow:visible} svg.bh-dot .bl{stroke:var(--line)} svg.bh-dot .wh{stroke:var(--muted);stroke-width:1.2}
-svg.bh-dot .wh.pl{opacity:.45;stroke-dasharray:2 1.5} svg.bh-dot circle{fill:var(--fg)} svg.bh-dot circle.better{fill:var(--ok)} svg.bh-dot circle.worse{fill:var(--bad)}
 .bh-chart figure{margin:4px 0 8px} .bh-leg{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:12px;color:var(--muted);margin:0 0 2px}
 .bh-leg i{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--link);margin-right:4px;vertical-align:-1px}
 .bh-leg i.s2{background:var(--brand);border-radius:1px;transform:rotate(45deg) scale(.85)}
@@ -405,16 +416,16 @@ const BH = (() => {
   let filter = new Set();
   const key = n => 'b.' + n;
   const data = el => el._d || (el._d = JSON.parse(el.querySelector('script').textContent));
-  // ?b.<campaign>=form:both;chart:0;c:<corpus>;m2:<metric>;sel:<variant>,<variant>
+  // ?b.<campaign>=form:bar;chart:0;c:<corpus>;m2:<metric>;sel:<variant>,<variant>
   function state(el) {
-    const d = data(el), st = {form: 'both', chart: false, c: '', m2: '', sel: []};
+    const d = data(el), st = {form: 'bar', chart: false, c: '', m2: '', sel: []};
     let raw = '';
     try { raw = new URLSearchParams(location.search).get(key(el.dataset.campaign)) || ''; } catch (e) {}
     for (const part of raw.split(';')) {
       const i = part.indexOf(':');
       if (i < 0) continue;
       const k = part.slice(0, i), v = part.slice(i + 1);
-      if (k === 'form' && ['num', 'dot', 'both'].includes(v)) st.form = v;
+      if (k === 'form') st.form = v === 'num' ? 'num' : 'bar';  // 'dot' and 'both' of older links: the bar
       else if (k === 'chart') st.chart = v === '1';
       else if (k === 'c') st.c = v;
       else if (k === 'm2') st.m2 = v;
@@ -447,7 +458,7 @@ const BH = (() => {
     return a >= 1e4 ? Math.round(x).toLocaleString('en') : `${+x.toPrecision(4)}`;
   }
   function step(span) { const p = Math.pow(10, Math.floor(Math.log10(span / 4))), r = span / 4 / p; return p * (r >= 5 ? 5 : r >= 2 ? 2 : 1); }
-  const pct = (d, sp) => `${d >= 0 ? '+' : ''}${d.toFixed(2)}%` + (sp != null ? ` <span class="pm">± ${sp.toFixed(2)}</span>` : '');
+  const pct = (d, sp) => `${d >= 0 ? '+' : ''}${d.toFixed(1)}%` + (sp != null ? ` <span class="pm">± ${sp.toFixed(1)}</span>` : '');
   const TITLE = {flat: 'inconclusive: not significant at 99.9% (Welch’s t over forks)', worse: 'higher, significant at 99.9% (Welch’s t over forks)',
                  better: 'lower, significant at 99.9% (Welch’s t over forks)'};
   const POOLED = '† a commit with one fork: its spread is the fork-to-fork sd pooled over this corpus’s commits with two forks or more';
@@ -474,11 +485,35 @@ const BH = (() => {
     const p = (hi - lo) * 0.06;
     return [lo - p, hi + p];
   }
-  function dot(m, ext, verdict) {
-    const W = 90, X = y => (3 + (y - ext[0]) / (ext[1] - ext[0]) * (W - 6)).toFixed(1);
-    const ci = m[2] != null ? `<path class="wh${m[6] ? ' pl' : ''}" d="M${X(m[0] - m[2])} 7H${X(m[0] + m[2])}M${X(m[0] - m[2])} 4v6M${X(m[0] + m[2])} 4v6"/>` : '';
-    return `<svg class="bh-dot" viewBox="0 0 ${W} 14" width="${W}" height="14" aria-hidden="true"><line class="bl" x1="0" x2="${W}" y1="7" y2="7"/>${ci}`
-      + `<circle cx="${X(m[0])}" cy="7" r="3.2" class="${verdict || ''}"/></svg>`;
+  // a value's bar, as CSS variables of its cell: the mean's width on the column's scale, and its CI as a band; the scale
+  // starts a little below the column's lowest value, so that steps between commits show
+  function bar(m, ext) {
+    const P = y => Math.max(0, Math.min(100, 8 + 92 * (y - ext[0]) / (ext[1] - ext[0]))).toFixed(1) + '%';
+    const ci = m[2] != null ? `;--c0:${P(m[0] - m[2])};--c1:${P(m[0] + m[2])}` : '';
+    return ` style="--w:${P(m[0])}${ci}"`;
+  }
+  // a column's unit for sizes and counts (alloc in MB/op, say): in its header, so that its values are plain numbers
+  function scaleOf(d, k) {
+    const kind = metric(d, k).kind;
+    if (kind !== 'alloc' && kind !== 'count') return null;
+    let hi = 0;
+    for (const cs of Object.values(d.cells)) for (const x of Object.values(cs)) { const m = x.m && x.m[k]; if (m && m[0] != null) hi = Math.max(hi, Math.abs(m[0])); }
+    const us = kind === 'alloc' ? [[1e9, 'GB'], [1e6, 'MB'], [1e3, 'KB'], [1, 'B']] : [[1e9, 'G'], [1e6, 'M'], [1e3, 'K'], [1, '']];
+    const [div, u] = us.find(([v]) => hi >= v * 10) || us[us.length - 1];
+    return {div, u};
+  }
+  const plain = x => Math.abs(x) >= 1000 ? Math.round(x).toLocaleString('en') : `${+x.toPrecision(4)}`;
+  const plainCI = ci => ci >= 100 ? Math.round(ci).toLocaleString('en') : `${+ci.toPrecision(2)}`;
+  function shown(d, k, m, s) {  // [mean, CI] as the cell shows them: plain numbers in the header's unit
+    const sc = scaleOf(d, k);
+    if (!sc) return s;
+    return [plain(m[0] / sc.div), m[2] != null ? plainCI(m[2] / sc.div) : ''];
+  }
+  function heading(d, k) {
+    const m = metric(d, k), sc = scaleOf(d, k);
+    if (!sc) return unitFix(m.h);
+    const per = String(m.h).includes('/') ? '/' + String(m.h).split('/').pop() : '';
+    return `${String(m.h).split('/')[0]} ${sc.u || '×'}${per}`;
   }
   function value(d, st, c, v, k, exts) {
     const x = cellOf(d, c, v);
@@ -486,14 +521,15 @@ const BH = (() => {
     if (!x) return u ? `<a class="bh-fail" href="${esc(u.log)}" title="${esc(u.reason)}">build failed</a>` : '<span class="bh-pend">pending</span>';
     if (x.state === 'running') return '<span class="badge running">running</span>';
     if (x.state === 'failed') return `<a class="bh-fail" href="${esc(x.log)}" title="${esc(x.why)}">run failed</a>`;
-    const m = x.m[k], s = x.s[k];
+    const m = x.m[k];
     if (!m) return '';
+    const s = shown(d, k, m, x.s[k]), sc = scaleOf(d, k), un = sc ? ` ${sc.u}` : '';
     const dag = m[6] ? '†' : '';
-    const n = st.form === 'dot' ? '' : `<span>${esc(s[0])}${s[1] ? ` <span class="pm">± ${esc(s[1])}${dag}</span>` : ''}</span>`;
-    const g = st.form === 'num' || !exts[c + '|' + k] ? '' : dot(m, exts[c + '|' + k], (x.d[k] || [])[2]);
-    const tip = `${esc(s[0])}${s[1] ? ' ± ' + esc(s[1]) + dag + ' (99.9% CI over forks)' : ''}; ${m[4]} fork${m[4] > 1 ? 's' : ''}, ${x.rounds} round${x.rounds > 1 ? 's' : ''}`
-      + (m[1] == null ? '; 1 fork: no spread yet' : m[6] ? `. ${POOLED}: ${(100 * m[1] / m[0]).toFixed(2)}%` : `, sd of the forks’ means ${(100 * m[1] / m[0]).toFixed(2)}%`);
-    return `<span class="bh-v" title="${tip}">${n}${g}</span>`;
+    const n = `<span class="mv">${esc(s[0])}</span>${s[1] ? ` <span class="pm">± ${esc(s[1])}${dag}</span>` : ''}`;
+    const g = st.form === 'num' || !exts[c + '|' + k] ? '' : bar(m, exts[c + '|' + k]);
+    const tip = `${esc(s[0])}${un}${s[1] ? ' ± ' + esc(s[1]) + un + dag + ' (99.9% CI over forks)' : ''}; ${m[4]} fork${m[4] > 1 ? 's' : ''}, ${x.rounds} round${x.rounds > 1 ? 's' : ''}`
+      + (m[1] == null ? '; 1 fork: no spread yet' : m[6] ? `. ${POOLED}: ${(100 * m[1] / m[0]).toFixed(1)}%` : `, sd of the forks’ means ${(100 * m[1] / m[0]).toFixed(1)}%`);
+    return `<span class="bh-v${g ? ' bar' : ''}${m[2] != null && m[6] ? ' pl' : ''}"${g} title="${tip}">${n}</span>`;
   }
   // the corpora the filter bar picked, all when it picked none of these
   function corpora(d) {
@@ -523,7 +559,7 @@ const BH = (() => {
     const per = m2 ? 4 : 2, open = memOf(el).open;
     let h = '<div class="scroll"><table class="t bh-t"><tr><th class="cm" rowspan="2">commit</th>'
       + cs.map(c => `<th class="cg gs" colspan="${per}">${esc(c)}</th>`).join('') + '</tr><tr>'
-      + cs.map(() => `<th class="n gs">${esc(unitFix(m1.h))}</th><th>Δ</th>` + (m2 ? `<th class="n">${esc(unitFix(m2.h))}</th><th>Δ</th>` : '')).join('') + '</tr>';
+      + cs.map(() => `<th class="n gs">${esc(heading(d, 'score'))}</th><th>Δ</th>` + (m2 ? `<th class="n">${esc(heading(d, m2.k))}</th><th>Δ</th>` : '')).join('') + '</tr>';
     for (const c of d.commits) {
       const sel = st.sel.includes(c.v), merged = c.merged.length, opened = merged && open.has(c.v);
       h += `<tr data-v="${esc(c.v)}" class="${sel ? 'sel' : ''}${opened ? ' has-sub' : ''}"><td class="cm"><div class="bh-cm">`
@@ -603,8 +639,8 @@ const BH = (() => {
     const empty = !e1 && !e2 ? `<text x="${(L + W - R) / 2}" y="${H / 2}" text-anchor="middle">nothing measured on ${esc(c)} yet</text>` : '';
     const pick = d.corpora.length > 1 ? `<div class="bh-ctl"><span class="fg"><span class="fl">${esc(d.corpusParam || 'corpus')}</span>`
       + d.corpora.map(x => `<button class="chip" data-bc="${esc(x)}" aria-pressed="${x === c}">${esc(x)}</button>`).join('') + '</span></div>' : '';
-    box.innerHTML = `<figure>${pick}<div class="bh-leg"><span><i></i>${esc(unitFix(m1.h))} (left)</span>`
-      + (m2 ? `<span><i class="s2"></i>${esc(unitFix(m2.h))} (right)</span>` : '')
+    box.innerHTML = `<figure>${pick}<div class="bh-leg"><span><i></i>${esc(heading(d, 'score'))} (left)</span>`
+      + (m2 ? `<span><i class="s2"></i>${esc(heading(d, m2.k))} (right)</span>` : '')
       + '<span>oldest → newest · error bars: 99.9% CI over forks (lighter, †: one fork, a pooled spread) · dashes: each fork’s mean · faint dots: every iteration</span></div>'
       + `<svg class="bh-g" viewBox="0 0 ${W} ${H}">${bands}${ax}<path class="l1" d="${lines[0]}"/><path class="l2" d="${lines[1]}"/>${g}${xl}${empty}${hits}</svg>`
       + '<p class="bh-tip k">Hover a commit to see its numbers; click to select it.</p></figure>';
@@ -612,11 +648,11 @@ const BH = (() => {
   function tipText(d, st, v) {
     const cm = d.commits.find(c => c.v === v), x = cellOf(d, st.c, v);
     if (!cm) return '';
-    const val = k => { const s = x && x.state === 'done' && x.s[k]; return s ? `${esc(s[0])}${s[1] ? ' ± ' + esc(s[1]) + (x.m[k][6] ? '†' : '') : ''}` : ''; };
+    const val = k => { const m = x && x.state === 'done' && x.m[k]; if (!m) return ''; const s = shown(d, k, m, x.s[k]); return `${esc(s[0])}${s[1] ? ' ± ' + esc(s[1]) + (m[6] ? '†' : '') : ''}`; };
     const m2 = st.m2 !== 'none' ? metric(d, st.m2) : null;
     const nums = !x ? 'pending' : x.state === 'running' ? 'running' : x.state === 'failed' ? 'run failed: ' + esc(x.why)
-      : `${val('score')} ${esc(unitFix(metric(d, 'score').h))} ${delta(x.d.score)}`
-        + (m2 && val(m2.k) ? ` · ${val(m2.k)} ${esc(unitFix(m2.h))} ${delta(x.d[m2.k])}` : '');
+      : `${val('score')} ${esc(heading(d, 'score'))} ${delta(x.d.score)}`
+        + (m2 && val(m2.k) ? ` · ${val(m2.k)} ${esc(heading(d, m2.k))} ${delta(x.d[m2.k])}` : '');
     return `${sha(cm)} ${esc(cm.subject)} · <b>${esc(st.c)}</b>: ${nums}`;
   }
   function drawCompare(el, d, st) {
@@ -636,9 +672,9 @@ const BH = (() => {
     for (const m of d.metrics) {
       const tds = cs.map(c => {
         const a = cellOf(d, c, base(c)), y = cellOf(d, c, b.v), x = pairDelta(a, y, m.k);
-        return x ? `<td>${delta(x)}<span class="ab">${esc(a.s[m.k][0])} → ${esc(y.s[m.k][0])}</span></td>` : '<td></td>';
+        return x ? `<td>${delta(x)}<span class="ab">${esc(shown(d, m.k, a.m[m.k], a.s[m.k])[0])} → ${esc(shown(d, m.k, y.m[m.k], y.s[m.k])[0])}</span></td>` : '<td></td>';
       });
-      if (tds.some(t => t !== '<td></td>')) rows += `<tr><td>${esc(unitFix(m.h))}</td>${tds.join('')}</tr>`;
+      if (tds.some(t => t !== '<td></td>')) rows += `<tr><td>${esc(heading(d, m.k))}</td>${tds.join('')}</tr>`;
     }
     let h = `<div class="bh-ph">${head}<button class="chip" data-bclear="1">clear</button></div>`;
     h += rows ? '<div class="scroll"><table class="t"><tr><th>metric</th>'
@@ -711,9 +747,8 @@ const BH = (() => {
     const d = data(el), st = state(el), others = d.metrics.filter(m => m.k !== 'score');
     const chip = (a, v, on, label, t) => `<button class="chip" ${a}="${v}" aria-pressed="${on}"${t ? ` title="${t}"` : ''}>${label}</button>`;
     el.querySelector('.bh-ctl').innerHTML = '<span class="fg"><span class="fl">show</span>'
-      + chip('data-bform', 'num', st.form === 'num', 'numbers', 'mean ± CI')
-      + chip('data-bform', 'dot', st.form === 'dot', 'dots', 'the mean on a scale shared down the column, the CI as a whisker')
-      + chip('data-bform', 'both', st.form === 'both', 'both') + '</span>'
+      + chip('data-bform', 'bar', st.form === 'bar', 'shaded', 'a bar behind each value, on a scale shared down the column; its lighter end is the CI')
+      + chip('data-bform', 'num', st.form === 'num', 'numbers', 'mean ± CI only') + '</span>'
       + `<span class="fg">${chip('data-bchart', '1', st.chart, 'chart', 'commits on x, the score left, the second metric right')}</span>`
       + '<label class="fg"><span class="fl">second metric</span><select data-bm2><option value="none">none</option>'
       + others.map(m => `<option value="${esc(m.k)}"${m.k === st.m2 ? ' selected' : ''}>${esc(unitFix(m.h))}</option>`).join('') + '</select></label>';
