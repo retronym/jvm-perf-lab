@@ -23,7 +23,7 @@ lock (one started before the lock existed) is identified by its pid and, when it
 time.
 
 State is in ~/.perflab/server (PERFLAB_SERVER_HOME): jobs.sqlite, token (POSTs carry it as X-Perflab-Token), server.json
-(pid, port), jobs/<id>/. The port is 8690 unless --port or PERFLAB_SERVER_PORT says otherwise.
+(pid, port), server.lock (flock-ed by the running server: one per home), jobs/<id>/. The port is 8690 unless --port or PERFLAB_SERVER_PORT says otherwise.
 
 HTTP (JSON unless noted):
   GET  /api/status                       the server
@@ -568,7 +568,14 @@ class Server:
         self.httpd.server_close()
 
     def serve_forever(self):
-        """Foreground: writes server.json, serves until SIGTERM or SIGINT."""
+        """Foreground: takes home/server.lock (one server per home: a second exits), writes server.json, serves until
+        SIGTERM or SIGINT."""
+        self.lockf = single_instance(self.home)
+        if self.lockf is None:
+            self.httpd.server_close()
+            st = _read_json(os.path.join(self.home, "server.json")) or {}
+            sys.exit(f"perflab server: another server is running for {self.home}"
+                     + (f" (pid {st['pid']}, {st.get('url')})" if st.get("pid") else ""))
         self.worker.start()
         state = os.path.join(self.home, "server.json")
         with open(state + ".tmp", "w") as f:
@@ -820,6 +827,18 @@ def status(server):
             "queued": sum(j["state"] == "queued" for j in jobs)}
 
 
+def single_instance(home_dir):
+    """The descriptor of home/server.lock, flock-ed for as long as this process keeps it open; None if another server
+    holds it."""
+    fd = os.open(os.path.join(home_dir, "server.lock"), os.O_WRONLY | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        os.close(fd)
+        return None
+    return fd
+
+
 def token(home_dir):
     path = os.path.join(home_dir, "token")
     try:
@@ -864,6 +883,9 @@ def ensure(port=None):
     if port is None:
         port = int(os.environ.get(PORT_ENV) or DEFAULT_PORT)
     if port and _listening(port):
+        url = _wait_running(3)  # another `ensure` racing this one: its server listens before it writes server.json
+        if url:
+            return url
         sys.exit(f"perflab server: port {port} is in use by something else (--port, or {PORT_ENV})")
     env = {**os.environ, "PYTHONPATH": os.pathsep.join(filter(None, [PKG, os.environ.get("PYTHONPATH")]))}
     with open(os.path.join(h, "server.log"), "ab") as log:
@@ -873,10 +895,22 @@ def ensure(port=None):
         st = _read_json(os.path.join(h, "server.json"))
         if st and st.get("pid") == proc.pid and _listening(st["port"]):
             return st["url"]
-        if proc.poll() is not None:
+        if proc.poll() is not None:  # it exited: perhaps because another server, started meanwhile, has the lock
             break
         time.sleep(0.1)
+    url = _wait_running(3)
+    if url:
+        return url
     sys.exit(f"perflab server: did not start; see {os.path.join(h, 'server.log')}")
+
+
+def _wait_running(secs):
+    end = time.time() + secs
+    while True:
+        url = running()
+        if url or time.time() >= end:
+            return url
+        time.sleep(0.1)
 
 
 def api(method, path, body=None, url=None):
@@ -996,7 +1030,15 @@ def main(argv):
     x = ap.parse_args(argv)
     if x.action == "run":
         port = x.port if x.port is not None else int(os.environ.get(PORT_ENV) or DEFAULT_PORT)
-        Server(port=port, grace=x.grace).serve_forever()
+        try:
+            srv = Server(port=port, grace=x.grace)
+        except OSError as e:
+            fd = single_instance(home())
+            if fd is None:
+                sys.exit(f"perflab server: another server is running for {home()}")
+            os.close(fd)
+            sys.exit(f"perflab server: cannot listen on port {port}: {e.strerror or e}")
+        srv.serve_forever()
         return 0
     if x.action == "start":
         url = ensure(x.port)

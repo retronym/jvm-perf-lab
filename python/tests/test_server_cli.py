@@ -203,6 +203,35 @@ class SubmitsItselfTest(unittest.TestCase):
             self.assertIn("perflab-code", resp.read().decode())
 
 
+class SingleInstanceTest(unittest.TestCase):
+    """One server per home: a second exits saying so, and `start`s racing each other agree on the one that runs."""
+
+    def setUp(self):
+        self.home = tempfile.mkdtemp()
+        self.root = project()
+        self.env = {**os.environ, "PYTHONPATH": os.path.abspath(SRC), server.HOME_ENV: self.home,
+                    server.PORT_ENV: str(free_port())}
+
+    def perflab(self, *args, timeout=60):
+        return subprocess.run([sys.executable, "-m", "perflab", *args], cwd=self.root, env=self.env, capture_output=True,
+                              text=True, timeout=timeout)
+
+    def tearDown(self):
+        self.perflab("server", "stop")
+
+    def test_racing_starts_share_one_server_and_a_second_run_exits(self):
+        procs = [subprocess.Popen([sys.executable, "-m", "perflab", "server", "start"], cwd=self.root, env=self.env,
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) for _ in range(3)]
+        outs = [p.communicate(timeout=60) for p in procs]
+        self.assertEqual([p.returncode for p in procs], [0, 0, 0], outs)
+        self.assertEqual(len({o.strip() for o, _ in outs}), 1, outs)
+        for port in (self.env[server.PORT_ENV], str(free_port())):  # its port, or another
+            r = self.perflab("server", "run", "--port", port, timeout=30)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("another server is running for " + self.home, r.stderr)
+        self.assertEqual(self.perflab("server", "status").returncode, 0)
+
+
 class PagesLinkTest(unittest.TestCase):
     def test_queue_page_follows_the_running_jobs_project_and_the_index_links_the_queue(self):
         from perflab import config, index, serverui
