@@ -34,16 +34,20 @@ def fixture(campaigns, name="br"):
         with open(os.path.join(d, "result.json"), "w") as f:
             if r is not None:
                 json.dump([r], f)
-    # corpus a: commit 0 and 4 over two rounds, 1 and 3 one round, 2 unmeasured; 4 is 20% faster than 3
-    base = lambda x: [[x, x + 0.1, x - 0.1], [x + 0.05, x - 0.05, x]]
+    # corpus a, two forks a round: commits 0, 3 and 4 over two rounds, 1 one round of one fork, 2 unmeasured; 4 is 20%
+    # faster than 3. A fork's iterations average to x, its second fork's to x + 0.2.
+    base = lambda x: [[x, x + 0.1, x - 0.1], [x + 0.2, x + 0.1, x + 0.3]]
     alloc = lambda x: [[x, x], [x, x + 1]]
     cell("a", 0, 1, result("a", base(10.0), alloc(1e6)))
     cell("a", 0, 2, result("a", base(10.1), alloc(1e6)))
-    cell("a", 1, 1, result("a", base(10.0), alloc(1e6)))
+    cell("a", 1, 1, result("a", base(10.0)[:1], alloc(1e6)[:1]))
     cell("a", 3, 1, result("a", base(10.0), alloc(9e5)))
+    cell("a", 3, 2, result("a", base(10.0), alloc(9e5)))
     cell("a", 4, 1, result("a", base(8.0), alloc(9e5)))
     cell("a", 4, 2, result("a", base(8.1), alloc(9e5)))
-    cell("b", 0, 1, result("b", base(5.0), alloc(2e6)))
+    # corpus b: one fork per commit, so nothing to pool
+    cell("b", 0, 1, result("b", base(5.0)[:1], alloc(2e6)[:1]))
+    cell("b", 1, 1, result("b", base(5.5)[:1], alloc(2e6)[:1]))
     cell("b", 2, 1, None)  # running: JMH writes result.json when the fork ends
     # a profdiff of two of its commits
     os.makedirs(os.path.join(camp, f"diff-{SHAS[3][:10]}-{SHAS[4][:10]}"))
@@ -72,6 +76,27 @@ class CiTest(unittest.TestCase):
         self.assertAlmostEqual(h, 31.599 * 1.0 / 3 ** 0.5)
         self.assertEqual(metrics.ci999([1.0]), (1.0, None))
 
+    def test_welch_by_hand(self):
+        # va = 1/4, vb = 4/4; df = 1.25^2 / (0.25^2/3 + 1/3) = 4.4118; t999 between 4 (8.610) and 5 (6.869), in 1/df
+        d, half, df = metrics.welch((10.0, 1.0, 4, 3), (12.0, 2.0, 4, 3))
+        self.assertAlmostEqual(d, 20.0)
+        self.assertAlmostEqual(df, 1.5625 / (0.0625 / 3 + 1 / 3))
+        t = 8.610 + (1 / 4 - 1 / df) / (1 / 4 - 1 / 5) * (6.869 - 8.610)
+        self.assertAlmostEqual(half, 100 * t * 1.25 ** 0.5 / 10)
+        self.assertAlmostEqual(half, 87.18, places=1)  # not significant: |20| < 87
+        self.assertEqual(metrics.welch((10.0, None, 1, None), (12.0, 1.0, 4, 3))[1:], (None, None))
+        # a one-sided pool (df 9) against a commit's own forks
+        d, half, df = metrics.welch((10.0, 0.1, 1, 9), (9.0, 0.1, 4, 3))
+        va, vb = 0.01, 0.0025
+        self.assertAlmostEqual(df, (va + vb) ** 2 / (va ** 2 / 9 + vb ** 2 / 3))
+        self.assertAlmostEqual(half, 100 * metrics.t999(df) * (va + vb) ** 0.5 / 10)
+
+    def test_pooled_rel_sd(self):
+        r, df = metrics.pooled_rel_sd([(10.0, 1.0, 3), (20.0, 4.0, 1), (5.0, None, 0), (7.0, 0.0, 0)])
+        self.assertEqual(df, 4)
+        self.assertAlmostEqual(r, ((3 * 0.01 + 1 * 0.04) / 4) ** 0.5)
+        self.assertEqual(metrics.pooled_rel_sd([(5.0, None, 0)]), (None, 0))
+
 
 class BranchViewTest(unittest.TestCase):
     def setUp(self):
@@ -95,35 +120,85 @@ class BranchViewTest(unittest.TestCase):
         self.assertEqual(d["diffs"], [{"name": f"{self.v[3]}-{self.v[4]}", "href": f"diff-{self.v[3]}-{self.v[4]}/compare.html",
                                        "a": self.v[3], "b": self.v[4]}])
 
-    def test_cells_mean_sd_ci_and_raw(self):
+    def test_cells_are_over_forks(self):
         a = branchview.branch_view(self.camp)["cells"]["a"]
         self.assertNotIn(self.v[2], a)  # unmeasured
         c0 = a[self.v[0]]
-        self.assertEqual((c0["state"], c0["rounds"]), ("done", 2))
-        mean, sd, ci, ok = c0["m"]["score"]
-        self.assertAlmostEqual(mean, 10.05)
-        self.assertAlmostEqual(sd, metrics.stats([10.0, 10.1])[1])
-        samples = [x for r in (10.0, 10.1) for f in [[r, r + 0.1, r - 0.1], [r + 0.05, r - 0.05, r]] for x in f]
-        self.assertAlmostEqual(ci, metrics.ci999(samples)[1])
+        self.assertEqual((c0["state"], c0["rounds"], c0["forks"]), ("done", 2, 4))
+        # the forks' means: 10.0, 10.2 (round 1) and 10.1, 10.3 (round 2)
+        mean, sd, ci, ok, n, df, pooled = c0["m"]["score"]
+        self.assertAlmostEqual(mean, 10.15)
+        self.assertAlmostEqual(sd, (0.05 / 3) ** 0.5)  # deviations .15, .05, .05, .15
+        self.assertEqual((n, df, pooled), (4, 3, False))
+        self.assertAlmostEqual(ci, 12.924 * (0.05 / 3) ** 0.5 / 2)
         self.assertTrue(ok)
-        self.assertEqual(len(c0["raw"]["score"]), 4)  # two forks of each of two rounds
+        self.assertEqual(len(c0["raw"]["score"]), 4)  # every iteration kept, by fork
         self.assertEqual(len(c0["raw"]["alloc"]), 4)
-        self.assertIsNone(a[self.v[1]]["m"]["score"][1])  # one round: no sd over rounds
-        self.assertEqual(c0["s"]["score"][0], "10.05")
+        self.assertEqual(c0["s"]["score"][0], "10.15")
         b = branchview.branch_view(self.camp)["cells"]["b"]
         self.assertEqual(b[self.v[2]], {"state": "running"})
 
-    def test_delta_against_the_previous_measured_commit(self):
+    def test_one_fork_takes_the_pooled_spread(self):
+        a = branchview.branch_view(self.camp)["cells"]["a"]
+        mean, sd, ci, _, n, df, pooled = a[self.v[1]]["m"]["score"]
+        # relative variances of commits 0, 3 and 4, each with 3 df, pooled
+        r2 = ((0.05 / 3) / 10.15 ** 2 + (0.04 / 3) / 10.1 ** 2 + (0.05 / 3) / 8.15 ** 2) / 3
+        self.assertEqual((mean, n, df, pooled), (10.0, 1, 9, True))
+        self.assertAlmostEqual(sd, 10.0 * r2 ** 0.5)
+        self.assertAlmostEqual(ci, metrics.t999(9) * 10.0 * r2 ** 0.5)
+        self.assertNotEqual(a[self.v[1]]["s"]["score"][1], "")
+
+    def test_one_fork_and_nothing_to_pool_has_no_spread(self):
+        b = branchview.branch_view(self.camp)["cells"]["b"]
+        self.assertEqual(b[self.v[0]]["m"]["score"][1:3], [None, None])
+        self.assertEqual(b[self.v[0]]["s"]["score"][1], "")
+        d, half, verdict, _ = b[self.v[1]]["d"]["score"]
+        self.assertAlmostEqual(d, 10.0)
+        self.assertEqual((half, verdict), (None, "flat"))  # uncoloured: no spread yet
+
+    def test_delta_is_welch_over_fork_means(self):
         a = branchview.branch_view(self.camp)["cells"]["a"]
         self.assertIsNone(a[self.v[0]]["prev"])
         self.assertEqual(a[self.v[0]]["d"], {})
         self.assertEqual(a[self.v[3]]["prev"], self.v[1])  # skipping the unmeasured commit
-        d, spread, verdict = a[self.v[4]]["d"]["score"]
-        self.assertAlmostEqual(d, 100 * (8.05 / 10.0 - 1))
-        self.assertIsNotNone(spread)  # one round against two: the CIs combined
-        self.assertEqual(verdict, "better")
-        self.assertEqual(a[self.v[3]]["d"]["score"][2], "flat")
+        # 4 against 3: forks 8.0, 8.2, 8.1, 8.3 against 10.0, 10.2, 10.0, 10.2
+        va, vb = (0.04 / 3) / 4, (0.05 / 3) / 4
+        df = (va + vb) ** 2 / (va ** 2 / 3 + vb ** 2 / 3)
+        d, half, verdict, pooled = a[self.v[4]]["d"]["score"]
+        self.assertAlmostEqual(d, 100 * (8.15 / 10.1 - 1))
+        self.assertAlmostEqual(half, 100 * metrics.t999(df) * (va + vb) ** 0.5 / 10.1)
+        self.assertAlmostEqual(df, 5.927, places=3)
+        self.assertEqual((verdict, pooled), ("better", False))
+        # 3 against 1, one fork with the pooled sd and its 9 df
+        sd1 = a[self.v[1]]["m"]["score"][1]
+        va, vb = sd1 ** 2, (0.04 / 3) / 4
+        df = (va + vb) ** 2 / (va ** 2 / 9 + vb ** 2 / 3)
+        d, half, verdict, pooled = a[self.v[3]]["d"]["score"]
+        self.assertAlmostEqual(d, 1.0)
+        self.assertAlmostEqual(half, 100 * metrics.t999(df) * (va + vb) ** 0.5 / 10.0)
+        self.assertEqual((verdict, pooled), ("flat", True))
         self.assertAlmostEqual(a[self.v[3]]["d"]["alloc"][0], -10.0, places=3)
+
+    @unittest.skipUnless(shutil.which("node"), "needs node")
+    def test_the_page_computes_the_same_deltas(self):
+        cells = branchview.branch_view(self.camp)["cells"]
+        js = branchview.STATS_JS + (f"const cells = {json.dumps(cells)};\nconst out = {{}};\n"
+                                    "for (const [c, vs] of Object.entries(cells)) for (const [v, x] of Object.entries(vs))\n"
+                                    "  if (x.prev) for (const k of Object.keys(x.d)) out[c + '|' + v + '|' + k] = BH_STATS.welch(vs[x.prev].m[k], x.m[k]);\n"
+                                    "console.log(JSON.stringify(out));")
+        r = subprocess.run(["node", "-e", js], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = json.loads(r.stdout)
+        expected = {f"{c}|{v}|{k}": d for c, vs in cells.items() for v, x in vs.items() for k, d in x.get("d", {}).items()}
+        self.assertEqual(out.keys(), expected.keys())
+        self.assertIn("a|" + self.v[4] + "|score", out)
+        for key, (d, half, verdict, pooled) in expected.items():
+            jd, jhalf, jverdict, jpooled = out[key]
+            self.assertAlmostEqual(jd, d, msg=key)
+            self.assertEqual(jhalf is None, half is None, key)
+            if half is not None:
+                self.assertAlmostEqual(jhalf, half, msg=key)
+            self.assertEqual((jverdict, jpooled), (verdict, pooled), key)
 
 
 class BranchIndexTest(unittest.TestCase):

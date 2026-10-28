@@ -200,6 +200,33 @@ def ci999(xs):
     return mean, (t999(len(xs) - 1) * sd / len(xs) ** 0.5 if len(xs) > 1 else None)
 
 
+def pooled_rel_sd(groups):
+    """(relative sd, df) pooled over groups of samples [(mean, sd, df)], each group's relative variance weighted by its
+    df; (None, 0) when no group has df >= 1 and a nonzero mean. A spread for a group of one sample, from groups of the same
+    kind that have more."""
+    gs = [(sd / mean, df) for mean, sd, df in groups if df and df >= 1 and mean and sd is not None]
+    df = sum(df for _, df in gs)
+    return ((sum(df * r * r for r, df in gs) / df) ** 0.5, df) if df else (None, 0)
+
+
+def welch(a, b):
+    """Welch's t of b against a, each (mean, sd, n, df) of independent samples (sd and df may be a pool's): (Δ% of b
+    against a, half-width in % of its 99.9% CI with the Welch–Satterthwaite df, that df). The half-width and df are None
+    when either sd is unknown; Δ is None when a's mean is zero. The difference is significant at 99.9% exactly when
+    |Δ| > half-width."""
+    (ma, sa, na, dfa), (mb, sb, nb, dfb) = a, b
+    if not ma or mb is None:
+        return None, None, None
+    d = 100 * (mb / ma - 1)
+    if sa is None or sb is None:
+        return d, None, None
+    va, vb = sa * sa / na, sb * sb / nb
+    if va + vb == 0:
+        return d, 0.0, math.inf
+    df = (va + vb) ** 2 / sum(v * v / f for v, f in ((va, dfa), (vb, dfb)) if v)
+    return d, 100 * t999(df) * (va + vb) ** 0.5 / abs(ma), df
+
+
 def summarise(variants, per_unit=None):
     """{variant: [metrics of each round (`of`)]}, the first variant the baseline -> (columns [(key, label, kind, main)]
     in the order first seen, {variant: {key: (mean, sd or None for one round, Δ% or None, spread of Δ or None, Δ ok)}}).

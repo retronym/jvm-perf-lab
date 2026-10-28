@@ -4,15 +4,22 @@ directory has the branch.json the runner writes (doc/branch-explore-PLAN.md has 
 commits' short shas, its cells where every campaign's are, <campaign>/<corpus>/<variant>/<round>/result.json.
 
 `branch_view` gathers what the page draws, `section` puts it on the campaign's card, and BRANCH_JS draws it: the
-history table (numbers, dots on a shared per-column scale, or both), the chart (score left, a second metric right, the
-mean with its 99.9% CI over every measurement iteration of every fork), and the comparison of two selected rows. The
-view's state is in the page's URL (`?b.<campaign>=...`), so a view can be linked and survives the index's refresh.
+history table (numbers, dots on a shared per-column scale, or both), the chart (score left, a second metric right, each
+commit's mean with its 99.9% CI over forks, its forks' means and every measurement iteration), and the comparison of two
+selected rows. The view's state is in the page's URL (`?b.<campaign>=...`), so a view can be linked and survives the
+index's refresh.
 
-Per commit and corpus, a metric has its mean over rounds (as the campaign summary), its sd over rounds, and a 99.9%
-CI: from the measurement iterations of every fork pooled (`rawData` in result.json, the score's and those secondary
-metrics that have one), else from the rounds' means. A Δ is against the previous measured commit and is coloured, as
-in the summary, only when it is beyond its spread: the rounds' combined relative sd when both commits have two rounds
-or more, else their combined relative CIs (a coarse pass has one round per commit).
+The unit of variation is the fork: fork-to-fork variance (JIT decisions, code layout) dominates, and a fork's
+iterations are autocorrelated, so pooling iterations would make the interval far too narrow. Per commit, corpus and
+metric, each fork of each round contributes the mean of its measurement iterations (`rawData` in result.json, the
+score's and those secondary metrics that have one; a metric without it, its round's value). The commit's mean is
+theirs, and its 99.9% CI is t(n-1)·sd/√n over its n forks. A commit with one fork has no spread of its own: it takes
+the fork-to-fork relative sd pooled over the campaign's commits with two forks or more (same corpus and metric, each
+weighted by its df), marked as pooled; with no such commit yet it has no interval.
+
+A Δ is against the previous measured commit, and the comparison of two rows uses the same test (`metrics.welch`, and
+`welch` in the page): Welch's t on the forks' means, Welch–Satterthwaite df, a pooled sd for a side of one fork. Δ% is
+shown ± the half-width of its 99.9% CI and coloured only when significant at 99.9%.
 """
 import datetime, glob, html, json, math, os
 
@@ -41,6 +48,11 @@ def raw_of(r, k, u):
 
 def fin(x):
     return x if x is not None and math.isfinite(x) else None
+
+
+def fork_stats(m):
+    """A cell's metric `m` (as `branch_view` has it) as `metrics.welch` takes it: (mean, sd, n forks, df)."""
+    return m[0], m[1], m[4], m[5]
 
 
 def sig(x, n=5):
@@ -74,9 +86,11 @@ def branch_view(campaign_dir, rel_to=None):
     {"commits": [newest first: {sha, short, v (variant), subject, author, date, shown (date), index, merged}],
      "corpora": [...], "metrics": [{k, h (heading), kind}], the score first,
      "cells": {corpus: {variant: {"state": "done" | "running", "rounds": n,
-                                  "m": {k: [mean, sd over rounds or None, CI half-width or None, Δ against it means something]},
+                                  "forks": n, "m": {k: [mean, sd of the forks' means, CI half-width, Δ against it
+                                  means something, n forks, df, sd pooled]} (sd, CI and df None without a spread),
                                   "s": {k: [mean shown, CI shown]}, "raw": {k: [[x, ...] per fork, of every round]},
-                                  "d": {k: [Δ%, spread, verdict]}, "prev": variant of the previous measured commit}}},
+                                  "d": {k: [Δ%, half-width of its CI, verdict, a side pooled]},
+                                  "prev": variant of the previous measured commit}}},
      "diffs": [{name, href}]}
 
     `rel_to` is the directory the page's links are relative to (default `campaign_dir`)."""
@@ -99,7 +113,7 @@ def branch_view(campaign_dir, rel_to=None):
 
     cols, cells = {}, {}
     for corpus in corpora:
-        per_v, prev = {}, None
+        per_v, units, prev = {}, {}, None
         for v in variants:
             rs, running = [], False
             for cell in sorted(glob.glob(os.path.join(campaign_dir, corpus, v, "*"))):
@@ -115,32 +129,46 @@ def branch_view(campaign_dir, rel_to=None):
                     per_v[v] = {"state": "running"}
                 continue
             of = [metrics.of(r, per_unit, metrics.cached_hw_events(cell)) for r, cell in rs]
-            # the Δ against the previous measured commit, as the summary computes it for two variants
-            cs, st = metrics.summarise({**({prev[0]: prev[1]} if prev else {}), v: of}, per_unit)
-            for k, label, kind, main in cs:
-                cols.setdefault(k, (k, label, kind, main))
-            kinds = {k: kind for k, _, kind, _ in cs}
-            m, s, raw, d = {}, {}, {}, {}
-            for k, (mean, sd, dd, spread, ok) in st[v].items():
-                kind = kinds[k]
-                forks = [f for (r, _) in rs for f in raw_of(r, k, metrics.units_per_op(r, per_unit) if per_unit else 1.0)]
-                samples = [x for f in forks for x in f]
-                _, ci = metrics.ci999(samples) if len(samples) > 1 else (None, None)
-                if ci is None and sd is not None:
-                    ci = metrics.t999(len(rs) - 1) * sd / len(rs) ** 0.5
-                m[k] = [fin(mean), fin(sd), fin(ci), metrics.delta_ok(mean, kind, per_unit)]
-                s[k] = [metrics.fmt(kind, mean), "" if ci is None else ci_shown(kind, ci, mean)]
+            kinds, raw, us = {}, {}, {}
+            for ms in of:
+                for k, label, kind, main, _ in ms:
+                    cols.setdefault(k, (k, label, kind, main))
+                    kinds[k] = kind
+            for k in kinds:
+                forks = [f for (r, _) in rs for f in raw_of(r, k, metrics.units_per_op(r, per_unit) if per_unit else 1.0) if f]
                 if forks:
-                    raw[k] = [[sig(x) for x in f] for f in forks if f]
-                if prev and dd is not None:
-                    pm = per_v[prev[0]]["m"].get(k)
-                    if spread is None and pm and pm[2] is not None and ci is not None and pm[0] and mean:
-                        spread = 100 * ((pm[2] / pm[0]) ** 2 + (ci / mean) ** 2) ** 0.5
-                    d[k] = [fin(dd), fin(spread), index.verdict(dd, spread, ok)]
-            per_v[v] = {"state": "done", "rounds": len(rs), "m": m, "s": s, "raw": raw, "d": d, "prev": prev[0] if prev else None}
+                    raw[k] = [[sig(x) for x in f] for f in forks]
+                # the unit of variation is the fork: the mean of its measurement iterations; a metric without them has
+                # the round's value (JMH's mean over the round's forks)
+                us[k] = [sum(f) / len(f) for f in forks] or [x for ms in of for kk, _, _, _, x in ms if kk == k and fin(x) is not None]
+            units[v] = (us, kinds)
+            per_v[v] = {"state": "done", "rounds": len(rs), "forks": max((len(u) for u in us.values()), default=0),
+                        "m": {}, "s": {}, "raw": raw, "d": {}, "prev": prev}
             if running:
                 per_v[v]["running"] = True
-            prev = (v, of)
+            prev = v
+        # per metric, the fork-to-fork relative sd pooled over the commits with two forks or more, for those with one
+        stat = {v: {k: (*metrics.stats(xs), len(xs)) for k, xs in us.items() if xs} for v, (us, _) in units.items()}
+        keys = {k for st in stat.values() for k in st}
+        pool = {k: metrics.pooled_rel_sd([(st[k][0], st[k][1], st[k][2] - 1) for st in stat.values() if k in st]) for k in keys}
+        for v, (us, kinds) in units.items():
+            x = per_v[v]
+            for k, (mean, sd, n) in stat[v].items():
+                kind, pooled, df = kinds[k], n < 2, n - 1
+                if pooled:
+                    r, df = pool[k]
+                    sd = None if r is None else r * abs(mean)
+                ci = None if sd is None else metrics.t999(df) * sd / n ** 0.5
+                x["m"][k] = [fin(mean), fin(sd), fin(ci), metrics.delta_ok(mean, kind, per_unit), n, df if sd is not None else None, pooled and sd is not None]
+                x["s"][k] = [metrics.fmt(kind, mean), "" if ci is None else ci_shown(kind, ci, mean)]
+            if x["prev"]:
+                pm = per_v[x["prev"]]["m"]
+                for k, m in x["m"].items():
+                    if k not in pm:
+                        continue
+                    d, half, _ = metrics.welch(fork_stats(pm[k]), fork_stats(m))
+                    if d is not None:
+                        x["d"][k] = [fin(d), fin(half), index.verdict(d, half, pm[k][3]), pm[k][6] or m[6]]
         if per_v:
             cells[corpus] = per_v
     corpora = [c for c in corpora if c in cells] + [c for c in named if c not in cells]
@@ -251,14 +279,19 @@ def section(campaign_dir, rel_to, corpus_param="corpus"):
     n = len(data["commits"])
     measured = len({v for cs in data["cells"].values() for v, c in cs.items() if c["state"] == "done"})
     note = (f"{n} first-parent commits of <code>{esc(data['range'])}</code>, newest first; {measured} measured. "
-            "Mean over rounds ± 99.9% CI; Δ against the previous measured commit")
+            "Mean over forks ± 99.9% CI over forks; Δ against the previous measured commit")
     help_ = ui.help_popover(
         "<p style='margin-top:0'>A row per first-parent commit; a merge's <b>+n</b> lists the commits it brought in. Per corpus, the "
-        "score as a number (mean over rounds ± a 99.9% confidence interval over every measurement iteration of every fork), as a dot "
-        "on a scale shared down the column, or both, and a second metric beside it.</p><p>Δ is against the previous (older) measured "
-        "commit, coloured only when it is beyond the spread: the rounds' sd when both commits have two rounds or more, else their CIs.</p>"
-        "<p><b>Chart</b>: commits oldest to newest, gaps where a commit is unmeasured; error bars are the CI, "
-        "the cloud every iteration. Tick two rows (or one, against the commit before it) to compare them. The view is kept in the "
+        "score as a number, as a dot on a scale shared down the column, or both, and a second metric beside it.</p>"
+        "<p>The unit is the <b>fork</b>: each fork of each round counts once, as the mean of its measurement iterations (they vary "
+        "far less within a fork than between forks, and are not independent). A value is the mean over forks ± a 99.9% confidence "
+        "interval over forks. A commit with one fork has no spread of its own: † marks an interval from the fork-to-fork sd pooled "
+        "over this corpus's commits with two forks or more; until there is one, it has none.</p>"
+        "<p>Δ is against the previous (older) measured commit, ± its 99.9% CI (Welch's t over the forks' means), coloured only when "
+        "significant at 99.9%. Comparing two rows uses the same test.</p>"
+        "<p><b>Chart</b>: commits oldest to newest, gaps where a commit is unmeasured; error bars are the 99.9% CI over forks "
+        "(lighter when pooled), dashes each fork's mean, the faint cloud every iteration. Tick two rows (or one, against the commit "
+        "before it) to compare them. The view is kept in the "
         "page's URL.</p><p style='margin-bottom:0'><b>Profiles</b> are runs of their own (a profiler perturbs the score), in the "
         "campaign <i>&lt;name&gt;.profile</i> beside this one, from the same builds: <code>perflab branch profile</code>. A row's "
         "<b>profile</b> badge opens its flame graphs; comparing two rows shows their differential flame graphs (<code>perflab branch "
@@ -284,7 +317,7 @@ table.bh-t tr.bh-sub td{padding-top:0;border-bottom:1px solid var(--line2)} tabl
 .bh-v{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end} .bh-v .pm{white-space:nowrap}
 .bh-pend{color:var(--muted);font-size:11.5px}
 svg.bh-dot{display:block;overflow:visible} svg.bh-dot .bl{stroke:var(--line)} svg.bh-dot .wh{stroke:var(--muted);stroke-width:1.2}
-svg.bh-dot circle{fill:var(--fg)} svg.bh-dot circle.better{fill:var(--ok)} svg.bh-dot circle.worse{fill:var(--bad)}
+svg.bh-dot .wh.pl{opacity:.45;stroke-dasharray:2 1.5} svg.bh-dot circle{fill:var(--fg)} svg.bh-dot circle.better{fill:var(--ok)} svg.bh-dot circle.worse{fill:var(--bad)}
 .bh-chart figure{margin:4px 0 8px} .bh-leg{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:12px;color:var(--muted);margin:0 0 2px}
 .bh-leg i{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--link);margin-right:4px;vertical-align:-1px}
 .bh-leg i.s2{background:var(--brand);border-radius:1px;transform:rotate(45deg) scale(.85)}
@@ -292,7 +325,8 @@ svg.bh-g{width:100%;height:auto;display:block;overflow:visible;user-select:none}
 svg.bh-g .ax{stroke:var(--line)} svg.bh-g .gl{stroke:var(--line2)} svg.bh-g .hit{fill:transparent;cursor:pointer}
 svg.bh-g .band{fill:transparent} svg.bh-g .band.sel{fill:var(--link-bg)} svg.bh-g .band.hl{fill:var(--line2)}
 svg.bh-g .c1{fill:var(--link);opacity:.28} svg.bh-g .c2{fill:var(--brand);opacity:.28}
-svg.bh-g .e1{stroke:var(--link);stroke-width:1.6} svg.bh-g .e2{stroke:var(--brand);stroke-width:1.6}
+svg.bh-g .e1{stroke:var(--link);stroke-width:1.6} svg.bh-g .e2{stroke:var(--brand);stroke-width:1.6} svg.bh-g .pl{opacity:.45;stroke-dasharray:3 2}
+svg.bh-g .f1{stroke:var(--link);stroke-width:1.3;opacity:.75} svg.bh-g .f2{stroke:var(--brand);stroke-width:1.3;opacity:.75}
 svg.bh-g .p1{fill:var(--link);stroke:var(--panel);stroke-width:1.2} svg.bh-g .p2{fill:var(--brand);stroke:var(--panel);stroke-width:1.2}
 svg.bh-g .l1{fill:none;stroke:var(--link);stroke-width:1;opacity:.6} svg.bh-g .l2{fill:none;stroke:var(--brand);stroke-width:1;opacity:.6;stroke-dasharray:3 2}
 svg.bh-g text.un{opacity:.45} svg.bh-g text.yl{font-size:10.5px}
@@ -309,8 +343,42 @@ a.bh-pb:hover{text-decoration:none;border-color:var(--brand)} .bh-pb.run{color:v
 @media (max-width:700px){table.bh-t td.cm,table.bh-t th.cm{min-width:150px;max-width:170px} .bh-subj,.bh-who{max-width:130px}}
 """
 
+# `metrics.t999` and `metrics.welch` for the page, on a cell's metric as `branch_view` has it: [mean, sd, CI, Δ ok,
+# n forks, df, pooled]; welch(x, y) is [Δ% of y against x, half-width of its 99.9% CI, verdict, a side pooled] or null
+STATS_JS = r"""
+const BH_STATS = (() => {
+  const T999 = __T999__;
+  function t999(df) {
+    for (let i = 1; i < T999.length; i++) {
+      const [d0, t0] = T999[i - 1], [d1, t1] = T999[i];
+      if (d1 == null || df <= d1) {
+        if (df <= d0) return t0;
+        return t0 + (1 / d0 - 1 / df) / (1 / d0 - (d1 == null ? 0 : 1 / d1)) * (t1 - t0);
+      }
+    }
+    return T999[T999.length - 1][1];
+  }
+  function welch(x, y) {
+    if (!x || !y || x[0] == null || y[0] == null || !x[0]) return null;
+    const d = 100 * (y[0] / x[0] - 1);
+    let h = null;
+    if (x[1] != null && y[1] != null) {
+      const va = x[1] * x[1] / x[4], vb = y[1] * y[1] / y[4];
+      if (va + vb === 0) h = 0;
+      else {
+        const df = (va + vb) ** 2 / ((va ? va * va / x[5] : 0) + (vb ? vb * vb / y[5] : 0));
+        h = 100 * t999(df) * Math.sqrt(va + vb) / Math.abs(x[0]);
+      }
+    }
+    const v = !x[3] ? 'na' : h == null || Math.abs(d) <= h || Math.abs(d) < 0.005 ? 'flat' : d > 0 ? 'worse' : 'better';
+    return [d, h, v, !!(x[6] || y[6])];
+  }
+  return {t999, welch};
+})();
+""".replace("__T999__", json.dumps([[d if math.isfinite(d) else None, t] for d, t in metrics.T999]))
+
 # draws each branch campaign's history (`section`) from its data (`branch_view`), in the state in the page's URL
-JS = r"""
+JS = STATS_JS + r"""
 const BH = (() => {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
   const mem = {};  // per campaign, for this page only: the merges opened, the commit hovered, the jobs queued by pair
@@ -361,23 +429,17 @@ const BH = (() => {
   }
   function step(span) { const p = Math.pow(10, Math.floor(Math.log10(span / 4))), r = span / 4 / p; return p * (r >= 5 ? 5 : r >= 2 ? 2 : 1); }
   const pct = (d, sp) => `${d >= 0 ? '+' : ''}${d.toFixed(2)}%` + (sp != null ? ` <span class="pm">± ${sp.toFixed(2)}</span>` : '');
-  const TITLE = {flat: 'inconclusive: within the spread', worse: 'higher, beyond the spread', better: 'lower, beyond the spread'};
+  const TITLE = {flat: 'inconclusive: not significant at 99.9% (Welch’s t over forks)', worse: 'higher, significant at 99.9% (Welch’s t over forks)',
+                 better: 'lower, significant at 99.9% (Welch’s t over forks)'};
+  const POOLED = '† one fork: its spread is the fork-to-fork sd pooled over the commits with two forks or more';
   function delta(x) {
     if (!x || x[0] == null) return '';
     if (x[2] === 'na') return '<span class="d na" title="the values are about zero: no percent change">–</span>';
-    return `<span class="d ${x[2]}" title="${x[1] == null ? 'no spread' : TITLE[x[2]]}">${pct(x[0], x[1])}</span>`;
+    const t = x[1] == null ? '1 fork: no spread yet' : TITLE[x[2]] + '; ± the 99.9% CI of Δ' + (x[3] ? '. ' + POOLED : '');
+    return `<span class="d ${x[2]}" title="${t}">${pct(x[0], x[1])}${x[1] != null && x[3] ? '†' : ''}</span>`;
   }
-  // as `branchview.branch_view` (after `metrics.summarise`): Δ of b against a, its spread from the rounds' sd, else the CIs
-  function pairDelta(a, b, k) {
-    const x = a && a.m && a.m[k], y = b && b.m && b.m[k];
-    if (!x || !y || x[0] == null || y[0] == null || !x[0]) return null;
-    const d = 100 * (y[0] / x[0] - 1);
-    let sp = null;
-    if (x[1] != null && y[1] != null && y[0]) sp = 100 * Math.hypot(x[1] / x[0], y[1] / y[0]);
-    else if (x[2] != null && y[2] != null && y[0]) sp = 100 * Math.hypot(x[2] / x[0], y[2] / y[0]);
-    const v = !x[3] ? 'na' : sp == null || Math.abs(d) <= sp || Math.abs(d) < 0.005 ? 'flat' : d > 0 ? 'worse' : 'better';
-    return [d, sp, v];
-  }
+  // Δ of b against a, as `branchview.branch_view` computes the Δ column (`metrics.welch`)
+  const pairDelta = (a, b, k) => BH_STATS.welch(a && a.m && a.m[k], b && b.m && b.m[k]);
   // the extent of a metric's mean ± CI (and with `withRaw` its samples) down a corpus's column
   function extent(d, c, k, withRaw) {
     let lo = Infinity, hi = -Infinity;
@@ -395,7 +457,7 @@ const BH = (() => {
   }
   function dot(m, ext, verdict) {
     const W = 90, X = y => (3 + (y - ext[0]) / (ext[1] - ext[0]) * (W - 6)).toFixed(1);
-    const ci = m[2] != null ? `<path class="wh" d="M${X(m[0] - m[2])} 7H${X(m[0] + m[2])}M${X(m[0] - m[2])} 4v6M${X(m[0] + m[2])} 4v6"/>` : '';
+    const ci = m[2] != null ? `<path class="wh${m[6] ? ' pl' : ''}" d="M${X(m[0] - m[2])} 7H${X(m[0] + m[2])}M${X(m[0] - m[2])} 4v6M${X(m[0] + m[2])} 4v6"/>` : '';
     return `<svg class="bh-dot" viewBox="0 0 ${W} 14" width="${W}" height="14" aria-hidden="true"><line class="bl" x1="0" x2="${W}" y1="7" y2="7"/>${ci}`
       + `<circle cx="${X(m[0])}" cy="7" r="3.2" class="${verdict || ''}"/></svg>`;
   }
@@ -405,10 +467,11 @@ const BH = (() => {
     if (x.state === 'running') return '<span class="badge running">running</span>';
     const m = x.m[k], s = x.s[k];
     if (!m) return '';
-    const n = st.form === 'dot' ? '' : `<span>${esc(s[0])}${s[1] ? ` <span class="pm">± ${esc(s[1])}</span>` : ''}</span>`;
+    const dag = m[6] ? '†' : '';
+    const n = st.form === 'dot' ? '' : `<span>${esc(s[0])}${s[1] ? ` <span class="pm">± ${esc(s[1])}${dag}</span>` : ''}</span>`;
     const g = st.form === 'num' || !exts[c + '|' + k] ? '' : dot(m, exts[c + '|' + k], (x.d[k] || [])[2]);
-    const tip = `${esc(s[0])}${s[1] ? ' ± ' + esc(s[1]) : ''} (99.9% CI); ${x.rounds} round${x.rounds > 1 ? 's' : ''}`
-      + (m[1] != null ? `, sd over rounds ${(100 * m[1] / m[0]).toFixed(2)}%` : '');
+    const tip = `${esc(s[0])}${s[1] ? ' ± ' + esc(s[1]) + dag + ' (99.9% CI over forks)' : ''}; ${m[4]} fork${m[4] > 1 ? 's' : ''}, ${x.rounds} round${x.rounds > 1 ? 's' : ''}`
+      + (m[1] == null ? '; 1 fork: no spread yet' : m[6] ? `. ${POOLED}: ${(100 * m[1] / m[0]).toFixed(2)}%` : `, sd of the forks’ means ${(100 * m[1] / m[0]).toFixed(2)}%`);
     return `<span class="bh-v" title="${tip}">${n}${g}</span>`;
   }
   // the corpora the filter bar picked, all when it picked none of these
@@ -492,8 +555,11 @@ const BH = (() => {
         if (!v || v[0] == null) { prev = null; return; }
         const cx = X(i) + dx;
         let j = 0;
-        for (const f of (x.raw || {})[m.k] || []) for (const s of f) g += `<circle class="c${n}" cx="${f1(cx + jit(i * 7 + n, j++) * spread)}" cy="${f1(y(s))}" r="1.7"/>`;
-        if (v[2] != null) g += `<path class="e${n}" d="M${f1(cx)} ${f1(y(v[0] - v[2]))}V${f1(y(v[0] + v[2]))}M${f1(cx - 4)} ${f1(y(v[0] - v[2]))}h8M${f1(cx - 4)} ${f1(y(v[0] + v[2]))}h8"/>`;
+        const forks = (x.raw || {})[m.k] || [];
+        for (const f of forks) for (const s of f) g += `<circle class="c${n}" cx="${f1(cx + jit(i * 7 + n, j++) * spread)}" cy="${f1(y(s))}" r="1.7"/>`;
+        // each fork's mean, a short dash: the unit the interval is over
+        for (const f of forks) if (f.length) { const fy = f1(y(f.reduce((p, s) => p + s, 0) / f.length)); g += `<path class="f${n}" d="M${f1(cx - spread * 0.5)} ${fy}h${f1(spread)}"/>`; }
+        if (v[2] != null) g += `<path class="e${n}${v[6] ? ' pl' : ''}" d="M${f1(cx)} ${f1(y(v[0] - v[2]))}V${f1(y(v[0] + v[2]))}M${f1(cx - 4)} ${f1(y(v[0] - v[2]))}h8M${f1(cx - 4)} ${f1(y(v[0] + v[2]))}h8"/>`;
         g += n === 1 ? `<circle class="p1" cx="${f1(cx)}" cy="${f1(y(v[0]))}" r="4"/>`
           : `<rect class="p2" x="${f1(cx - 3.5)}" y="${f1(y(v[0]) - 3.5)}" width="7" height="7" transform="rotate(45 ${f1(cx)} ${f1(y(v[0]))})"/>`;
         // the means joined only between neighbours: an unmeasured commit is a gap
@@ -518,14 +584,14 @@ const BH = (() => {
       + d.corpora.map(x => `<button class="chip" data-bc="${esc(x)}" aria-pressed="${x === c}">${esc(x)}</button>`).join('') + '</span></div>' : '';
     box.innerHTML = `<figure>${pick}<div class="bh-leg"><span><i></i>${esc(unitFix(m1.h))} (left)</span>`
       + (m2 ? `<span><i class="s2"></i>${esc(unitFix(m2.h))} (right)</span>` : '')
-      + '<span>oldest → newest · error bars: 99.9% CI · faint dots: every iteration of every fork</span></div>'
+      + '<span>oldest → newest · error bars: 99.9% CI over forks (lighter, †: one fork, a pooled spread) · dashes: each fork’s mean · faint dots: every iteration</span></div>'
       + `<svg class="bh-g" viewBox="0 0 ${W} ${H}">${bands}${ax}<path class="l1" d="${lines[0]}"/><path class="l2" d="${lines[1]}"/>${g}${xl}${empty}${hits}</svg>`
       + '<p class="bh-tip k">Hover a commit to see its numbers; click to select it.</p></figure>';
   }
   function tipText(d, st, v) {
     const cm = d.commits.find(c => c.v === v), x = cellOf(d, st.c, v);
     if (!cm) return '';
-    const val = k => { const s = x && x.state === 'done' && x.s[k]; return s ? `${esc(s[0])}${s[1] ? ' ± ' + esc(s[1]) : ''}` : ''; };
+    const val = k => { const s = x && x.state === 'done' && x.s[k]; return s ? `${esc(s[0])}${s[1] ? ' ± ' + esc(s[1]) + (x.m[k][6] ? '†' : '') : ''}` : ''; };
     const m2 = st.m2 !== 'none' ? metric(d, st.m2) : null;
     const nums = !x ? 'pending' : x.state === 'running' ? 'running'
       : `${val('score')} ${esc(unitFix(metric(d, 'score').h))} ${delta(x.d.score)}`
