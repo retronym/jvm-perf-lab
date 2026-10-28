@@ -431,7 +431,7 @@ const BH = (() => {
   const pct = (d, sp) => `${d >= 0 ? '+' : ''}${d.toFixed(2)}%` + (sp != null ? ` <span class="pm">± ${sp.toFixed(2)}</span>` : '');
   const TITLE = {flat: 'inconclusive: not significant at 99.9% (Welch’s t over forks)', worse: 'higher, significant at 99.9% (Welch’s t over forks)',
                  better: 'lower, significant at 99.9% (Welch’s t over forks)'};
-  const POOLED = '† one fork: its spread is the fork-to-fork sd pooled over the commits with two forks or more';
+  const POOLED = '† a commit with one fork: its spread is the fork-to-fork sd pooled over this corpus’s commits with two forks or more';
   function delta(x) {
     if (!x || x[0] == null) return '';
     if (x[2] === 'na') return '<span class="d na" title="the values are about zero: no percent change">–</span>';
