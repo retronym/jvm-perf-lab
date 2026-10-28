@@ -242,6 +242,17 @@ class ServerTest(unittest.TestCase):
         self.call("POST", f"/api/jobs/{blocker['id']}/cancel")
         self.until(b["id"], "done")
 
+    def test_transcript_tail_and_offset(self):
+        j = self.submit("cells", "3", "0")
+        self.until(j["id"], "done")
+        path = f"/api/jobs/{j['id']}/transcript"
+        whole = self.transcript(j["id"])
+        self.assertEqual(self.call("GET", path + "?tail=2")[1], "cell 2\nfinished\n")
+        self.assertEqual(self.call("GET", path + "?offset=3")[1], whole[3:])
+        self.assertEqual(self.call("GET", path + "?offset=99999")[1], "")
+        for q in ("offset=abc", "tail=x", "offset=-1", "tail=-2"):
+            self.assertEqual(self.call("GET", f"{path}?{q}")[0], 400, q)
+
     def test_posts_need_the_token_and_our_origin(self):
         self.assertEqual(self.call("POST", "/api/jobs", {}, {"X-Perflab-Token": "nope"})[0], 403)
         self.assertEqual(self.call("POST", "/api/jobs", {}, {"Origin": "http://evil.example"})[0], 403)
@@ -333,6 +344,22 @@ class ServerTest(unittest.TestCase):
         self.assertGreaterEqual(r["reclaimed"], 50000)
         self.assertFalse(os.path.exists(os.path.join(c, ".build")))
         self.assertEqual(self.call("POST", "/api/storage/cleanup", {"action": "nuke"})[0], 400)
+
+
+class TailTest(unittest.TestCase):
+    def test_tail_reads_back_from_the_end(self):
+        f = os.path.join(tempfile.mkdtemp(), "t.txt")
+        lines = [f"line {i} µ\n" for i in range(50)]
+        for text in ("".join(lines), "".join(lines) + "last, unterminated"):
+            open(f, "w").write(text)
+            want = text.splitlines(keepends=True)
+            for n in (1, 3, 49, 50, 51, 200):
+                for block in (1, 7, 1 << 16):
+                    self.assertEqual(server._tail(f, n, block=block), "".join(want[-n:]), (n, block))
+        self.assertEqual(server._tail(f), text)
+        self.assertEqual(server._tail(os.path.join(f, "nope"), 3), "")
+        open(f, "w").close()
+        self.assertEqual(server._tail(f, 3), "")
 
 
 class StorageTest(unittest.TestCase):

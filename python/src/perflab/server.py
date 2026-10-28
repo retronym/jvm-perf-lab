@@ -518,17 +518,24 @@ sys.exit(rc if rc >= 0 else 128 - rc)
 """
 
 
-def _tail(path, lines=None, offset=None):
+def _tail(path, lines=None, offset=None, block=1 << 16):
+    """The file's text from byte `offset`, or its last `lines` lines (read back from its end, not all of it), or all."""
     try:
         with open(path, "rb") as f:
             if offset is not None:
                 f.seek(int(offset))
                 return f.read().decode(errors="replace")
-            data = f.read()
+            if not lines:
+                return f.read().decode(errors="replace")
+            pos, data = f.seek(0, os.SEEK_END), b""
+            while pos > 0 and data.count(b"\n") <= lines:  # one more than `lines`: the end of the line before them
+                n = min(block, pos)
+                pos -= n
+                f.seek(pos)
+                data = f.read(n) + data
     except OSError:
         return ""
-    text = data.decode(errors="replace")
-    return "".join(text.splitlines(keepends=True)[-lines:]) if lines else text
+    return b"".join(data.splitlines(keepends=True)[-lines:]).decode(errors="replace")
 
 
 # ---- HTTP
@@ -674,7 +681,14 @@ class Server:
                         if not m.group(2):
                             return self._send(200, public(j))
                         f = os.path.join(j["dir"], "output.log") if qs.get("file") == "output" else j["transcript"]
-                        text = _tail(f, offset=qs["offset"]) if "offset" in qs else _tail(f, int(qs.get("tail") or 0) or None)
+                        try:
+                            offset = int(qs["offset"]) if "offset" in qs else None
+                            lines = int(qs.get("tail") or 0)
+                        except ValueError:
+                            return self._error(400, "offset and tail are numbers")
+                        if (offset or 0) < 0 or lines < 0:
+                            return self._error(400, "offset and tail are not negative")
+                        text = _tail(f, offset=offset) if offset is not None else _tail(f, lines or None)
                         return self._send(200, text, "text/plain; charset=utf-8")
                     return self._error(404, "not found")
                 except (BrokenPipeError, ConnectionResetError):
