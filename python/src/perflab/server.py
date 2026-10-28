@@ -13,7 +13,8 @@ time, and serves a UI (the queue, storage admin) and every registered project's 
 A job is a perflab command line, `{argv, cwd, env}`: the server runs `python -m perflab --transcript
 <job dir>/transcript.txt <argv>` in `cwd`, in its own session and process group, with the submitting shell's toolchain
 variables (ENV_KEEP) and PERFLAB_CONTROL=<job dir>/control (perflab.control: pause and cancel at a cell boundary) and
-PERFLAB_JOB=<id>. Cancel writes `cancel` there, and after a grace period sends SIGTERM to the job's process group.
+PERFLAB_JOB=<id>, under a small wrapper that writes its exit status to <job dir>/exit.json (read by a server that
+adopts the job after a restart). Cancel writes `cancel` there, and after a grace period sends SIGTERM to the job's process group.
 
 State is in ~/.perflab/server (PERFLAB_SERVER_HOME): jobs.sqlite, token (POSTs carry it as X-Perflab-Token), server.json
 (pid, port), jobs/<id>/. The port is 8690 unless --port or PERFLAB_SERVER_PORT says otherwise.
@@ -65,6 +66,17 @@ def _alive(pid):
         return True
     except (OSError, TypeError, ValueError):
         return False
+
+
+def _exited(pid):
+    """Whether an adopted job's process has exited: reaped if it is this process's own child (a server restarted in
+    this process), else gone."""
+    try:
+        if os.waitpid(int(pid), os.WNOHANG)[0]:
+            return True
+    except (ChildProcessError, ValueError, TypeError):
+        pass
+    return not _alive(pid)
 
 
 def _listening(port):
@@ -309,7 +321,9 @@ class Worker(threading.Thread):
                 time.sleep(1)
 
     def command(self, job):
-        return [job["python"] or sys.executable, "-m", job["module"] or "perflab", "--transcript", job["transcript"], *job["argv"]]
+        """The job's perflab command line, under WRAPPER, which records how it ended in <job dir>/exit.json."""
+        return [sys.executable, "-c", WRAPPER, os.path.join(job["dir"], EXIT_NAME),
+                job["python"] or sys.executable, "-m", job["module"] or "perflab", "--transcript", job["transcript"], *job["argv"]]
 
     def environment(self, job):
         env = {k: v for k, v in os.environ.items() if not k.startswith("PERFLAB_")}
@@ -321,7 +335,7 @@ class Worker(threading.Thread):
 
     def spawn(self, job):
         os.makedirs(job["dir"], exist_ok=True)
-        for f in ("control", "control.ack"):
+        for f in ("control", "control.ack", EXIT_NAME):
             control.write(os.path.join(job["dir"], f), None)
         with open(os.path.join(job["dir"], "output.log"), "ab") as out:
             return subprocess.Popen(self.command(job), cwd=job["cwd"], env=self.environment(job), stdin=subprocess.DEVNULL,
@@ -342,9 +356,11 @@ class Worker(threading.Thread):
         ctl = os.path.join(job["dir"], "control")
         term_at = None
         while True:
-            rc = proc.poll() if proc else (None if _alive(pid) else "gone")
+            rc = proc.poll() if proc else ("gone" if _exited(pid) else None)
             if rc is not None:
                 break
+            if self.stopping.is_set():  # the server is stopping: the job runs on, and the next server adopts it
+                return
             j = self.q.get(jid)
             want = "paused" if control.acked(ctl) else "running"
             if j["state"] != want:
@@ -358,7 +374,10 @@ class Worker(threading.Thread):
                 term_at = float("inf")
             self.wake.wait(0.5)
             self.wake.clear()
-        if rc == "gone":  # adopted: its status went with the server that started it
+        ended = _read_json(os.path.join(job["dir"], EXIT_NAME))
+        if ended and isinstance(ended.get("rc"), int):  # the wrapper's record: all an adopted job leaves of its status
+            rc = ended["rc"]
+        if rc == "gone":  # adopted, and its wrapper died without a record (SIGKILL)
             rc = None
             failed = "[perflab] failed:" in _tail(job["transcript"], 20)
         else:
@@ -376,6 +395,27 @@ class Worker(threading.Thread):
             os.killpg(pgid, sig)
         except (ProcessLookupError, PermissionError):
             pass
+
+
+EXIT_NAME = "exit.json"
+# The job's process group leader: it runs the job, outlives a SIGTERM to the group (the job's to act on) and writes how
+# the job ended to exit.json, so that a server adopting the job (restarted while it ran) knows its status. Inline, so
+# that it needs nothing but the server's Python. rc is Popen's: -N for a signal.
+WRAPPER = r"""
+import json, os, signal, subprocess, sys, time
+for s in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+    signal.signal(s, lambda *_: None)
+out, cmd = sys.argv[1], sys.argv[2:]
+try:
+    rc = subprocess.Popen(cmd).wait()
+except OSError as e:
+    print(f"could not start {cmd[0]}: {e}", flush=True)
+    rc = 127
+with open(out + ".tmp", "w") as f:
+    json.dump({"rc": rc, "ended": time.time()}, f)
+os.replace(out + ".tmp", out)
+sys.exit(rc if rc >= 0 else 128 - rc)
+"""
 
 
 def _tail(path, lines=None, offset=None):
