@@ -52,8 +52,9 @@ const BenchTimeline = (() => {
 
   function mount(svg, legend, tip) {
     let D = {iters: [], series: [], pauses: [], load: [], jvm: [], profile: ''}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
-    let L = 150;
-    const R = 16;
+    let L = 150, R = 16;
+    // the score lane: every iteration's score at its time, and at the right, each variant's measurements as a cloud
+    const scoreRow = {name: 'score', h: 96, scores: true}, CLOUD = 96;
     const counterRows = [
       {name: 'iterations', h: 46},
       {name: 'benchmark thread', h: 80, key: 'bench_c', unit: 'G cycles/s'},
@@ -72,6 +73,7 @@ const BenchTimeline = (() => {
     let rows = counterRows, height = 0;
     const layout = () => {
       rows = D.series.length ? counterRows : plainRows.concat(D.load.length ? [{name: 'other processes', h: 60, load: true}] : []);
+      if (D.iters.some(i => i.kind === 'measure' || i.kind === 'warmup')) rows = [rows[0], scoreRow, ...rows.slice(1)];
       if (D.jvm.length) rows = rows.concat(jvmRows);
       height = rows.reduce((a, r) => a + r.h + 8, 8) + 24;
     };
@@ -107,6 +109,8 @@ const BenchTimeline = (() => {
       svg.innerHTML = '';
       const W = svg.clientWidth || 900;
       L = W < 600 ? 106 : 150;
+      layout();
+      R = rows.includes(scoreRow) ? 16 + Math.min(CLOUD, W / 6) : 16;
       const X = t => L + (t - x0) / (x1 - x0) * (W - L - R);
       defs();
       if (!D.iters.length && !D.series.length) {
@@ -114,7 +118,6 @@ const BenchTimeline = (() => {
         el('text', {x: 12, y: 24, class: 'lab'}).textContent = 'No iterations yet.';
         return;
       }
-      layout();
       svg.setAttribute('height', height);
       let y = 8;
       const ticks = W < 600 ? 6 : 12;
@@ -166,6 +169,8 @@ const BenchTimeline = (() => {
             el('line', {x1: X(s), x2: X(s), y1: 0, y2: height - 22, stroke: 'var(--fg)', 'stroke-width': 1, opacity: 0.35});
             el('text', {x: X(s) + 2, y: y + r.h + 1, class: 'lab'}).textContent = `fork ${f}`;
           }
+        } else if (r.scores) {
+          drawScores(r, y, W, X);
         } else if (r.jvm) {
           const th = (r.h - 4) / r.jvm.length;
           r.jvm.forEach((kind, k) => {
@@ -232,6 +237,53 @@ const BenchTimeline = (() => {
         }
         y += r.h + 8;
       }
+    }
+
+    // a stable jitter in [-1, 1] for the i-th point, so the cloud does not move as iterations arrive
+    const jitter = i => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return 2 * (x - Math.floor(x)) - 1; };
+    function drawScores(r, y, W, X) {
+      const its = D.iters.filter(i => i.kind === 'measure' || i.kind === 'warmup');
+      const meas = its.filter(i => i.kind === 'measure');
+      // the scale fits the measurements (warmups, often far off, are clipped to the edge as hollow marks)
+      const fit = (meas.length ? meas : its).map(i => i.score);
+      let lo = Math.min(...fit), hi = Math.max(...fit);
+      const pad = (hi - lo) * 0.12 || Math.abs(hi) * 0.02 || 1;
+      lo -= pad; hi += pad;
+      const Y = v => y + r.h - 6 - (Math.min(Math.max(v, lo), hi) - lo) / (hi - lo) * (r.h - 12);
+      const sx = L < 150 ? {x: L + 3, 'text-anchor': 'start', class: 'lab halo'} : {x: L - 4, 'text-anchor': 'end', class: 'lab'};
+      el('text', {...sx, y: Y(hi) + 8}).textContent = fmt(hi);
+      el('text', {...sx, y: Y(lo)}).textContent = fmt(lo);
+      el('line', {x1: L, x2: W - R, y1: Y((lo + hi) / 2), y2: Y((lo + hi) / 2), class: 'grid', 'stroke-dasharray': '2 4'});
+      const off = v => v < lo || v > hi;
+      const dot = (cx, it, rr) => {
+        const warm = it.kind === 'warmup', out = off(it.score);
+        const c = el('circle', {cx, cy: Y(it.score), r: rr, fill: warm || out ? 'none' : color(it.variant),
+          stroke: warm ? 'var(--life)' : color(it.variant), 'stroke-width': warm || out ? 1.2 : 0, opacity: warm ? 0.8 : 0.85});
+        c.dataset.tip = `#${it.i} ${it.kind} ${it.variant || ''}: ${fmt(it.score)} ${unitOf(it.unit)}` + (out ? ' (off the scale)' : '');
+      };
+      // over time: each iteration at its midpoint
+      for (const it of its) {
+        const t = (it.s + it.e) / 2;
+        if (t < x0 || t > x1) continue;
+        dot(X(t), it, 2.6);
+      }
+      // the distribution: a column per variant, measurements jittered across it, the median as a tick
+      const a = W - R + 10, w = R - 16 - 10;
+      el('line', {x1: a - 5, x2: a - 5, y1: y + 2, y2: y + r.h - 2, class: 'grid'});
+      const vs = variants.length ? variants : [''];
+      const cw = w / vs.length;
+      vs.forEach((v, k) => {
+        const xs = meas.filter(i => (i.variant || '') === v), mid = a + cw * (k + 0.5);
+        xs.forEach((it, j) => dot(mid + jitter(j + 7 * k) * cw * 0.32, it, 2.2));
+        if (xs.length) {
+          const sorted = xs.map(i => i.score).sort((p, q) => p - q), n = sorted.length;
+          const med = n % 2 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+          const m = el('line', {x1: mid - cw * 0.42, x2: mid + cw * 0.42, y1: Y(med), y2: Y(med), stroke: 'var(--fg)', 'stroke-width': 1.5});
+          m.dataset.tip = `${v || 'measurement'}: median ${fmt(med)} ${unitOf(xs[0].unit)} of ${n}, range ${fmt(sorted[0])}–${fmt(sorted[n - 1])}`;
+        }
+        if (vs.length > 1) el('text', {x: mid, y: y + r.h + 1, 'text-anchor': 'middle', class: 'lab'}).textContent = (n => v.length > n ? v.slice(0, n - 1) + '…' : v)(Math.max(3, Math.floor(cw / 6.2)));
+      });
+      if (!meas.length) el('text', {x: a, y: y + r.h / 2 + 4, class: 'lab'}).textContent = 'no measurements yet';
     }
 
     function set(data) {
