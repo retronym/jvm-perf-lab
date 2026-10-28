@@ -50,7 +50,7 @@ compares the work, not the op. The index's summary toggles between per unit and 
 """
 import atexit, glob, json, os, re, shlex, shutil, subprocess, sys, time
 
-from . import config, jmh, launch, loadgate, metrics, specs, transcript
+from . import branch, config, jmh, launch, loadgate, metrics, specs, transcript
 
 JMH_LOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "jmh.lock")
 MAX_ATTEMPTS = 10
@@ -86,6 +86,16 @@ class Spec:
         here = os.path.dirname(os.path.abspath(path))
         self.builds = {v: {**b, "checkout": os.path.normpath(os.path.join(here, b["checkout"])) if b.get("checkout") else None}
                        for v, b in (s.get("builds") or {}).items()}
+        self.out = os.path.join(cfg.campaigns, self.name)
+        # "branch": the commits of a range as variants, each its own build (perflab.branch)
+        self.branch = s.get("branch")
+        self.branch_info = None
+        if self.branch:
+            if self.builds or self.paired or s.get("variants"):
+                sys.exit(f"{path}: \"branch\" makes the variants; it cannot have \"variants\", \"builds\" or \"paired\"")
+            self.branch = {**self.branch, "checkout": os.path.normpath(os.path.join(here, self.branch["checkout"]))}
+            self.branch_info = branch.load(self.out, self.branch, write=False)
+            self.builds = {c["variant"]: {"checkout": self.branch["checkout"], "commit": c} for c in self.branch_info["commits"]}
         self.variants = {"paired": ""} if self.paired else s.get("variants") or {v: "" for v in self.builds}
         if self.builds and (self.paired or set(self.builds) != set(self.variants)):
             sys.exit(f"{path}: \"builds\" needs a build for each variant, and cannot be paired")
@@ -101,9 +111,12 @@ class Spec:
         self.per_unit = s.get("perUnit")
         self.historical = s.get("historical")
         self.description, self.variant_descriptions = s.get("description"), s.get("variantDescriptions") or {}
-        self.out = os.path.join(cfg.campaigns, self.name)
 
     def cells(self):
+        if self.branch_info:
+            for r, corpus, variant in branch.cells(self.rounds, self.corpora, self.branch_info["order"]):
+                yield r, corpus, self.corpora[corpus], variant, ""
+            return
         for r in range(1, self.rounds + 1):
             for corpus, iters in self.corpora.items():
                 for variant, flags in self.variants.items():
@@ -235,7 +248,7 @@ def run(spec, dry):
         shutil.copy(spec.path, os.path.join(spec.out, "spec.json"))
     # the spec version cells are tagged with; `perflab trees` records the user's spec once and passes its id down
     version = os.environ.get(specs.ENV) or specs.record(spec.out, spec.path)
-    todo = [c for c in cells if not os.path.exists(os.path.join(spec.cell_dir(c[1], c[3], c[0]), "result.json"))]
+    todo = [c for c in cells if not done(spec.cell_dir(c[1], c[3], c[0]))]
     log(f"{spec.name}: {len(cells)} cells, {len(todo)} to run")
     if not dry:
         # the index first: it lists the campaign's cells before any has run, and updates itself as they finish
@@ -249,7 +262,9 @@ def run(spec, dry):
     built = {}
     if spec.builds:  # builds are snapshots: launch mode, for this campaign (and a dry run shows it)
         os.environ["PERFLAB_BUILD_MODE"] = "launch"
-    if launch.enabled() and todo and not dry:
+    if spec.branch_info and not dry:
+        branch.save(spec.out, spec.branch_info)
+    if launch.enabled() and todo and not dry and not spec.branch_info:  # a branch builds each commit before its first cell
         for v in dict.fromkeys(c[3] for c in todo):
             b = spec.builds.get(v)
             if b is None:
@@ -262,6 +277,11 @@ def run(spec, dry):
                                         label=f"{spec.name}: {v} ({b['checkout'] or ''})")
     for r, corpus, iters, variant, flags in todo:
         dest = spec.cell_dir(corpus, variant, r)
+        if os.environ.get("PERFLAB_CONTROL") and not dry:  # under perflab server: pause or cancel between cells
+            from . import control
+            control.checkpoint()
+        if spec.branch_info and variant not in built and not dry:
+            built[variant] = build_commit(spec, spec.builds[variant]["commit"])
         cmd = spec.command(corpus, iters, variant, flags, dest, built.get(variant))
         if not dry:
             specs.tag(dest, version)
@@ -314,6 +334,34 @@ def run(spec, dry):
         s = summary(json.load(open(os.path.join(dest, "result.json")))[0])
         log(f"  {s['ms']:.1f} ± {s['err']:.1f} {s['unit']}" + (f", {s['cyc'] / 1e9:.2f}G cycles/op" if s.get("cyc") else "")
             + (f", other load {load:.2f} cores" if spec.loadgate else ""))
+
+
+def done(dest):
+    """A cell has a result: an interrupted one can leave an empty result.json, and is run again."""
+    res = os.path.join(dest, "result.json")
+    return os.path.exists(res) and os.path.getsize(res) > 0
+
+
+def build_commit(spec, commit):
+    """A branch commit's launch-mode build, in <campaign>/.build/<key>: checked out into the campaign's worktree and
+    built there, unless a build with the same key (tree, variables, build command) is already kept."""
+    tpl = branch.template()
+    probe = branch.env_for(spec.branch, os.path.join(spec.out, branch.WORKTREE))
+    dir = os.path.join(spec.out, launch.BUILD_DIR, branch.build_key(commit, probe, tpl))
+    if not os.path.exists(os.path.join(dir, launch.LAUNCH)):
+        wt = branch.checkout(spec.out, spec.branch_info, commit)
+        log(f"build of {commit['short']} {commit['subject'][:60]}")
+    else:
+        wt = None
+    built = launch.build(dir, branch.env_for(spec.branch, wt) if wt else probe,
+                         label=f"{spec.name}: {commit['short']} {commit['subject'][:60]}")
+    # the build says what it built (launch.json's "build"): the commit's tree, clean
+    b = built.get("build") or {}
+    if b.get("dirty"):
+        sys.exit(f"{dir}: the build of {commit['short']} was of a dirty checkout")
+    if b.get("commit") and branch.git(spec.branch["checkout"], "rev-parse", f"{b['commit']}^{{tree}}").strip() != commit["tree"]:
+        sys.exit(f"{dir}: built {b['commit'][:10]}, whose tree is not {commit['short']}'s")
+    return built
 
 
 def summary(r):

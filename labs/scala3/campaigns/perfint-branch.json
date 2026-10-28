@@ -1,0 +1,23 @@
+{
+  "name": "perfint-branch",
+  "description": [
+    "retronym/scala3 `scala3-perf-integration`, commit by commit: each first-parent merge is one performance PR on top of scala/scala3 main.",
+    "Explored coarse-first (doc/branch-explore.md): scalaz over every commit, ends first, then tastyQuery, then a second round in reverse."
+  ],
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M",
+  "rounds": 2,
+  "corpora": {
+    "scalaz": "-f 1 -wi 12 -i 8 -w 3 -r 3",
+    "tastyQuery": "-f 1 -wi 12 -i 8 -w 3 -r 3"
+  },
+  "branch": {
+    "checkout": "/Users/jzaugg-virtus/code/retronym/scala3",
+    "range": "74dd858355..708df2535c",
+    "env": {"SCALA3_CHECKOUT": "{checkout}", "SCALA3_BENCHMARKS": "/Users/jzaugg-virtus/code/.worktrees/scala3/scala3-benchmarks"}
+  },
+  "loadgate": {"maxCores": 1.5, "quietSecs": 30},
+  "gcLog": true
+}
