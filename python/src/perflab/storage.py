@@ -200,7 +200,10 @@ def cleanup(entries_, action, dry_run=True, target=None, days=None, now=None):
             result["reclaimed"] += b
             result["removed"].append(p)
             if not dry_run:
-                if os.path.isdir(p) and not os.path.islink(p):
+                if os.path.basename(p) == ".worktree":  # a git worktree: unregistered too, so a resume can add it again
+                    from . import branch
+                    branch.remove_worktree(os.path.dirname(p), _json(os.path.join(os.path.dirname(p), "branch.json")))
+                elif os.path.isdir(p) and not os.path.islink(p):
                     shutil.rmtree(p, ignore_errors=True)
                 else:
                     try:

@@ -447,6 +447,27 @@ class StorageTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             storage.cleanup(es, "profiles")
 
+    def test_dropping_a_branch_campaigns_worktree_unregisters_it(self):
+        repo = os.path.join(self.root, "repo")
+        git = lambda *a: subprocess.run(["git", "-C", repo, "-c", "user.name=t", "-c", "user.email=t@t", *a],
+                                        check=True, capture_output=True, text=True).stdout
+        os.makedirs(repo)
+        git("init", "-q")
+        git("commit", "-q", "--allow-empty", "-m", "c0")
+        camp = os.path.join(self.camps, "br")
+        os.makedirs(camp)
+        json.dump({"checkout": repo}, open(os.path.join(camp, "branch.json"), "w"))
+        wt = os.path.join(camp, ".worktree")
+        git("worktree", "add", "-q", "--detach", wt, "HEAD")
+        old = time.time() - 86400
+        for d, _, fs in os.walk(camp):
+            for f in fs:
+                os.utime(os.path.join(d, f), (old, old))
+        r = storage.cleanup(storage.scan([("p", self.camps, self.runs)]), "builds", dry_run=False)
+        self.assertIn(wt, r["removed"])
+        self.assertFalse(os.path.exists(wt))
+        self.assertNotIn(os.path.realpath(wt), git("worktree", "list"))
+
     def test_active_campaigns_and_runs_are_never_touched(self):
         for n in ("running", "building", "byjob", "byspec", "recent", "idle"):
             self.campaign(n)

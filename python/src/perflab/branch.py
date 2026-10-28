@@ -8,7 +8,7 @@ moved ref doesn't change what it measures). Every commit is checked out in turn 
 campaign, <campaign>/.worktree, so the build tool's incremental state carries over between neighbours and the user's
 checkout is left alone; "{checkout}" in env is that worktree. A commit's variant is its short sha.
 """
-import hashlib, json, os, subprocess, sys
+import hashlib, json, os, shutil, subprocess, sys
 
 from . import config
 
@@ -120,6 +120,7 @@ def checkout(out, b, commit):
     wt = os.path.join(out, WORKTREE)
     repo = b["checkout"]
     if not os.path.exists(os.path.join(wt, ".git")):
+        git(repo, "worktree", "prune")  # a worktree deleted by hand is still registered, and `add` refuses its path
         git(repo, "worktree", "add", "--detach", wt, commit["sha"])
     else:
         git(wt, "checkout", "--detach", "--force", commit["sha"])
@@ -130,10 +131,17 @@ def env_for(spec_branch, wt):
     return {k: str(x).replace("{checkout}", wt) for k, x in (spec_branch.get("env") or {}).items()}
 
 
-def remove_worktree(out, b):
+def remove_worktree(out, b=None):
+    """Removes the campaign's worktree, and unregisters it from the repo of `b` (branch.json; without it, or when git
+    can't, the directory is just deleted)."""
     wt = os.path.join(out, WORKTREE)
-    if os.path.exists(wt):
-        subprocess.run(["git", "-C", b["checkout"], "worktree", "remove", "--force", wt], capture_output=True)
+    repo = (b or {}).get("checkout")
+    if repo and os.path.exists(wt):
+        subprocess.run(["git", "-C", repo, "worktree", "remove", "--force", wt], capture_output=True)
+    if os.path.lexists(wt):
+        shutil.rmtree(wt, ignore_errors=True)
+    if repo:
+        subprocess.run(["git", "-C", repo, "worktree", "prune"], capture_output=True)
 
 
 def template():

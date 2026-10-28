@@ -79,6 +79,14 @@ class ResolveTest(unittest.TestCase):
         self.assertEqual(b["tip"], self.tip)
         self.assertEqual(b["order"][:2], [b["commits"][0]["variant"], b["commits"][3]["variant"]])
 
+    def test_a_worktree_deleted_by_hand_is_made_again(self):
+        out = tempfile.mkdtemp()
+        b = branch.resolve(self.repo, f"{self.base}..main")
+        wt = branch.checkout(out, b, b["commits"][0])
+        subprocess.run(["rm", "-rf", wt], check=True)  # still registered with the repo
+        self.assertEqual(branch.checkout(out, b, b["commits"][1]), wt)
+        self.assertEqual(git(wt, "rev-parse", "HEAD"), b["commits"][1]["sha"])
+
     def test_every_commit_without_first_parent(self):
         b = branch.resolve(self.repo, f"{self.base}..main", first_parent=False)
         self.assertEqual(len(b["commits"]), 6)
