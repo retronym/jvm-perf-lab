@@ -81,9 +81,9 @@ def snapshot(built, dir):
     return {**built, "classpath": cp, "javaOptions": opts, "snapshot": snap, "external": external, "built": built}
 
 
-def build(dir):
-    """Runs [build] launch into `dir` and snapshots it there; the snapshot's launch.json. An existing snapshot in `dir`
-    is reused (a campaign that resumes measures the build it started with)."""
+def build(dir, env=None):
+    """Runs [build] launch into `dir`, with the variables `env` set, and snapshots it there; the snapshot's launch.json.
+    An existing snapshot in `dir` is reused (a campaign that resumes measures the build it started with)."""
     from . import jmh
     path = os.path.join(dir, LAUNCH)
     if os.path.exists(path) and "snapshot" in (launch := read(path)):
@@ -95,7 +95,9 @@ def build(dir):
     staging = os.path.join(dir, "build")
     shutil.rmtree(staging, ignore_errors=True)
     os.makedirs(staging)
-    rc = jmh.run_build(tpl.replace("{out}", staging), os.path.join(staging, "build.log"))
+    if env:
+        transcript.say("[perflab] build with " + " ".join(f"{k}={v}" for k, v in env.items()))
+    rc = jmh.run_build(tpl.replace("{out}", staging), os.path.join(staging, "build.log"), env=env)
     built_f = os.path.join(staging, LAUNCH)
     if rc or not os.path.exists(built_f):
         sys.exit(f"the build step failed (exit {rc}, see {staging}/build.log)")

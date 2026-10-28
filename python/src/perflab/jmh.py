@@ -126,7 +126,7 @@ def profile_args(profile, out, kperf=None, lib=None):
 def jmh_command(args_file, built=None):
     """The command that runs JMH with `args_file`: [build] jmh, or in launch mode, `java` from the build's snapshot
     `built` (launch.build), with the JDK the arguments name by -jvm, else the build's."""
-    if launch.enabled():
+    if built is not None or launch.enabled():
         if built is None:  # a dry run: the build step has not run
             return f"[launch mode] {config.get().get('build', 'launch')}; then java <the snapshot's options and classpath> <main> @{args_file}"
         with open(args_file) as f:
@@ -200,15 +200,15 @@ def brief(cmd):
     return shlex.join(words) if len(words) > 1 else cmd
 
 
-def run_build(cmd, log_path, every=None, tick=None):
+def run_build(cmd, log_path, every=None, tick=None, env=None):
     """Runs the build, logging to `log_path` and, line by line as it comes, to the transcript, followed by JMH's log
-    beside it; calls `tick` every `every` seconds while it runs."""
+    beside it; calls `tick` every `every` seconds while it runs. `env`: variables set for it."""
     root = config.get().root
     transcript.say(f"[perflab] command: {brief(cmd)}\n[perflab] its log: {log_path}")
     with open(log_path, "w") as log:
         log.write(f"$ {cmd}\n")
         proc = subprocess.Popen(cmd, shell=True, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True, errors="replace", bufsize=1)
+                                text=True, errors="replace", bufsize=1, env={**os.environ, **env} if env else None)
 
         def copy():
             for line in proc.stdout:
@@ -231,6 +231,7 @@ def run_build(cmd, log_path, every=None, tick=None):
             done.set()
             for t in threads:
                 t.join(timeout=5)
+            proc.stdout.close()
 
 
 def mark(out, status, **kw):

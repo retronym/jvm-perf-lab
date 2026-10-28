@@ -1,6 +1,6 @@
 # Design: perflab launches JMH itself
 
-Status: steps 1 and 2 are implemented (`[build] mode = "launch"`, `perflab.launch`; the scala3 lab's `perflabLaunch`); 3 and 4 are not. A mode beside `[build] jmh = "sbt --client '...Jmh/run {args}'"`, not a replacement.
+Status: steps 1 to 3 are implemented (`[build] mode = "launch"`, `perflab.launch`; the scala3 lab's `perflabLaunch`); 4 is not. A mode beside `[build] jmh = "sbt --client '...Jmh/run {args}'"`, not a replacement.
 
 ## Problem
 
@@ -71,6 +71,6 @@ JMH's own uber-jar workflow (`java -jar benchmarks.jar`) separates build and run
 
 1. The `perflabLaunch` sbt task: done in the scala3 lab; the scala2 lab and `examples/sample` to follow.
 2. `[build] launch` and `mode = "launch"`: run the step, snapshot the build, launch directly, in `run` and `ab run`. Done. A run snapshots into `<run>/.build`, a campaign into `<campaign>/.build`, once, reused when it resumes.
-3. `"builds"` in campaign specs, the builds panel on the card, the transcript of each build step.
+3. `"builds"` in campaign specs: done, a snapshot per variant in `<campaign>/.build/<variant>`, each cell checked to have run from its variant's snapshot. A builds panel on the card is still to do. First used on scala/scala3#27357 (`labs/scala3/campaigns/pr27357.json`).
 4. Retire `trees` once `builds` covers it, or keep it for builds that need different lab code.
 

@@ -723,6 +723,30 @@ class LaunchTest(unittest.TestCase):
         self.assertEqual(jmh.brief(f"java -Xss2m -cp a.jar{os.pathsep}b M @x"), "java -Xss2m -cp '<2 entries>' M @x")
         self.assertEqual(jmh.brief("sbt --client 'b/Jmh/run @x'"), "sbt --client 'b/Jmh/run @x'")
 
+    def test_a_campaign_builds_each_variant_from_its_checkout(self):
+        # the build step names the classes after the checkout it was given
+        with open(os.path.join(self.p.dir, "build.py"), "w") as f:
+            f.write("import json, os, sys\n"
+                    "co = os.environ['CO']; os.makedirs(co + '/classes', exist_ok=True)\n"
+                    "json.dump({'mainClass': 'M', 'java': 'java', 'roots': [co], 'classpath': [co + '/classes'], 'javaOptions': [f'-Dco={co}/classes']},"
+                    " open(os.path.join(sys.argv[1], 'launch.json'), 'w'))\n")
+        spec_f = os.path.join(self.p.dir, "s.json")
+        with open(spec_f, "w") as f:
+            json.dump({"name": "b", "benchmark": "B", "rounds": 1, "corpora": {"c": ""},
+                       "builds": {v: {"checkout": v, "env": {"CO": "{checkout}"}} for v in ("base", "pr")}}, f)
+        spec = ab.Spec(spec_f)
+        self.addCleanup(os.environ.pop, "PERFLAB_BUILD_MODE", None)  # a campaign with builds runs in launch mode
+        self.assertEqual(list(spec.variants), ["base", "pr"])
+        cmds = {}
+        orig, jmh.run_build = jmh.run_build, lambda cmd, log, *a, **k: (cmds.setdefault(log, cmd), orig(cmd, log, *a, **k))[1] \
+            if "build.py" in cmd else 1
+        self.addCleanup(setattr, jmh, "run_build", orig)
+        with self.assertRaises(SystemExit):  # the stubbed cell run fails; the builds are what this checks
+            ab.run(spec, False)
+        b = launch.read(os.path.join(spec.out, launch.BUILD_DIR, "base", launch.LAUNCH))
+        self.assertTrue(b["built"]["classpath"][0].startswith(os.path.join(self.p.dir, "base")))
+        self.assertIn(os.path.join(spec.out, launch.BUILD_DIR, "base", "snapshot"), b["classpath"][0])
+
     def test_the_load_gates_root_is_perflab(self):
         self.assertEqual(loadgate.server_pid(), os.getpid())
 

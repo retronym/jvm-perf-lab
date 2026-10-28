@@ -25,6 +25,10 @@ A spec:
     "gcLog": true,                                       # optional: gc.log per cell, for its timeline
     "perUnit": "files",                                  # optional: an aux counter of the benchmark; the summary and
                                                          # report divide every count by its units per op (cycles/file)
+    "builds": {"base": {"checkout": "../scala3-base", "env": {"SCALA3_CHECKOUT": "{checkout}"}}, "pr": {...}},
+                                                         # optional: a build per variant (launch mode: [build] launch
+                                                         # with env set, snapshotted in <campaign>/.build/<variant>);
+                                                         # "variants" defaults to their names
     "historical": "<why>",                               # optional: kept for its results; `run` refuses it
     "description": "Does -Yx help? See [#123](<url>).",  # optional Markdown (a string, or a list of lines): the
     "variantDescriptions": {"U": "uncached, from **#123**"}  # campaign and each variant, in a panel atop its card
@@ -77,7 +81,14 @@ class Spec:
         self.corpora = s["corpora"]
         self.corpus_param = cfg.get("benchmark", "corpus")
         self.paired = s.get("paired")
-        self.variants = {"paired": ""} if self.paired else s["variants"]
+        # "builds": {variant: {"checkout": <dir>, "env": {...}}}: each variant its own build, in launch mode
+        # (doc/direct-launch.md); "{checkout}" in a value is the checkout's path, relative ones are to the spec's
+        here = os.path.dirname(os.path.abspath(path))
+        self.builds = {v: {**b, "checkout": os.path.normpath(os.path.join(here, b["checkout"])) if b.get("checkout") else None}
+                       for v, b in (s.get("builds") or {}).items()}
+        self.variants = {"paired": ""} if self.paired else s.get("variants") or {v: "" for v in self.builds}
+        if self.builds and (self.paired or set(self.builds) != set(self.variants)):
+            sys.exit(f"{path}: \"builds\" needs a build for each variant, and cannot be paired")
         self.variant_jmh_args = s.get("variantJmhArgs", {})
         if self.paired:
             spec = "|".join(f"{n}={o}" for n, o in self.paired.items())
@@ -166,7 +177,7 @@ def mean_load(path):
     return sum(xs) / len(xs) if xs else 0.0
 
 
-def check(spec, dest, started, flags, variant):
+def check(spec, dest, started, flags, variant, built=None):
     """The run produced fresh results, with the JVM arguments and benchmark parameters the spec asked for."""
     res = os.path.join(dest, "result.json")
     if not os.path.exists(res) or os.path.getmtime(res) < started:
@@ -189,6 +200,10 @@ def check(spec, dest, started, flags, variant):
             got = rs[0].get("params", {}).get(name)
             if got != value:
                 return f"parameter {name}: the run had {got!r}, not {value!r}"
+    # in launch mode, the fork ran from this variant's snapshot: its options that name the snapshot reached the fork
+    for o in (built or {}).get("javaOptions", []):
+        if built["snapshot"] in o and o not in args:
+            return f"the fork did not run from {built['snapshot']}: {o} missing from its jvmArgs"
     # a later -Xmx/-Xms/-Xss wins; make sure it is ours
     for opt in ("-Xmx", "-Xms", "-Xss"):
         ours = [a for a in spec.jvm_args.split() if a.startswith(opt)]
@@ -229,11 +244,24 @@ def run(spec, dry):
             log(f"index (updates as cells finish): {serve.ensure()}")
         except Exception as e:  # the index is a convenience; never let it stop a campaign
             log(f"index not served: {e}")
-    # launch mode: the campaign's build, made once and kept, so every cell (and a resumed campaign) measures the same
-    built = launch.build(os.path.join(spec.out, launch.BUILD_DIR)) if launch.enabled() and todo and not dry else None
+    # launch mode: the campaign's build, or each variant's, made once and kept, so every cell (and a resumed campaign)
+    # measures the same build
+    built = {}
+    if spec.builds:  # builds are snapshots: launch mode, for this campaign (and a dry run shows it)
+        os.environ["PERFLAB_BUILD_MODE"] = "launch"
+    if launch.enabled() and todo and not dry:
+        for v in dict.fromkeys(c[3] for c in todo):
+            b = spec.builds.get(v)
+            if b is None:
+                built[v] = built.get(None) or launch.build(os.path.join(spec.out, launch.BUILD_DIR))
+                built[None] = built[v]
+            else:
+                env = {k: str(x).replace("{checkout}", b["checkout"] or "") for k, x in (b.get("env") or {}).items()}
+                log(f"build of {v}: {b['checkout'] or ''}")
+                built[v] = launch.build(os.path.join(spec.out, launch.BUILD_DIR, v), env)
     for r, corpus, iters, variant, flags in todo:
         dest = spec.cell_dir(corpus, variant, r)
-        cmd = spec.command(corpus, iters, variant, flags, dest, built)
+        cmd = spec.command(corpus, iters, variant, flags, dest, built.get(variant))
         if not dry:
             specs.tag(dest, version)
         if dry:
@@ -264,7 +292,7 @@ def run(spec, dry):
             break
         else:
             sys.exit(f"{dest}: no clean run in {MAX_ATTEMPTS} attempts")
-        problem = f"build exited with {rc} (see {dest}/build.log)" if rc else check(spec, dest, started, flags, variant)
+        problem = f"build exited with {rc} (see {dest}/build.log)" if rc else check(spec, dest, started, flags, variant, built.get(variant))
         if not problem and spec.kperf and spec.profile.startswith("async:cycles"):
             problem = check_samples(spec, dest)
         if problem:
