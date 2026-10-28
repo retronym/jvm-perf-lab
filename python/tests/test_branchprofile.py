@@ -1,6 +1,7 @@
 import json, os, re, shutil, subprocess, sys, tempfile, time, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab server`, even when run alone
 from perflab import ab, branch, branchprofile, branchview, config, index, jmh, launch  # noqa: E402
 from test_branch import git, repo_with_history  # noqa: E402
 from test_branchview import SHAS, Project as ViewProject, fixture, result  # noqa: E402

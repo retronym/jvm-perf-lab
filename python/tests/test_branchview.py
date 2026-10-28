@@ -1,6 +1,7 @@
 import json, os, re, shutil, subprocess, sys, tempfile, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab server`, even when run alone
 from perflab import branchview, config, index, metrics  # noqa: E402
 
 SHAS = ["a" * 40, "b" * 40, "c" * 40, "d" * 40, "e" * 40]
