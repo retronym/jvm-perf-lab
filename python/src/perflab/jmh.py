@@ -21,9 +21,9 @@ VM operation and JIT lanes from the JDK's events with async);
 afterwards flame graphs for async, a merged report for audits. The run is on the index (`perflab serve`, whose URL it prints first) as it goes: <out>/run.json holds
 its status.
 """
-import argparse, glob, json, os, shlex, subprocess, sys, threading, time
+import argparse, glob, json, os, shlex, shutil, subprocess, sys, threading, time
 
-from . import config, transcript
+from . import config, launch, transcript
 
 # retronym/async-profiler's integration branch as built by `mise run tools:async-profiler` (kperf events, jfrconv --spans
 # and its flame graph UI), ahead of a stock install
@@ -123,7 +123,16 @@ def profile_args(profile, out, kperf=None, lib=None):
     sys.exit(f"unknown profile {profile!r}")
 
 
-def jmh_command(args_file):
+def jmh_command(args_file, built=None):
+    """The command that runs JMH with `args_file`: [build] jmh, or in launch mode, `java` from the build's snapshot
+    `built` (launch.build), with the JDK the arguments name by -jvm, else the build's."""
+    if launch.enabled():
+        if built is None:  # a dry run: the build step has not run
+            return f"[launch mode] {config.get().get('build', 'launch')}; then java <the snapshot's options and classpath> <main> @{args_file}"
+        with open(args_file) as f:
+            args = f.read().splitlines()
+        java = args[args.index("-jvm") + 1] if "-jvm" in args[:-1] else None
+        return launch.command(built, args_file, java)
     tpl = config.get().get("build", "jmh")
     if not tpl:
         sys.exit("perflab.toml: [build] jmh is not set (e.g. jmh = \"sbt --client 'bench/Jmh/run {args}'\")")
@@ -141,7 +150,7 @@ OUTPUTS = ["jmh.log", "result.json", "report.md", "audit-*.json", "**/*.jfr", "*
            "iterations.tsv", "timeline.tsv", "gc.log", "gc-*.log", "run.json"]
 
 
-def prepare(out, profile, jmh_args, kperf=None, lib=None, jvm_append=None):
+def prepare(out, profile, jmh_args, kperf=None, lib=None, jvm_append=None, built=None):
     """Writes <out>/jmh.args for this run and returns the build command that runs it."""
     os.makedirs(out, exist_ok=True)
     import shutil
@@ -159,7 +168,7 @@ def prepare(out, profile, jmh_args, kperf=None, lib=None, jvm_append=None):
     write_args(path, args)
     with open(os.path.join(out, "profile.txt"), "w") as f:
         f.write(profile + "\n")
-    return jmh_command(path)
+    return jmh_command(path, built)
 
 
 def finish(out, profile, lib=None):
@@ -179,12 +188,25 @@ def finish(out, profile, lib=None):
                 auditfold.main(reports, out=f)
 
 
+def brief(cmd):
+    """A command for the transcript: a classpath as its number of entries (the whole command is atop its log)."""
+    try:
+        words = shlex.split(cmd)
+    except ValueError:
+        return cmd
+    for i, w in enumerate(words[:-1]):
+        if w in ("-cp", "-classpath", "--class-path"):
+            words[i + 1] = f"<{len(words[i + 1].split(os.pathsep))} entries>"
+    return shlex.join(words) if len(words) > 1 else cmd
+
+
 def run_build(cmd, log_path, every=None, tick=None):
     """Runs the build, logging to `log_path` and, line by line as it comes, to the transcript, followed by JMH's log
     beside it; calls `tick` every `every` seconds while it runs."""
     root = config.get().root
-    transcript.say(f"[perflab] build: {cmd}\n[perflab] build log: {log_path}")
+    transcript.say(f"[perflab] command: {brief(cmd)}\n[perflab] its log: {log_path}")
     with open(log_path, "w") as log:
+        log.write(f"$ {cmd}\n")
         proc = subprocess.Popen(cmd, shell=True, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, errors="replace", bufsize=1)
 
@@ -256,6 +278,11 @@ def main(argv):
     timeline_args = f"-Dperflab.cell={out} -Xlog:gc:file={out}/gc-%p.log:time,uptime"
     jvm_args = " ".join(a for a in [config.get().get("benchmark", "jvmArgs"), timeline_args] if a)
     cmd = prepare(out, x.profile, jmh_args, x.kperf, x.lib, jvm_args)
+    if launch.enabled() and not x.dry_run:
+        # the run's own snapshot of the build, made after `prepare` cleared the run's outputs
+        build_dir = os.path.join(out, launch.BUILD_DIR)  # hidden: the index globs a run for its graphs
+        shutil.rmtree(build_dir, ignore_errors=True)
+        cmd = jmh_command(os.path.join(out, "jmh.args"), launch.build(build_dir))
     if x.dry_run:
         print(cmd)
         print(open(os.path.join(out, "jmh.args")).read(), end="")

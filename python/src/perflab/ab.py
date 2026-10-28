@@ -46,7 +46,7 @@ compares the work, not the op. The index's summary toggles between per unit and 
 """
 import atexit, glob, json, os, re, shlex, shutil, subprocess, sys, time
 
-from . import config, jmh, loadgate, metrics, specs, transcript
+from . import config, jmh, launch, loadgate, metrics, specs, transcript
 
 JMH_LOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "jmh.lock")
 MAX_ATTEMPTS = 10
@@ -101,7 +101,7 @@ class Spec:
     def cell_dir(self, corpus, variant, r):
         return os.path.join(self.out, corpus, variant, str(r))
 
-    def command(self, corpus, iters, variant, flags, dest):
+    def command(self, corpus, iters, variant, flags, dest, built=None):
         """Writes the cell's arguments file and returns the build command that runs it."""
         extra = []
         if self.gc_log:
@@ -111,7 +111,7 @@ class Spec:
         jvm_args = " ".join(x for x in [self.jvm_args, flags, *extra] if x)
         args = (["-jvm", self.jvm] if self.jvm else []) + ["-p", f"{self.corpus_param}={corpus}"]
         args += shlex.split(iters) + shlex.split(self.variant_jmh_args.get(variant, "")) + [self.benchmark]
-        return jmh.prepare(dest, self.profile, args, self.kperf, self.lib, jvm_args)
+        return jmh.prepare(dest, self.profile, args, self.kperf, self.lib, jvm_args, built)
 
 
 def jmh_lock_held():
@@ -229,9 +229,11 @@ def run(spec, dry):
             log(f"index (updates as cells finish): {serve.ensure()}")
         except Exception as e:  # the index is a convenience; never let it stop a campaign
             log(f"index not served: {e}")
+    # launch mode: the campaign's build, made once and kept, so every cell (and a resumed campaign) measures the same
+    built = launch.build(os.path.join(spec.out, launch.BUILD_DIR)) if launch.enabled() and todo and not dry else None
     for r, corpus, iters, variant, flags in todo:
         dest = spec.cell_dir(corpus, variant, r)
-        cmd = spec.command(corpus, iters, variant, flags, dest)
+        cmd = spec.command(corpus, iters, variant, flags, dest, built)
         if not dry:
             specs.tag(dest, version)
         if dry:

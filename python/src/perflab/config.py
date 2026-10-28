@@ -3,6 +3,10 @@
     [build]
     # runs JMH; {args} is an arguments file (passed as `@file` to perflab's JMH driver, io.github.retronym.perflab.jmh.Main)
     jmh = "sbt --client 'bench/Jmh/run {args}'"
+    # launch mode (perflab.launch): perflab runs this once per run or campaign, snapshots the build it describes in
+    # {out}/launch.json, and starts JMH itself from the snapshot; `jmh` and `server` are then unused
+    mode = "jmh"                      # or "launch" (or PERFLAB_BUILD_MODE=launch)
+    launch = "sbt -batch 'bench/perflabLaunch {out}'"
     # which process tree runs the benchmarks, so the load gate does not count it as competing load:
     # "sbt" (the sbt server of this checkout, from project/target/active.json) or "self" (perflab's own children)
     server = "sbt"
@@ -37,7 +41,7 @@
 import os, tomllib
 
 DEFAULTS = {
-    "build": {"jmh": "", "server": "self"},
+    "build": {"jmh": "", "server": "self", "mode": "jmh", "launch": ""},
     "benchmark": {"default": "", "corpus": "corpus", "variants": "variants", "jvmArgs": ""},
     "paths": {"runs": "out/perflab/runs", "campaigns": "out/perflab/ab"},
     "index": {"flags": "^-D"},

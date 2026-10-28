@@ -1,7 +1,7 @@
-import json, os, re, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
+import json, os, re, shlex, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from perflab import ab, analyze, auditfold, compare, config, defcosts, index, inlinetree, jmh, jvmevents, loadgate, metrics, regraph, serve, specs, timeline, transcript, trees  # noqa: E402
+from perflab import ab, analyze, auditfold, compare, config, defcosts, index, inlinetree, jmh, jvmevents, launch, loadgate, metrics, regraph, serve, specs, timeline, transcript, trees  # noqa: E402
 
 
 class Project:
@@ -624,7 +624,7 @@ class TranscriptTest(unittest.TestCase):
         self.assertIn("  > # Fork: 1 of 1", lines)
         self.assertIn("  | done", lines)
         with open(os.path.join(out, "build.log")) as f:
-            self.assertEqual(f.read(), "\x1b[0Jcompiling\ndone\n")
+            self.assertEqual(f.read(), f"$ {cmd}\n\x1b[0Jcompiling\ndone\n")  # the command atop its log
 
     def test_follow_waits_for_a_line_to_end(self):
         import threading
@@ -665,6 +665,66 @@ class TranscriptTest(unittest.TestCase):
         self.assertFalse(os.path.exists(loadgate.state_path()))
         with open(self.path) as f:
             self.assertIn("waiting: other load 3.0 cores (javac 3.0)", f.read())
+
+
+class LaunchTest(unittest.TestCase):
+    """Launch mode: the build step writes launch.json, perflab snapshots the build and starts JMH itself."""
+    def setUp(self):
+        self.p = Project('[build]\nmode = "launch"\nlaunch = "python3 build.py {out}"\n')
+        d = self.p.dir
+        self.roots = os.path.join(d, "checkout")
+        os.makedirs(os.path.join(self.roots, "classes"))
+        with open(os.path.join(self.roots, "classes", "A.class"), "w") as f:
+            f.write("v1")
+        with open(os.path.join(self.roots, "lib.jar"), "w") as f:
+            f.write("jar")
+        self.ext = os.path.join(d, "cache.jar")
+        open(self.ext, "w").close()
+        launch_json = {"mainClass": "M", "java": "/jdk/bin/java", "roots": [self.roots],
+                       "classpath": [os.path.join(self.roots, "classes"), os.path.join(self.roots, "missing"), self.ext],
+                       "javaOptions": ["-Xss2m", f"-Dlib={os.path.join(self.roots, 'lib.jar')}{os.pathsep}/elsewhere"],
+                       "build": {"checkout": self.roots, "commit": "abcdef1234567", "dirty": False}}
+        with open(os.path.join(d, "build.py"), "w") as f:
+            f.write("import json, os, sys\n"
+                    f"json.dump({launch_json!r}, open(os.path.join(sys.argv[1], 'launch.json'), 'w'))\n")
+
+    def test_snapshot_copies_the_builds_outputs(self):
+        built = launch.build(os.path.join(self.p.dir, "c", launch.BUILD_DIR))
+        cp = built["classpath"]
+        self.assertEqual(len(cp), 2)  # the missing output directory is dropped
+        self.assertTrue(cp[0].startswith(built["snapshot"]))
+        self.assertEqual(cp[1], self.ext)
+        self.assertEqual([e["path"] for e in built["external"]], [self.ext])
+        lib = built["javaOptions"][1].split("=", 1)[1].split(os.pathsep)
+        self.assertTrue(lib[0].startswith(built["snapshot"]) and lib[1] == "/elsewhere")
+        # the snapshot is the build as it was: a later change to the checkout does not reach it
+        with open(os.path.join(self.roots, "classes", "A.class"), "w") as f:
+            f.write("v2")
+        with open(os.path.join(cp[0], "A.class")) as f:
+            self.assertEqual(f.read(), "v1")
+
+    def test_a_campaign_reuses_its_snapshot(self):
+        d = os.path.join(self.p.dir, "c", launch.BUILD_DIR)
+        first = launch.build(d)
+        os.unlink(os.path.join(self.p.dir, "build.py"))  # no second build
+        self.assertEqual(launch.build(d)["snapshot"], first["snapshot"])
+
+    def test_the_command_starts_the_driver_from_the_snapshot(self):
+        built = launch.build(os.path.join(self.p.dir, "r", launch.BUILD_DIR))
+        out = os.path.join(self.p.dir, "r")
+        cmd = shlex.split(jmh.prepare(out, "none", ["-jvm", "/other/bin/java", "B"], built=built))
+        self.assertEqual(cmd[0], "/other/bin/java")  # the JDK the forks use, as -jvm names it
+        self.assertEqual(cmd[cmd.index("-cp") + 1], os.pathsep.join(built["classpath"]))
+        self.assertEqual(cmd[-2:], ["M", f"@{out}/jmh.args"])
+        cmd = shlex.split(jmh.prepare(out, "none", ["B"], built=built))
+        self.assertEqual(cmd[0], "/jdk/bin/java")  # else the build's
+
+    def test_the_transcript_counts_a_classpath(self):
+        self.assertEqual(jmh.brief(f"java -Xss2m -cp a.jar{os.pathsep}b M @x"), "java -Xss2m -cp '<2 entries>' M @x")
+        self.assertEqual(jmh.brief("sbt --client 'b/Jmh/run @x'"), "sbt --client 'b/Jmh/run @x'")
+
+    def test_the_load_gates_root_is_perflab(self):
+        self.assertEqual(loadgate.server_pid(), os.getpid())
 
 
 if __name__ == "__main__":

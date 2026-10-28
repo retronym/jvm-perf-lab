@@ -21,6 +21,8 @@ When reporting, link the run or campaign on that page rather than only pasting n
 
 Run long commands in the background with a transcript, and follow that file instead of waiting blind: `perflab --transcript <scratch>/t.txt ab run <spec>` (also `run`, `trees`). It gets perflab's progress, loadgate waits, the build's output as it comes (sbt compiling, a failing build or a server started without the lab's environment) and JMH's iterations. A loadgate wait also shows live on the index.
 
+In a lab with `[build] launch` (the scala3 lab), prefer launch mode for campaigns: `PERFLAB_BUILD_MODE=launch`, with the lab's environment (`SCALA3_CHECKOUT`, `SCALA3_BENCHMARKS`, `JAVA_HOME`) set on the perflab command itself. A batch sbt builds once and perflab snapshots the build into `<campaign>/.build`, so no sbt server is needed or left running, and editing the checkout mid-campaign doesn't change what is measured.
+
 ## 2. Dry-run, then read the arguments
 
 ```bash

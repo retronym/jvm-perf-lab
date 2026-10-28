@@ -119,7 +119,8 @@ def server_pid():
     of this checkout (the process holding the socket named in project/target/active.json), or perflab itself."""
     from . import config
     cfg = config.get()
-    if cfg.get("build", "server") == "sbt":
+    from . import launch
+    if cfg.get("build", "server") == "sbt" and not launch.enabled():  # in launch mode, perflab starts JMH itself
         try:
             uri = json.load(open(os.path.join(cfg.root, "project", "target", "active.json")))["uri"]
         except (OSError, ValueError, KeyError):
