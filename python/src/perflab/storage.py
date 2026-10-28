@@ -121,9 +121,10 @@ def entries(project, campaigns, runs, jobs_argv=(), seen=None, now=None):
                     e["newest"] = max(e["newest"], mtime)
             e["total"] = sum(e["bytes"].values())
             run_state = _json(os.path.join(d, "run.json")) if kind == "run" else None
-            e["active"] = (name in names if kind == "campaign" else False) \
-                or bool(run_state and run_state.get("status") == "running" and _alive(run_state.get("pid"))) \
-                or now - e["newest"] < ACTIVE_SECS
+            why = ("named by running.json, build.json or a running job" if kind == "campaign" and name in names
+                   else "its run.json says running" if run_state and run_state.get("status") == "running" and _alive(run_state.get("pid"))
+                   else f"written in the last {ACTIVE_SECS // 60} minutes" if now - e["newest"] < ACTIVE_SECS else None)
+            e["active"], e["activeWhy"] = bool(why), why
             out.append(e)
     return out
 

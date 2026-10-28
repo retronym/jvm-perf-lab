@@ -15,6 +15,9 @@
   loadgate   wait for a quiet machine, or sample competing load
   site       a static site of the campaigns and runs, for publishing
   defcosts   cost per definition from a compiler's table (Scala 3 -Yprofile-defs): histograms, outliers, comparison
+  server     the per-user perflab server: a queue of jobs run one at a time, its UI and storage admin (start|stop|status)
+  submit     queue `perflab <arguments>` on the server and follow it (`perflab submit -- ab run spec.json`)
+  jobs       the server's queue
 
 Configuration: perflab.toml in the project (see perflab.config). `perflab <command> --help` for a command's options.
 
@@ -27,7 +30,8 @@ from . import transcript
 
 COMMANDS = {"run": "jmh", "ab": "ab", "trees": "trees", "index": "index", "timeline": "timeline", "regraph": "regraph",
             "profdiff": "profdiff", "inlinetree": "inlinetree", "frameweight": "frameweight", "subtree": "subtree", "analyze": "analyze",
-            "auditfold": "auditfold", "loadgate": "loadgate", "site": "site", "serve": "serve", "defcosts": "defcosts"}
+            "auditfold": "auditfold", "loadgate": "loadgate", "site": "site", "serve": "serve", "defcosts": "defcosts",
+            "server": "server", "submit": "server:submit_main", "jobs": "server:jobs_main"}
 
 
 def main(argv=None):
@@ -41,9 +45,10 @@ def main(argv=None):
     # killed (`timeout`, `kill`, ab stopping its load sampler): exit through `finally` and atexit, so the live state a
     # command publishes for the index (running.json, loadgate.json) is cleared
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(128 + signal.SIGTERM))
-    module = importlib.import_module(f".{COMMANDS[argv[0]]}", __package__)
+    name, _, function = COMMANDS[argv[0]].partition(":")
+    module = importlib.import_module(f".{name}", __package__)
     try:
-        return module.main(argv[1:]) or 0
+        return getattr(module, function or "main")(argv[1:]) or 0
     except SystemExit as e:
         if isinstance(e.code, str):  # sys.exit with a message, not a status
             transcript.failed(e.code)
