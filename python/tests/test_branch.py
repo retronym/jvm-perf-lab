@@ -127,6 +127,33 @@ class DoneTest(unittest.TestCase):
         self.assertTrue(ab.done(d))
 
 
+class CleanCheckoutTest(unittest.TestCase):
+    def test_a_build_starts_from_the_tree_alone(self):
+        repo = tempfile.mkdtemp()
+        base, tip = repo_with_history(repo)
+        out = tempfile.mkdtemp()
+        b = branch.resolve(repo, f"{base}..main")
+        wt = branch.checkout(out, b, b["commits"][-1])
+        os.makedirs(os.path.join(wt, "target"))
+        open(os.path.join(wt, "target", "Stale.class"), "w").close()  # another commit's build output
+        branch.checkout(out, b, b["commits"][0], clean=False)
+        self.assertTrue(os.path.exists(os.path.join(wt, "target", "Stale.class")))  # "incremental": true
+        branch.checkout(out, b, b["commits"][1])
+        self.assertFalse(os.path.exists(os.path.join(wt, "target")))
+
+
+class FailedCellTest(unittest.TestCase):
+    def test_a_failed_run_is_shown_not_running(self):
+        from perflab import branchview
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "result.json"), "w") as f:
+            f.write("[]")  # JMH's file when the benchmark threw
+        self.assertEqual(branchview.load_cell(d), "running")
+        with open(os.path.join(d, ab.FAILED), "w") as f:
+            f.write("empty result.json\n")
+        self.assertEqual(branchview.load_cell(d), "failed")
+
+
 class ResolveTest(unittest.TestCase):
     def setUp(self):
         self.repo = tempfile.mkdtemp()

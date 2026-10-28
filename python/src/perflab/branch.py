@@ -216,8 +216,11 @@ def set_unbuildable(out, variant, reason=None, log=None):
     _write(out, UNBUILDABLE, u)
 
 
-def checkout(out, b, commit):
-    """The campaign's worktree with `commit` checked out (made on first use); its path."""
+def checkout(out, b, commit, clean=True):
+    """The campaign's worktree with `commit` checked out (made on first use); its path. With `clean`, everything git
+    does not track is removed first (the build tool's outputs and state), so the build is from scratch: an incremental
+    build across commits can keep stale classes (Scala 3's inline methods: a caller compiled against another commit's
+    body, NoSuchMethodError at run time)."""
     wt = os.path.join(out, WORKTREE)
     repo = b["checkout"]
     if not os.path.exists(os.path.join(wt, ".git")):
@@ -225,6 +228,8 @@ def checkout(out, b, commit):
         git(repo, "worktree", "add", "--detach", wt, commit["sha"])
     else:
         git(wt, "checkout", "--detach", "--force", commit["sha"])
+        if clean:
+            git(wt, "clean", "-ffdxq")
     return wt
 
 

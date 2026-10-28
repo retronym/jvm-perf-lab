@@ -298,7 +298,7 @@ def run(spec, dry, retry_unbuildable=False):
                                         label=f"{spec.name}: {v} ({b['checkout'] or ''})")
     # a branch's commits that did not build: their cells are skipped (until a run with --retry-unbuildable)
     unbuildable = branch.unbuildable(spec.build_out) if spec.branch_info and not retry_unbuildable else {}
-    skipped = {}
+    skipped, failed = {}, []
     for r, corpus, iters, variant, flags in todo:
         dest = spec.cell_dir(corpus, variant, r)
         if variant in unbuildable:
@@ -318,6 +318,8 @@ def run(spec, dry, retry_unbuildable=False):
         cmd = spec.command(corpus, iters, variant, flags, dest, built.get(variant))
         if not dry:
             specs.tag(dest, version)
+            if os.path.exists(os.path.join(dest, FAILED)):
+                os.unlink(os.path.join(dest, FAILED))
         if dry:
             print(f"{dest}:\n  {cmd}")
             continue
@@ -349,6 +351,15 @@ def run(spec, dry, retry_unbuildable=False):
         problem = f"build exited with {rc} (see {dest}/build.log)" if rc else check(spec, dest, started, flags, variant, built.get(variant))
         if not problem and spec.kperf and spec.profile.startswith("async:cycles"):
             problem = check_samples(spec, dest)
+        if problem and spec.branch_info:
+            # a commit whose run fails is a result of the branch, not the end of the campaign: recorded in the cell (the
+            # view shows it), the other cells run, and a resume tries it again
+            with open(os.path.join(dest, FAILED), "w") as f:
+                f.write(problem + "\n")
+            set_running(spec, None)
+            log(f"  failed: {problem}")
+            failed.append(f"{os.path.relpath(dest, spec.out)}: {problem}")
+            continue
         if problem:
             sys.exit(f"{dest}: {problem}")
         # the xctrace profiler names its files after the trace; the timeline reads them by fixed names
@@ -371,6 +382,11 @@ def run(spec, dry, retry_unbuildable=False):
         log(f"{spec.name}: {len(skipped)} commit{'s' if len(skipped) > 1 else ''} did not build, {'their' if len(skipped) > 1 else 'its'} cells skipped: "
             + ", ".join(f"{v} ({why})" for v, why in skipped.items())
             + f"; build logs in {os.path.join(spec.build_out, branch.FAILED_LOGS)}; `perflab ab run <spec> --retry-unbuildable` tries again")
+    if failed:
+        sys.exit(f"{spec.name}: {len(failed)} cell{'s' if len(failed) > 1 else ''} failed (a resume runs them again):\n  " + "\n  ".join(failed))
+
+
+FAILED = "failed.txt"  # in a branch campaign's cell whose run failed: why
 
 
 def done(dest):
@@ -419,7 +435,7 @@ def build_commit(spec, commit):
         dir = os.path.join(spec.build_out, launch.BUILD_DIR, key)
     wt = None
     if not reuse:
-        wt = branch.checkout(spec.build_out, spec.branch_info, commit)
+        wt = branch.checkout(spec.build_out, spec.branch_info, commit, clean=not spec.branch.get("incremental"))
         log(f"build of {commit['short']} {commit['subject'][:60]}")
     try:
         built = launch.build(dir, branch.env_for(spec.branch, wt) if wt else probe,

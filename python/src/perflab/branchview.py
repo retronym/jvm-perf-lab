@@ -61,16 +61,18 @@ def sig(x, n=5):
 
 
 def load_cell(cell):
-    """A cell's JMH result, "running" while its result.json is empty or partial, None before it has one."""
+    """A cell's JMH result, "failed" when its run did (a branch campaign records why), "running" while its result.json
+    is empty or partial, None before it has one."""
     f = os.path.join(cell, "result.json")
-    if not os.path.exists(f):
-        return None
     try:
         r = json.load(open(f))[0]
         r["primaryMetric"]["score"]
         return r
     except (OSError, ValueError, IndexError, KeyError, TypeError):
-        return "running"
+        pass
+    if os.path.exists(os.path.join(cell, "failed.txt")):  # ab.FAILED: its run failed
+        return "failed"
+    return "running" if os.path.exists(f) else None
 
 
 def date_shown(iso):
@@ -85,7 +87,7 @@ def branch_view(campaign_dir, rel_to=None):
 
     {"commits": [newest first: {sha, short, v (variant), subject, author, date, shown (date), index, merged}],
      "corpora": [...], "metrics": [{k, h (heading), kind}], the score first,
-     "cells": {corpus: {variant: {"state": "done" | "running", "rounds": n,
+     "cells": {corpus: {variant: {"state": "done" | "running" | "failed" (with "why" and "log"), "rounds": n,
                                   "forks": n, "m": {k: [mean, sd of the forks' means, CI half-width, Δ against it
                                   means something, n forks, df, sd pooled]} (sd, CI and df None without a spread),
                                   "s": {k: [mean shown, CI shown]}, "raw": {k: [[x, ...] per fork, of every round]},
@@ -115,18 +117,23 @@ def branch_view(campaign_dir, rel_to=None):
     for corpus in corpora:
         per_v, units, prev = {}, {}, None
         for v in variants:
-            rs, running = [], False
+            rs, running, failed = [], False, None
             for cell in sorted(glob.glob(os.path.join(campaign_dir, corpus, v, "*"))):
                 if not (os.path.isdir(cell) and os.path.basename(cell).isdigit()):
                     continue
                 r = load_cell(cell)
                 if r == "running":
                     running = True
+                elif r == "failed":
+                    failed = cell
                 elif r is not None:
                     rs.append((r, cell))
             if not rs:
                 if running:
                     per_v[v] = {"state": "running"}
+                elif failed:
+                    per_v[v] = {"state": "failed", "why": open(os.path.join(failed, "failed.txt")).read().strip(),
+                                "log": os.path.relpath(os.path.join(failed, "jmh.log"), rel_to or campaign_dir)}
                 continue
             of = [metrics.of(r, per_unit, metrics.cached_hw_events(cell)) for r, cell in rs]
             kinds, raw, us = {}, {}, {}
@@ -478,6 +485,7 @@ const BH = (() => {
     const u = (d.unbuildable || {})[v];
     if (!x) return u ? `<a class="bh-fail" href="${esc(u.log)}" title="${esc(u.reason)}">build failed</a>` : '<span class="bh-pend">pending</span>';
     if (x.state === 'running') return '<span class="badge running">running</span>';
+    if (x.state === 'failed') return `<a class="bh-fail" href="${esc(x.log)}" title="${esc(x.why)}">run failed</a>`;
     const m = x.m[k], s = x.s[k];
     if (!m) return '';
     const dag = m[6] ? '†' : '';
@@ -606,7 +614,7 @@ const BH = (() => {
     if (!cm) return '';
     const val = k => { const s = x && x.state === 'done' && x.s[k]; return s ? `${esc(s[0])}${s[1] ? ' ± ' + esc(s[1]) + (x.m[k][6] ? '†' : '') : ''}` : ''; };
     const m2 = st.m2 !== 'none' ? metric(d, st.m2) : null;
-    const nums = !x ? 'pending' : x.state === 'running' ? 'running'
+    const nums = !x ? 'pending' : x.state === 'running' ? 'running' : x.state === 'failed' ? 'run failed: ' + esc(x.why)
       : `${val('score')} ${esc(unitFix(metric(d, 'score').h))} ${delta(x.d.score)}`
         + (m2 && val(m2.k) ? ` · ${val(m2.k)} ${esc(unitFix(m2.h))} ${delta(x.d[m2.k])}` : '');
     return `${sha(cm)} ${esc(cm.subject)} · <b>${esc(st.c)}</b>: ${nums}`;
