@@ -32,7 +32,7 @@ Design: [branch-explore.md](branch-explore.md). Test case: retronym/scala3 `scal
 6. DONE Admin: storage per campaign by tier (allocated bytes); cleanup actions with a dry run; pins.
    - `storage.py`; the server's /admin page and /api/storage. Active (running.json, build.json, a running job's argv or spec name, a running run.json, or written in the last 10 minutes) is never touched.
    - Deferred: APFS clones are separate inodes, so they still count once each (no portable way to see shared extents); pins from the index's cards.
-7. TODO The perfint campaign under the server: coarse pass on scalaz, then tastyQuery, then a second round; check the view against it.
+7. RUNNING (job 1 on the server) The perfint campaign under the server: coarse pass on scalaz, then tastyQuery, then a second round; check the view against it.
 
 ## Future work
 

@@ -5,6 +5,17 @@ os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab 
 from perflab import ab, analyze, auditfold, compare, config, defcosts, index, inlinetree, jmh, jvmevents, launch, loadgate, metrics, regraph, serve, specs, timeline, transcript, trees  # noqa: E402
 
 
+def _ensure_then_stop(root=None, port=None, _ensure=serve.ensure):
+    """serve.ensure, with the server it starts for a test's temporary project stopped when the tests end."""
+    url = _ensure(root, port)
+    import atexit
+    atexit.register(serve.stop, os.path.abspath(root or config.get().campaigns))
+    return url
+
+
+serve.ensure = _ensure_then_stop
+
+
 class Project:
     """A temporary project with a perflab.toml, as the current configuration."""
     def __init__(self, toml):
