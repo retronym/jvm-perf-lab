@@ -84,7 +84,7 @@ An admin page lists, per project and campaign, bytes by tier:
 - **profiles:** `.jfr`, `.trace`, rendered flame graphs. Graphs can be re-rendered from the recording.
 - **builds:** snapshots and the campaign worktree. Rebuildable from the commit.
 
-Actions are "drop builds of finished campaigns", "drop rendered graphs", "drop profiles older than N days", and "delete campaign". Each shows the bytes it would reclaim before it runs. A pinned campaign is skipped by every bulk action. Bytes are counted as allocated blocks, so APFS clones are not counted twice.
+Actions are "drop builds of finished campaigns", "drop rendered graphs", "drop profiles older than N days", and "delete campaign". Each shows the bytes it would reclaim before it runs. A pinned campaign is skipped by every bulk action. Bytes are counted as allocated blocks, hard links once. APFS clones still count once per clone, since there is no portable way to see shared extents, so the builds tier overstates what deleting reclaims.
 
 ## Supporting changes
 
