@@ -49,7 +49,7 @@ java -javaagent:perflab-agent.jar=spec=envelope.audit,out=audit-{pid}.json ...
 | `perflab ab run\|report <spec>` | campaigns: variants over corpora, interleaved by round or paired within forks, each run checked; the summary shows every counter the cells recorded, per op or per unit of work |
 | `perflab trees <spec>` | campaigns across checkouts |
 | `perflab serve` | serve the results page (one server per checkout) on 127.0.0.1 and print its URL, the same every time; the page updates itself as results arrive and follows the running fork's timeline (`run` and `ab run` do this first) |
-| `perflab server start`, `submit -- <args>`, `jobs` | a per-user server ([doc/branch-explore.md](doc/branch-explore.md) §6, §8) that queues perflab command lines and runs one at a time, with pause and cancel at cell boundaries, every registered project's results page, and a storage page with cleanup (`submit` follows the job's transcript; Ctrl-C detaches) |
+| `perflab server start`, `submit -- <args>`, `jobs` | a per-user server ([doc/branch-explore.md](doc/branch-explore.md) §6, §8) that queues perflab command lines and runs one at a time, with pause and cancel at cell boundaries, every registered project's results page, and a storage page with cleanup (`submit` follows the job's transcript; Ctrl-C detaches). While it runs, `run` and `ab run` submit themselves (`--local`: in the foreground) and `serve` prints the project's page on it |
 | `perflab index`, `timeline` | rebuild the results page, or one run's or cell's timeline |
 | `perflab site` | the results page as a static site, with an intro, for publishing |
 | `perflab regraph`, `profdiff`, `frameweight`, `subtree`, `analyze` | flame graphs and analysis of async-profiler runs |

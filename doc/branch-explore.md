@@ -57,7 +57,7 @@ A row whose step from its predecessor exceeds k × the pooled noise is marked as
 
 ### 6. A persistent perflab server; the CLI submits
 
-One `perflab server` per machine (per user) owns the measurement. It keeps a durable queue (SQLite in `~/.perflab/server/`), runs one job at a time, and serves the UI for every project registered with it. `perflab ab run`, `perflab run` and the branch commands submit a job, print its URL, and follow its transcript. `--wait` or `--detach` decides whether the terminal stays attached. Without a server they run in the foreground as today, so the CLI keeps working on a laptop without setup.
+One `perflab server` per machine (per user) owns the measurement. It keeps a durable queue (SQLite in `~/.perflab/server/`), runs one job at a time, and serves the UI for every project registered with it. `perflab ab run`, `perflab run` and the branch commands submit a job, print its URL, and follow its transcript; Ctrl-C detaches, and `--local` runs one in the foreground. Without a server they run in the foreground as today, so the CLI keeps working on a laptop without setup.
 
 - **A job is a perflab command line,** `{argv, cwd, env}`, run as a subprocess in its own process group, with its transcript in the job's directory. This keeps the server ignorant of campaigns, and means anything the CLI can do can be queued.
 - **Control:**
