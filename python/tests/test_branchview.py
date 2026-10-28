@@ -182,24 +182,92 @@ class BranchViewTest(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("node"), "needs node")
     def test_the_page_computes_the_same_deltas(self):
-        cells = branchview.branch_view(self.camp)["cells"]
-        js = branchview.STATS_JS + (f"const cells = {json.dumps(cells)};\nconst out = {{}};\n"
-                                    "for (const [c, vs] of Object.entries(cells)) for (const [v, x] of Object.entries(vs))\n"
-                                    "  if (x.prev) for (const k of Object.keys(x.d)) out[c + '|' + v + '|' + k] = BH_STATS.welch(vs[x.prev].m[k], x.m[k]);\n"
-                                    "console.log(JSON.stringify(out));")
-        r = subprocess.run(["node", "-e", js], capture_output=True, text=True)
-        self.assertEqual(r.returncode, 0, r.stderr)
-        out = json.loads(r.stdout)
-        expected = {f"{c}|{v}|{k}": d for c, vs in cells.items() for v, x in vs.items() for k, d in x.get("d", {}).items()}
-        self.assertEqual(out.keys(), expected.keys())
+        out = page_deltas(self, branchview.branch_view(self.camp)["cells"])
         self.assertIn("a|" + self.v[4] + "|score", out)
-        for key, (d, half, verdict, pooled) in expected.items():
-            jd, jhalf, jverdict, jpooled = out[key]
-            self.assertAlmostEqual(jd, d, msg=key)
-            self.assertEqual(jhalf is None, half is None, key)
-            if half is not None:
-                self.assertAlmostEqual(jhalf, half, msg=key)
-            self.assertEqual((jverdict, jpooled), (verdict, pooled), key)
+
+
+def page_deltas(t, cells):
+    """Check that the page's `welch` (as the comparison panel uses it) gives each cell's Δ column; the page's Δs."""
+    js = branchview.STATS_JS + (f"const cells = {json.dumps(cells)};\nconst out = {{}};\n"
+                                "for (const [c, vs] of Object.entries(cells)) for (const [v, x] of Object.entries(vs))\n"
+                                "  for (const k of Object.keys(x.d || {})) out[c + '|' + v + '|' + k] = BH_STATS.welch(vs[(x.pv || {})[k] || x.prev].m[k], x.m[k]);\n"
+                                "console.log(JSON.stringify(out));")
+    r = subprocess.run(["node", "-e", js], capture_output=True, text=True)
+    t.assertEqual(r.returncode, 0, r.stderr)
+    out = json.loads(r.stdout)
+    expected = {f"{c}|{v}|{k}": d for c, vs in cells.items() for v, x in vs.items() for k, d in x.get("d", {}).items()}
+    t.assertEqual(out.keys(), expected.keys())
+    for key, (d, half, verdict, pooled) in expected.items():
+        jd, jhalf, jverdict, jpooled = out[key]
+        t.assertAlmostEqual(jd, d, msg=key)
+        t.assertEqual(jhalf is None, half is None, key)
+        if half is not None:
+            t.assertAlmostEqual(jhalf, half, msg=key)
+        t.assertEqual((jverdict, jpooled), (verdict, pooled), key)
+    return out
+
+
+def add_xctrace(cell, cycles, profile="xctrace:ipc"):
+    """Give a cell's result an xctrace profile's counters, per fork as its score's rawData: cycles, instructions at an
+    IPC of 2, IPC, and an L1D miss counter with its per-kinst form; and the profile it ran under."""
+    f = os.path.join(cell, "result.json")
+    [r] = json.load(open(f))
+    raw = [[cycles * (1 + 0.01 * j) for _ in fork] for j, fork in enumerate(r["primaryMetric"]["rawData"])]
+    mean = lambda raw: sum(x for f in raw for x in f) / sum(len(f) for f in raw)
+    ins = [[2 * x for x in f] for f in raw]
+    r["secondaryMetrics"].update({
+        "xctrace.CORE_ACTIVE_CYCLE": {"score": mean(raw), "scoreUnit": "#/op", "rawData": raw},
+        "xctrace.INST_ALL": {"score": mean(ins), "scoreUnit": "#/op", "rawData": ins},
+        "xctrace.IPC.bench": {"score": 2.0, "scoreUnit": "insts/cycle"},
+        "xctrace.L1D_CACHE_MISS_LD": {"score": cycles / 1000, "scoreUnit": "#/op"},
+        "xctrace.L1D_CACHE_MISS_LD/kinst": {"score": 0.5, "scoreUnit": "#/kinst"}})
+    json.dump([r], open(f, "w"))
+    open(os.path.join(cell, "profile.txt"), "w").write(profile + "\n")
+
+
+class ProfiledCampaignTest(unittest.TestCase):
+    """A branch campaign measured under a profile: its cells' counters are metrics of the view, and an async profile's
+    flame graphs are linked from its rows."""
+    def setUp(self):
+        Project()
+        self.camps = config.get().campaigns
+        self.camp = fixture(self.camps)
+        self.v = [s[:10] for s in SHAS]
+        for i, rnd, cyc in [(0, 1, 1e9), (0, 2, 1e9), (3, 1, 1.1e9), (3, 2, 1.1e9), (4, 1, 9e8), (4, 2, 9e8)]:
+            add_xctrace(os.path.join(self.camp, "a", self.v[i], str(rnd)), cyc)
+
+    def test_every_metric_of_the_cells_is_in_the_view(self):
+        d = branchview.branch_view(self.camp, self.camps)
+        keys = [m["k"] for m in d["metrics"]]
+        for k in ("score", "cycles", "instructions", "ipc", "alloc", "ev:L1D_CACHE_MISS_LD", "ev:L1D_CACHE_MISS_LD/kinst"):
+            self.assertIn(k, keys)
+        self.assertFalse([m for m in d["metrics"] if m.get("src")])  # none from a profile pass: there is none
+        a = d["cells"]["a"]
+        c3, c4 = a[self.v[3]], a[self.v[4]]
+        self.assertEqual(c3["m"]["cycles"][4], 4)  # over forks, from rawData
+        self.assertEqual(len(c3["raw"]["cycles"]), 4)
+        self.assertEqual(c3["m"]["ipc"][4], 2)  # no rawData: a value per round
+        # commit 1 has no counters: 3's Δ of cycles is against 0, the latest commit with them
+        self.assertEqual(c3["prev"], self.v[1])
+        self.assertEqual(c3["pv"]["cycles"], self.v[0])
+        self.assertAlmostEqual(c3["d"]["cycles"][0], 10.0, places=6)
+        self.assertNotIn("pv", c4)
+        self.assertAlmostEqual(c4["d"]["cycles"][0], 100 * (9 / 11 - 1), places=6)
+        self.assertEqual(c4["d"]["cycles"][2], "better")
+        self.assertNotIn("graphs", c3)  # xctrace: no flame graphs
+        if shutil.which("node"):
+            self.assertIn(f"a|{self.v[3]}|cycles", page_deltas(self, d["cells"]))
+
+    def test_an_async_campaign_links_its_cells_graphs(self):
+        for rnd in (1, 2):
+            cell = os.path.join(self.camp, "a", self.v[4], str(rnd))
+            open(os.path.join(cell, "profile.txt"), "w").write("async:cpu,alloc\n")
+            open(os.path.join(cell, "rec.jfr"), "w").write("jfr")
+            for ev in ("cpu", "alloc"):
+                open(os.path.join(cell, f"rec-{ev}.html"), "w").write("<html>")
+        g = branchview.branch_view(self.camp, self.camps)["cells"]["a"][self.v[4]]["graphs"]
+        self.assertEqual(g[0], ["cpu #1", "bench", f"br/a/{self.v[4]}/1/rec-cpu.html"])
+        self.assertEqual([x[0] for x in g], ["cpu #1", "alloc #1", "cpu #2", "alloc #2"])
 
 
 class BranchIndexTest(unittest.TestCase):

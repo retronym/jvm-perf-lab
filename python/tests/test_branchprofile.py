@@ -8,10 +8,12 @@ from test_branchview import SHAS, Project as ViewProject, fixture, result  # noq
 from test_perflab import Project  # noqa: E402
 
 
-def fake_profile_cell(d, corpus="a"):
-    """A profile cell: its result, its profile, a recording and its bench graphs."""
+def fake_profile_cell(d, corpus="a", scores=((10.0, 10.1),), allocs=((1e6, 1e6),), hw=None):
+    """A profile cell: its result, its profile, a recording and its bench graphs; with `hw`, its kperf events per op."""
     os.makedirs(d, exist_ok=True)
-    json.dump([result(corpus, [[10.0, 10.1]], [[1e6, 1e6]])], open(os.path.join(d, "result.json"), "w"))
+    json.dump([result(corpus, [list(f) for f in scores], [list(f) for f in allocs])], open(os.path.join(d, "result.json"), "w"))
+    if hw:
+        json.dump(hw, open(os.path.join(d, "hw-events.json"), "w"))
     open(os.path.join(d, "profile.txt"), "w").write("async:cpu,alloc\n")
     open(os.path.join(d, "rec.jfr"), "w").write("jfr")
     for ev in ("cpu", "alloc"):
@@ -205,8 +207,59 @@ class ProfileViewTest(unittest.TestCase):
         self.assertEqual(ds[f"{self.v[0][:7]}-{self.v[2][:7]}"], (self.v[0], self.v[2]))
         self.assertEqual(ds[f"{self.v[3]}-{self.v[4]}"], (self.v[3], self.v[4]))
 
+    def profile_metrics(self):
+        """Profile cells with allocation and kperf counters: commit 2 profiled and not measured; 3 over two forks, 4 one.
+        Their scores (99) are the profiler's, and must not show."""
+        hw = lambda cyc: {"cycles": cyc, "instructions": 2 * cyc, "L1D_MISS": cyc / 100}
+        fake_profile_cell(os.path.join(self.prof, "a", self.v[2], "1"), scores=[[99.0]], allocs=[[2e6, 2e6]], hw=hw(1e9))
+        fake_profile_cell(os.path.join(self.prof, "a", self.v[3], "1"), scores=[[99.0], [99.0]], allocs=[[2e6, 2e6], [2.02e6, 2.02e6]], hw=hw(1e9))
+        fake_profile_cell(os.path.join(self.prof, "a", self.v[4], "1"), scores=[[99.0]], allocs=[[1.5e6, 1.5e6]], hw=hw(8e8))
+        return branchview.branch_view(self.camp, self.camps)
+
+    def test_profile_metrics_are_second_metrics(self):
+        d = self.profile_metrics()
+        ms = {m["k"]: m for m in d["metrics"]}
+        for k in ("p:alloc", "p:cycles", "p:instructions", "p:ipc", "p:ev:L1D_MISS", "p:ev:L1D_MISS/kinst"):
+            self.assertEqual(ms[k]["src"], "profile", k)
+        self.assertNotIn("p:score", ms)
+        self.assertEqual((ms["alloc"].get("src"), ms["p:alloc"]["h"]), (None, "alloc/op"))  # apart from the measurement's alloc
+        a = d["cells"]["a"]
+        c2, c3, c4 = a[self.v[2]], a[self.v[3]], a[self.v[4]]
+        # commit 2: profiled, not measured; its score is pending, not the profile's
+        self.assertEqual((c2["state"], c2["rounds"], c2["pr"]), ("done", 0, 1))
+        self.assertNotIn("score", c2["m"])
+        self.assertNotIn("ms", c2)
+        self.assertAlmostEqual(c2["m"]["p:alloc"][0], 2e6)
+        # commit 3's score is its measurement's
+        self.assertAlmostEqual(c3["m"]["score"][0], 10.1)
+        self.assertAlmostEqual(c3["m"]["alloc"][0], 9e5, delta=1)
+        self.assertEqual((c3["m"]["p:alloc"][0], c3["m"]["p:alloc"][4]), (2.01e6, 2))  # over the profile cell's two forks
+        self.assertEqual(len(c3["raw"]["p:alloc"]), 2)
+        # Δ against the previous commit with that metric: 3's against 2 (its prev, 1, is not profiled), 4's against 3
+        self.assertEqual((c3["prev"], c3["pv"]), (self.v[1], {k: self.v[2] for k in c3["d"] if k.startswith("p:")}))
+        self.assertAlmostEqual(c3["d"]["p:alloc"][0], 0.5)
+        self.assertNotIn("pv", c4)
+        self.assertAlmostEqual(c4["d"]["p:alloc"][0], 100 * (1.5 / 2.01 - 1))
+        self.assertAlmostEqual(c4["d"]["p:cycles"][0], -20.0)
+        self.assertTrue(c4["d"]["p:alloc"][3])  # 4 has one fork: the pooled sd
+        self.assertEqual(c4["d"]["p:alloc"][2], "better")
+        self.assertAlmostEqual(c4["d"]["score"][0], 100 * (8.15 / 10.1 - 1))  # the measurement's, unchanged
+        if shutil.which("node"):
+            from test_branchview import page_deltas
+            self.assertIn(f"a|{self.v[3]}|p:alloc", page_deltas(self, d["cells"]))
+        # the profile's graphs still link from its rows
+        self.assertEqual(d["profile"]["cells"]["a"][self.v[2]]["graphs"][0][2], f"br.profile/a/{self.v[2]}/1/rec-cpu.html")
+
+    def test_a_corpus_only_profiled_has_columns(self):
+        fake_profile_cell(os.path.join(self.prof, "z", self.v[0], "1"), "z", hw={"cycles": 1e9, "instructions": 1e9})
+        d = branchview.branch_view(self.camp, self.camps)
+        self.assertEqual(d["corpora"], ["a", "b", "z"])
+        self.assertNotIn("score", d["cells"]["z"][self.v[0]]["m"])
+        self.assertIn("p:cycles", d["cells"]["z"][self.v[0]]["m"])
+
     @unittest.skipUnless(shutil.which("node"), "needs node")
     def test_the_scripts_parse(self):
+        self.profile_metrics()
         page = open(index.build(self.camps)).read()
         self.assertIn('id="c-br.profile"', page)  # its own card, beside the branch campaign's
         blob = re.search(r'<div class="bh" data-campaign="br">.*?<script type="application/json">(.*?)</script>', page, re.S).group(1)

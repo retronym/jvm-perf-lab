@@ -75,6 +75,59 @@ def load_cell(cell):
     return "running" if os.path.exists(f) else None
 
 
+def results(d):
+    """A commit's cells on a corpus, in `d` (<campaign>/<corpus>/<variant>), by round: ([(JMH result, cell)] of those
+    done, whether any is running, the last failed cell or None)."""
+    rs, running, failed = [], False, None
+    for cell in sorted(glob.glob(os.path.join(d, "*")), key=lambda c: (len(c), c)):
+        if not (os.path.isdir(cell) and os.path.basename(cell).isdigit()):
+            continue
+        r = load_cell(cell)
+        if r == "running":
+            running = True
+        elif r == "failed":
+            failed = cell
+        elif r is not None:
+            rs.append((r, cell))
+    return rs, running, failed
+
+
+def failed_cell(cell, rel_to):
+    return {"why": open(os.path.join(cell, "failed.txt")).read().strip(), "log": os.path.relpath(os.path.join(cell, "jmh.log"), rel_to)}
+
+
+PROFILED = "p:"  # a profile pass's metric is keyed apart from the measurement's of the same name
+
+
+def fork_units(rs, per_unit, prefix="", keep=lambda k, kind: True):
+    """A commit's metrics (`metrics.of`, with an async kperf profile's events) over its cells `rs` ([(result, cell)]),
+    those `keep` takes, keyed `prefix` + key: ({key: [per fork, the mean of its measurement iterations]}, {key: kind},
+    {key: [[iteration, ...] per fork]}, [(key, label, kind)] in the order first seen). A metric without per-iteration
+    samples has a value per round (JMH's mean over the round's forks)."""
+    of = [metrics.of(r, per_unit, metrics.cached_hw_events(cell)) for r, cell in rs]
+    kinds, raw, us, cols = {}, {}, {}, []
+    for ms in of:
+        for k, label, kind, _, _ in ms:
+            if keep(k, kind) and prefix + k not in kinds:
+                kinds[prefix + k] = kind
+                cols.append((prefix + k, label, kind))
+    for pk in kinds:
+        k = pk[len(prefix):]
+        forks = [f for (r, _) in rs for f in raw_of(r, k, metrics.units_per_op(r, per_unit) if per_unit else 1.0) if f]
+        if forks:
+            raw[pk] = [[sig(x) for x in f] for f in forks]
+        us[pk] = [sum(f) / len(f) for f in forks] or [x for ms in of for kk, _, _, _, x in ms if kk == k and fin(x) is not None]
+    return us, kinds, raw, cols
+
+
+def own_graphs(rs, rel_to):
+    """The flame graphs of a commit's own cells (a campaign measured under an async profile), [[event, kind, href]],
+    the event with its round when more than one round has graphs."""
+    per = [(os.path.basename(cell), graph_links(cell, rel_to)) for _, cell in rs]
+    per = [(n, gs) for n, gs in per if gs]
+    return [[f"{ev} #{n}" if len(per) > 1 else ev, k, href] for n, gs in per for ev, k, href in gs]
+
+
 def date_shown(iso):
     try:
         return datetime.datetime.fromisoformat(iso).strftime("%a %d %b %Y")
@@ -86,13 +139,21 @@ def branch_view(campaign_dir, rel_to=None):
     """What the page draws for a branch campaign, None when `campaign_dir` has no branch.json:
 
     {"commits": [newest first: {sha, short, v (variant), subject, author, date, shown (date), index, merged}],
-     "corpora": [...], "metrics": [{k, h (heading), kind}], the score first,
+     "corpora": [...], "metrics": [{k, h (heading), kind, src: "profile" for the profile pass's}], the score first,
      "cells": {corpus: {variant: {"state": "done" | "running" | "failed" (with "why" and "log"), "rounds": n,
+                                  "pr": n rounds of the profile pass, "ms": the score's state when only profiled,
+                                  "graphs": [[event, kind, href]] of its own cells, when measured under an async profile,
+                                  "pv": {k: variant} the Δ is against, when not "prev" (a metric "prev" lacks),
                                   "forks": n, "m": {k: [mean, sd of the forks' means, CI half-width, Δ against it
                                   means something, n forks, df, sd pooled]} (sd, CI and df None without a spread),
                                   "s": {k: [mean shown, CI shown]}, "raw": {k: [[x, ...] per fork, of every round]},
                                   "d": {k: [Δ%, half-width of its CI, verdict, a side pooled]},
                                   "prev": variant of the previous measured commit}}},
+
+    The profile pass (<campaign>.profile, `profiles`) contributes its cells' metrics, keyed "p:<key>", but not the
+    score: a profiler perturbs it (allocation, PMU counters and their ratios it does not, or not much). They have the
+    same statistics as the measurement's, over the profile cells' forks; a commit profiled and not measured has a cell
+    of them alone.
      "diffs": [{name, href}], "unbuildable": {variant: {reason, log (href of its build.log)}}}
 
     `rel_to` is the directory the page's links are relative to (default `campaign_dir`)."""
@@ -113,51 +174,50 @@ def branch_view(campaign_dir, rel_to=None):
     named = list(spec.get("corpora") or [])
     corpora = [c for c in named] + [c for c in on_disk if c not in named and any(os.path.isdir(os.path.join(campaign_dir, c, v)) for v in variants)]
 
-    cols, cells = {}, {}
+    pdir = os.path.normpath(campaign_dir) + PROFILE_SUFFIX
+    pdir = pdir if os.path.isdir(pdir) else None
+    if pdir:  # a corpus only the profile pass ran on gets its columns too
+        corpora += [c for c in profile_corpora(pdir) if c not in corpora and any(os.path.isdir(os.path.join(pdir, c, v)) for v in variants)]
+    rel_to = rel_to or campaign_dir
+    cols, pcols, cells = {}, {}, {}
     for corpus in corpora:
-        per_v, units, prev = {}, {}, None
+        per_v, units = {}, {}
+        prev = None  # the previous commit with a score
         for v in variants:
-            rs, running, failed = [], False, None
-            for cell in sorted(glob.glob(os.path.join(campaign_dir, corpus, v, "*"))):
-                if not (os.path.isdir(cell) and os.path.basename(cell).isdigit()):
-                    continue
-                r = load_cell(cell)
-                if r == "running":
-                    running = True
-                elif r == "failed":
-                    failed = cell
-                elif r is not None:
-                    rs.append((r, cell))
-            if not rs:
+            rs, running, failed = results(os.path.join(campaign_dir, corpus, v))
+            # the profile pass's cells: their metrics, but not the score (or anything else timed: the profiler perturbs it)
+            prs = results(os.path.join(pdir, corpus, v))[0] if pdir else []
+            if not rs and not prs:
                 if running:
                     per_v[v] = {"state": "running"}
                 elif failed:
-                    per_v[v] = {"state": "failed", "why": open(os.path.join(failed, "failed.txt")).read().strip(),
-                                "log": os.path.relpath(os.path.join(failed, "jmh.log"), rel_to or campaign_dir)}
+                    per_v[v] = {"state": "failed", **failed_cell(failed, rel_to)}
                 continue
-            of = [metrics.of(r, per_unit, metrics.cached_hw_events(cell)) for r, cell in rs]
-            kinds, raw, us = {}, {}, {}
-            for ms in of:
-                for k, label, kind, main, _ in ms:
-                    cols.setdefault(k, (k, label, kind, main))
-                    kinds[k] = kind
-            for k in kinds:
-                forks = [f for (r, _) in rs for f in raw_of(r, k, metrics.units_per_op(r, per_unit) if per_unit else 1.0) if f]
-                if forks:
-                    raw[k] = [[sig(x) for x in f] for f in forks]
-                # the unit of variation is the fork: the mean of its measurement iterations; a metric without them has
-                # the round's value (JMH's mean over the round's forks)
-                us[k] = [sum(f) / len(f) for f in forks] or [x for ms in of for kk, _, _, _, x in ms if kk == k and fin(x) is not None]
-            units[v] = (us, kinds)
-            per_v[v] = {"state": "done", "rounds": len(rs), "forks": max((len(u) for u in us.values()), default=0),
-                        "m": {}, "s": {}, "raw": raw, "d": {}, "prev": prev}
+            us, kinds, raw, cs = fork_units(rs, per_unit)
+            pus, pkinds, praw, pcs = fork_units(prs, per_unit, PROFILED, lambda k, kind: kind != "score")
+            for c in cs:
+                cols.setdefault(c[0], c)
+            for c in pcs:
+                pcols.setdefault(c[0], c)
+            x = per_v[v] = {"state": "done", "rounds": len(rs), "forks": max((len(u) for u in us.values()), default=0),
+                            "m": {}, "s": {}, "raw": {**raw, **praw}, "d": {}, "prev": prev}
+            if prs:
+                x["pr"] = len(prs)
+            if not rs:  # profiled, not measured (yet): the score's state
+                x.update({"ms": "running"} if running else {"ms": "failed", **failed_cell(failed, rel_to)} if failed else {})
             if running:
-                per_v[v]["running"] = True
-            prev = v
+                x["running"] = True
+            g = own_graphs(rs, rel_to)
+            if g:
+                x["graphs"] = g
+            units[v] = ({**us, **pus}, {**kinds, **pkinds})
+            if "score" in us:
+                prev = v
         # per metric, the fork-to-fork relative sd pooled over the commits with two forks or more, for those with one
         stat = {v: {k: (*metrics.stats(xs), len(xs)) for k, xs in us.items() if xs} for v, (us, _) in units.items()}
         keys = {k for st in stat.values() for k in st}
         pool = {k: metrics.pooled_rel_sd([(st[k][0], st[k][1], st[k][2] - 1) for st in stat.values() if k in st]) for k in keys}
+        last = {}  # per metric, the latest commit with it so far: a Δ is against it
         for v, (us, kinds) in units.items():
             x = per_v[v]
             for k, (mean, sd, n) in stat[v].items():
@@ -168,18 +228,18 @@ def branch_view(campaign_dir, rel_to=None):
                 ci = None if sd is None else metrics.t999(df) * sd / n ** 0.5
                 x["m"][k] = [fin(mean), fin(sd), fin(ci), metrics.delta_ok(mean, kind, per_unit), n, df if sd is not None else None, pooled and sd is not None]
                 x["s"][k] = [metrics.fmt(kind, mean), "" if ci is None else ci_shown(kind, ci, mean)]
-            if x["prev"]:
-                pm = per_v[x["prev"]]["m"]
-                for k, m in x["m"].items():
-                    if k not in pm:
-                        continue
-                    d, half, _ = metrics.welch(fork_stats(pm[k]), fork_stats(m))
+            for k, m in x["m"].items():
+                if k in last:
+                    pm = per_v[last[k]]["m"][k]
+                    d, half, _ = metrics.welch(fork_stats(pm), fork_stats(m))
                     if d is not None:
-                        x["d"][k] = [fin(d), fin(half), index.verdict(d, half, pm[k][3]), pm[k][6] or m[6]]
+                        x["d"][k] = [fin(d), fin(half), index.verdict(d, half, pm[3]), pm[6] or m[6]]
+                        if last[k] != x["prev"]:  # the commit before it lacks this metric: what its Δ is against
+                            x.setdefault("pv", {})[k] = last[k]
+                last[k] = v
         if per_v:
             cells[corpus] = per_v
     corpora = [c for c in corpora if c in cells] + [c for c in named if c not in cells]
-    rel_to = rel_to or campaign_dir
     # profdiff outputs in the campaign itself (made by hand): a pair when the name is exactly <a>-<b> of two commits
     forms = {f: v for v in variants for f in (v, v[:7])}
     diffs = []
@@ -191,9 +251,10 @@ def branch_view(campaign_dir, rel_to=None):
                          "date": c.get("date", ""), "shown": date_shown(c.get("date")), "index": c.get("index", i),
                          "merged": c.get("merged") or []}
                         for i, (c, v) in reversed(list(enumerate(zip(commits, variants))))],
-            "corpora": corpora, "metrics": [{"k": k, "h": label, "kind": kind} for k, label, kind, _ in cols.values()],
+            "corpora": corpora, "metrics": [{"k": k, "h": label, "kind": kind} for k, label, kind in cols.values()]
+                                          + [{"k": k, "h": label, "kind": kind, "src": "profile"} for k, label, kind in pcols.values()],
             "cells": cells, "diffs": diffs, "range": branch.get("range", ""), "perUnit": per_unit,
-            "unbuildable": unbuildable(campaign_dir, rel_to),
+            "unbuildable": unbuildable(campaign_dir, rel_to), "measureProfile": spec.get("profile"),
             "profile": profiles(campaign_dir, variants, rel_to)}
 
 
@@ -213,6 +274,9 @@ PROFILE_SUFFIX = ".profile"  # the profile campaign beside a branch campaign (pe
 def graph_links(cell, rel_to):
     """A profile cell's rendered flame graphs, [[event, kind, href], ...], as the index's cell rows link them."""
     from . import regraph
+    pf = os.path.join(cell, "profile.txt")
+    if not (os.path.exists(pf) and open(pf).read().startswith("async")):  # xctrace, say: no flame graphs
+        return []
     jfr = (glob.glob(os.path.join(cell, "**", "*.jfr"), recursive=True) or [None])[0]
     events = regraph.events_of(cell)
     if not jfr and events:  # a published copy leaves the recording out: its first event's bench graph names it
@@ -227,14 +291,14 @@ def graph_links(cell, rel_to):
 def profiles(campaign_dir, variants, rel_to):
     """The branch campaign's profiles, from <campaign>.profile beside it, None without one:
 
-    {"campaign": its name, "corpora": [the corpora it profiles],
+    {"campaign": its name, "profile": its profile (as `perflab run --profile`), "corpora": [the corpora it profiles],
      "cells": {corpus: {variant: {"state": "done" | "running", "graphs": [[event, kind, href], ...]}}},
      "diffs": [{"a", "b" (variants), "corpus", "href" (compare.html), "events": [{"ev", "slots": [[view, href], ...]}]}]}
 
     A diff is one `perflab branch diff` wrote (its pair.json names the commits and the corpus), so the view matches it
     to a pair of rows exactly."""
     from . import compare, regraph
-    pdir =os.path.normpath(campaign_dir) + PROFILE_SUFFIX
+    pdir = os.path.normpath(campaign_dir) + PROFILE_SUFFIX
     if not os.path.isdir(pdir):
         return None
     try:
@@ -243,10 +307,8 @@ def profiles(campaign_dir, variants, rel_to):
         spec = {}
     cells = {}
     corpora = list(spec.get("corpora") or [])
-    for d in sorted(glob.glob(os.path.join(pdir, "*/"))):
-        corpus = os.path.basename(d.rstrip("/"))
-        if corpus.startswith(("diff-", ".")):
-            continue
+    for corpus in profile_corpora(pdir):
+        d = os.path.join(pdir, corpus)
         for v in variants:
             for cell in sorted(glob.glob(os.path.join(d, v, "*")), key=lambda c: (len(c), c)):
                 if not (os.path.isdir(cell) and os.path.basename(cell).isdigit()):
@@ -278,7 +340,12 @@ def profiles(campaign_dir, variants, rel_to):
                                                       for view, _, name, _ in compare.SLOTS
                                                       if os.path.exists(os.path.join(d, name.format(event=ev)))]}
                                  for ev in events]})
-    return {"campaign": os.path.basename(pdir), "corpora": corpora, "cells": cells, "diffs": diffs}
+    return {"campaign": os.path.basename(pdir), "profile": spec.get("profile", ""), "corpora": corpora, "cells": cells, "diffs": diffs}
+
+
+def profile_corpora(pdir):
+    """The corpora a profile campaign has cells of, by its directories."""
+    return [c for c in (os.path.basename(d.rstrip("/")) for d in sorted(glob.glob(os.path.join(pdir, "*/")))) if not c.startswith(("diff-", "."))]
 
 
 def ci_shown(kind, ci, mean):
@@ -302,7 +369,7 @@ def parts(campaign_dir, rel_to, corpus_param="corpus"):
     data["corpusParam"] = corpus_param
     blob = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
     n = len(data["commits"])
-    measured = len({v for cs in data["cells"].values() for v, c in cs.items() if c["state"] == "done"})
+    measured = len({v for cs in data["cells"].values() for v, c in cs.items() if "score" in c.get("m", {})})
     note = (f"{n} first-parent commits of <code>{esc(data['range'])}</code>, newest first; {measured} measured. "
             "Mean over forks ± 99.9% CI over forks; Δ against the previous measured commit")
     help_ = ui.help_popover(
@@ -321,7 +388,9 @@ def parts(campaign_dir, rel_to, corpus_param="corpus"):
         "page's URL.</p><p style='margin-bottom:0'><b>Profiles</b> are runs of their own (a profiler perturbs the score), in the "
         "campaign <i>&lt;name&gt;.profile</i> beside this one, from the same builds: <code>perflab branch profile</code>. A row's "
         "<b>profile</b> badge opens its flame graphs; comparing two rows shows their differential flame graphs (<code>perflab branch "
-        "diff</code>), or offers to make them.</p>", right=True)
+        "diff</code>), or offers to make them. The profile pass's metrics, other than the score, are second metrics marked "
+        "<b>· profile</b> (allocation, PMU counters), with the same statistics over its own forks, and a Δ against the commit profiled "
+        "before. A campaign measured under an async profile has a <b>graphs</b> badge for its own cells' flame graphs.</p>", right=True)
     return (note, help_, f'<div class="bh" data-campaign="{esc(name)}"><div class="bh-ctl"></div><div class="bh-chart"></div>'
             f'<div class="bh-table"></div><div class="bh-cmp"></div><script type="application/json">{blob}</script></div>')
 
@@ -509,11 +578,26 @@ const BH = (() => {
     if (!sc) return s;
     return [plain(m[0] / sc.div), m[2] != null ? plainCI(m[2] / sc.div) : ''];
   }
+  // a metric of the profile pass (<campaign>.profile): "· profile" after its heading, keyed p:<key>
+  const fromProfile = (d, k) => metric(d, k).src === 'profile';
   function heading(d, k) {
-    const m = metric(d, k), sc = scaleOf(d, k);
-    if (!sc) return unitFix(m.h);
+    const m = metric(d, k), sc = scaleOf(d, k), p = fromProfile(d, k) ? ' · profile' : '';
+    if (!sc) return unitFix(m.h) + p;
     const per = String(m.h).includes('/') ? '/' + String(m.h).split('/').pop() : '';
-    return `${String(m.h).split('/')[0]} ${sc.u || '×'}${per}`;
+    return `${String(m.h).split('/')[0]} ${sc.u || '×'}${per}${p}`;
+  }
+  function headTip(d, k) {
+    if (!fromProfile(d, k)) return '';
+    const P = d.profile || {};
+    return `from the profile pass, ${P.campaign || 'the profile campaign'}${P.profile ? ` (${P.profile})` : ''}: runs of their own under the profiler, so no score from them`;
+  }
+  const th = (d, k, cls) => `<th class="${cls}"${fromProfile(d, k) ? ` title="${esc(headTip(d, k))}"` : ''}>${esc(heading(d, k))}</th>`;
+  // a commit's score when it is profiled and not measured: its measurement's state
+  function unmeasured(x, v, d) {
+    const u = (d.unbuildable || {})[v];
+    if (x.ms === 'running') return '<span class="badge running">running</span>';
+    if (x.ms === 'failed') return `<a class="bh-fail" href="${esc(x.log)}" title="${esc(x.why)}">run failed</a>`;
+    return u ? `<a class="bh-fail" href="${esc(u.log)}" title="${esc(u.reason)}">build failed</a>` : '<span class="bh-pend" title="profiled, not measured yet">pending</span>';
   }
   function value(d, st, c, v, k, exts) {
     const x = cellOf(d, c, v);
@@ -522,12 +606,13 @@ const BH = (() => {
     if (x.state === 'running') return '<span class="badge running">running</span>';
     if (x.state === 'failed') return `<a class="bh-fail" href="${esc(x.log)}" title="${esc(x.why)}">run failed</a>`;
     const m = x.m[k];
-    if (!m) return '';
+    if (!m) return k === 'score' ? unmeasured(x, v, d) : '';
+    const rounds = fromProfile(d, k) ? x.pr : x.rounds;
     const s = shown(d, k, m, x.s[k]), sc = scaleOf(d, k), un = sc ? ` ${sc.u}` : '';
     const dag = m[6] ? '†' : '';
     const n = `<span class="mv">${esc(s[0])}</span>${s[1] ? ` <span class="pm">± ${esc(s[1])}${dag}</span>` : ''}`;
     const g = st.form === 'num' || !exts[c + '|' + k] ? '' : bar(m, exts[c + '|' + k]);
-    const tip = `${esc(s[0])}${un}${s[1] ? ' ± ' + esc(s[1]) + un + dag + ' (99.9% CI over forks)' : ''}; ${m[4]} fork${m[4] > 1 ? 's' : ''}, ${x.rounds} round${x.rounds > 1 ? 's' : ''}`
+    const tip = `${esc(s[0])}${un}${s[1] ? ' ± ' + esc(s[1]) + un + dag + ' (99.9% CI over forks)' : ''}; ${m[4]} fork${m[4] > 1 ? 's' : ''}, ${rounds} round${rounds > 1 ? 's' : ''}${fromProfile(d, k) ? ' of the profile pass' : ''}`
       + (m[1] == null ? '; 1 fork: no spread yet' : m[6] ? `. ${POOLED}: ${(100 * m[1] / m[0]).toFixed(1)}%` : `, sd of the forks’ means ${(100 * m[1] / m[0]).toFixed(1)}%`);
     return `<span class="bh-v${g ? ' bar' : ''}${m[2] != null && m[6] ? ' pl' : ''}"${g} title="${tip}">${n}</span>`;
   }
@@ -538,19 +623,30 @@ const BH = (() => {
   }
   // a commit's profile cells (in <campaign>.profile): a badge opening its flame graphs in the lightbox, every graph of
   // every profiled corpus in its group
+  // a badge opening a commit's flame graphs in the lightbox: per corpus [corpus, {graphs}], every graph in its group
+  function graphBadge(group, per, label, tip) {
+    const gs = per.flatMap(([cp, x]) => (x.graphs || []).map(g => [per.length > 1 ? `${cp} · ${g[0]}` : g[0], g[1], g[2]]));
+    if (!gs.length) return '';
+    return ` <span class="bh-pf" data-lb-group="${esc(group)}">`
+      + gs.map((g, i) => `<a class="bh-pb"${i ? ' hidden' : ''} href="${esc(g[2])}" data-lb="${esc(g[0])}|${esc(g[1])}" title="${esc(tip)}">${label}</a>`).join('')
+      + '</span>';
+  }
   function profBadge(d, c) {
     const P = d.profile;
     if (!P) return '';
     const per = P.corpora.map(cp => [cp, (P.cells[cp] || {})[c.v]]).filter(x => x[1]);
     if (!per.length) return '';
-    const gs = per.flatMap(([cp, x]) => x.graphs.map(g => [per.length > 1 ? `${cp} · ${g[0]}` : g[0], g[1], g[2]]));
-    if (!gs.length)
-      return per.some(x => x[1].state === 'running') ? ' <span class="bh-pb run" title="its profile is running">profiling</span>'
-        : ' <span class="bh-pb" title="profiled; its flame graphs are not rendered yet">profiled</span>';
-    const tip = `flame graphs of its profile${per.length > 1 ? 's' : ''} (${esc(P.campaign)}: ${per.map(x => esc(x[0])).join(', ')})`;
-    return ` <span class="bh-pf" data-lb-group="${esc(P.campaign)} · ${esc(c.short.slice(0, 7))}">`
-      + gs.map((g, i) => `<a class="bh-pb"${i ? ' hidden' : ''} href="${esc(g[2])}" data-lb="${esc(g[0])}|${esc(g[1])}" title="${tip}">profile</a>`).join('')
-      + '</span>';
+    const tip = `flame graphs of its profile${per.length > 1 ? 's' : ''} (${P.campaign}: ${per.map(x => x[0]).join(', ')})`;
+    return graphBadge(`${P.campaign} · ${c.short.slice(0, 7)}`, per, 'profile', tip)
+      || (per.some(x => x[1].state === 'running') ? ' <span class="bh-pb run" title="its profile is running">profiling</span>'
+        : ' <span class="bh-pb" title="profiled; its flame graphs are not rendered yet">profiled</span>');
+  }
+  // the flame graphs of the commit's own cells, when the campaign measures under an async profile
+  function ownBadge(el, d, c) {
+    const per = d.corpora.map(cp => [cp, cellOf(d, cp, c.v)]).filter(x => x[1] && x[1].graphs && x[1].graphs.length);
+    if (!per.length) return '';
+    const tip = `flame graphs of its cells (${d.measureProfile || 'profiled'}, as measured: ${per.map(x => x[0]).join(', ')})`;
+    return graphBadge(`${el.dataset.campaign} · ${c.short.slice(0, 7)}`, per, 'graphs', tip);
   }
   function drawTable(el, d, st) {
     const cs = corpora(d), m2 = st.m2 !== 'none' ? metric(d, st.m2) : null, m1 = metric(d, 'score');
@@ -559,7 +655,7 @@ const BH = (() => {
     const per = m2 ? 4 : 2, open = memOf(el).open;
     let h = '<div class="scroll"><table class="t bh-t"><tr><th class="cm" rowspan="2">commit</th>'
       + cs.map(c => `<th class="cg gs" colspan="${per}">${esc(c)}</th>`).join('') + '</tr><tr>'
-      + cs.map(() => `<th class="n gs">${esc(heading(d, 'score'))}</th><th>Δ</th>` + (m2 ? `<th class="n">${esc(heading(d, m2.k))}</th><th>Δ</th>` : '')).join('') + '</tr>';
+      + cs.map(() => th(d, 'score', 'n gs') + '<th>Δ</th>' + (m2 ? th(d, m2.k, 'n') + '<th>Δ</th>' : '')).join('') + '</tr>';
     for (const c of d.commits) {
       const sel = st.sel.includes(c.v), merged = c.merged.length, opened = merged && open.has(c.v);
       h += `<tr data-v="${esc(c.v)}" class="${sel ? 'sel' : ''}${opened ? ' has-sub' : ''}"><td class="cm"><div class="bh-cm">`
@@ -567,7 +663,7 @@ const BH = (() => {
         + `<span class="bh-c"><span class="bh-subj" title="${esc(c.subject)}">${sha(c, 7)} ${esc(c.subject)}</span>`
         + `<span class="bh-who" title="${esc(c.date)}">${esc(c.author)} · ${esc(c.shown)}`
         + (merged ? `<button class="bh-mg" data-bmerge="${esc(c.v)}" aria-expanded="${!!opened}" title="a merge of ${merged} commit${merged > 1 ? 's' : ''}: list them">+${merged}</button>` : '')
-        + profBadge(d, c) + '</span></span></div></td>';
+        + ownBadge(el, d, c) + profBadge(d, c) + '</span></span></div></td>';
       for (const cp of cs) {
         const x = cellOf(d, cp, c.v), dd = x && x.d || {};
         h += `<td class="n gs">${value(d, st, cp, c.v, 'score', exts)}</td><td>${delta(dd.score)}</td>`;
@@ -601,7 +697,7 @@ const BH = (() => {
       hits += `<rect class="hit" data-bhv="${esc(cm.v)}" x="${f1(L + i * band)}" y="${T}" width="${f1(band)}" height="${H - T}"/>`;
       const x = cells[cm.v];
       if ((N - 1 - i) % every === 0)
-        xl += `<text class="${x && x.state === 'done' ? '' : 'un'}" x="${f1(X(i))}" y="${H - B + 14}" text-anchor="middle">${esc(cm.short.slice(0, 7))}</text>`;
+        xl += `<text class="${x && x.state === 'done' && x.m.score ? '' : 'un'}" x="${f1(X(i))}" y="${H - B + 14}" text-anchor="middle">${esc(cm.short.slice(0, 7))}</text>`;
     });
     [[m1, e1, -off, 1], [m2, e2, off, 2]].forEach(([m, e, dx, n]) => {
       if (!m || !e) return;
@@ -651,7 +747,7 @@ const BH = (() => {
     const val = k => { const m = x && x.state === 'done' && x.m[k]; if (!m) return ''; const s = shown(d, k, m, x.s[k]); return `${esc(s[0])}${s[1] ? ' ± ' + esc(s[1]) + (m[6] ? '†' : '') : ''}`; };
     const m2 = st.m2 !== 'none' ? metric(d, st.m2) : null;
     const nums = !x ? 'pending' : x.state === 'running' ? 'running' : x.state === 'failed' ? 'run failed: ' + esc(x.why)
-      : `${val('score')} ${esc(heading(d, 'score'))} ${delta(x.d.score)}`
+      : (val('score') ? `${val('score')} ${esc(heading(d, 'score'))} ${delta(x.d.score)}` : 'score pending')
         + (m2 && val(m2.k) ? ` · ${val(m2.k)} ${esc(heading(d, m2.k))} ${delta(x.d[m2.k])}` : '');
     return `${sha(cm)} ${esc(cm.subject)} · <b>${esc(st.c)}</b>: ${nums}`;
   }
@@ -663,18 +759,21 @@ const BH = (() => {
     const one = picked.length === 1, b = picked[picked.length - 1];
     let cs = corpora(d);
     // one row: against the commit measured before it on each corpus (the Δ column); two: the older against the newer
-    const base = c => one ? (cellOf(d, c, b.v) || {}).prev : picked[0].v;
+    // (per metric: the profile pass's against the commit profiled before it, its Δ column too)
+    const base = (c, k) => { if (!one) return picked[0].v; const x = cellOf(d, c, b.v) || {}; return (k && (x.pv || {})[k]) || x.prev; };
     const head = one ? `<h4>${sha(b)} against the commit measured before it</h4><span class="k">tick a second row to compare any two</span>`
       : `<h4>${sha(picked[0])} → ${sha(b)}</h4><span class="k">${esc(picked[0].subject)} → ${esc(b.subject)}</span>`;
     // the corpora both have results on
-    cs = cs.filter(c => d.metrics.some(m => pairDelta(cellOf(d, c, base(c)), cellOf(d, c, b.v), m.k)));
+    cs = cs.filter(c => d.metrics.some(m => pairDelta(cellOf(d, c, base(c, m.k)), cellOf(d, c, b.v), m.k)));
     let rows = '';
     for (const m of d.metrics) {
       const tds = cs.map(c => {
-        const a = cellOf(d, c, base(c)), y = cellOf(d, c, b.v), x = pairDelta(a, y, m.k);
-        return x ? `<td>${delta(x)}<span class="ab">${esc(shown(d, m.k, a.m[m.k], a.s[m.k])[0])} → ${esc(shown(d, m.k, y.m[m.k], y.s[m.k])[0])}</span></td>` : '<td></td>';
+        const bv = base(c, m.k), a = cellOf(d, c, bv), y = cellOf(d, c, b.v), x = pairDelta(a, y, m.k);
+        const vs = bv !== base(c) && byV(bv) ? ` (vs ${sha(byV(bv), 7)})` : '';
+        return x ? `<td>${delta(x)}<span class="ab">${esc(shown(d, m.k, a.m[m.k], a.s[m.k])[0])} → ${esc(shown(d, m.k, y.m[m.k], y.s[m.k])[0])}${vs}</span></td>` : '<td></td>';
       });
-      if (tds.some(t => t !== '<td></td>')) rows += `<tr><td>${esc(heading(d, m.k))}</td>${tds.join('')}</tr>`;
+      const t = headTip(d, m.k);
+      if (tds.some(t => t !== '<td></td>')) rows += `<tr><td${t ? ` title="${esc(t)}"` : ''}>${esc(heading(d, m.k))}</td>${tds.join('')}</tr>`;
     }
     let h = `<div class="bh-ph">${head}<button class="chip" data-bclear="1">clear</button></div>`;
     h += rows ? '<div class="scroll"><table class="t"><tr><th>metric</th>'
@@ -745,13 +844,16 @@ const BH = (() => {
   }
   function drawOne(el) {
     const d = data(el), st = state(el), others = d.metrics.filter(m => m.k !== 'score');
+    const opts = ms => ms.map(m => `<option value="${esc(m.k)}"${m.k === st.m2 ? ' selected' : ''}${m.src === 'profile' ? ` title="${esc(headTip(d, m.k))}"` : ''}>${esc(heading(d, m.k))}</option>`).join('');
     const chip = (a, v, on, label, t) => `<button class="chip" ${a}="${v}" aria-pressed="${on}"${t ? ` title="${t}"` : ''}>${label}</button>`;
     el.querySelector('.bh-ctl').innerHTML = '<span class="fg"><span class="fl">show</span>'
       + chip('data-bform', 'bar', st.form === 'bar', 'shaded', 'a bar behind each value, on a scale shared down the column; its lighter end is the CI')
       + chip('data-bform', 'num', st.form === 'num', 'numbers', 'mean ± CI only') + '</span>'
       + `<span class="fg">${chip('data-bchart', '1', st.chart, 'chart', 'commits on x, the score left, the second metric right')}</span>`
       + '<label class="fg"><span class="fl">second metric</span><select data-bm2><option value="none">none</option>'
-      + others.map(m => `<option value="${esc(m.k)}"${m.k === st.m2 ? ' selected' : ''}>${esc(unitFix(m.h))}</option>`).join('') + '</select></label>';
+      + opts(others.filter(m => m.src !== 'profile'))
+      + (others.some(m => m.src === 'profile') ? `<optgroup label="profile pass (${esc((d.profile || {}).campaign || '')})">${opts(others.filter(m => m.src === 'profile'))}</optgroup>` : '')
+      + '</select></label>';
     drawChart(el, d, st); drawTable(el, d, st); drawCompare(el, d, st);
     if (memOf(el).hover) hover(el, memOf(el).hover);
   }
