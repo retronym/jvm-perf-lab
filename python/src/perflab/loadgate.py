@@ -2,7 +2,8 @@
 its descendants: the sbt server, JMH's launcher and forks, xctrace), measured as the change in cumulative CPU time.
 
   perflab loadgate wait   <root-pid> [max-cores=1.5] [quiet-secs=60]   blocks until other load stays under max-cores
-  perflab loadgate sample <root-pid> <out.tsv>                          appends "epoch<TAB>cores<TAB>top" every 5 s until killed
+  perflab loadgate sample <root-pid> <out.tsv> [secs=5]                 appends "epoch<TAB>cores<TAB>top<TAB>secs" every secs until
+                                                                       killed: the load over the secs before epoch
   perflab loadgate mean   <out.tsv> [since-epoch]                       mean other-load in cores over the samples
 """
 import json, os, subprocess, sys, time
@@ -63,6 +64,49 @@ def other_load(root, interval=5.0):
     if bg >= 0.1:
         top += f"; background daemons {bg:.1f}"
     return total, top
+
+def samples(path):
+    """A sample file's [(start, end, cores, top)], in epoch seconds; samples without a window are of 5 s."""
+    out = []
+    try:
+        lines = open(path).read().splitlines()
+    except FileNotFoundError:
+        return out
+    for l in lines:
+        p = l.split("\t")
+        try:
+            end, cores = float(p[0]), float(p[1])
+            secs = float(p[3]) if len(p) > 3 and p[3] else 5.0
+        except (IndexError, ValueError):
+            continue
+        out.append((end - secs, end, cores, p[2] if len(p) > 2 else ""))
+    return out
+
+
+def per_iteration(load_tsv, iterations_tsv):
+    """Each measurement iteration's competing load: [{"index", "start", "end", "score", "cores" (the highest of the
+    samples overlapping it, None without any), "top"}], from a cell's load.tsv and iterations.tsv."""
+    ss = samples(load_tsv)
+    out = []
+    try:
+        rows = open(iterations_tsv).read().splitlines()
+    except FileNotFoundError:
+        return out
+    head = rows[0].split("\t") if rows else []
+    for r in rows[1:]:
+        x = dict(zip(head, r.split("\t")))
+        if x.get("kind") not in ("measure", "measurement"):
+            continue
+        try:
+            a, b = float(x["start_ms"]) / 1000, float(x["end_ms"]) / 1000
+        except (KeyError, ValueError):
+            continue
+        over = [s for s in ss if s[0] < b and s[1] > a]
+        top = max(over, key=lambda s: s[2]) if over else None
+        out.append({"index": int(x.get("index") or 0), "start": a, "end": b, "score": float(x["score"]) if x.get("score") else None,
+                    "cores": top[2] if top else None, "top": top[3] if top else ""})
+    return out
+
 
 STATE_NAME = "loadgate.json"
 # where the wait is published: <campaigns> of this checkout, or of the one `perflab trees` runs from
@@ -138,10 +182,11 @@ def main(argv):
         wait(int(argv[1]), float(argv[2]) if len(argv) > 2 else 1.5, float(argv[3]) if len(argv) > 3 else 60)
     elif cmd == "sample":
         root, path = int(argv[1]), argv[2]
+        secs = float(argv[3]) if len(argv) > 3 else 5.0
         while True:
-            load, top = other_load(root)
+            load, top = other_load(root, secs)
             with open(path, "a") as f:
-                f.write(f"{time.time():.0f}\t{load:.2f}\t{top}\n")
+                f.write(f"{time.time():.1f}\t{load:.2f}\t{top}\t{secs:g}\n")
     elif cmd == "mean":
         path = argv[1]
         since = float(argv[2]) if len(argv) > 2 else 0

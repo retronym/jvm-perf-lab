@@ -193,13 +193,30 @@ def wait_until_quiet(spec):
         loadgate.wait(loadgate.server_pid(), g.get("maxCores", 1.5), g.get("quietSecs", 30))
 
 
+LOAD_SECS = 2  # a load sample's window: shorter than a measurement iteration, to say which ones a burst hit
+LOAD_CHECK = "load.json"  # in a cell: each measurement iteration's competing load, and the gate's verdict
+
+
 def start_load_sampler(spec, path):
-    """Competing load every 5 s while a cell runs, into `path`."""
+    """Competing load every LOAD_SECS while a cell runs, into `path`."""
     if os.path.exists(path):
         os.unlink(path)
     if not spec.loadgate:
         return None
-    return subprocess.Popen([sys.executable, "-m", "perflab", "loadgate", "sample", str(loadgate.server_pid()), path])
+    return subprocess.Popen([sys.executable, "-m", "perflab", "loadgate", "sample", str(loadgate.server_pid()), path, str(LOAD_SECS)])
+
+
+def load_check(spec, dest):
+    """The measurement iterations that ran while other load was over the gate's maxCores (the mean over a cell hides a
+    burst that hits two of its iterations), recorded in <cell>/load.json; [] when none did, or without a gate."""
+    if not spec.loadgate:
+        return []
+    its = loadgate.per_iteration(os.path.join(dest, "load.tsv"), os.path.join(dest, "iterations.tsv"))
+    limit = spec.loadgate.get("maxCores", 1.5)
+    hit = [i for i in its if i["cores"] is not None and i["cores"] > limit]
+    with open(os.path.join(dest, LOAD_CHECK), "w") as f:
+        json.dump({"maxCores": limit, "iterations": its, "disturbed": [i["index"] for i in hit]}, f)
+    return hit
 
 
 def mean_load(path):
@@ -344,6 +361,12 @@ def run(spec, dry, retry_unbuildable=False):
             load = mean_load(load_tsv)
             if not rc and spec.loadgate and load > spec.loadgate.get("maxCores", 1.5):
                 log(f"  other load averaged {load:.1f} cores during the run; rerunning")
+                continue
+            hit = [] if rc else load_check(spec, dest)
+            if hit:
+                worst = max(hit, key=lambda i: i["cores"])
+                log(f"  other load over {spec.loadgate.get('maxCores', 1.5)} cores during measurement iteration"
+                    f"{'s' if len(hit) > 1 else ''} {', '.join(str(i['index']) for i in hit)} (up to {worst['cores']:.1f}: {worst['top']}); rerunning")
                 continue
             break
         else:

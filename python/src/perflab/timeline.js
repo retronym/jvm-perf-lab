@@ -6,7 +6,7 @@
 //   timeline.tsv    per 50 ms: cycles and instructions of the benchmark thread, JIT, GC, other threads of the fork and
 //                   other processes (from xctrace, so only once the fork has finished)
 //   gc.log          -Xlog:gc with wall-clock `time` decorations: pauses (a run's forks' logs concatenated)
-//   load.tsv        the load gate's 5 s samples of other processes' CPU, in cores
+//   load.tsv        the load gate's samples of other processes' CPU, in cores (each over its window: 5 s unless it says)
 //   profile.txt     the run's profile (e.g. xctrace:ipc), to name the gaps a profiler leaves between iterations
 //   jvm-events.tsv  the JDK's events in an async run's .jfr (jvmevents.py): kind (vmop, c1, c2, deopt), start_ms, end_ms, what
 // Used by timeline.py (a page per cell) and index.py (a live panel in index.html).
@@ -38,7 +38,7 @@ const BenchTimeline = (() => {
       if (!isNaN(end)) pauses.push({s: end - +m[3], e: end, what: m[2].trim()});
     }
     const load = (f.load || '').split('\n').map(l => l.split('\t')).filter(p => p.length >= 2 && p[0])
-      .map(p => ({t: +p[0] * 1000, cores: +p[1], top: p[2] || ''}));
+      .map(p => ({t: +p[0] * 1000, cores: +p[1], top: p[2] || '', w: (+p[3] || 5) * 1000}));
     const jvm = tsv(f.jvm).map(r => ({kind: r.kind, s: +r.start_ms, e: +r.end_ms, what: r.what}));
     return {iters, series, pauses, load, jvm, profile: (f.profile || '').trim()};
   }
@@ -228,10 +228,10 @@ const BenchTimeline = (() => {
           el('text', {x: W - R - 2, y: y + 12, 'text-anchor': 'end', class: 'lab'}).textContent = `load.tsv: other processes, cores (max ${lmax.toFixed(1)})`;
           let ld = '';
           for (const l of D.load) {
-            if (l.t < x0 - 5000 || l.t > x1 + 5000) continue;
+            if (l.t < x0 - l.w || l.t > x1 + l.w) continue;
             const yy = y + r.h - 4 - l.cores / lmax * (r.h - 10);
             const clamp = x => Math.min(Math.max(x, L), W - R);
-            ld += (ld ? 'L' : 'M') + clamp(X(l.t - 5000)).toFixed(1) + ',' + yy.toFixed(1) + 'L' + clamp(X(l.t)).toFixed(1) + ',' + yy.toFixed(1);
+            ld += (ld ? 'L' : 'M') + clamp(X(l.t - l.w)).toFixed(1) + ',' + yy.toFixed(1) + 'L' + clamp(X(l.t)).toFixed(1) + ',' + yy.toFixed(1);
           }
           if (ld) el('path', {d: ld, fill: 'none', stroke: 'var(--v1)', 'stroke-width': 1.2, 'stroke-dasharray': '4 3'});
         }
