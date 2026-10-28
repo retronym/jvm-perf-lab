@@ -30,7 +30,7 @@ HTTP (JSON unless noted):
   GET  /api/jobs[?all=1]                 jobs, queue order first
   GET  /api/jobs/<id>                    one job
   GET  /api/jobs/<id>/transcript[?tail=<lines>|offset=<bytes>][&file=output]   its transcript (text), or its output
-  POST /api/jobs                         {argv, cwd, env?, priority?, python?, module?}: a new job
+  POST /api/jobs                         {argv, cwd, env?, priority?}: a new job, `perflab <argv>`
   POST /api/jobs/<id>/pause|resume|cancel
   POST /api/jobs/<id>/priority           {priority}
   POST /api/jobs/<id>/move               {by: -1 (earlier) or 1}
@@ -40,6 +40,11 @@ HTTP (JSON unless noted):
   POST /api/storage/pin                  {project, kind, name, pinned}
   GET  /, /admin                         the queue page, the storage page
   GET  /p/<project>/...                  the project's campaigns and runs (its index), as `perflab serve` serves them
+
+Under /p/, only the campaigns and runs directories are served (at their paths below the two's common directory), never
+a path with a segment that starts with `.` (worktrees, build snapshots), and every page but the project's index, which
+carries the token, under a CSP sandbox: its scripts run in an opaque origin, so that a flame graph or a page a
+benchmark wrote cannot read the index (and its token) or call the API.
 """
 import argparse, fcntl, hashlib, json, os, re, secrets, signal, socket, sqlite3, subprocess, sys, threading, time, traceback
 import http.server, urllib.error, urllib.parse, urllib.request
@@ -298,9 +303,27 @@ def _job(r):
 def _project(r):
     r = dict(r)
     root = os.path.commonpath([r["campaigns"], r["runs"]]) if r.get("runs") else r["campaigns"]
-    r["serveRoot"] = root
+    r["serveRoot"] = root  # what the URLs are relative to; only the mounts below it are served
+    r["mounts"] = [[os.path.relpath(d, root).replace(os.sep, "/"), d] for d in (r["campaigns"], r.get("runs")) if d]
     r["index"] = f"/p/{r['id']}/" + os.path.relpath(os.path.join(r["campaigns"], "index.html"), root)
     return r
+
+
+def _mount(project, rel):
+    """The directory `rel` (a URL path below /p/<project>/, unquoted) is in, and its path there; None if it is in
+    neither the campaigns nor the runs, or names a dot file or directory."""
+    if any(s.startswith(".") for s in rel.split("/")):
+        return None
+    for prefix, d in sorted(project["mounts"], key=lambda m: -len(m[0])):
+        if prefix == ".":
+            return d, rel
+        if rel == prefix or rel.startswith(prefix + "/"):
+            return d, rel[len(prefix) + 1:]
+    return None
+
+
+def _under(path, project):
+    return any(path.startswith(d + os.sep) for _, d in project["mounts"])
 
 
 def public(job):
@@ -583,6 +606,8 @@ class Server:
         server = self
 
         class Handler(httpd.Handler):
+            sandbox = False  # this response under SANDBOX
+
             def __init__(self, *a, **kw):
                 super().__init__(*a, directory=server.home, **kw)
 
@@ -609,10 +634,16 @@ class Server:
             def _error(self, code, msg):
                 self._send(code, {"error": msg})
 
+            def end_headers(self):
+                if self.sandbox:
+                    self.send_header("Content-Security-Policy", SANDBOX)
+                super().end_headers()
+
             def do_HEAD(self):
                 self.do_GET()
 
             def do_GET(self):
+                self.sandbox = False
                 if not self._host_ok():
                     return self._error(403, "bad Host")
                 url = urllib.parse.urlsplit(self.path)
@@ -660,8 +691,11 @@ class Server:
                     self.send_header("Location", project["index"])
                     self.end_headers()
                     return
-                self.directory = project["serveRoot"]
-                local = self.translate_path("/" + parts[3])
+                m = _mount(project, urllib.parse.unquote(parts[3]))
+                if m is None:
+                    return self._error(404, "not found")
+                self.directory, rel = m
+                local = self.translate_path("/" + urllib.parse.quote(rel))
                 if os.path.isdir(local) and not p.endswith("/"):
                     self.send_response(301)
                     self.send_header("Location", p + "/" + (f"?{query}" if query else ""))
@@ -674,7 +708,8 @@ class Server:
                     meta = f'<meta name="perflab-token" content="{server.token}">'
                     at = page.index(">") + 1 if page[:9].lower() == "<!doctype" else 0
                     return self._send(200, page[:at] + meta + page[at:], "text/html; charset=utf-8")
-                self.path = "/" + parts[3] + (f"?{query}" if query else "")
+                self.path = "/" + urllib.parse.quote(rel) + (f"?{query}" if query else "")
+                self.sandbox = True
                 return super().do_GET() if self.command == "GET" else super().do_HEAD()
 
             def do_POST(self):
@@ -691,7 +726,7 @@ class Server:
                     return self._error(400, "bad JSON")
                 p = urllib.parse.urlsplit(self.path).path
                 try:
-                    if p == "/api/jobs":
+                    if p == "/api/jobs":  # always `perflab`, by the server's Python: what to run is not the request's to say
                         return self._send(201, public(submit_local(server, body)))
                     if p == "/api/projects":
                         project = server.q.register(body.get("root") or "")
@@ -713,7 +748,7 @@ class Server:
                                             days=body.get("days"))
                         if not dry:
                             for pr in server.q.projects():
-                                if any(x.startswith(pr["serveRoot"] + os.sep) for x in r["removed"]):
+                                if any(_under(x, pr) for x in r["removed"]):
                                     _reindex(pr)
                         return self._send(200, r)
                     if p == "/api/storage/pin":
@@ -734,6 +769,11 @@ class Server:
         return Handler
 
 
+# the policy of every page under /p/ but the project's index: scripts run (flame graphs need them) in an opaque origin,
+# and links open, but nothing reads the server's pages
+SANDBOX = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads"
+
+
 def _reindex(project):
     subprocess.Popen([sys.executable, "-m", "perflab", "index"], cwd=project["root"], stdout=subprocess.DEVNULL,
                      stderr=subprocess.DEVNULL, start_new_session=True,
@@ -741,7 +781,8 @@ def _reindex(project):
 
 
 def submit_local(server, body, python=None, module=None):
-    python, module = python or body.get("python"), module or body.get("module")
+    """Queues the job `body` describes ({argv, cwd, env?, priority?}); `python` and `module` (tests: a stand-in for
+    perflab) are this process's to choose, never a request's."""
     cwd = os.path.abspath(body.get("cwd") or "")
     if not os.path.isdir(cwd):
         raise ValueError(f"no such directory: {cwd}")
@@ -857,15 +898,14 @@ def job_env(extra=()):
     return env
 
 
-def submit(argv, cwd=None, env=None, priority=0, module="perflab", start=True):
+def submit(argv, cwd=None, env=None, priority=0, start=True):
     """Queues `perflab <argv>` run in `cwd`; the job (with its "url" on the queue page). Starts the server if need be
     (unless `start` is false, when no server is a ConnectionError)."""
     url = ensure() if start else running()
     if not url:
         raise ConnectionError("no perflab server is running")
     j = api("POST", "/api/jobs", {"argv": list(argv), "cwd": os.path.abspath(cwd or os.getcwd()),
-                                  "env": job_env() if env is None else env, "priority": priority,
-                                  "python": sys.executable, "module": module}, url)
+                                  "env": job_env() if env is None else env, "priority": priority}, url)
     j["url"] = f"{url}#job-{j['id']}"
     if j.get("index"):
         j["indexUrl"] = url.rstrip("/") + j["index"]

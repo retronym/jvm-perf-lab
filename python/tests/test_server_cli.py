@@ -33,7 +33,7 @@ class AdoptTest(unittest.TestCase):
 
     def adopted(self, *argv):
         a = self.start()
-        j = server.submit_local(a, {"argv": list(argv), "cwd": self.root, "env": self.env, "module": "perflab_fakejob"})
+        j = server.submit_local(a, {"argv": list(argv), "cwd": self.root, "env": self.env}, module="perflab_fakejob")
         wait_for(lambda: a.q.get(j["id"])["pid"] and "cell 0" in server._tail(j["transcript"]), what="the job to start")
         a.stop()
         b = self.start()

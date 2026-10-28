@@ -160,10 +160,22 @@ class ServerTest(unittest.TestCase):
             return e.code, json.loads(body) if "json" in e.headers.get("Content-Type", "") else body.decode()
 
     def submit(self, *argv, priority=0):
-        code, j = self.call("POST", "/api/jobs", {"argv": list(argv), "cwd": self.root, "env": self.env,
-                                                  "module": "perflab_fakejob", "priority": priority})
+        """A job running perflab_fakejob: submitted in this process, since a request cannot choose what runs."""
+        j = server.submit_local(self.srv, {"argv": list(argv), "cwd": self.root, "env": self.env, "priority": priority},
+                                module="perflab_fakejob")
+        return server.public(j) | {"position": j["position"]}
+
+    def test_a_request_cannot_choose_the_python_or_module(self):
+        blocker = self.submit("cells", "200", "0.1")
+        self.until(blocker["id"], "running")
+        code, j = self.call("POST", "/api/jobs", {"argv": ["index"], "cwd": self.root, "python": "/bin/sh",
+                                                  "module": "perflab_fakejob"})
         self.assertEqual(code, 201, j)
-        return j
+        j = self.srv.q.get(j["id"])
+        self.assertEqual((j["python"], j["module"]), (None, "perflab"))
+        self.assertEqual(self.srv.worker.command(j)[5:8], [sys.executable, "-m", "perflab"])
+        self.call("POST", f"/api/jobs/{j['id']}/cancel")
+        self.call("POST", f"/api/jobs/{blocker['id']}/cancel")
 
     def job(self, jid):
         return self.call("GET", f"/api/jobs/{jid}")[1]
@@ -254,6 +266,50 @@ class ServerTest(unittest.TestCase):
         self.assertEqual((code, text), (200, "Δ ±"))
         self.assertEqual(self.call("GET", f"/p/{p['id']}/../../etc/passwd")[0], 404)
         self.assertEqual(self.call("GET", "/p/nope/")[0], 404)
+
+    def get(self, path):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(self.srv.url.rstrip("/") + path), timeout=10) as r:
+                return r.status, r.headers, r.read().decode()
+        except urllib.error.HTTPError as e:
+            return e.code, e.headers, e.read().decode()
+
+    def test_only_the_campaigns_and_runs_are_served_and_only_the_index_is_same_origin(self):
+        p = self.call("POST", "/api/projects", {"root": self.root})[1]
+        out = os.path.join(self.root, "out", "perflab")
+        files = {"ab/index.html": "<!doctype html><p>the index</p>", "ab/running.json": "{}", "ab/c1/x-cpu.html": "<p>flame",
+                 "ab/c1/v/1/timeline.tsv": "bin_ms\n", "ab/c1/.build/v/a.jar": "jar", "ab/.serve.json": "{}",
+                 "runs/r1/report.html": "<p>run", "secret.txt": "not a campaign or a run"}
+        for rel, text in files.items():
+            os.makedirs(os.path.dirname(os.path.join(out, rel)), exist_ok=True)
+            open(os.path.join(out, rel), "w").write(text)
+        base = f"/p/{p['id']}/"
+        code, h, page = self.get(base + "ab/index.html")
+        self.assertEqual(code, 200)
+        self.assertIn(self.srv.token, page)
+        self.assertIsNone(h["Content-Security-Policy"])  # it fetches running.json, build.json, cells' TSVs, itself, the API
+        for rel in ("ab/c1/x-cpu.html", "runs/r1/report.html", "ab/running.json", "ab/c1/v/1/timeline.tsv", "ab/c1/"):
+            code, h, _ = self.get(base + rel)
+            self.assertEqual(code, 200, rel)
+            self.assertEqual(h["Content-Security-Policy"], server.SANDBOX, rel)
+            self.assertNotIn("allow-same-origin", h["Content-Security-Policy"])
+        self.assertEqual(self.get(base + "runs/r1/report.html")[2], "<p>run")  # the runs: the index links them as ../runs/
+        for rel in ("ab/c1/.build/v/a.jar", "ab/.serve.json", "ab/c1/%2ebuild/v/a.jar", "ab/./index.html", "secret.txt",
+                    "ab/../secret.txt", "ab/c1/..%2f..%2fsecret.txt"):
+            self.assertEqual(self.get(base + rel)[0], 404, rel)
+
+    def test_a_far_runs_directory_does_not_widen_what_is_served(self):
+        far = os.path.realpath(tempfile.mkdtemp())
+        open(os.path.join(self.root, "perflab.toml"), "a").write(f'[paths]\nruns = "{far}/x/runs"\n')
+        p = self.call("POST", "/api/projects", {"root": self.root})[1]
+        self.assertEqual(p["serveRoot"], os.path.commonpath([p["campaigns"], p["runs"]]))
+        os.makedirs(os.path.join(far, "x", "runs", "r1"))
+        open(os.path.join(far, "x", "runs", "r1", "report.md"), "w").write("run")
+        open(os.path.join(far, "x", "other.txt"), "w").write("other")
+        rel = os.path.relpath(far, p["serveRoot"])
+        self.assertEqual(self.get(f"/p/{p['id']}/{rel}/x/runs/r1/report.md")[:3:2], (200, "run"))
+        self.assertEqual(self.get(f"/p/{p['id']}/{rel}/x/other.txt")[0], 404)
+        self.assertEqual(self.get(f"/p/{p['id']}/{os.path.relpath(self.root, p['serveRoot'])}/perflab.toml")[0], 404)
 
     def test_storage_api(self):
         p = self.call("POST", "/api/projects", {"root": self.root})[1]
