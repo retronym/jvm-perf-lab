@@ -239,6 +239,10 @@ const BenchTimeline = (() => {
       }
     }
 
+    // Student's t at 99.9% (two-sided), the confidence JMH reports its score error at, by degrees of freedom
+    const T999 = [636.62, 31.6, 12.92, 8.61, 6.87, 5.96, 5.41, 5.04, 4.78, 4.59, 4.44, 4.32, 4.22, 4.14, 4.07, 4.01, 3.97, 3.92,
+                  3.88, 3.85, 3.82, 3.79, 3.77, 3.75, 3.73, 3.71, 3.69, 3.67, 3.66, 3.65];
+    const t999 = df => df <= 30 ? T999[df - 1] : 3.291 + 0.36 * 30 / df;
     // a stable jitter in [-1, 1] for the i-th point, so the cloud does not move as iterations arrive
     const jitter = i => { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return 2 * (x - Math.floor(x)) - 1; };
     function drawScores(r, y, W, X) {
@@ -274,6 +278,20 @@ const BenchTimeline = (() => {
       const cw = w / vs.length;
       vs.forEach((v, k) => {
         const xs = meas.filter(i => (i.variant || '') === v), mid = a + cw * (k + 0.5);
+        // the 99.9% confidence interval of the mean, as a box behind the points (clipped to the scale)
+        if (xs.length > 1) {
+          const n = xs.length, mean = xs.reduce((p, i) => p + i.score, 0) / n;
+          const sd = Math.sqrt(xs.reduce((p, i) => p + (i.score - mean) ** 2, 0) / (n - 1)), ci = t999(n - 1) * sd / Math.sqrt(n);
+          const top = Y(mean + ci), bot = Y(mean - ci);
+          const box = el('rect', {x: mid - cw * 0.4, y: top, width: cw * 0.8, height: Math.max(1, bot - top), rx: 2,
+            fill: color(v), 'fill-opacity': 0.12, stroke: color(v), 'stroke-width': 1});
+          box.dataset.tip = `${v || 'measurement'}: mean ${fmt(mean)} ± ${fmt(ci)} ${unitOf(xs[0].unit)} (99.9% CI, n = ${n})`
+            + (mean + ci > hi || mean - ci < lo ? ', clipped to the scale' : '');
+          el('line', {x1: mid - cw * 0.4, x2: mid + cw * 0.4, y1: Y(mean), y2: Y(mean), stroke: color(v), 'stroke-width': 1, 'stroke-dasharray': '3 2'});
+          // a box that runs off the scale says so at that edge: the interval is wider than the measurements' range
+          if (mean + ci > hi) el('text', {x: mid, y: top + 9, 'text-anchor': 'middle', class: 'lab', fill: color(v)}).textContent = '▲';
+          if (mean - ci < lo) el('text', {x: mid, y: bot - 2, 'text-anchor': 'middle', class: 'lab', fill: color(v)}).textContent = '▼';
+        }
         xs.forEach((it, j) => dot(mid + jitter(j + 7 * k) * cw * 0.32, it, 2.2));
         if (xs.length) {
           const sorted = xs.map(i => i.score).sort((p, q) => p - q), n = sorted.length;
