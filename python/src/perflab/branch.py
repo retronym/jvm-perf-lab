@@ -5,8 +5,13 @@ build, explored coarse-first.
 
 The range is resolved once, oldest first with its base, into <campaign>/branch.json; a resumed campaign keeps it (a
 moved ref doesn't change what it measures). Every commit is checked out in turn into one detached worktree of the
-campaign, <campaign>/.worktree, so the build tool's incremental state carries over between neighbours and the user's
-checkout is left alone; "{checkout}" in env is that worktree. A commit's variant is its short sha.
+campaign, <campaign>/.worktree, and the user's checkout is left alone; "{checkout}" in env is that worktree. The
+explore order visits far-apart commits first, so consecutive builds are mostly not of neighbours; the build tool's
+incremental state still carries over in the worktree, and saves recompiling the modules the two commits share. A
+commit's variant is its short sha.
+
+A commit's build is kept in <campaign>/.build/<key> (build_key: its tree, the build's variables and command, and the
+harness), the key recorded in builds.json; a commit that does not build is recorded in unbuildable.json.
 """
 import hashlib, json, os, shutil, subprocess, sys
 

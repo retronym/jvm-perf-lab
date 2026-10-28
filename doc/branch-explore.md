@@ -17,8 +17,10 @@ Two operational problems come with it:
 The spec gets `"branch": {"checkout": <repo>, "range": "<base>..<tip>", "firstParent": true, "env": {...}}`. perflab resolves the range with git, oldest first, base included, and writes `<campaign>/branch.json`. Every commit becomes a variant named by its short sha, with a launch-mode build of its own. Everything downstream works unchanged: cell layout `<corpus>/<variant>/<round>`, checks, timelines, profiles, the report, resume.
 
 - **First parent by default.** On an integration branch, each first-parent commit is one merged PR, and that is the unit someone acts on. A merge row lists the commits it brought in; exploring those is a separate step (future work: "drill into a merge").
-- **perflab owns one worktree per campaign** (`<campaign>/.worktree`), detached, and checks each commit out into it before that commit's build. The build tool's incremental state carries over between neighbouring commits, as in branch-bench, and the user's checkout is untouched.
-- **Builds are keyed by tree, not commit.** A rebase that leaves a tree alone reuses its snapshot and its results (as branch-bench reuses them). The key also takes in what the build depends on outside the tree: the env and the `[build] launch` template.
+- **perflab owns one worktree per campaign** (`<campaign>/.worktree`), detached, and checks each commit out into it before that commit's build. The user's checkout is untouched. The explore order (below) builds far-apart commits one after another, so unlike branch-bench's history order the builds are mostly not of neighbours; the build tool's incremental state still saves recompiling the modules they share.
+- **Builds are keyed by tree, not commit.** A rebase that leaves a tree alone reuses its snapshot and its results (as branch-bench reuses them). The key also takes in what the build depends on outside the tree: the env, the `[build] launch` template, and the harness (the project's own committed tree and uncommitted diff, and the JDK the build finds).
+- **A campaign keeps the builds it started with.** Each commit's key is recorded in `builds.json` when it is built and wins while its snapshot is kept, so a harness that changes mid-campaign is a warning, not 13 rebuilds.
+- **A commit that doesn't build is skipped, not fatal.** It is recorded in `unbuildable.json` with its build log, its cells are skipped, and the campaign goes on; the view shows "build failed" in its row. `--retry-unbuildable` tries again.
 - **Builds are lazy.** A commit is built just before its first cell, not all up front: the first number arrives after one build instead of thirteen. Builds still never overlap a measurement.
 
 ### 2. Explore coarse-first
@@ -93,7 +95,8 @@ Actions are "drop builds of finished campaigns", "drop rendered graphs", "drop p
 - `metrics`/`index`: a cell's raw iterations (`rawData`) and CI reach the page's data, not just mean and sd.
 - `ab.run`: an order hook (the explore order), lazy per-variant builds, and the between-cells control check.
 - **Resume bug:** a cell with an empty `result.json` (interrupted) counts as done. It must be rerun.
-- `launch.build`: a snapshot key beyond its directory (tree + env + template).
+- `launch.build`: a snapshot key beyond its directory (tree + env + template + harness), and a check of what the build built before anything is snapshotted, so a refused build is never reused.
+- **Worktree removal** goes through `git worktree remove`, and checkout prunes first, so a worktree deleted by hand doesn't block a resume.
 
 ## Prior art
 
