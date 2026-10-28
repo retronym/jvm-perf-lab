@@ -65,6 +65,7 @@ One `perflab server` per machine (per user) owns the measurement. It keeps a dur
   - **Pause** takes effect at a cell boundary. Between cells, the runner checks a control file the server writes, so pause never throws away a fork's work.
   - **Resume** clears the control file.
   - **Cancel** sends SIGTERM to the process group; 2d2d3f2 made that clean.
+  - A job's identity is an flock its wrapper holds while it lives, not its pid: a restarted server adopts the job, knows it is gone when it can take the lock, and signals its group only while the lock is held, so a reused pid is never signalled.
   - **Reorder** and **priority** apply to queued jobs.
   - A job's results are never deleted with it.
 - **The index becomes the server's UI:** the queue (queued, running with its live timeline, paused, done, failed, cancelled) and the campaigns and runs of each registered project. Static `index.html` stays as an export (`perflab site`) and for `file://`.
