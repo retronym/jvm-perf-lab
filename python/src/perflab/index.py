@@ -1041,7 +1041,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       + ` <span class="k">${{b.lines}} lines · <a href="${{esc(log)}}">full log</a></span>`;
     document.getElementById('bd-cmd').innerHTML = `<code>${{esc(b.cmd)}}</code>`;
     const pre = document.getElementById('bd-tail'), end = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
-    pre.textContent = b.tail.join('\n');
+    pre.textContent = b.tail.join('\\n');
     if (end) pre.scrollTop = pre.scrollHeight;
   }}
   async function tick() {{
