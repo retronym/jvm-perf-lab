@@ -3,7 +3,7 @@ the server's JSON API, and carries the server's token for its POSTs: it is serve
 """
 import html, json, os
 
-from . import ui
+from . import timeline, ui
 
 CSS = """
 main{max-width:1100px;margin:0 auto;padding:16px 20px 40px}
@@ -39,6 +39,9 @@ details.more>summary{cursor:pointer;color:var(--link);font-size:12px;margin-top:
 #pending li{overflow-wrap:anywhere}
 table.t td.name{overflow-wrap:anywhere;min-width:140px} table.t td.acts{white-space:nowrap} table.t td .btns{flex-wrap:nowrap}
 table.t tr.on td{background:var(--link-bg)}
+#tl[hidden],#bd[hidden]{display:none} #tl .card-h,#bd .card-h{gap:6px 12px} #tl .help,#bd .help{margin-left:auto}
+#bd-cmd{margin:2px 0 6px;word-break:break-all}
+#bd pre{margin:0;max-height:16em;overflow:auto;font-size:12px;line-height:1.4;background:var(--line2);padding:6px 8px;border-radius:4px;white-space:pre-wrap;word-break:break-all}
 @media (max-width:700px){main{padding:12px 12px 24px} .tabsrow .in{padding:0 12px} .jh .btns{margin-left:0;width:100%} .argv .cwd{display:none} pre.tail{max-height:240px}
   .tile{min-width:0;flex:1 1 40%} .tile .v{font-size:17px}}
 """
@@ -76,7 +79,9 @@ function label(j) {
 }
 function buttons(j) {
   const b = (op, text, cls, title, body) => `<button class="btn ${cls || ''}" data-op="${op}" data-id="${j.id}" ${body ? `data-body='${esc(JSON.stringify(body))}'` : ''} title="${esc(title || '')}">${text}</button>`;
-  const t = `<a class="btn" href="/api/jobs/${j.id}/transcript" target="_blank" rel="noopener" title="the whole transcript, as text">transcript</a>`;
+  const p = projects[j.project];
+  const idx = p ? `<a class="btn" href="${esc(p.index)}" title="${esc(p.name)}: its campaigns and runs">index</a>` : '';
+  const t = idx + `<a class="btn" href="/api/jobs/${j.id}/transcript" target="_blank" rel="noopener" title="the whole transcript, as text">transcript</a>`;
   if (j.state === 'running' || j.state === 'paused') {
     const pausing = j.control === 'pause';
     return (pausing ? b('resume', 'Resume', 'go', 'clear the pause; a paused job carries on') : b('pause', 'Pause', '', 'pause at the next cell boundary'))
@@ -85,7 +90,7 @@ function buttons(j) {
   if (j.state === 'queued')
     return b('move', '↑', '', 'run sooner', {by: -1}) + b('move', '↓', '', 'run later', {by: 1})
       + b('priority', 'priority ' + (j.priority > 0 ? '+' : '') + j.priority, '', 'raise its priority by one', {priority: j.priority + 1})
-      + b('cancel', 'Cancel', 'bad', 'take it off the queue');
+      + b('cancel', 'Cancel', 'bad', 'take it off the queue') + idx;
   return t;
 }
 function jobHtml(j, tail) {
@@ -134,6 +139,38 @@ async function refresh() {
   active.forEach(j => fillTail(j.id, 60));
   open.forEach(id => fillTail(id, 200));
 }
+// the running job's project, live: its fork timeline (<campaigns>/running.json names the cell, as on the index) and
+// its launch-mode build (build.json)
+const tl = BenchTimeline.mount(document.getElementById('tl-chart'), document.getElementById('tl-legend'), document.getElementById('tl-tip'));
+let shown = null;
+const getJson = async u => { try { const r = await fetch(u, {cache: 'no-store'}); return r.ok ? await r.json() : null; } catch (e) { return null; } };
+const since = t => new Date(t * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+async function live() {
+  const j = jobs.find(j => j.state === 'running' || j.state === 'paused'), p = j && projects[j.project];
+  const base = p ? p.index.replace(/[^/]*$/, '') : null;
+  const [run, b] = base ? await Promise.all([getJson(base + 'running.json'), getJson(base + 'build.json')]) : [null, null];
+  const bd = document.getElementById('bd');
+  bd.hidden = !b || Date.now() / 1000 - b.updated > 30;  // a killed build leaves its file: the heartbeat is every 5 s
+  if (!bd.hidden) {
+    document.getElementById('bd-label').textContent = b.label;
+    document.getElementById('bd-status').innerHTML = `<span class="badge running">${dur(b.updated - b.started)}</span>`
+      + ` <span class="k">${b.lines} lines · <a href="${esc(base + b.log)}">full log</a></span>`;
+    document.getElementById('bd-cmd').innerHTML = `<code>${esc(b.cmd)}</code>`;
+    const pre = document.getElementById('bd-tail'), end = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
+    pre.textContent = b.tail.join('\n');
+    if (end) pre.scrollTop = pre.scrollHeight;
+  }
+  const panel = document.getElementById('tl');
+  panel.hidden = !run;
+  if (!run) { shown = null; return; }
+  const cell = base + run.cell.replace(/\/?$/, '/');
+  const name = run.run || (q => q.length >= 4 ? `${q[0]} · ${q[1]} · ${q[2]} #${q[3]}` : run.cell)(run.cell.replace(/\/$/, '').split('/'));
+  document.getElementById('tl-name').innerHTML = `<a href="${esc(p.index)}">${esc(p.name)}</a> · ${esc(name)}`;
+  document.getElementById('tl-status').innerHTML = `<span class="badge running">running since ${since(run.started)}</span>`
+    + ` <a class="btn" href="${esc(cell)}timeline.html" title="the cell's own timeline page">↗</a>`;
+  if (cell !== shown) { tl.reset(); shown = cell; }
+  tl.set(await BenchTimeline.fetchCell(cell));
+}
 document.addEventListener('click', async e => {
   const b = e.target.closest('button[data-op]');
   if (!b) return;
@@ -148,8 +185,9 @@ document.addEventListener('toggle', e => {
   const id = +d.dataset.id;
   if (d.open) { open.add(id); fillTail(id, 200); } else open.delete(id);
 }, true);
-refresh();
+refresh().then(live);
 setInterval(refresh, 3000);
+setInterval(live, 5000);
 """
 
 ADMIN_JS = r"""
@@ -226,17 +264,17 @@ load();
 """
 
 
-def _page(server, title, tab, body, script):
+def _page(server, title, tab, body, script, css="", head_script=""):
     projects = server.q.projects()
     links = "".join(f'<a href="{html.escape(p["index"])}" title="{html.escape(p["root"])}">{html.escape(p["name"])}</a>' for p in projects)
     tabs = (f'<a href="/"{" class=on" if tab == "queue" else ""}>Queue<span class="n" id="n-queued"></span></a>'
             f'<a href="/admin"{" class=on" if tab == "admin" else ""}>Storage</a>' + (f'<span class="sep"></span>{links}' if links else ""))
     return f"""{ui.HEAD}<title>{html.escape(title)} · perflab server</title>
-{ui.style(ui.BASE, CSS)}
+{ui.style(ui.BASE, CSS, css)}
 {ui.masthead("server", home="/")}
 <div class="nav"><div class="tabsrow"><div class="in"><nav class="tabs">{tabs}</nav></div></div></div>
 <main>{body}</main><div id="toast" hidden></div>
-<script>const TOKEN = {json.dumps(server.token)}, HOME = {json.dumps(os.path.expanduser("~"))};
+{f"<script>{head_script}</script>" if head_script else ""}<script>const TOKEN = {json.dumps(server.token)}, HOME = {json.dumps(os.path.expanduser("~"))};
 {COMMON_JS}
 {script}</script>"""
 
@@ -245,10 +283,19 @@ def queue_page(server):
     help_ = ui.help_popover("One job runs at a time, in queue order: higher priority first, then as submitted. <b>Pause</b> takes "
                             "effect at the next cell boundary, so no fork's work is lost; <b>Cancel</b> stops a job there too, "
                             "or with SIGTERM after a grace period. A job's results stay when it is cancelled.", right=True)
+    tl_help = ui.help_popover("The running job's fork, as its project's index shows it: each fork from JVM start to exit, "
+                              "iterations as they finish. Wheel or pinch to zoom, drag to pan, double-click to reset.", right=True)
+    bd_help = ui.help_popover("The running job's launch-mode build: its command, how long it has run and the last lines of "
+                              "its log.", right=True)
     body = (f'<h2 class="sec">Now <span class="k" id="conn"></span></h2><section class="card" id="active"></section>'
+            f'<section class="card" id="bd" hidden><div class="card-h"><h2>Building <span id="bd-label"></span></h2><span id="bd-status"></span>{bd_help}</div>'
+            '<p class="k" id="bd-cmd"></p><pre id="bd-tail"></pre></section>'
+            f'<section class="card" id="tl" hidden><div class="card-h"><h2>Fork timeline</h2><span class="k" id="tl-name"></span>'
+            f'<span id="tl-status"></span>{tl_help}</div><div class="tl-legend" id="tl-legend"></div><svg class="timeline" id="tl-chart"></svg></section>'
+            '<div class="tl-tip" id="tl-tip"></div>'
             f'<h2 class="sec">Queued {help_}</h2><section class="card" id="queued"></section>'
             f'<h2 class="sec">Finished <span class="k">newest first</span></h2><section class="card" id="history"></section>')
-    return _page(server, "queue", "queue", body, QUEUE_JS)
+    return _page(server, "queue", "queue", body, QUEUE_JS, timeline.CSS, timeline.script())
 
 
 def admin_page(server):

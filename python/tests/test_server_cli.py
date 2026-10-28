@@ -113,5 +113,29 @@ class SubmitsItselfTest(unittest.TestCase):
             self.assertIn("perflab-code", resp.read().decode())
 
 
+class PagesLinkTest(unittest.TestCase):
+    def test_queue_page_follows_the_running_jobs_project_and_the_index_links_the_queue(self):
+        from perflab import config, index, serverui
+        srv = server.Server(tempfile.mkdtemp(), port=0)
+        try:
+            page = serverui.queue_page(srv)
+        finally:
+            srv.httpd.server_close()
+        self.assertIn("BenchTimeline.mount", page)
+        self.assertIn("'running.json'", page)
+        self.assertIn("'build.json'", page)
+        root = project()
+        config._config = config.find(root)
+        html = open(index.build(os.path.join(root, "out", "perflab", "ab"))).read()
+        self.assertIn("fetch('/api/status'", html)  # only under /p/<project>/, served by the server
+        self.assertIn(r"/^\/p\/[^/]+\//.test(location.pathname)", html)
+        if shutil.which("node"):
+            for i, js in enumerate(re.findall(r"<script>(.*?)</script>", page + html, re.S)):
+                f = os.path.join(root, f"s{i}.js")
+                open(f, "w").write(js)
+                r = subprocess.run(["node", "--check", f], capture_output=True, text=True)
+                self.assertEqual(r.returncode, 0, r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

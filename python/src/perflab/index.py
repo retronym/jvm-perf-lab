@@ -597,6 +597,9 @@ table.t tr.has-sub td{border-bottom:0} table.t tr.sub td{padding-top:0} .cellg{d
 #tl .card-h{gap:6px 12px} #tl select{font:inherit;max-width:100%;padding:2px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
 #tl label{white-space:nowrap} #tl .help{margin-left:auto} #tl[hidden]{display:none}
 #bd[hidden]{display:none} #bd .card-h{gap:6px 12px} #bd .help{margin-left:auto} #bd-cmd{margin:2px 0 6px;word-break:break-all}
+.brand .links a.queue .qn{font-size:11px;line-height:16px;border-radius:999px;padding:0 7px;background:var(--ink2);color:var(--ink-muted)}
+.brand .links a.queue .qn.on{background:var(--brand);color:#fff}
+@media (max-width:700px){.brand .links a.queue{padding:3px 5px} .brand .links a.queue .ql,.brand .links a.queue .w{display:none}}
 #bd pre{margin:0;max-height:16em;overflow:auto;font-size:12px;line-height:1.4;background:var(--line2);padding:6px 8px;border-radius:4px;white-space:pre-wrap;word-break:break-all}
 #lg[hidden]{display:none} #lg .card-h{gap:6px 12px} #lg .help{margin-left:auto} #lg-top{margin:2px 0 6px}
 #lg svg{display:block;width:100%;height:90px;overflow:visible} #lg .area{fill:var(--warn-bg)} #lg .ln{fill:none;stroke:var(--warn);stroke-width:1.5}
@@ -1083,6 +1086,18 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       apply();
     }} catch (e) {{}}
   }}
+  // served by `perflab server` (under /p/<project>/): a link to its queue, with what runs and waits there
+  async function queue() {{
+    let s = null;
+    try {{ const r = await fetch('/api/status', {{cache: 'no-store'}}); s = r.ok ? await r.json() : null; }} catch (e) {{}}
+    if (!s || typeof s.queued !== 'number') return;
+    let a = document.getElementById('queue-link');
+    if (!a) {{ a = document.createElement('a'); a.id = 'queue-link'; a.className = 'queue'; a.href = '/'; document.querySelector('.brand .links').prepend(a); }}
+    a.title = s.running ? `running: perflab ${{s.running.argv.join(' ')}}` : 'the perflab server: nothing running';
+    a.innerHTML = `<span class="ql">Queue </span><span class="qn${{s.running ? ' on' : ''}}">${{s.running ? '▶ 1<span class="w"> running</span>' : 'idle'}}`
+      + `${{s.queued ? ` · ${{s.queued}}<span class="w"> queued</span>` : ''}}</span>`;
+  }}
+  if (location.protocol.startsWith('http') && /^\\/p\\/[^/]+\\//.test(location.pathname)) {{ queue(); setInterval(queue, 10000); }}
   apply(); tick();
   // served (not from a file): follow what runs
   if (location.protocol.startsWith('http')) {{ setInterval(tick, 5000); setInterval(refresh, 10000); }}
