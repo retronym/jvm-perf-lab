@@ -19,11 +19,14 @@ Send the user the URL it prints, in your next message, before results exist. It 
 
 When reporting, link the run or campaign on that page rather than only pasting numbers.
 
+Run long commands in the background with a transcript, and follow that file instead of waiting blind: `perflab --transcript <scratch>/t.txt ab run <spec>` (also `run`, `trees`). It gets perflab's progress, loadgate waits, the build's output as it comes (sbt compiling, a failing build or a server started without the lab's environment) and JMH's iterations. A loadgate wait also shows live on the index.
+
 ## 2. Dry-run, then read the arguments
 
 ```bash
 perflab run --dry-run --profile <profile> -- <jmh arguments>
 perflab ab run <spec.json> --dry-run
+perflab trees <spec.json> --dry-run
 ```
 
 This prints the build command and the `jmh.args` file perflab will hand to JMH, one argument per line. Read it before the real run and check: one `-jvmArgsAppend`, the `-jvm` you meant, the `-p` values you meant. A fork that fails to start is almost always visible here.
