@@ -21,7 +21,9 @@ Configuration: perflab.toml in the project (see perflab.config). `perflab <comma
   perflab --transcript <file> <command> ...   appends progress and the build's output to <file> as they come
                                               (perflab.transcript), for a caller to follow
 """
-import importlib, sys
+import importlib, signal, sys
+
+from . import transcript
 
 COMMANDS = {"run": "jmh", "ab": "ab", "trees": "trees", "index": "index", "timeline": "timeline", "regraph": "regraph",
             "profdiff": "profdiff", "inlinetree": "inlinetree", "frameweight": "frameweight", "subtree": "subtree", "analyze": "analyze",
@@ -31,11 +33,21 @@ COMMANDS = {"run": "jmh", "ab": "ab", "trees": "trees", "index": "index", "timel
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["--transcript"] and len(argv) > 1:
-        from . import transcript
         transcript.setup(argv[1])
         argv = argv[2:]
     if not argv or argv[0] in ("-h", "--help") or argv[0] not in COMMANDS:
         print(__doc__)
         return 0 if argv and argv[0] in ("-h", "--help") else 2
+    # killed (`timeout`, `kill`, ab stopping its load sampler): exit through `finally` and atexit, so the live state a
+    # command publishes for the index (running.json, loadgate.json) is cleared
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(128 + signal.SIGTERM))
     module = importlib.import_module(f".{COMMANDS[argv[0]]}", __package__)
-    return module.main(argv[1:]) or 0
+    try:
+        return module.main(argv[1:]) or 0
+    except SystemExit as e:
+        if isinstance(e.code, str):  # sys.exit with a message, not a status
+            transcript.failed(e.code)
+        raise
+    except BaseException as e:
+        transcript.failed(f"{type(e).__name__}: {e}")
+        raise

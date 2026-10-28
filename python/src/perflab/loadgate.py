@@ -7,6 +7,8 @@ its descendants: the sbt server, JMH's launcher and forks, xctrace), measured as
 """
 import json, os, subprocess, sys, time
 
+from . import transcript
+
 # macOS daemons that run at background QoS, which Apple Silicon confines to the efficiency cores: reported, but not
 # counted against the limit, since the benchmark runs on the performance cores.
 BACKGROUND = {"mediaanalysisd", "photoanalysisd", "spotlightknowledged", "spotlightknowledged.updater", "mds", "mds_stores", "mdworker",
@@ -90,7 +92,6 @@ def publish(state):
 def wait(root, limit=1.5, quiet=60):
     """Blocks until other processes' load stays under `limit` cores for `quiet` seconds. While it waits, the samples
     are published for the index (`publish`) and each is a line of the transcript."""
-    from . import transcript
     since = None
     state = {"pid": os.getpid(), "started": time.time(), "limit": limit, "quiet": quiet, "quietSince": None, "samples": []}
     try:

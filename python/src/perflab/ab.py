@@ -46,14 +46,13 @@ compares the work, not the op. The index's summary toggles between per unit and 
 """
 import atexit, glob, json, os, re, shlex, shutil, subprocess, sys, time
 
-from . import config, jmh, loadgate, metrics, specs
+from . import config, jmh, loadgate, metrics, specs, transcript
 
 JMH_LOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "jmh.lock")
 MAX_ATTEMPTS = 10
 
 
 def log(msg):
-    from . import transcript
     transcript.say(f"[ab {time.strftime('%H:%M:%S')}] {msg}")
 
 

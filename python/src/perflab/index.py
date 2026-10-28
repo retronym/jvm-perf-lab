@@ -626,7 +626,7 @@ svg.sv-c .wh{stroke:var(--fg);stroke-width:1.2;opacity:.7}
 # (or of the values, a panel per corpus). The view, metrics and scale are remembered in this browser; `apply` redraws.
 SUMMARY_JS = r"""
 const SV = (() => { try { return JSON.parse(localStorage.getItem('perflab.summary')) || {}; } catch (e) { return {}; } })();
-SV.view = SV.view || 'table'; SV.metrics = SV.metrics || ['score']; SV.scale = SV.scale || 'delta'; SV.norm = SV.norm || 'unit'; 
+SV.view = SV.view || 'table'; SV.metrics = SV.metrics || ['score']; SV.scale = SV.scale || 'delta'; SV.norm = SV.norm || 'unit';
 const svOff = {};  // per campaign: the variants switched off
 let svCorpora = new Set();
 const svEsc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
@@ -1004,8 +1004,8 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
     const xs = g.samples, last = xs[xs.length - 1], now = last[0], esc = s => String(s).replace(/[&<>]/g, c => ({{'&': '&amp;', '<': '&lt;', '>': '&gt;'}})[c]);
     const mins = s => s >= 60 ? `${{Math.floor(s / 60)}} min ${{Math.round(s % 60)}} s` : `${{Math.round(s)}} s`;
     const q = g.quietSince ? now - g.quietSince : 0;
-    document.getElementById('lg-status').innerHTML = `<span class="badge ${{q ? 'finished' : 'running'}}">${{last[1].toFixed(1)}} cores, limit ${{g.limit}}</span>`
-      + ` <span class="k">waiting ${{mins(now - g.started)}}${{q ? `, quiet for ${{mins(q)}} of ${{mins(g.quiet)}}` : ''}}</span>`;
+    document.getElementById('lg-status').innerHTML = `<span class="badge ${{g.quietSince ? 'finished' : 'running'}}">${{last[1].toFixed(1)}} cores, limit ${{g.limit}}</span>`
+      + ` <span class="k">waiting ${{mins(now - g.started)}}${{g.quietSince ? `, quiet for ${{mins(q)}} of ${{mins(g.quiet)}}` : ''}}</span>`;
     document.getElementById('lg-top').textContent = last[2] ? `Other load: ${{last[2]}}` : '';
     document.getElementById('lg-bar').firstChild.style.width = `${{Math.min(100, 100 * q / g.quiet)}}%`;
     const svg = document.getElementById('lg-chart'), W = svg.clientWidth || 600, H = 90, pad = 18;
@@ -1016,7 +1016,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
     svg.innerHTML = (g.quietSince ? `<rect class="q" x="${{x(g.quietSince)}}" y="${{y(top)}}" width="${{x(now) - x(g.quietSince)}}" height="${{y(0) - y(top)}}"/>` : '')
       + `<path class="area" d="M${{x(xs[0][0])}},${{y(0)}} L${{pts.join(' L')}} L${{x(now)}},${{y(0)}} Z"/><path class="ln" d="M${{pts.join(' L')}}"/>`
       + `<line class="lim" x1="${{pad}}" x2="${{W - pad}}" y1="${{y(g.limit)}}" y2="${{y(g.limit)}}"/>`
-      + `<text x="${{W - pad}}" y="${{y(g.limit) - 3}}" text-anchor="end">limit ${{g.limit}} cores</text>`
+      + `<text x="${{pad + 2}}" y="${{y(g.limit) - 3}}">limit ${{g.limit}} cores</text>`
       + `<text x="${{pad}}" y="${{H - 2}}">${{esc(new Date(t0 * 1000).toLocaleTimeString([], {{hour: '2-digit', minute: '2-digit'}}))}}</text>`
       + `<text x="${{W - pad}}" y="${{H - 2}}" text-anchor="end">now</text>`;
   }}

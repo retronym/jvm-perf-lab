@@ -41,17 +41,28 @@ def follow(path, done, prefix="  > "):
     the event `done` is set; a thread's target. Nothing without a transcript."""
     if not os.environ.get(ENV):
         return
-    f = None
+    f, partial = None, ""
     while True:
         finished = done.is_set()  # read what is there once more after the writer has exited
         if f is None and os.path.exists(path):
             f = open(path, errors="replace")
         for line in (f or ()):
-            line = line.rstrip("\r\n")
+            # a line JMH is still writing comes without its newline: keep it for the next read
+            if not line.endswith("\n") and not finished:
+                partial += line
+                continue
+            line, partial = (partial + line).rstrip("\r\n"), ""
             if line.strip():
                 write(prefix + line)
         if finished:
             break
         done.wait(1)
+    if partial.strip():
+        write(prefix + partial)
     if f:
         f.close()
+
+
+def failed(message):
+    """A command's last words, when it exits with a message (sys.exit) or an exception."""
+    write(f"[perflab] failed: {message}")

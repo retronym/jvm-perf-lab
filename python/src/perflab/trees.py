@@ -8,7 +8,7 @@ from "variants" (default none). With an sbt build, each checkout needs its sbt s
 """
 import json, os, shutil, subprocess, sys
 
-from . import config, loadgate, specs
+from . import config, loadgate, specs, transcript
 
 
 def run_in(tree, *args, version=None):
@@ -62,7 +62,7 @@ def main(argv):
     path = os.path.join(out, "spec.json")
     json.dump(combined, open(path, "w"), indent=2)
     version = specs.record(out, argv[0])  # the spec as given, trees and all; each tree's cells are tagged with it
-    from . import index, serve, transcript
+    from . import index, serve
     try:
         transcript.say(f"perflab trees: index (updates after each round): {serve.ensure()}")
     except Exception as e:  # the index is a convenience; never let it stop a campaign

@@ -21,9 +21,9 @@ VM operation and JIT lanes from the JDK's events with async);
 afterwards flame graphs for async, a merged report for audits. The run is on the index (`perflab serve`, whose URL it prints first) as it goes: <out>/run.json holds
 its status.
 """
-import argparse, glob, json, os, shlex, subprocess, sys, time
+import argparse, glob, json, os, shlex, subprocess, sys, threading, time
 
-from . import config
+from . import config, transcript
 
 # retronym/async-profiler's integration branch as built by `mise run tools:async-profiler` (kperf events, jfrconv --spans
 # and its flame graph UI), ahead of a stock install
@@ -182,8 +182,6 @@ def finish(out, profile, lib=None):
 def run_build(cmd, log_path, every=None, tick=None):
     """Runs the build, logging to `log_path` and, line by line as it comes, to the transcript, followed by JMH's log
     beside it; calls `tick` every `every` seconds while it runs."""
-    import threading
-    from . import transcript
     root = config.get().root
     transcript.say(f"[perflab] build: {cmd}\n[perflab] build log: {log_path}")
     with open(log_path, "w") as log:
@@ -262,7 +260,7 @@ def main(argv):
         print(cmd)
         print(open(os.path.join(out, "jmh.args")).read(), end="")
         return 0
-    from . import serve, transcript
+    from . import serve
     mark(out, "running")
     try:
         transcript.say(f"[perflab] index (updates as the run goes): {serve.ensure()}")

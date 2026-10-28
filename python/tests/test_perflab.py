@@ -618,11 +618,38 @@ class TranscriptTest(unittest.TestCase):
         # the build prints (with a terminal control sequence), and JMH writes its own log beside build.log
         cmd = "printf '\\033[0Jcompiling\\n'; echo '# Fork: 1 of 1' > run/jmh.log; sleep 1.5; echo done"
         self.assertEqual(jmh.run_build(cmd, os.path.join(out, "build.log")), 0)
-        lines = open(self.path).read().splitlines()
+        with open(self.path) as f:
+            lines = f.read().splitlines()
         self.assertIn("  | compiling", lines)
         self.assertIn("  > # Fork: 1 of 1", lines)
         self.assertIn("  | done", lines)
-        self.assertEqual(open(os.path.join(out, "build.log")).read(), "\x1b[0Jcompiling\ndone\n")
+        with open(os.path.join(out, "build.log")) as f:
+            self.assertEqual(f.read(), "\x1b[0Jcompiling\ndone\n")
+
+    def test_follow_waits_for_a_line_to_end(self):
+        import threading
+        log = os.path.join(self.p.dir, "jmh.log")
+        done = threading.Event()
+        t = threading.Thread(target=transcript.follow, args=(log, done))
+        with open(log, "w") as f:
+            f.write("Iteration   1: ")
+            f.flush()
+            t.start()
+            time.sleep(1.5)
+            f.write("12.3 ms/op\n")
+        done.set()
+        t.join()
+        with open(self.path) as f:
+            self.assertIn("  > Iteration   1: 12.3 ms/op", f.read().splitlines())
+
+    def test_a_failure_is_its_last_line(self):
+        import signal
+        from perflab import cli
+        self.addCleanup(signal.signal, signal.SIGTERM, signal.getsignal(signal.SIGTERM))
+        with self.assertRaises(FileNotFoundError):
+            cli.main(["ab", "run", os.path.join(self.p.dir, "missing.json")])
+        with open(self.path) as f:
+            self.assertTrue(f.read().splitlines()[-1].startswith("[perflab] failed: FileNotFoundError"))
 
     def test_loadgate_wait_is_published_then_removed(self):
         seen = []
@@ -636,7 +663,8 @@ class TranscriptTest(unittest.TestCase):
         self.assertEqual(seen[0]["samples"][0][1:], [3.0, "javac 3.0"])
         self.assertIsNone(seen[-1])
         self.assertFalse(os.path.exists(loadgate.state_path()))
-        self.assertIn("waiting: other load 3.0 cores (javac 3.0)", open(self.path).read())
+        with open(self.path) as f:
+            self.assertIn("waiting: other load 3.0 cores (javac 3.0)", f.read())
 
 
 if __name__ == "__main__":
