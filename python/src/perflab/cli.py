@@ -19,12 +19,15 @@
   submit     queue `perflab <arguments>` on the server and follow it (`perflab submit -- ab run spec.json`)
   jobs       the server's queue
 
+While `perflab server` runs, `run` and `ab run` go to its queue as `perflab submit` would and follow the job (Ctrl-C
+detaches; it runs on); `--local` runs one here instead, as do `--dry-run` and the commands a job runs.
+
 Configuration: perflab.toml in the project (see perflab.config). `perflab <command> --help` for a command's options.
 
   perflab --transcript <file> <command> ...   appends progress and the build's output to <file> as they come
                                               (perflab.transcript), for a caller to follow
 """
-import importlib, signal, sys
+import importlib, os, signal, sys
 
 from . import transcript
 
@@ -32,6 +35,20 @@ COMMANDS = {"run": "jmh", "ab": "ab", "trees": "trees", "index": "index", "timel
             "profdiff": "profdiff", "inlinetree": "inlinetree", "frameweight": "frameweight", "subtree": "subtree", "analyze": "analyze",
             "auditfold": "auditfold", "loadgate": "loadgate", "site": "site", "serve": "serve", "defcosts": "defcosts",
             "server": "server", "submit": "server:submit_main", "jobs": "server:jobs_main"}
+# the commands that become a job of a running `perflab server`: command -> the subcommands that do (None: all)
+SUBMITS = {"run": None, "ab": {"run"}}
+LOCAL_ENV = "PERFLAB_LOCAL"  # server.LOCAL_ENV
+
+
+def submits(argv):
+    """`argv` without `--local` (before any `--`), and whether it is a command to submit to a running server."""
+    if argv[0] not in SUBMITS:
+        return argv, False
+    end = argv.index("--") if "--" in argv else len(argv)
+    head = argv[:end]
+    argv = [a for a in head if a != "--local"] + argv[end:]
+    sub = SUBMITS[argv[0]]
+    return argv, bool(sub is None or argv[1:2] and argv[1] in sub) and not any(a in ("--local", "--dry-run", "-h", "--help") for a in head)
 
 
 def main(argv=None):
@@ -45,6 +62,14 @@ def main(argv=None):
     # killed (`timeout`, `kill`, ab stopping its load sampler): exit through `finally` and atexit, so the live state a
     # command publishes for the index (running.json, loadgate.json) is cleared
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(128 + signal.SIGTERM))
+    argv, submit = submits(argv)
+    if submit and not os.environ.get(LOCAL_ENV):
+        from . import server
+        rc = server.delegate(argv)
+        if rc is not None:
+            return rc
+    # in the foreground from here on, and so are the perflab commands this one runs (`trees` runs `ab run`)
+    os.environ[LOCAL_ENV] = "1"
     name, _, function = COMMANDS[argv[0]].partition(":")
     module = importlib.import_module(f".{name}", __package__)
     try:

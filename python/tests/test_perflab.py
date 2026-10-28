@@ -1,6 +1,7 @@
 import json, os, re, shlex, shutil, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab server`: commands run here, not on its queue
 from perflab import ab, analyze, auditfold, compare, config, defcosts, index, inlinetree, jmh, jvmevents, launch, loadgate, metrics, regraph, serve, specs, timeline, transcript, trees  # noqa: E402
 
 

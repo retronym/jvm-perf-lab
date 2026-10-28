@@ -1,6 +1,7 @@
 import json, os, subprocess, sys, tempfile, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab server`: commands run here, not on its queue
 from perflab import ab, branch, config, jmh, launch  # noqa: E402
 from test_perflab import Project  # noqa: E402
 

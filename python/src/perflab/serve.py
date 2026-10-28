@@ -6,7 +6,8 @@ arrive.
 Builds the index, then starts a server in the background for the directory holding both <campaigns> and <runs>, unless
 one this command started is still serving it, so it can be run any number of times and always prints the same URL. The
 port is [index] port in perflab.toml, else one derived from the project's path (8700-8799), so each checkout keeps its
-own address. `perflab run` and `perflab ab run` do this before they start.
+own address. `perflab run` and `perflab ab run` do this before they start. While `perflab server` runs, it serves the
+project instead: the URL printed is the project's index there (/p/<project>/...), and no server is started here.
 """
 import argparse, hashlib, json, os, signal, socket, subprocess, sys, time
 
@@ -69,6 +70,9 @@ def ensure(root=None, port=None):
     os.makedirs(root, exist_ok=True)
     from . import index
     index.build(root)
+    url = on_server(root)
+    if url:
+        return url
     rel = os.path.relpath(root, serve)
     url = lambda p: f"http://127.0.0.1:{p}/" + ("index.html" if rel == "." else f"{rel}/index.html")
     st = _state(root)
@@ -100,6 +104,20 @@ def ensure(root=None, port=None):
             break
         time.sleep(0.1)
     return url(p)
+
+
+def on_server(root):
+    """The project's index on the running `perflab server` (/p/<project>/...), registering the project, if a server
+    runs and `root` is the project's campaigns; else None."""
+    from . import server
+    url = server.running()
+    if not url or os.path.realpath(root) != os.path.realpath(config.get().campaigns):
+        return None
+    try:
+        p = server.api("POST", "/api/projects", {"root": config.get().root}, url)
+    except Exception:  # an older server, or one that went away: serve it here
+        return None
+    return url.rstrip("/") + p["index"]
 
 
 def stop(root=None):

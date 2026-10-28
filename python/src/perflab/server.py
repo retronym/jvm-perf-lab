@@ -38,11 +38,12 @@ HTTP (JSON unless noted):
 import argparse, hashlib, json, os, re, secrets, signal, socket, sqlite3, subprocess, sys, threading, time, traceback
 import http.server, urllib.error, urllib.parse, urllib.request
 
-from . import config, control, httpd, storage
+from . import config, control, httpd, storage, transcript
 
 DEFAULT_PORT = 8690
 HOME_ENV, PORT_ENV, GRACE_ENV = "PERFLAB_SERVER_HOME", "PERFLAB_SERVER_PORT", "PERFLAB_SERVER_GRACE"
 JOB_ENV = "PERFLAB_JOB"
+LOCAL_ENV = "PERFLAB_LOCAL"  # set by a command run in the foreground, so that the perflab commands it runs are too
 STATES = ("queued", "running", "paused", "done", "failed", "cancelled")
 ACTIVE = ("running", "paused")
 FINAL = ("done", "failed", "cancelled")
@@ -52,7 +53,7 @@ TRANSITIONS = {"queued": {"running", "cancelled"},
 # the submitting shell's variables a job keeps: the toolchain, perflab's own settings, the locale
 ENV_KEEP = re.compile(r"^(PATH|HOME|USER|LOGNAME|SHELL|LANG|LC_\w+|TMPDIR|TZ|JAVA_HOME|JAVA_\w+|JDK_\w+|SBT_\w+|SCALA\w*|"
                       r"MAVEN_\w+|M2_HOME|COURSIER_\w+|MISE_\w+|ASYNC_PROFILER\w*|JFRCONV|PYTHONPATH|PERFLAB_\w+)$")
-ENV_DROP = {"PERFLAB_TRANSCRIPT", control.ENV, control.POLL_ENV, HOME_ENV, PORT_ENV, GRACE_ENV, JOB_ENV}
+ENV_DROP = {"PERFLAB_TRANSCRIPT", control.ENV, control.POLL_ENV, HOME_ENV, PORT_ENV, GRACE_ENV, JOB_ENV, LOCAL_ENV}
 PKG = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # what `import perflab` needs on the path
 
 
@@ -669,6 +670,7 @@ def submit_local(server, body):
                         body.get("module") or "perflab", os.path.join(server.home, "jobs"))
     server.worker.wake.set()
     j["position"] = next((i + 1 for i, q in enumerate(server.q.queued()) if q["id"] == j["id"]), None)
+    j["index"] = project["index"]
     return j
 
 
@@ -781,13 +783,29 @@ def submit(argv, cwd=None, env=None, priority=0, module="perflab", start=True):
                                   "env": job_env() if env is None else env, "priority": priority,
                                   "python": sys.executable, "module": module}, url)
     j["url"] = f"{url}#job-{j['id']}"
+    if j.get("index"):
+        j["indexUrl"] = url.rstrip("/") + j["index"]
     return j
 
 
+class _Tee:
+    def __init__(self, out, path):
+        self.out, self.path = out, path
+
+    def write(self, text):
+        self.out.write(text)
+        if self.path:
+            with open(self.path, "a") as f:
+                f.write(text)
+
+    def flush(self):
+        self.out.flush()
+
+
 def follow(job, out=None, poll=1.0):
-    """Prints the job's transcript as it grows until the job ends; its exit status (1 if it failed without one, 130
-    if it was cancelled)."""
-    out = out or sys.stdout
+    """Prints the job's transcript as it grows until the job ends, and appends it to this command's own transcript if
+    it has one (`perflab --transcript`); its exit status (1 if it failed without one, 130 if it was cancelled)."""
+    out = _Tee(out or sys.stdout, os.environ.get(transcript.ENV))
     offset = 0
     while True:
         j = api("GET", f"/api/jobs/{job['id']}")
@@ -887,16 +905,36 @@ def submit_main(argv):
     root = config.get().root
     if not os.path.exists(os.path.join(root, "perflab.toml")):
         sys.exit("perflab submit: no perflab.toml here or above")
-    j = submit(args, os.getcwd(), job_env(x.env), x.priority)
+    return queued(submit(args, os.getcwd(), job_env(x.env), x.priority), x.detach)
+
+
+def queued(j, detach=False):
+    """Says where a submitted job is, then follows it unless `detach`; Ctrl-C detaches."""
     where = f" (#{j['position']} in the queue)" if j.get("position") else ""
-    print(f"[perflab] job {j['id']} queued{where}: {j['url']}", flush=True)
-    if x.detach:
+    transcript.say(f"[perflab] job {j['id']} queued{where}: {j['url']}")
+    if j.get("indexUrl"):
+        transcript.say(f"[perflab] index (updates as it runs): {j['indexUrl']}")
+    if detach:
         return 0
     try:
         return follow(j)
     except KeyboardInterrupt:
-        print(f"\n[perflab] detached; job {j['id']} runs on: {j['url']}")
+        transcript.say(f"\n[perflab] detached; job {j['id']} runs on: {j['url']}")
         return 0
+
+
+def delegate(argv):
+    """`perflab <argv>` (`run`, `ab run`) as a job on the running server, followed as `perflab submit` follows it;
+    None if no server is running, or this is a job or a command run in the foreground already."""
+    if os.environ.get(JOB_ENV) or os.environ.get(LOCAL_ENV) or not running():
+        return None
+    if not os.path.exists(os.path.join(config.get().root, "perflab.toml")):
+        return None  # not a project: the command says why, in the foreground
+    try:
+        j = submit(argv, os.getcwd(), job_env(), start=False)
+    except ConnectionError:
+        return None
+    return queued(j)
 
 
 def jobs_main(argv):

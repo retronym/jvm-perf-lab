@@ -1,7 +1,9 @@
 """Campaigns: a benchmark under one profile, over corpora and variants, run round by round with the variants
 interleaved, each run checked against the spec.
 
-  perflab ab run    <spec.json> [--dry-run]   runs every missing cell; resumable
+  perflab ab run    <spec.json> [--dry-run] [--local]
+                                              runs every missing cell; resumable. On `perflab server`'s queue while
+                                              one runs (--local: here)
   perflab ab report <spec.json> [--per-op]    markdown summary, per "perUnit" if the spec has one (--per-op: per op);
                                               for async profiles, an index of flame graphs
 

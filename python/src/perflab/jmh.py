@@ -1,6 +1,8 @@
 """One JMH run of a project's benchmarks under a profile, through the build command in `perflab.toml`.
 
-  perflab run [--profile <profile>] [--out <dir>] [--dry-run] -- <jmh arguments>
+  perflab run [--profile <profile>] [--out <dir>] [--dry-run] [--local] -- <jmh arguments>
+
+While `perflab server` runs, the run goes to its queue and is followed here (Ctrl-C detaches); `--local` runs it here.
 
 Profiles:
   none                       JMH and the driver's default profilers only
