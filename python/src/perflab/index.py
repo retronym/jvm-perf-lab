@@ -9,7 +9,7 @@ each cell, `perflab run` at its start and end, and the page refreshes itself.
 """
 import glob, html, json, math, os, re, sys, time
 
-from . import ab, config, jmh, loadgate, metrics, regraph, runinfo, specs, timeline, ui
+from . import ab, branchview, config, jmh, loadgate, metrics, regraph, runinfo, specs, timeline, ui
 
 root = None  # the directory of the page being built: its links are relative to it
 CAMPAIGNS = None
@@ -835,7 +835,8 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       # perflab inlinetree pages: the cells' compilation units compared, one per event
       trees_ = sorted(glob.glob(os.path.join(spec_dir, "inlinetree*.html")))
       prog = progress(spec_dir)
-      if not rows and not diffs and not trees_ and not prog:
+      history = branchview.section(spec_dir, root, config.get().corpus_param)
+      if not rows and not diffs and not trees_ and not prog and not history:
           continue
       sid = "c-" + esc(name)
       diff_html = (f'<div class="diffs" data-lb-group="{esc(name)} · differential flame graphs"><span class="k">Differential flame graphs (a → b)</span>'
@@ -877,7 +878,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
                                   f'data-corpus="{esc(" ".join(sorted(corpora)))}" data-profiled="{1 if profiled else 0}">'
                                   f'{card_head("campaign", name, progress_badge(prog, name), when, buttons)}'
                                   f'{variants_panel(spec_dir)}{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{spec_history(spec_dir, counts, sid)}'
-                                  f'{sub("Summary", about, VIEW_TOGGLE + (norm_toggle(per_unit) if per_unit and not paired else "")) + summ if summ else ""}{cells_html}</section>'))
+                                  f'{history}{sub("Summary", about, VIEW_TOGGLE + (norm_toggle(per_unit) if per_unit and not paired else "")) + summ if summ else ""}{cells_html}</section>'))
   run_dirs = sorted(glob.glob(os.path.join(runs, "*/"))) if runs and os.path.isdir(runs) else []
   RUN_NAMES.clear(); RUN_NAMES.update(os.path.basename(r.rstrip("/")) for r in run_dirs)
   for run in run_dirs:
@@ -927,7 +928,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
                   f'CPU Counters template. Each run name links to its card.</p>{counters_html}</section>') if counters_html else ""
 
   page = f"""{ui.HEAD}<meta name="perflab-code" content="{code_version()}"><title>{esc(title)} · {ui.NAME}</title>
-  {ui.style(ui.BASE, ui.LIGHTBOX_CSS, CSS, INTRO_CSS, timeline.CSS)}
+  {ui.style(ui.BASE, ui.LIGHTBOX_CSS, CSS, INTRO_CSS, timeline.CSS, branchview.CSS)}
   {ui.masthead(title)}
   <div class="nav"><div class="tabsrow"><div class="in"><nav class="tabs">{tabs}</nav>{help_html}</div></div>
   <div class="filterbar"><div class="in"><button class="chip ftoggle" onclick="this.closest('.filterbar').classList.toggle('open')">Filter ▾</button>{groups}
@@ -954,6 +955,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   </div></main>{f'<footer>{footer}</footer>' if footer else ''}
   <script>{timeline.script()}</script>{ui.lightbox_script()}
   <script>{SUMMARY_JS}</script>
+  <script>{branchview.JS}</script>
   <script>
   const RUNNING = {json.dumps(running_json)}, LOADGATE = {json.dumps(loadgate_json)}, BUILD = {json.dumps(build_json)};
   const chips = [...document.querySelectorAll('.filterbar .chip')];
@@ -975,7 +977,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       for (const tr of card.querySelectorAll('tr[data-corpus]')) tr.classList.toggle('hidden', sel.corpus.size > 0 && !sel.corpus.has(tr.dataset.corpus));
     }}
     for (const tr of document.querySelectorAll('#counters-card tr[data-tool]')) tr.classList.toggle('hidden', !match(tr));
-    drawSummaries(sel.corpus);
+    drawSummaries(sel.corpus); BH.draw(sel.corpus);
     const n = s => document.querySelectorAll(`#live section.card.${{s}}:not(.hidden)`).length;
     for (const [id, s] of [['n-campaigns', 'campaign'], ['n-runs', 'run']]) {{ const e = document.getElementById(id); if (e) e.textContent = n(s); }}
   }}

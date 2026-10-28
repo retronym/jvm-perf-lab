@@ -173,6 +173,33 @@ def stats(xs):
     return mean, sd
 
 
+# Student's t at 0.9995 (a two-sided 99.9% interval, as JMH's scoreError) by degrees of freedom; between entries
+# it is interpolated in 1/df, beyond the last it tends to the normal's 3.291
+T999 = ((1, 636.62), (2, 31.599), (3, 12.924), (4, 8.610), (5, 6.869), (6, 5.959), (7, 5.408), (8, 5.041), (9, 4.781),
+        (10, 4.587), (12, 4.318), (15, 4.073), (20, 3.850), (25, 3.725), (30, 3.646), (40, 3.551), (60, 3.460),
+        (120, 3.373), (math.inf, 3.291))
+
+
+def t999(df):
+    for (d0, t0), (d1, t1) in zip(T999, T999[1:]):
+        if df <= d1:
+            if df <= d0:
+                return t0
+            w = (1 / d0 - 1 / df) / (1 / d0 - (0 if d1 == math.inf else 1 / d1))
+            return t0 + w * (t1 - t0)
+    return T999[-1][1]
+
+
+def ci999(xs):
+    """(mean, half-width of its 99.9% confidence interval) of samples taken as independent, as JMH's score ± error;
+    the half-width is None for fewer than two."""
+    xs = [x for x in xs if x is not None and math.isfinite(x)]
+    if not xs:
+        return None, None
+    mean, sd = stats(xs)
+    return mean, (t999(len(xs) - 1) * sd / len(xs) ** 0.5 if len(xs) > 1 else None)
+
+
 def summarise(variants, per_unit=None):
     """{variant: [metrics of each round (`of`)]}, the first variant the baseline -> (columns [(key, label, kind, main)]
     in the order first seen, {variant: {key: (mean, sd or None for one round, Δ% or None, spread of Δ or None, Δ ok)}}).

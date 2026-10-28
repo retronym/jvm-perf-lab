@@ -1,0 +1,515 @@
+"""A branch campaign's history (doc/branch-explore.md, decisions 3 and 4): its commits newest first, first-parent, with
+one column per corpus, and a chart of the same data with commits on x. A campaign is a branch campaign when its
+directory has the branch.json the runner writes (doc/branch-explore-PLAN.md has the contract); its variants are the
+commits' short shas, its cells where every campaign's are, <campaign>/<corpus>/<variant>/<round>/result.json.
+
+`branch_view` gathers what the page draws, `section` puts it on the campaign's card, and BRANCH_JS draws it: the
+history table (numbers, dots on a shared per-column scale, or both), the chart (score left, a second metric right, the
+mean with its 99.9% CI over every measurement iteration of every fork), and the comparison of two selected rows. The
+view's state is in the page's URL (`?b.<campaign>=...`), so a view can be linked and survives the index's refresh.
+
+Per commit and corpus, a metric has its mean over rounds (as the campaign summary), its sd over rounds, and a 99.9%
+CI: from the measurement iterations of every fork pooled (`rawData` in result.json, the score's and those secondary
+metrics that have one), else from the rounds' means. A Δ is against the previous measured commit and is coloured, as
+in the summary, only when it is beyond its spread: the rounds' combined relative sd when both commits have two rounds
+or more, else their combined relative CIs (a coarse pass has one round per commit).
+"""
+import datetime, glob, html, json, math, os
+
+from . import metrics, ui
+
+BRANCH_NAME = "branch.json"
+esc = html.escape
+
+# where a metric of `metrics.of` has per-iteration samples: the primary metric, or a secondary metric of result.json
+RAW_SOURCE = {"score": None, "alloc": "gc.alloc.rate.norm", "cycles": "xctrace.CORE_ACTIVE_CYCLE", "instructions": "xctrace.INST_ALL"}
+
+
+def raw_source(k):
+    return RAW_SOURCE.get(k, f"xctrace.{k[3:]}" if k.startswith("ev:") and "/" not in k else False)
+
+
+def raw_of(r, k, u):
+    """The forks' measurement iterations of metric `k` in a JMH result, divided by `u` (units per op), [[x, ...] per fork]."""
+    src = raw_source(k)
+    if src is False:
+        return []
+    m = r["primaryMetric"] if src is None else r.get("secondaryMetrics", {}).get(src)
+    raw = (m or {}).get("rawData") or []
+    return [[x / u for x in fork if isinstance(x, (int, float)) and math.isfinite(x)] for fork in raw] if u else []
+
+
+def fin(x):
+    return x if x is not None and math.isfinite(x) else None
+
+
+def sig(x, n=5):
+    """`x` to `n` significant digits, for the raw samples on the page."""
+    return float(f"{x:.{n}g}")
+
+
+def load_cell(cell):
+    """A cell's JMH result, "running" while its result.json is empty or partial, None before it has one."""
+    f = os.path.join(cell, "result.json")
+    if not os.path.exists(f):
+        return None
+    try:
+        r = json.load(open(f))[0]
+        r["primaryMetric"]["score"]
+        return r
+    except (OSError, ValueError, IndexError, KeyError, TypeError):
+        return "running"
+
+
+def date_shown(iso):
+    try:
+        return datetime.datetime.fromisoformat(iso).strftime("%a %d %b %Y")
+    except (TypeError, ValueError):
+        return iso or ""
+
+
+def branch_view(campaign_dir, rel_to=None):
+    """What the page draws for a branch campaign, None when `campaign_dir` has no branch.json:
+
+    {"commits": [newest first: {sha, short, v (variant), subject, author, date, shown (date), index, merged}],
+     "corpora": [...], "metrics": [{k, h (heading), kind}], the score first,
+     "cells": {corpus: {variant: {"state": "done" | "running", "rounds": n,
+                                  "m": {k: [mean, sd over rounds or None, CI half-width or None, Δ against it means something]},
+                                  "s": {k: [mean shown, CI shown]}, "raw": {k: [[x, ...] per fork, of every round]},
+                                  "d": {k: [Δ%, spread, verdict]}, "prev": variant of the previous measured commit}}},
+     "diffs": [{name, href}]}
+
+    `rel_to` is the directory the page's links are relative to (default `campaign_dir`)."""
+    bf = os.path.join(campaign_dir, BRANCH_NAME)
+    if not os.path.exists(bf):
+        return None
+    from . import index
+    branch = json.load(open(bf))
+    try:
+        spec = json.load(open(os.path.join(campaign_dir, "spec.json")))
+    except (OSError, ValueError):
+        spec = {}
+    per_unit = spec.get("perUnit")
+    commits = sorted(branch.get("commits", []), key=lambda c: c.get("index", 0))
+    variants = [c.get("variant") or c["short"] for c in commits]
+    on_disk = sorted(os.path.basename(d.rstrip("/")) for d in glob.glob(os.path.join(campaign_dir, "*/"))
+                     if not os.path.basename(d.rstrip("/")).startswith(("diff-", ".")))
+    named = list(spec.get("corpora") or [])
+    corpora = [c for c in named] + [c for c in on_disk if c not in named and any(os.path.isdir(os.path.join(campaign_dir, c, v)) for v in variants)]
+
+    cols, cells = {}, {}
+    for corpus in corpora:
+        per_v, prev = {}, None
+        for v in variants:
+            rs, running = [], False
+            for cell in sorted(glob.glob(os.path.join(campaign_dir, corpus, v, "*"))):
+                if not (os.path.isdir(cell) and os.path.basename(cell).isdigit()):
+                    continue
+                r = load_cell(cell)
+                if r == "running":
+                    running = True
+                elif r is not None:
+                    rs.append((r, cell))
+            if not rs:
+                if running:
+                    per_v[v] = {"state": "running"}
+                continue
+            of = [metrics.of(r, per_unit, metrics.cached_hw_events(cell)) for r, cell in rs]
+            # the Δ against the previous measured commit, as the summary computes it for two variants
+            cs, st = metrics.summarise({**({prev[0]: prev[1]} if prev else {}), v: of}, per_unit)
+            for k, label, kind, main in cs:
+                cols.setdefault(k, (k, label, kind, main))
+            kinds = {k: kind for k, _, kind, _ in cs}
+            m, s, raw, d = {}, {}, {}, {}
+            for k, (mean, sd, dd, spread, ok) in st[v].items():
+                kind = kinds[k]
+                forks = [f for (r, _) in rs for f in raw_of(r, k, metrics.units_per_op(r, per_unit) if per_unit else 1.0)]
+                samples = [x for f in forks for x in f]
+                _, ci = metrics.ci999(samples) if len(samples) > 1 else (None, None)
+                if ci is None and sd is not None:
+                    ci = metrics.t999(len(rs) - 1) * sd / len(rs) ** 0.5
+                m[k] = [fin(mean), fin(sd), fin(ci), metrics.delta_ok(mean, kind, per_unit)]
+                s[k] = [metrics.fmt(kind, mean), "" if ci is None else ci_shown(kind, ci, mean)]
+                if forks:
+                    raw[k] = [[sig(x) for x in f] for f in forks if f]
+                if prev and dd is not None:
+                    pm = per_v[prev[0]]["m"].get(k)
+                    if spread is None and pm and pm[2] is not None and ci is not None and pm[0] and mean:
+                        spread = 100 * ((pm[2] / pm[0]) ** 2 + (ci / mean) ** 2) ** 0.5
+                    d[k] = [fin(dd), fin(spread), index.verdict(dd, spread, ok)]
+            per_v[v] = {"state": "done", "rounds": len(rs), "m": m, "s": s, "raw": raw, "d": d, "prev": prev[0] if prev else None}
+            if running:
+                per_v[v]["running"] = True
+            prev = (v, of)
+        if per_v:
+            cells[corpus] = per_v
+    corpora = [c for c in corpora if c in cells] + [c for c in named if c not in cells]
+    rel_to = rel_to or campaign_dir
+    diffs = [{"name": os.path.basename(os.path.dirname(f)).removeprefix("diff-"), "href": os.path.relpath(f, rel_to)}
+             for f in sorted(glob.glob(os.path.join(campaign_dir, "diff-*", "compare.html")))]
+    return {"commits": [{"sha": c["sha"], "short": c["short"], "v": v, "subject": c.get("subject", ""), "author": c.get("author", ""),
+                         "date": c.get("date", ""), "shown": date_shown(c.get("date")), "index": c.get("index", i),
+                         "merged": c.get("merged") or []}
+                        for i, (c, v) in reversed(list(enumerate(zip(commits, variants))))],
+            "corpora": corpora, "metrics": [{"k": k, "h": label, "kind": kind} for k, label, kind, _ in cols.values()],
+            "cells": cells, "diffs": diffs, "range": branch.get("range", ""), "perUnit": per_unit}
+
+
+def ci_shown(kind, ci, mean):
+    """A CI's half-width as its mean is shown: a score to the score's decimals."""
+    return ui.num(ci, mean) if kind == "score" else metrics.fmt(kind, ci)
+
+
+def section(campaign_dir, rel_to, corpus_param="corpus"):
+    """The History section of a branch campaign's card, "" for any other campaign."""
+    data = branch_view(campaign_dir, rel_to)
+    if data is None:
+        return ""
+    name = os.path.basename(os.path.normpath(campaign_dir))
+    data["corpusParam"] = corpus_param
+    blob = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
+    n = len(data["commits"])
+    measured = len({v for cs in data["cells"].values() for v, c in cs.items() if c["state"] == "done"})
+    note = (f"{n} first-parent commits of <code>{esc(data['range'])}</code>, newest first; {measured} measured. "
+            "Mean over rounds ± 99.9% CI; Δ against the previous measured commit")
+    help_ = ui.help_popover(
+        "<p style='margin-top:0'>A row per first-parent commit; a merge's <b>+n</b> lists the commits it brought in. Per corpus, the "
+        "score as a number (mean over rounds ± a 99.9% confidence interval over every measurement iteration of every fork), as a dot "
+        "on a scale shared down the column, or both, and a second metric beside it.</p><p>Δ is against the previous (older) measured "
+        "commit, coloured only when it is beyond the spread: the rounds' sd when both commits have two rounds or more, else their CIs.</p>"
+        "<p style='margin-bottom:0'><b>Chart</b>: commits oldest to newest, gaps where a commit is unmeasured; error bars are the CI, "
+        "the cloud every iteration. Tick two rows (or one, against the commit before it) to compare them. The view is kept in the "
+        "page's URL.</p>", right=True)
+    return (f'<h3 class="sub">History <span class="k">{note}</span> {help_}</h3>'
+            f'<div class="bh" data-campaign="{esc(name)}"><div class="bh-ctl"></div><div class="bh-chart"></div>'
+            f'<div class="bh-table"></div><div class="bh-cmp"></div><script type="application/json">{blob}</script></div>')
+
+
+CSS = """
+.bh{margin:2px 0 10px} .bh-ctl{display:flex;flex-wrap:wrap;gap:4px 18px;margin:6px 0 4px;align-items:center}
+.bh-ctl select{font:inherit;font-size:12px;padding:1px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
+table.bh-t td{vertical-align:middle} table.bh-t th{vertical-align:bottom} table.bh-t th.cg{text-align:center;color:var(--fg);border-bottom:1px solid var(--line2)}
+table.bh-t td.gs,table.bh-t th.gs{border-left:1px solid var(--line2)}
+table.bh-t td.cm,table.bh-t th.cm{position:sticky;left:0;z-index:1;background:var(--panel);white-space:normal;min-width:180px;max-width:360px}
+.bh-cm{display:flex;gap:8px;align-items:flex-start} .bh-cm input{margin:3px 0 0}
+.bh-c{min-width:0} .bh-subj{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px}
+.bh-who{display:block;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px}
+.bh-mg{font:11px/15px inherit;border:1px solid var(--line);background:var(--panel);color:var(--link);border-radius:999px;padding:0 6px;margin-left:4px;cursor:pointer;vertical-align:1px}
+table.bh-t tr.hl td{background:var(--line2)} table.bh-t tr.sel td{background:var(--link-bg)}
+table.bh-t tr.bh-sub td{padding-top:0;border-bottom:1px solid var(--line2)} table.bh-t tr.has-sub td{border-bottom:0}
+.bh-sub ul{margin:0;padding:0 0 0 26px;list-style:none;font-size:12px} .bh-sub li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px}
+.bh-v{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end} .bh-v .pm{white-space:nowrap}
+.bh-pend{color:var(--muted);font-size:11.5px}
+svg.bh-dot{display:block;overflow:visible} svg.bh-dot .bl{stroke:var(--line)} svg.bh-dot .wh{stroke:var(--muted);stroke-width:1.2}
+svg.bh-dot circle{fill:var(--fg)} svg.bh-dot circle.better{fill:var(--ok)} svg.bh-dot circle.worse{fill:var(--bad)}
+.bh-chart figure{margin:4px 0 8px} .bh-leg{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:12px;color:var(--muted);margin:0 0 2px}
+.bh-leg i{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--link);margin-right:4px;vertical-align:-1px}
+.bh-leg i.s2{background:var(--brand);border-radius:1px;transform:rotate(45deg) scale(.85)}
+svg.bh-g{width:100%;height:auto;display:block;overflow:visible;user-select:none} svg.bh-g text{font-size:11px;fill:var(--muted)}
+svg.bh-g .ax{stroke:var(--line)} svg.bh-g .gl{stroke:var(--line2)} svg.bh-g .hit{fill:transparent;cursor:pointer}
+svg.bh-g .band{fill:transparent} svg.bh-g .band.sel{fill:var(--link-bg)} svg.bh-g .band.hl{fill:var(--line2)}
+svg.bh-g .c1{fill:var(--link);opacity:.28} svg.bh-g .c2{fill:var(--brand);opacity:.28}
+svg.bh-g .e1{stroke:var(--link);stroke-width:1.6} svg.bh-g .e2{stroke:var(--brand);stroke-width:1.6}
+svg.bh-g .p1{fill:var(--link);stroke:var(--panel);stroke-width:1.2} svg.bh-g .p2{fill:var(--brand);stroke:var(--panel);stroke-width:1.2}
+svg.bh-g .l1{fill:none;stroke:var(--link);stroke-width:1;opacity:.6} svg.bh-g .l2{fill:none;stroke:var(--brand);stroke-width:1;opacity:.6;stroke-dasharray:3 2}
+svg.bh-g text.un{opacity:.45} svg.bh-g text.yl{font-size:10.5px}
+.bh-tip{font-size:12px;min-height:1.5em;margin:2px 0 0;overflow-wrap:anywhere}
+.bh-cmp{margin:8px 0 0} .bh-cmp:empty{display:none} .bh-ph{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;margin:0 0 2px}
+.bh-cmp h4{margin:0;font-size:12.5px} .bh-cmp table.t td{text-align:right} .bh-cmp table.t td:first-child,.bh-cmp table.t th:first-child{text-align:left}
+.bh-cmp .ab{display:block;font-size:11px;color:var(--muted)}
+@media (max-width:700px){table.bh-t td.cm,table.bh-t th.cm{min-width:150px;max-width:170px} .bh-subj,.bh-who{max-width:130px}}
+"""
+
+# draws each branch campaign's history (`section`) from its data (`branch_view`), in the state in the page's URL
+JS = r"""
+const BH = (() => {
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
+  const mem = {};  // per campaign, for this page only: the merges opened, the commit hovered
+  const memOf = el => mem[el.dataset.campaign] = mem[el.dataset.campaign] || {open: new Set(), hover: null};
+  let filter = new Set();
+  const key = n => 'b.' + n;
+  const data = el => el._d || (el._d = JSON.parse(el.querySelector('script').textContent));
+  // ?b.<campaign>=form:both;chart:0;c:<corpus>;m2:<metric>;sel:<variant>,<variant>
+  function state(el) {
+    const d = data(el), st = {form: 'both', chart: false, c: '', m2: '', sel: []};
+    let raw = '';
+    try { raw = new URLSearchParams(location.search).get(key(el.dataset.campaign)) || ''; } catch (e) {}
+    for (const part of raw.split(';')) {
+      const i = part.indexOf(':');
+      if (i < 0) continue;
+      const k = part.slice(0, i), v = part.slice(i + 1);
+      if (k === 'form' && ['num', 'dot', 'both'].includes(v)) st.form = v;
+      else if (k === 'chart') st.chart = v === '1';
+      else if (k === 'c') st.c = v;
+      else if (k === 'm2') st.m2 = v;
+      else if (k === 'sel') st.sel = v.split(',').filter(Boolean);
+    }
+    if (!d.corpora.includes(st.c)) st.c = d.corpora[0] || '';
+    const others = d.metrics.filter(m => m.k !== 'score');
+    if (st.m2 !== 'none' && !others.some(m => m.k === st.m2))
+      st.m2 = others.some(m => m.k === 'alloc') ? 'alloc' : others.length ? others[0].k : 'none';
+    st.sel = st.sel.filter(v => d.commits.some(c => c.v === v)).slice(-2);
+    return st;
+  }
+  function save(el, st) {
+    try {
+      const q = new URLSearchParams(location.search);
+      q.set(key(el.dataset.campaign), `form:${st.form};chart:${st.chart ? 1 : 0};c:${st.c};m2:${st.m2};sel:${st.sel.join(',')}`);
+      history.replaceState(history.state, '', location.pathname + '?' + q.toString() + location.hash);
+    } catch (e) {}
+  }
+  const metric = (d, k) => d.metrics.find(m => m.k === k) || {k, h: k, kind: 'score'};
+  const cellOf = (d, c, v) => (d.cells[c] || {})[v];
+  const unitFix = s => String(s).replace('us/', 'µs/');
+  const sha = (c, n) => `<code title="${esc(c.sha)}">${esc(c.short.slice(0, n || 10))}</code>`;
+  // a tick's label: three or four significant digits, with the unit's scale for sizes and counts
+  function tick(kind, x) {
+    const a = Math.abs(x), p = y => +y.toPrecision(3);
+    if (kind === 'alloc') return a >= 1e5 ? `${p(x / 1e6)}MB` : a >= 1e3 ? `${p(x / 1e3)}KB` : `${p(x)}B`;
+    if (kind === 'count') return a >= 1e9 ? `${p(x / 1e9)}G` : a >= 1e6 ? `${p(x / 1e6)}M` : a >= 1e3 ? `${p(x / 1e3)}K` : `${p(x)}`;
+    if (kind === 'pct') return `${p(x)}%`;
+    return a >= 1e4 ? Math.round(x).toLocaleString('en') : `${+x.toPrecision(4)}`;
+  }
+  function step(span) { const p = Math.pow(10, Math.floor(Math.log10(span / 4))), r = span / 4 / p; return p * (r >= 5 ? 5 : r >= 2 ? 2 : 1); }
+  const pct = (d, sp) => `${d >= 0 ? '+' : ''}${d.toFixed(2)}%` + (sp != null ? ` <span class="pm">± ${sp.toFixed(2)}</span>` : '');
+  const TITLE = {flat: 'inconclusive: within the spread', worse: 'higher, beyond the spread', better: 'lower, beyond the spread'};
+  function delta(x) {
+    if (!x || x[0] == null) return '';
+    if (x[2] === 'na') return '<span class="d na" title="the values are about zero: no percent change">–</span>';
+    return `<span class="d ${x[2]}" title="${x[1] == null ? 'no spread' : TITLE[x[2]]}">${pct(x[0], x[1])}</span>`;
+  }
+  // as `branchview.branch_view` (after `metrics.summarise`): Δ of b against a, its spread from the rounds' sd, else the CIs
+  function pairDelta(a, b, k) {
+    const x = a && a.m && a.m[k], y = b && b.m && b.m[k];
+    if (!x || !y || x[0] == null || y[0] == null || !x[0]) return null;
+    const d = 100 * (y[0] / x[0] - 1);
+    let sp = null;
+    if (x[1] != null && y[1] != null && y[0]) sp = 100 * Math.hypot(x[1] / x[0], y[1] / y[0]);
+    else if (x[2] != null && y[2] != null && y[0]) sp = 100 * Math.hypot(x[2] / x[0], y[2] / y[0]);
+    const v = !x[3] ? 'na' : sp == null || Math.abs(d) <= sp || Math.abs(d) < 0.005 ? 'flat' : d > 0 ? 'worse' : 'better';
+    return [d, sp, v];
+  }
+  // the extent of a metric's mean ± CI (and with `withRaw` its samples) down a corpus's column
+  function extent(d, c, k, withRaw) {
+    let lo = Infinity, hi = -Infinity;
+    for (const x of Object.values(d.cells[c] || {})) {
+      const m = x.m && x.m[k];
+      if (!m || m[0] == null) continue;
+      const ys = [m[0] - (m[2] || 0), m[0] + (m[2] || 0)];
+      if (withRaw) for (const f of (x.raw || {})[k] || []) ys.push(...f);
+      for (const y of ys) { lo = Math.min(lo, y); hi = Math.max(hi, y); }
+    }
+    if (!isFinite(lo)) return null;
+    if (hi - lo <= Math.abs(hi) * 1e-9) { const e = Math.abs(hi) * 0.01 || 1; lo -= e; hi += e; }
+    const p = (hi - lo) * 0.06;
+    return [lo - p, hi + p];
+  }
+  function dot(m, ext, verdict) {
+    const W = 90, X = y => (3 + (y - ext[0]) / (ext[1] - ext[0]) * (W - 6)).toFixed(1);
+    const ci = m[2] != null ? `<path class="wh" d="M${X(m[0] - m[2])} 7H${X(m[0] + m[2])}M${X(m[0] - m[2])} 4v6M${X(m[0] + m[2])} 4v6"/>` : '';
+    return `<svg class="bh-dot" viewBox="0 0 ${W} 14" width="${W}" height="14" aria-hidden="true"><line class="bl" x1="0" x2="${W}" y1="7" y2="7"/>${ci}`
+      + `<circle cx="${X(m[0])}" cy="7" r="3.2" class="${verdict || ''}"/></svg>`;
+  }
+  function value(d, st, c, v, k, exts) {
+    const x = cellOf(d, c, v);
+    if (!x) return '<span class="bh-pend">pending</span>';
+    if (x.state === 'running') return '<span class="badge running">running</span>';
+    const m = x.m[k], s = x.s[k];
+    if (!m) return '';
+    const n = st.form === 'dot' ? '' : `<span>${esc(s[0])}${s[1] ? ` <span class="pm">± ${esc(s[1])}</span>` : ''}</span>`;
+    const g = st.form === 'num' || !exts[c + '|' + k] ? '' : dot(m, exts[c + '|' + k], (x.d[k] || [])[2]);
+    const tip = `${esc(s[0])}${s[1] ? ' ± ' + esc(s[1]) : ''} (99.9% CI); ${x.rounds} round${x.rounds > 1 ? 's' : ''}`
+      + (m[1] != null ? `, sd over rounds ${(100 * m[1] / m[0]).toFixed(2)}%` : '');
+    return `<span class="bh-v" title="${tip}">${n}${g}</span>`;
+  }
+  // the corpora the filter bar picked, all when it picked none of these
+  function corpora(d) {
+    const cs = d.corpora.filter(c => !filter.size || filter.has(c));
+    return cs.length ? cs : d.corpora;
+  }
+  function drawTable(el, d, st) {
+    const cs = corpora(d), m2 = st.m2 !== 'none' ? metric(d, st.m2) : null, m1 = metric(d, 'score');
+    const exts = {};
+    for (const c of cs) for (const m of [m1, m2]) if (m) exts[c + '|' + m.k] = extent(d, c, m.k, false);
+    const per = m2 ? 4 : 2, open = memOf(el).open;
+    let h = '<div class="scroll"><table class="t bh-t"><tr><th class="cm" rowspan="2">commit</th>'
+      + cs.map(c => `<th class="cg gs" colspan="${per}">${esc(c)}</th>`).join('') + '</tr><tr>'
+      + cs.map(() => `<th class="n gs">${esc(unitFix(m1.h))}</th><th>Δ</th>` + (m2 ? `<th class="n">${esc(unitFix(m2.h))}</th><th>Δ</th>` : '')).join('') + '</tr>';
+    for (const c of d.commits) {
+      const sel = st.sel.includes(c.v), merged = c.merged.length, opened = merged && open.has(c.v);
+      h += `<tr data-v="${esc(c.v)}" class="${sel ? 'sel' : ''}${opened ? ' has-sub' : ''}"><td class="cm"><div class="bh-cm">`
+        + `<input type="checkbox" data-bsel="${esc(c.v)}"${sel ? ' checked' : ''} aria-label="compare ${esc(c.short)}">`
+        + `<span class="bh-c"><span class="bh-subj" title="${esc(c.subject)}">${sha(c)} ${esc(c.subject)}</span>`
+        + `<span class="bh-who" title="${esc(c.date)}">${esc(c.author)} · ${esc(c.shown)}`
+        + (merged ? `<button class="bh-mg" data-bmerge="${esc(c.v)}" aria-expanded="${!!opened}" title="a merge of ${merged} commit${merged > 1 ? 's' : ''}: list them">+${merged}</button>` : '')
+        + '</span></span></div></td>';
+      for (const cp of cs) {
+        const x = cellOf(d, cp, c.v), dd = x && x.d || {};
+        h += `<td class="n gs">${value(d, st, cp, c.v, 'score', exts)}</td><td>${delta(dd.score)}</td>`;
+        if (m2) h += `<td class="n">${x && x.state === 'done' ? value(d, st, cp, c.v, m2.k, exts) : ''}</td><td>${delta(dd[m2.k])}</td>`;
+      }
+      h += '</tr>';
+      if (opened)
+        h += `<tr class="bh-sub${sel ? ' sel' : ''}" data-v="${esc(c.v)}"><td class="cm"><ul>`
+          + c.merged.map(m => `<li title="${esc(m.subject)}">${sha({sha: m.sha, short: m.sha})} ${esc(m.subject)}</li>`).join('')
+          + `</ul></td><td colspan="${cs.length * per}"></td></tr>`;
+    }
+    el.querySelector('.bh-table').innerHTML = h + '</table></div>';
+  }
+  function drawChart(el, d, st) {
+    const box = el.querySelector('.bh-chart');
+    if (!st.chart) { box.innerHTML = ''; return; }
+    const c = st.c, cells = d.cells[c] || {}, order = [...d.commits].reverse(), N = order.length;
+    const m1 = metric(d, 'score'), m2 = st.m2 !== 'none' ? metric(d, st.m2) : null;
+    const W = Math.max(300, Math.round(el.clientWidth || 700)), H = 250, L = 54, R = m2 ? 58 : 14, T = 8, B = 30;
+    const band = (W - L - R) / Math.max(1, N), X = i => L + (i + 0.5) * band;
+    const e1 = extent(d, c, 'score', true), e2 = m2 && extent(d, c, m2.k, true);
+    const Y = e => y => T + (H - T - B) * (1 - (y - e[0]) / (e[1] - e[0]));
+    const off = e2 ? band * 0.17 : 0, spread = Math.min(band * (e2 ? 0.2 : 0.4), 26);
+    const jit = (i, j) => { const s = Math.sin(i * 12.9898 + j * 78.233) * 43758.5453; return s - Math.floor(s) - 0.5; };
+    const f1 = x => x.toFixed(1);
+    let g = '', bands = '', hits = '', xl = '';
+    const lines = ['', ''];
+    const every = Math.max(1, Math.ceil(56 / band));
+    order.forEach((cm, i) => {
+      bands += `<rect class="band${st.sel.includes(cm.v) ? ' sel' : ''}" data-bband="${esc(cm.v)}" x="${f1(L + i * band)}" y="${T}" width="${f1(band)}" height="${H - T - B}"/>`;
+      hits += `<rect class="hit" data-bhv="${esc(cm.v)}" x="${f1(L + i * band)}" y="${T}" width="${f1(band)}" height="${H - T}"/>`;
+      const x = cells[cm.v];
+      if ((N - 1 - i) % every === 0)
+        xl += `<text class="${x && x.state === 'done' ? '' : 'un'}" x="${f1(X(i))}" y="${H - B + 14}" text-anchor="middle">${esc(cm.short.slice(0, 7))}</text>`;
+    });
+    [[m1, e1, -off, 1], [m2, e2, off, 2]].forEach(([m, e, dx, n]) => {
+      if (!m || !e) return;
+      const y = Y(e);
+      let prev = null;
+      order.forEach((cm, i) => {
+        const x = cells[cm.v], v = x && x.state === 'done' && x.m[m.k];
+        if (!v || v[0] == null) { prev = null; return; }
+        const cx = X(i) + dx;
+        let j = 0;
+        for (const f of (x.raw || {})[m.k] || []) for (const s of f) g += `<circle class="c${n}" cx="${f1(cx + jit(i * 7 + n, j++) * spread)}" cy="${f1(y(s))}" r="1.7"/>`;
+        if (v[2] != null) g += `<path class="e${n}" d="M${f1(cx)} ${f1(y(v[0] - v[2]))}V${f1(y(v[0] + v[2]))}M${f1(cx - 4)} ${f1(y(v[0] - v[2]))}h8M${f1(cx - 4)} ${f1(y(v[0] + v[2]))}h8"/>`;
+        g += n === 1 ? `<circle class="p1" cx="${f1(cx)}" cy="${f1(y(v[0]))}" r="4"/>`
+          : `<rect class="p2" x="${f1(cx - 3.5)}" y="${f1(y(v[0]) - 3.5)}" width="7" height="7" transform="rotate(45 ${f1(cx)} ${f1(y(v[0]))})"/>`;
+        // the means joined only between neighbours: an unmeasured commit is a gap
+        if (prev) lines[n - 1] += `M${f1(prev[0])} ${f1(prev[1])}L${f1(cx)} ${f1(y(v[0]))}`;
+        prev = [cx, y(v[0])];
+      });
+    });
+    let ax = `<line class="ax" x1="${L}" x2="${L}" y1="${T}" y2="${H - B}"/><line class="ax" x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}"/>`;
+    if (e1) {
+      const y = Y(e1), s = step(e1[1] - e1[0]);
+      for (let t = Math.ceil(e1[0] / s) * s; t <= e1[1]; t += s)
+        ax += `<line class="gl" x1="${L}" x2="${W - R}" y1="${f1(y(t))}" y2="${f1(y(t))}"/><text class="yl" x="${L - 5}" y="${f1(y(t) + 3.5)}" text-anchor="end">${tick(m1.kind, t)}</text>`;
+    }
+    if (e2) {
+      const y = Y(e2), s = step(e2[1] - e2[0]);
+      ax += `<line class="ax" x1="${W - R}" x2="${W - R}" y1="${T}" y2="${H - B}"/>`;
+      for (let t = Math.ceil(e2[0] / s) * s; t <= e2[1]; t += s)
+        ax += `<text class="yl" x="${W - R + 5}" y="${f1(y(t) + 3.5)}">${tick(m2.kind, t)}</text>`;
+    }
+    const empty = !e1 && !e2 ? `<text x="${(L + W - R) / 2}" y="${H / 2}" text-anchor="middle">nothing measured on ${esc(c)} yet</text>` : '';
+    const pick = d.corpora.length > 1 ? `<div class="bh-ctl"><span class="fg"><span class="fl">${esc(d.corpusParam || 'corpus')}</span>`
+      + d.corpora.map(x => `<button class="chip" data-bc="${esc(x)}" aria-pressed="${x === c}">${esc(x)}</button>`).join('') + '</span></div>' : '';
+    box.innerHTML = `<figure>${pick}<div class="bh-leg"><span><i></i>${esc(unitFix(m1.h))} (left)</span>`
+      + (m2 ? `<span><i class="s2"></i>${esc(unitFix(m2.h))} (right)</span>` : '')
+      + '<span>oldest → newest · error bars: 99.9% CI · faint dots: every iteration of every fork</span></div>'
+      + `<svg class="bh-g" viewBox="0 0 ${W} ${H}">${bands}${ax}<path class="l1" d="${lines[0]}"/><path class="l2" d="${lines[1]}"/>${g}${xl}${empty}${hits}</svg>`
+      + '<p class="bh-tip k">Hover a commit to see its numbers; click to select it.</p></figure>';
+  }
+  function tipText(d, st, v) {
+    const cm = d.commits.find(c => c.v === v), x = cellOf(d, st.c, v);
+    if (!cm) return '';
+    const val = k => { const s = x && x.state === 'done' && x.s[k]; return s ? `${esc(s[0])}${s[1] ? ' ± ' + esc(s[1]) : ''}` : ''; };
+    const m2 = st.m2 !== 'none' ? metric(d, st.m2) : null;
+    const nums = !x ? 'pending' : x.state === 'running' ? 'running'
+      : `${val('score')} ${esc(unitFix(metric(d, 'score').h))} ${delta(x.d.score)}`
+        + (m2 && val(m2.k) ? ` · ${val(m2.k)} ${esc(unitFix(m2.h))} ${delta(x.d[m2.k])}` : '');
+    return `${sha(cm)} ${esc(cm.subject)} · <b>${esc(st.c)}</b>: ${nums}`;
+  }
+  function drawCompare(el, d, st) {
+    const box = el.querySelector('.bh-cmp');
+    if (!st.sel.length) { box.innerHTML = ''; return; }
+    const byV = v => d.commits.find(c => c.v === v);
+    const picked = st.sel.map(byV).sort((a, b) => a.index - b.index);
+    const cs = corpora(d), one = picked.length === 1, b = picked[picked.length - 1];
+    // one row: against the commit measured before it on each corpus (the Δ column); two: the older against the newer
+    const base = c => one ? (cellOf(d, c, b.v) || {}).prev : picked[0].v;
+    const head = one ? `<h4>${sha(b)} against the commit measured before it</h4><span class="k">tick a second row to compare any two</span>`
+      : `<h4>${sha(picked[0])} → ${sha(b)}</h4><span class="k">${esc(picked[0].subject)} → ${esc(b.subject)}</span>`;
+    let rows = '';
+    for (const m of d.metrics) {
+      const tds = cs.map(c => {
+        const a = cellOf(d, c, base(c)), y = cellOf(d, c, b.v), x = pairDelta(a, y, m.k);
+        return x ? `<td>${delta(x)}<span class="ab">${esc(a.s[m.k][0])} → ${esc(y.s[m.k][0])}</span></td>` : '<td></td>';
+      });
+      if (tds.some(t => t !== '<td></td>')) rows += `<tr><td>${esc(unitFix(m.h))}</td>${tds.join('')}</tr>`;
+    }
+    let h = `<div class="bh-ph">${head}<button class="chip" data-bclear="1">clear</button></div>`;
+    h += rows ? '<div class="scroll"><table class="t"><tr><th>metric</th>'
+      + cs.map(c => `<th class="n">${esc(c)}${one && base(c) ? ` <span class="k">vs ${sha(byV(base(c)), 7)}</span>` : ''}</th>`).join('') + `</tr>${rows}</table></div>`
+      : '<p class="k">They have no results on the same corpus yet.</p>';
+    // profdiff outputs (diff-<name>/compare.html) whose name has both commits
+    const diffs = one ? [] : d.diffs.filter(x => [picked[0], b].every(c => x.name.includes(c.short.slice(0, 7))));
+    if (diffs.length)
+      h += `<div class="diffs" data-lb-group="${esc(el.dataset.campaign)} · differential flame graphs"><span class="k">Differential flame graphs</span>`
+        + diffs.map(x => `<a class="btn" href="${esc(x.href)}" data-lb="diff|${esc(x.name)}">${esc(x.name)}</a>`).join('') + '</div>';
+    box.innerHTML = h;
+  }
+  function drawOne(el) {
+    const d = data(el), st = state(el), others = d.metrics.filter(m => m.k !== 'score');
+    const chip = (a, v, on, label, t) => `<button class="chip" ${a}="${v}" aria-pressed="${on}"${t ? ` title="${t}"` : ''}>${label}</button>`;
+    el.querySelector('.bh-ctl').innerHTML = '<span class="fg"><span class="fl">show</span>'
+      + chip('data-bform', 'num', st.form === 'num', 'numbers', 'mean ± CI')
+      + chip('data-bform', 'dot', st.form === 'dot', 'dots', 'the mean on a scale shared down the column, the CI as a whisker')
+      + chip('data-bform', 'both', st.form === 'both', 'both') + '</span>'
+      + `<span class="fg">${chip('data-bchart', '1', st.chart, 'chart', 'commits on x, the score left, the second metric right')}</span>`
+      + '<label class="fg"><span class="fl">second metric</span><select data-bm2><option value="none">none</option>'
+      + others.map(m => `<option value="${esc(m.k)}"${m.k === st.m2 ? ' selected' : ''}>${esc(unitFix(m.h))}</option>`).join('') + '</select></label>';
+    drawChart(el, d, st); drawTable(el, d, st); drawCompare(el, d, st);
+    if (memOf(el).hover) hover(el, memOf(el).hover);
+  }
+  function draw(cs) {
+    if (cs) filter = cs;
+    for (const el of document.querySelectorAll('.bh')) drawOne(el);
+  }
+  function hover(el, v) {
+    memOf(el).hover = v;
+    el.querySelectorAll('tr[data-v]').forEach(tr => tr.classList.toggle('hl', tr.dataset.v === v));
+    el.querySelectorAll('rect[data-bband]').forEach(r => r.classList.toggle('hl', r.dataset.bband === v));
+    const tip = el.querySelector('.bh-tip');
+    if (tip) tip.innerHTML = tipText(data(el), state(el), v);
+  }
+  function update(el, f) { const st = state(el); f(st); save(el, st); drawOne(el); }
+  const toggle = (st, v) => { st.sel = st.sel.includes(v) ? st.sel.filter(x => x !== v) : [...st.sel, v].slice(-2); };
+  document.addEventListener('click', e => {
+    const el = e.target.closest && e.target.closest('.bh'), t = el && e.target.closest('[data-bform],[data-bchart],[data-bc],[data-bmerge],[data-bhv],[data-bclear]');
+    if (!t) return;
+    if (t.dataset.bform) update(el, st => { st.form = t.dataset.bform; });
+    else if (t.dataset.bchart) update(el, st => { st.chart = !st.chart; });
+    else if (t.dataset.bc) update(el, st => { st.c = t.dataset.bc; });
+    else if (t.dataset.bclear) update(el, st => { st.sel = []; });
+    else if (t.dataset.bhv) update(el, st => toggle(st, t.dataset.bhv));
+    else {
+      const o = memOf(el).open, v = t.dataset.bmerge;
+      if (o.has(v)) o.delete(v); else o.add(v);
+      drawOne(el);
+    }
+  });
+  document.addEventListener('change', e => {
+    const el = e.target.closest && e.target.closest('.bh');
+    if (!el) return;
+    if (e.target.matches('[data-bm2]')) update(el, st => { st.m2 = e.target.value; });
+    else if (e.target.matches('[data-bsel]')) update(el, st => toggle(st, e.target.dataset.bsel));
+  });
+  document.addEventListener('mouseover', e => {
+    const t = e.target.closest && e.target.closest('.bh tr[data-v], .bh rect[data-bhv]');
+    if (!t) return;
+    const el = t.closest('.bh'), v = t.dataset.v || t.dataset.bhv;
+    if (memOf(el).hover !== v) hover(el, v);
+  });
+  let rz = 0;
+  addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => draw(), 150); });
+  return {draw};
+})();
+"""
