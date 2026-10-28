@@ -42,6 +42,7 @@ object InMemoryClasspath:
     protected def createFileEntry(file: AbstractFile): SourceFileEntry = SourceFileEntry(file)
     protected def isMatchingFile(f: AbstractFile): Boolean = !f.isDirectory && FileUtils.endsSourceExtension(f.name)
     override def sources(inPackage: String): Iterable[SourceFileEntry] = files(inPackage)
+    def searchLocations: Iterable[AbstractFile] = Seq(dir)
 
   /** The snapshot for a corpus: `default`, or `jdkForLibrary` if the corpus has no scala-library on its classpath. */
   def forCorpus(corpus: Corpus): InMemoryClasspath = if corpus.withScalaLibrary then default else jdkForLibrary
