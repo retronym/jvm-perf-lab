@@ -35,9 +35,10 @@ Pinpoint and asv's `find` add an adaptive stage: more forks where adjacent commi
 A branch campaign's card shows its history, newest first, as `git log --graph --first-parent` would show it. Each row has the short sha, subject, author and date, with one column per corpus.
 
 - **Columns** show the primary metric as a number (mean ± CI), as a dot on a shared per-column scale with its interval as a whisker (a sparkline running down the page), or as both. A second, low-noise metric (default `gc.alloc.rate.norm`) can sit beside it.
-- **Δ against the previous row** shows in each cell, coloured only when it exceeds the combined spread, as campaigns already do.
+- **The unit of variation is the fork.** Fork-to-fork variance (JIT decisions, code layout) dominates and a fork's iterations are autocorrelated, so pooling iterations would give far too narrow an interval. Each fork of each round counts once, as the mean of its measurement iterations; the CI is t(n-1) over a commit's n forks. A commit with one fork (a coarse pass) borrows the fork-to-fork relative sd pooled over the campaign's commits with two or more (same corpus and metric, weighted by df), marked † and drawn lighter; until one has two, it shows no interval.
+- **Δ against the previous row** shows in each cell, ± its 99.9% CI, coloured only when significant at 99.9% by Welch's t on the forks' means (the pooled sd for a side of one fork). Comparing any two rows uses the same test.
 - **The chart** turns the same data around: commits on x (by index, with a gap for each unmeasured commit, never interpolated), the primary axis left (default score, i.e. wall time per op), the secondary right (default `gc.alloc.rate.norm`), and a corpus picker.
-  - Each commit gets a point at its mean with CI error bars, over a jittered cloud of every measurement iteration of every fork. These come from `result.json`'s `rawData`, which is already kept and never shown.
+  - Each commit gets a point at its mean with CI error bars, over a mark for each fork's mean and a jittered cloud of every measurement iteration of every fork. These come from `result.json`'s `rawData`, which is already kept and never shown.
   - Hovering a point highlights its row; clicking selects it.
 - **View state lives in the URL** (shape, metrics, corpus, selected rows), so a view can be linked.
 
