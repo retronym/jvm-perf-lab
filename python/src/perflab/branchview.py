@@ -339,7 +339,7 @@ const BH = (() => {
       const sel = st.sel.includes(c.v), merged = c.merged.length, opened = merged && open.has(c.v);
       h += `<tr data-v="${esc(c.v)}" class="${sel ? 'sel' : ''}${opened ? ' has-sub' : ''}"><td class="cm"><div class="bh-cm">`
         + `<input type="checkbox" data-bsel="${esc(c.v)}"${sel ? ' checked' : ''} aria-label="compare ${esc(c.short)}">`
-        + `<span class="bh-c"><span class="bh-subj" title="${esc(c.subject)}">${sha(c)} ${esc(c.subject)}</span>`
+        + `<span class="bh-c"><span class="bh-subj" title="${esc(c.subject)}">${sha(c, 7)} ${esc(c.subject)}</span>`
         + `<span class="bh-who" title="${esc(c.date)}">${esc(c.author)} · ${esc(c.shown)}`
         + (merged ? `<button class="bh-mg" data-bmerge="${esc(c.v)}" aria-expanded="${!!opened}" title="a merge of ${merged} commit${merged > 1 ? 's' : ''}: list them">+${merged}</button>` : '')
         + '</span></span></div></td>';
@@ -351,7 +351,7 @@ const BH = (() => {
       h += '</tr>';
       if (opened)
         h += `<tr class="bh-sub${sel ? ' sel' : ''}" data-v="${esc(c.v)}"><td class="cm"><ul>`
-          + c.merged.map(m => `<li title="${esc(m.subject)}">${sha({sha: m.sha, short: m.sha})} ${esc(m.subject)}</li>`).join('')
+          + c.merged.map(m => `<li title="${esc(m.subject)}">${sha({sha: m.sha, short: m.sha}, 7)} ${esc(m.subject)}</li>`).join('')
           + `</ul></td><td colspan="${cs.length * per}"></td></tr>`;
     }
     el.querySelector('.bh-table').innerHTML = h + '</table></div>';
@@ -432,11 +432,14 @@ const BH = (() => {
     if (!st.sel.length) { box.innerHTML = ''; return; }
     const byV = v => d.commits.find(c => c.v === v);
     const picked = st.sel.map(byV).sort((a, b) => a.index - b.index);
-    const cs = corpora(d), one = picked.length === 1, b = picked[picked.length - 1];
+    const one = picked.length === 1, b = picked[picked.length - 1];
+    let cs = corpora(d);
     // one row: against the commit measured before it on each corpus (the Δ column); two: the older against the newer
     const base = c => one ? (cellOf(d, c, b.v) || {}).prev : picked[0].v;
     const head = one ? `<h4>${sha(b)} against the commit measured before it</h4><span class="k">tick a second row to compare any two</span>`
       : `<h4>${sha(picked[0])} → ${sha(b)}</h4><span class="k">${esc(picked[0].subject)} → ${esc(b.subject)}</span>`;
+    // the corpora both have results on
+    cs = cs.filter(c => d.metrics.some(m => pairDelta(cellOf(d, c, base(c)), cellOf(d, c, b.v), m.k)));
     let rows = '';
     for (const m of d.metrics) {
       const tds = cs.map(c => {
