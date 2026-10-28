@@ -9,7 +9,7 @@ each cell, `perflab run` at its start and end, and the page refreshes itself.
 """
 import glob, html, json, math, os, re, sys, time
 
-from . import ab, config, metrics, regraph, runinfo, specs, timeline, ui
+from . import ab, config, loadgate, metrics, regraph, runinfo, specs, timeline, ui
 
 root = None  # the directory of the page being built: its links are relative to it
 CAMPAIGNS = None
@@ -596,6 +596,10 @@ table.t tr.has-sub td{border-bottom:0} table.t tr.sub td{padding-top:0} .cellg{d
 .hidden{display:none!important} section.card{scroll-margin-top:100px} #counters-card .k{margin:0 0 4px}
 #tl .card-h{gap:6px 12px} #tl select{font:inherit;max-width:100%;padding:2px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
 #tl label{white-space:nowrap} #tl .help{margin-left:auto} #tl[hidden]{display:none}
+#lg[hidden]{display:none} #lg .card-h{gap:6px 12px} #lg .help{margin-left:auto} #lg-top{margin:2px 0 6px}
+#lg svg{display:block;width:100%;height:90px;overflow:visible} #lg .area{fill:var(--warn-bg)} #lg .ln{fill:none;stroke:var(--warn);stroke-width:1.5}
+#lg .lim{stroke:var(--bad);stroke-dasharray:4 3} #lg .q{fill:var(--ok-bg)} #lg text{fill:var(--muted);font-size:11px}
+#lg .bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;max-width:240px} #lg .bar>i{display:block;height:100%;background:var(--ok)}
 footer{max-width:1400px;margin:0 auto;padding:0 20px 30px;color:var(--muted);font-size:12px}
 .sv-tg{display:inline-flex;vertical-align:middle;margin-left:8px;border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .sv-tg button{border:0;background:var(--panel);color:var(--muted);padding:2px 6px;cursor:pointer;display:grid;place-items:center}
@@ -909,6 +913,10 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
           + (f'<a href="#counters" data-sec="counters">Counters<span class="n">{n_counters}</span></a>' if n_counters else "")
           + f'<a href="#runs" data-sec="runs">Runs<span class="n" id="n-runs">{len(run_sections)}</span></a>')
   running_json = os.path.relpath(os.path.join(campaigns, ab.RUNNING_NAME), root)
+  loadgate_json = os.path.relpath(os.path.join(campaigns, loadgate.STATE_NAME), root)
+  lg_help = ui.help_popover("A campaign with a <code>loadgate</code> waits before each cell until the load of other processes stays under "
+                            "its limit for its quiet period. Other load in cores, sampled every 5 s; the dashed line is the limit, the green "
+                            "band the quiet time so far.", right=True)
   counters_sec = (f'<h2 class="sec" id="counters">PMU counters <span class="k">by run, benchmark thread only (xctrace)</span></h2>'
                   f'<section class="card" id="counters-card"><p class="k">Misses per 1,000 instructions; top-down shares of issue slots when a run used the '
                   f'CPU Counters template. Each run name links to its card.</p>{counters_html}</section>') if counters_html else ""
@@ -927,6 +935,8 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   <label class="k"><input type="checkbox" id="tl-follow" checked> follow the running fork</label><span id="tl-status"></span>{tl_help}</div>
   <div class="tl-legend" id="tl-legend"></div><svg class="timeline" id="tl-chart"></svg></section>
   <div class="tl-tip" id="tl-tip"></div>
+  <section class="card" id="lg" hidden><div class="card-h"><h2>Waiting for a quiet machine</h2><span id="lg-status"></span>{lg_help}</div>
+  <p class="k" id="lg-top"></p><div class="bar" id="lg-bar"><i></i></div><svg id="lg-chart"></svg></section>
   <div id="live">
   <h2 class="sec" id="campaigns">Campaigns <span class="k">variants compared over rounds, newest first</span></h2>
   {notes(os.path.join(campaigns, "FINDINGS.md")).replace('class="notes"', 'class="notes" id="findings"', 1)}
@@ -938,7 +948,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   <script>{timeline.script()}</script>{ui.lightbox_script()}
   <script>{SUMMARY_JS}</script>
   <script>
-  const RUNNING = {json.dumps(running_json)};
+  const RUNNING = {json.dumps(running_json)}, LOADGATE = {json.dumps(loadgate_json)};
   const chips = [...document.querySelectorAll('.filterbar .chip')];
   chips.forEach(c => c.onclick = () => {{ c.classList.toggle('on'); apply(); }});
   document.getElementById('q').oninput = apply;
@@ -983,7 +993,35 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   // a cell's name as the picker shows it: a run's name, or campaign · corpus · variant #round
   const nameOf = r => r.run || (p => p.length >= 4 ? `${{p[0]}} · ${{p[1]}} · ${{p[2]}} #${{p[3]}}` : r.cell)(r.cell.replace(/\\/$/, '').split('/'));
   status.onclick = e => {{ if (e.target.closest('a')) {{ e.preventDefault(); follow.checked = true; tick(); }} }};
+  // loadgate.json, written by `perflab loadgate` while a campaign waits for other load to settle before a cell
+  const lg = document.getElementById('lg');
+  async function gate() {{
+    let g = null;
+    try {{ const r = await fetch(LOADGATE, {{cache: 'no-store'}}); g = r.ok ? await r.json() : null; }} catch (e) {{}}
+    // a killed wait leaves its file behind: samples come every 5 s, so an old last one means nobody is waiting
+    lg.hidden = !g || !g.samples.length || Date.now() / 1000 - g.samples[g.samples.length - 1][0] > 30;
+    if (lg.hidden) return;
+    const xs = g.samples, last = xs[xs.length - 1], now = last[0], esc = s => String(s).replace(/[&<>]/g, c => ({{'&': '&amp;', '<': '&lt;', '>': '&gt;'}})[c]);
+    const mins = s => s >= 60 ? `${{Math.floor(s / 60)}} min ${{Math.round(s % 60)}} s` : `${{Math.round(s)}} s`;
+    const q = g.quietSince ? now - g.quietSince : 0;
+    document.getElementById('lg-status').innerHTML = `<span class="badge ${{q ? 'finished' : 'running'}}">${{last[1].toFixed(1)}} cores, limit ${{g.limit}}</span>`
+      + ` <span class="k">waiting ${{mins(now - g.started)}}${{q ? `, quiet for ${{mins(q)}} of ${{mins(g.quiet)}}` : ''}}</span>`;
+    document.getElementById('lg-top').textContent = last[2] ? `Other load: ${{last[2]}}` : '';
+    document.getElementById('lg-bar').firstChild.style.width = `${{Math.min(100, 100 * q / g.quiet)}}%`;
+    const svg = document.getElementById('lg-chart'), W = svg.clientWidth || 600, H = 90, pad = 18;
+    const t0 = g.started, t1 = Math.max(now, t0 + 60), top = Math.max(g.limit * 1.5, ...xs.map(s => s[1]));
+    const x = t => pad + (W - 2 * pad) * (t - t0) / (t1 - t0), y = v => H - 14 - (H - 24) * v / top;
+    const pts = xs.map(s => `${{x(s[0]).toFixed(1)}},${{y(s[1]).toFixed(1)}}`);
+    svg.setAttribute('viewBox', `0 0 ${{W}} ${{H}}`);
+    svg.innerHTML = (g.quietSince ? `<rect class="q" x="${{x(g.quietSince)}}" y="${{y(top)}}" width="${{x(now) - x(g.quietSince)}}" height="${{y(0) - y(top)}}"/>` : '')
+      + `<path class="area" d="M${{x(xs[0][0])}},${{y(0)}} L${{pts.join(' L')}} L${{x(now)}},${{y(0)}} Z"/><path class="ln" d="M${{pts.join(' L')}}"/>`
+      + `<line class="lim" x1="${{pad}}" x2="${{W - pad}}" y1="${{y(g.limit)}}" y2="${{y(g.limit)}}"/>`
+      + `<text x="${{W - pad}}" y="${{y(g.limit) - 3}}" text-anchor="end">limit ${{g.limit}} cores</text>`
+      + `<text x="${{pad}}" y="${{H - 2}}">${{esc(new Date(t0 * 1000).toLocaleTimeString([], {{hour: '2-digit', minute: '2-digit'}}))}}</text>`
+      + `<text x="${{W - pad}}" y="${{H - 2}}" text-anchor="end">now</text>`;
+  }}
   async function tick() {{
+    gate();
     try {{ const r = await fetch(RUNNING, {{cache: 'no-store'}}); running = r.ok ? await r.json() : null; }} catch (e) {{ running = null; }}
     panel.hidden = !running && !picked;
     if (panel.hidden) return;

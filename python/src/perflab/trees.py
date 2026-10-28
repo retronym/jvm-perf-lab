@@ -1,14 +1,14 @@
 """Campaigns across builds: each variant is a checkout (e.g. a git worktree) with its own perflab.toml, run round by
 round, alternating variants; results are gathered into this checkout's campaign directory and reported together.
 
-  perflab trees <spec.json>
+  perflab trees <spec.json> [--dry-run]   --dry-run: each checkout's `ab run --dry-run` for the first round
 
 The spec is a campaign spec plus "trees": {"<variant>": "<checkout, relative to this one>"}. A variant's JVM flags come
 from "variants" (default none). With an sbt build, each checkout needs its sbt server running.
 """
 import json, os, shutil, subprocess, sys
 
-from . import config, specs
+from . import config, loadgate, specs
 
 
 def run_in(tree, *args, version=None):
@@ -47,6 +47,12 @@ def main(argv):
     spec = json.load(open(argv[0]))
     here = config.get().root
     trees = {v: os.path.abspath(os.path.join(here, t)) for v, t in spec["trees"].items()}
+    if "--dry-run" in argv:
+        for variant, tree in trees.items():
+            print(f"perflab trees: {variant} in {tree}", flush=True)
+            if run_in(tree, "ab", "run", tree_spec(spec, variant, 1, tree), "--dry-run") != 0:
+                sys.exit(f"perflab trees: {variant}: dry run failed ({tree})")
+        return 0
     out = os.path.join(config.get().campaigns, spec["name"])
     # one live view from the start: the combined campaign and its spec (so the index knows the planned cells) exist
     # before the first round, are served from this checkout, and gain each variant's cells as its round finishes
@@ -56,13 +62,16 @@ def main(argv):
     path = os.path.join(out, "spec.json")
     json.dump(combined, open(path, "w"), indent=2)
     version = specs.record(out, argv[0])  # the spec as given, trees and all; each tree's cells are tagged with it
-    from . import index, serve
+    from . import index, serve, transcript
     try:
-        print(f"perflab trees: index (updates after each round): {serve.ensure()}", flush=True)
+        transcript.say(f"perflab trees: index (updates after each round): {serve.ensure()}")
     except Exception as e:  # the index is a convenience; never let it stop a campaign
-        print(f"perflab trees: index not served: {e}", flush=True)
+        transcript.say(f"perflab trees: index not served: {e}")
+    # the checkouts' loadgate waits show on this checkout's index, the one being watched
+    os.environ[loadgate.LIVE_ENV] = config.get().campaigns
     for r in range(1, spec["rounds"] + 1):
         for variant, tree in trees.items():
+            transcript.say(f"perflab trees: round {r} {variant} in {tree}")
             if run_in(tree, "ab", "run", tree_spec(spec, variant, r, tree), version=version) != 0:
                 sys.exit(f"perflab trees: {variant} round {r} failed ({tree})")
             gather(spec, trees, out)

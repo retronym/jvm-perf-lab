@@ -180,15 +180,37 @@ def finish(out, profile, lib=None):
 
 
 def run_build(cmd, log_path, every=None, tick=None):
-    """Runs the build, logging to `log_path`; calls `tick` every `every` seconds while it runs."""
+    """Runs the build, logging to `log_path` and, line by line as it comes, to the transcript, followed by JMH's log
+    beside it; calls `tick` every `every` seconds while it runs."""
+    import threading
+    from . import transcript
     root = config.get().root
+    transcript.say(f"[perflab] build: {cmd}\n[perflab] build log: {log_path}")
     with open(log_path, "w") as log:
-        proc = subprocess.Popen(cmd, shell=True, cwd=root, stdout=log, stderr=subprocess.STDOUT)
-        while True:
-            try:
-                return proc.wait(timeout=every)
-            except subprocess.TimeoutExpired:
-                tick()
+        proc = subprocess.Popen(cmd, shell=True, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, errors="replace", bufsize=1)
+
+        def copy():
+            for line in proc.stdout:
+                log.write(line)
+                log.flush()
+                transcript.build_line(line)
+
+        done = threading.Event()
+        threads = [threading.Thread(target=copy, daemon=True),
+                   threading.Thread(target=transcript.follow, args=(os.path.join(os.path.dirname(log_path), "jmh.log"), done), daemon=True)]
+        for t in threads:
+            t.start()
+        try:
+            while True:
+                try:
+                    return proc.wait(timeout=every)
+                except subprocess.TimeoutExpired:
+                    tick()
+        finally:
+            done.set()
+            for t in threads:
+                t.join(timeout=5)
 
 
 def mark(out, status, **kw):
@@ -240,13 +262,13 @@ def main(argv):
         print(cmd)
         print(open(os.path.join(out, "jmh.args")).read(), end="")
         return 0
-    from . import serve
+    from . import serve, transcript
     mark(out, "running")
     try:
-        print(f"[perflab] index (updates as the run goes): {serve.ensure()}", flush=True)
+        transcript.say(f"[perflab] index (updates as the run goes): {serve.ensure()}")
     except Exception as e:  # the index is a convenience; never let it stop a run
-        print(f"[perflab] index not served: {e}", flush=True)
-    print(f"[perflab] {cmd}\n[perflab] output: {out}", flush=True)
+        transcript.say(f"[perflab] index not served: {e}")
+    transcript.say(f"[perflab] output: {out}")
     try:
         rc = run_build(cmd, os.path.join(out, "build.log"), every=10, tick=refresh_index)
         if rc == 0:
@@ -255,5 +277,5 @@ def main(argv):
         mark(out, "interrupted")
         raise
     mark(out, "finished" if rc == 0 else "failed", rc=rc)
-    print(f"[perflab] {'done' if rc == 0 else f'build exited with {rc}, see build.log'}: {out}")
+    transcript.say(f"[perflab] {'done' if rc == 0 else f'build exited with {rc}, see build.log'}: {out}")
     return rc

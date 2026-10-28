@@ -62,20 +62,55 @@ def other_load(root, interval=5.0):
         top += f"; background daemons {bg:.1f}"
     return total, top
 
-def wait(root, limit=1.5, quiet=60):
-    """Blocks until other processes' load stays under `limit` cores for `quiet` seconds."""
-    since = None
-    while True:
-        load, top = other_load(root)
-        now = time.time()
-        if load <= limit:
-            since = since or now
-            if now - since >= quiet:
-                print(f"idle: other load {load:.2f} cores", flush=True)
-                return
+STATE_NAME = "loadgate.json"
+# where the wait is published: <campaigns> of this checkout, or of the one `perflab trees` runs from
+LIVE_ENV = "PERFLAB_LIVE_DIR"
+
+
+def state_path():
+    from . import config
+    return os.path.join(os.environ.get(LIVE_ENV) or config.get().campaigns, STATE_NAME)
+
+
+def publish(state):
+    """<campaigns>/loadgate.json while a wait lasts (the index draws it), removed when it ends."""
+    path = state_path()
+    try:
+        if state is None:
+            os.unlink(path)
         else:
-            since = None
-            print(f"waiting: other load {load:.1f} cores ({top})", flush=True)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path + ".tmp", "w") as f:
+                json.dump(state, f)
+            os.replace(path + ".tmp", path)
+    except OSError:
+        pass
+
+
+def wait(root, limit=1.5, quiet=60):
+    """Blocks until other processes' load stays under `limit` cores for `quiet` seconds. While it waits, the samples
+    are published for the index (`publish`) and each is a line of the transcript."""
+    from . import transcript
+    since = None
+    state = {"pid": os.getpid(), "started": time.time(), "limit": limit, "quiet": quiet, "quietSince": None, "samples": []}
+    try:
+        while True:
+            load, top = other_load(root)
+            now = time.time()
+            if load <= limit:
+                since = since or now
+                if now - since >= quiet:
+                    transcript.say(f"idle: other load {load:.2f} cores")
+                    return
+                transcript.write(f"quiet: other load {load:.2f} cores for {now - since:.0f} of {quiet:.0f} s")
+            else:
+                since = None
+                transcript.say(f"waiting: other load {load:.1f} cores ({top})")
+            state["samples"] = (state["samples"] + [[round(now), round(load, 2), top]])[-720:]
+            state["quietSince"] = since
+            publish(state)
+    finally:
+        publish(None)
 
 
 def server_pid():

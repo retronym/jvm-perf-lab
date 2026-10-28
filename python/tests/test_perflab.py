@@ -1,7 +1,7 @@
 import json, os, re, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from perflab import ab, analyze, auditfold, compare, config, defcosts, index, inlinetree, jmh, jvmevents, metrics, regraph, serve, specs, timeline, trees  # noqa: E402
+from perflab import ab, analyze, auditfold, compare, config, defcosts, index, inlinetree, jmh, jvmevents, loadgate, metrics, regraph, serve, specs, timeline, transcript, trees  # noqa: E402
 
 
 class Project:
@@ -603,6 +603,40 @@ class TreesTest(unittest.TestCase):
         trees.gather({"name": "c"}, {"v": tree}, out)
         self.assertTrue(os.path.exists(os.path.join(out, "k", "v", "1", "result.json")))
         self.assertTrue(os.path.isdir(keep))
+
+
+class TranscriptTest(unittest.TestCase):
+    def setUp(self):
+        self.p = Project('[build]\njmh = "x"\n')
+        self.path = os.path.join(self.p.dir, "t.txt")
+        self.addCleanup(os.environ.pop, transcript.ENV, None)
+        transcript.setup(self.path)
+
+    def test_build_output_and_jmh_log_as_they_come(self):
+        out = os.path.join(self.p.dir, "run")
+        os.makedirs(out)
+        # the build prints (with a terminal control sequence), and JMH writes its own log beside build.log
+        cmd = "printf '\\033[0Jcompiling\\n'; echo '# Fork: 1 of 1' > run/jmh.log; sleep 1.5; echo done"
+        self.assertEqual(jmh.run_build(cmd, os.path.join(out, "build.log")), 0)
+        lines = open(self.path).read().splitlines()
+        self.assertIn("  | compiling", lines)
+        self.assertIn("  > # Fork: 1 of 1", lines)
+        self.assertIn("  | done", lines)
+        self.assertEqual(open(os.path.join(out, "build.log")).read(), "\x1b[0Jcompiling\ndone\n")
+
+    def test_loadgate_wait_is_published_then_removed(self):
+        seen = []
+        loads = iter([(3.0, "javac 3.0"), (0.5, ""), (0.5, "")])
+        orig, loadgate.other_load = loadgate.other_load, lambda root: next(loads)
+        self.addCleanup(setattr, loadgate, "other_load", orig)
+        orig_publish = loadgate.publish
+        loadgate.publish = lambda st: (seen.append(json.loads(json.dumps(st))), orig_publish(st))
+        self.addCleanup(setattr, loadgate, "publish", orig_publish)
+        loadgate.wait(os.getpid(), limit=1.0, quiet=0)
+        self.assertEqual(seen[0]["samples"][0][1:], [3.0, "javac 3.0"])
+        self.assertIsNone(seen[-1])
+        self.assertFalse(os.path.exists(loadgate.state_path()))
+        self.assertIn("waiting: other load 3.0 cores (javac 3.0)", open(self.path).read())
 
 
 if __name__ == "__main__":

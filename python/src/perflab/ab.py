@@ -53,7 +53,8 @@ MAX_ATTEMPTS = 10
 
 
 def log(msg):
-    print(f"[ab {time.strftime('%H:%M:%S')}] {msg}", flush=True)
+    from . import transcript
+    transcript.say(f"[ab {time.strftime('%H:%M:%S')}] {msg}")
 
 
 class Spec:

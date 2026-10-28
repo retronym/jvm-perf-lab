@@ -17,6 +17,9 @@
   defcosts   cost per definition from a compiler's table (Scala 3 -Yprofile-defs): histograms, outliers, comparison
 
 Configuration: perflab.toml in the project (see perflab.config). `perflab <command> --help` for a command's options.
+
+  perflab --transcript <file> <command> ...   appends progress and the build's output to <file> as they come
+                                              (perflab.transcript), for a caller to follow
 """
 import importlib, sys
 
@@ -27,6 +30,10 @@ COMMANDS = {"run": "jmh", "ab": "ab", "trees": "trees", "index": "index", "timel
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["--transcript"] and len(argv) > 1:
+        from . import transcript
+        transcript.setup(argv[1])
+        argv = argv[2:]
     if not argv or argv[0] in ("-h", "--help") or argv[0] not in COMMANDS:
         print(__doc__)
         return 0 if argv and argv[0] in ("-h", "--help") else 2
