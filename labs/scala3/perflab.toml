@@ -3,6 +3,9 @@
 # perflab passes its JMH arguments as @<file> to perflab's JMH driver, the lab's main class
 jmh = "sbt --client 'lab/Jmh/run {args}'"
 server = "sbt"
+# launch mode (`mode = "launch"`, or PERFLAB_BUILD_MODE=launch): a batch sbt builds once per run or campaign, perflab
+# snapshots the build and starts JMH itself; SCALA3_CHECKOUT (and SCALA3_BENCHMARKS) come from perflab's environment
+launch = "sbt -batch -J-Xmx8g 'lab/perflabLaunch {out}'"
 
 [benchmark]
 default = "CompileBenchmark"

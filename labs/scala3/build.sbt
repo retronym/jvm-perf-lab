@@ -59,4 +59,32 @@ lazy val lab = project.in(file("."))
       s"-Dcompilerlab.scalaLibrary=${(library / Compile / packageBin).value}",
       s"-Dcompilerlab.corpora=${sys.env.getOrElse("SCALA3_BENCHMARKS", (checkout / ".." / "scala3-benchmarks").getCanonicalPath)}/bench-sources",
     ),
+    // perflab's launch mode (doc/direct-launch.md in jvm-perf-lab): compiles the benchmarks and writes <dir>/launch.json,
+    // what `Jmh/run` would run, for perflab to snapshot and start itself, with no sbt during the measurement
+    perflabLaunch := {
+      val out = file(complete.DefaultParsers.spaceDelimited("<dir>").parsed.headOption.getOrElse(sys.error("perflabLaunch <dir>")))
+      val cp = (Jmh / fullClasspath).value.files.map(_.getCanonicalPath)
+      val opts = (Jmh / run / javaOptions).value
+      val main = (Jmh / run / mainClass).value.getOrElse(sys.error("no Jmh / run / mainClass"))
+      val java = (Jmh / run / javaHome).value.getOrElse(file(sys.props("java.home"))) / "bin" / "java"
+      def git(args: String*) = scala.util.Try(scala.sys.process.Process("git" +: "-C" +: checkout.getPath +: args).!!.trim).getOrElse("")
+      def str(s: String) = "\"" + s.flatMap {
+        case '"' => "\\\""; case '\\' => "\\\\"; case '\n' => "\\n"; case c if c < ' ' => f"\\u${c.toInt}%04x"; case c => c.toString
+      } + "\""
+      def arr(xs: Seq[String]) = xs.map(str).mkString("[", ", ", "]")
+      val json = Seq(
+        "\"mainClass\": " + str(main),
+        "\"java\": " + str(java.getCanonicalPath),
+        "\"classpath\": " + arr(cp),
+        "\"javaOptions\": " + arr(opts),
+        // the directories whose files are this build's own output, which perflab copies into its snapshot
+        "\"roots\": " + arr(Seq(baseDirectory.value.getCanonicalPath, checkout.getPath)),
+        "\"build\": {\"checkout\": " + str(checkout.getPath) + ", \"commit\": " + str(git("rev-parse", "HEAD"))
+          + ", \"dirty\": " + git("status", "--porcelain", "--untracked-files=no").nonEmpty + "}",
+      ).mkString("{\n  ", ",\n  ", "\n}\n")
+      IO.write(out / "launch.json", json)
+      streams.value.log.info(s"perflabLaunch: ${out / "launch.json"}")
+    },
   )
+
+lazy val perflabLaunch = inputKey[Unit]("compiles the benchmarks and writes <dir>/launch.json for perflab's launch mode")
