@@ -34,6 +34,13 @@ Design: [branch-explore.md](branch-explore.md). Test case: retronym/scala3 `scal
    - Deferred: APFS clones are separate inodes, so they still count once each (no portable way to see shared extents); pins from the index's cards.
 7. RUNNING (job 1 on the server) The perfint campaign under the server: coarse pass on scalaz, then tastyQuery, then a second round; check the view against it.
 
+8. DONE The load gate per measurement iteration (2 s samples; a burst over any iteration reruns the cell; `load.json` per cell).
+9. TODO Branch view, from looking at perfint-branch:
+   - profile metrics in the table and chart, from the campaign's own profile and from a `.profile` pass (in progress);
+   - within-fork uncertainty: each fork's 99.9% CI over its iterations as a thin whisker on its dash; with one fork, the table shows it muted (`±~`), never used to colour Δ; the between/within-fork sd ratio in the tooltip;
+   - each iteration's dot coloured by the competing load over it (`load.json`), a marker on a cell with disturbed iterations;
+   - a cell popover (click a value): its rounds and forks, score, load, links to timeline and jmh.log, and on the server **Void & rerun**: the cell moves to `<campaign>/.void/` with a reason, and an `ab run` resume is queued (once).
+
 ## Future work
 
 - Adaptive exploration: refine where neighbours differ by more than their noise (Pinpoint).
