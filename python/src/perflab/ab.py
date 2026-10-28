@@ -385,13 +385,20 @@ def done(dest):
 
 def build_commit(spec, commit):
     """A branch commit's launch-mode build, in <campaign>/.build/<key>: checked out into the campaign's worktree and
-    built there, unless a build with the same key (tree, variables, build command) is already kept. A profile campaign
-    has its branch campaign's builds and worktree (`build_out`).
+    built there, unless a build with the same key (tree, variables, build command, harness) is already kept, or the
+    commit's recorded one (branch.recorded_key). A profile campaign has its branch campaign's builds and worktree
+    (`build_out`).
     None when the commit does not build (or builds something else than its tree, or a dirty one): it is recorded in
     <campaign>/unbuildable.json, with its build.log, and nothing of it is kept in .build."""
     tpl = branch.template()
     probe = branch.env_for(spec.branch, os.path.join(spec.build_out, branch.WORKTREE))
-    dir = os.path.join(spec.build_out, launch.BUILD_DIR, branch.build_key(commit, probe, tpl))
+    if getattr(spec, "harness", None) is None:  # once a run: the project and JDK don't change under it
+        spec.harness = branch.harness(probe)
+    key, warning = branch.recorded_key(spec.build_out, commit, probe, tpl, spec.harness)
+    if warning and not getattr(spec, "harness_warned", False):
+        log(f"  warning: {warning}")
+        spec.harness_warned = True
+    dir = os.path.join(spec.build_out, launch.BUILD_DIR, key)
 
     def validate(built):  # the build says what it built (launch.json's "build"): the commit's tree, clean
         b = built.get("build") or {}
@@ -408,6 +415,8 @@ def build_commit(spec, commit):
         log(f"  the snapshot in {dir} is not {commit['short']}'s ({problem}); building it again")
         shutil.rmtree(dir, ignore_errors=True)
         reuse = False
+        key = branch.build_key(commit, probe, tpl, spec.harness)
+        dir = os.path.join(spec.build_out, launch.BUILD_DIR, key)
     wt = None
     if not reuse:
         wt = branch.checkout(spec.build_out, spec.branch_info, commit)
@@ -421,6 +430,7 @@ def build_commit(spec, commit):
         log(f"  {commit['short']} did not build: {e.reason} (see {os.path.join(spec.build_out, branch.FAILED_LOGS, commit['variant'] + '.log')})")
         return None
     branch.set_unbuildable(spec.build_out, commit["variant"])
+    branch.record_key(spec.build_out, commit, key)
     return built
 
 

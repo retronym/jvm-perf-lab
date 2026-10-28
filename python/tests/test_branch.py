@@ -51,6 +51,67 @@ class ExploreTest(unittest.TestCase):
         self.assertNotEqual(branch.build_key(a, {"E": "x"}, "sbt"), branch.build_key(a, {"E": "y"}, "sbt"))
 
 
+class BuildKeyTest(unittest.TestCase):
+    def setUp(self):
+        self.out = tempfile.mkdtemp()
+        self.c = {"tree": "t", "sha": "1", "variant": "v", "short": "v"}
+
+    def snapshot(self, key):
+        d = os.path.join(self.out, launch.BUILD_DIR, key)
+        os.makedirs(d)
+        json.dump({"snapshot": d}, open(os.path.join(d, launch.LAUNCH), "w"))
+
+    def test_the_harness_follows_the_old_key(self):
+        old = branch.build_key(self.c, {"E": "x"}, "sbt")
+        k1, k2 = (branch.build_key(self.c, {"E": "x"}, "sbt", {"java": j}) for j in ("a", "b"))
+        self.assertEqual([k1.split("-")[0], k2.split("-")[0]], [old, old])
+        self.assertNotEqual(branch.harness_part(k1), branch.harness_part(k2))
+        self.assertIsNone(branch.harness_part(old))
+
+    def test_a_campaign_from_before_builds_json_keeps_its_snapshots(self):
+        old = branch.build_key(self.c, {}, "sbt")
+        self.snapshot(old)
+        self.assertEqual(branch.recorded_key(self.out, self.c, {}, "sbt", {"java": "b"}), (old, None))
+        # without its snapshot, the key with the harness
+        self.assertEqual(branch.recorded_key(self.out, {**self.c, "tree": "u"}, {}, "sbt", {"java": "b"})[0],
+                         branch.build_key({**self.c, "tree": "u"}, {}, "sbt", {"java": "b"}))
+
+    def test_a_recorded_key_wins_while_its_snapshot_is_kept(self):
+        k1 = branch.build_key(self.c, {}, "sbt", {"java": "a"})
+        self.snapshot(k1)
+        branch.record_key(self.out, self.c, k1)
+        key, warning = branch.recorded_key(self.out, self.c, {}, "sbt", {"java": "b"})
+        self.assertEqual(key, k1)
+        self.assertIn("another harness", warning)
+        self.assertEqual(branch.recorded_key(self.out, self.c, {}, "sbt", {"java": "a"}), (k1, None))
+        # a commit built after the harness changed: the new harness, and a warning
+        c2 = {**self.c, "tree": "u", "variant": "w", "short": "w"}
+        key, warning = branch.recorded_key(self.out, c2, {}, "sbt", {"java": "b"})
+        self.assertEqual(key, branch.build_key(c2, {}, "sbt", {"java": "b"}))
+        self.assertIn("earlier commits", warning)
+        # the snapshot dropped: built again, with the harness of now
+        import shutil
+        shutil.rmtree(os.path.join(self.out, launch.BUILD_DIR, k1))
+        self.assertEqual(branch.recorded_key(self.out, self.c, {}, "sbt", {"java": "b"}),
+                         (branch.build_key(self.c, {}, "sbt", {"java": "b"}), None))
+
+    def test_harness_is_the_jdk_and_the_projects_state(self):
+        p = Project('[build]\njmh = "true"\n')
+        os.chdir(p.dir)
+        h = branch.harness({"JAVA_HOME": p.dir})
+        self.assertEqual(h["javaHome"], os.path.realpath(p.dir))
+        self.assertNotIn("tree", h)  # not a git repo
+        git(p.dir, "init", "-q")
+        git(p.dir, "add", ".")
+        git(p.dir, "commit", "-qm", "p")
+        h1 = branch.harness({})
+        with open(os.path.join(p.dir, "perflab.toml"), "a") as f:
+            f.write("# changed\n")
+        h2 = branch.harness({})
+        self.assertEqual(h1["tree"], h2["tree"])
+        self.assertNotEqual(h1["diff"], h2["diff"])
+
+
 class DoneTest(unittest.TestCase):
     def test_an_empty_result_is_not_done(self):
         d = tempfile.mkdtemp()
@@ -146,9 +207,9 @@ class BranchCampaignTest(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(spec.out, branch.BRANCH)))
         # each snapshot holds the commit it was built from
         commits = {c["variant"]: c for c in spec.branch_info["commits"]}
+        keys = json.load(open(os.path.join(spec.out, branch.BUILDS)))
         for v in spec.branch_info["order"][:2]:
-            key = branch.build_key(commits[v], branch.env_for(spec.branch, os.path.join(spec.out, branch.WORKTREE)), branch.template())
-            b = launch.read(os.path.join(spec.out, launch.BUILD_DIR, key, launch.LAUNCH))
+            b = launch.read(os.path.join(spec.out, launch.BUILD_DIR, keys[v], launch.LAUNCH))
             self.assertEqual(open(os.path.join(b["classpath"][0], "A.class")).read(), commits[v]["sha"])
 
     def run_all(self, *flags):
@@ -200,6 +261,22 @@ class BranchCampaignTest(unittest.TestCase):
         self.assertEqual(sorted(self.run_all(True)), sorted([c1, merge]))
         self.assertEqual(branch.unbuildable(spec.out), {})
         self.assertTrue(ab.done(spec.cell_dir("x", c1, 1)))
+
+    def test_a_resume_keeps_its_snapshots_whatever_the_harness(self):
+        import shutil
+        spec = ab.Spec(self.spec_f)
+        self.assertEqual(len(self.run_all()), 4)
+        # as a campaign from before builds.json: its snapshots under the keys without a harness
+        keys = json.load(open(os.path.join(spec.out, branch.BUILDS)))
+        os.unlink(os.path.join(spec.out, branch.BUILDS))
+        for k in keys.values():
+            os.rename(os.path.join(spec.out, launch.BUILD_DIR, k), os.path.join(spec.out, launch.BUILD_DIR, k.split("-")[0]))
+        shutil.rmtree(os.path.join(spec.out, "x"))
+        os.environ["JAVA_HOME"], old = self.p.dir, os.environ.get("JAVA_HOME")  # and the JDK changed
+        self.addCleanup(lambda: os.environ.__setitem__("JAVA_HOME", old) if old else os.environ.pop("JAVA_HOME", None))
+        self.assertEqual(self.run_all(), [])
+        self.assertEqual(json.load(open(os.path.join(spec.out, branch.BUILDS))), {v: k.split("-")[0] for v, k in keys.items()})
+        self.assertTrue(all(ab.done(spec.cell_dir("x", c["variant"], 1)) for c in spec.branch_info["commits"]))
 
     def test_the_view_shows_a_failed_build(self):
         from perflab import branchview

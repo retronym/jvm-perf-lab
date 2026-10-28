@@ -10,11 +10,12 @@ checkout is left alone; "{checkout}" in env is that worktree. A commit's variant
 """
 import hashlib, json, os, shutil, subprocess, sys
 
-from . import config
+from . import config, launch
 
 BRANCH = "branch.json"
 WORKTREE = ".worktree"
 UNBUILDABLE = "unbuildable.json"
+BUILDS = "builds.json"  # {variant: the key of its directory in .build}
 FAILED_LOGS = ".unbuildable"  # their build.logs, <variant>.log: results, not builds, so dropping builds keeps them
 SHORT = 10
 
@@ -110,11 +111,69 @@ def cells(rounds, corpora, order):
                 yield r, corpus, v
 
 
-def build_key(commit, env, template):
+def build_key(commit, env, template, harness=None):
     """What a commit's build depends on: its tree, the build's variables and the build command (not the commit, so a
-    rebase that leaves a tree alone reuses its build)."""
-    h = hashlib.sha1(json.dumps([commit["tree"], sorted(env.items()), template]).encode()).hexdigest()
-    return h[:16]
+    rebase that leaves a tree alone reuses its build), then, after a "-", the `harness` it is built with. Without a
+    harness, the key campaigns had before builds.json (the same as the first part)."""
+    h = hashlib.sha1(json.dumps([commit["tree"], sorted(env.items()), template]).encode()).hexdigest()[:16]
+    if harness is None:
+        return h
+    return h + "-" + hashlib.sha1(json.dumps(harness, sort_keys=True).encode()).hexdigest()[:8]
+
+
+def harness_part(key):
+    return key.split("-", 1)[1] if "-" in key else None
+
+
+def harness(env):
+    """What a build depends on beyond the commit and the build command: the project (perflab.toml's directory) as
+    committed and its uncommitted changes, when it is in a git repo, and the JDK the build would find (JAVA_HOME, and
+    the `java` on PATH) in the environment it runs in, ours with `env` over it."""
+    root = config.get().root
+    h = {}
+    p = subprocess.run(["git", "-C", root, "rev-parse", "HEAD:./"], capture_output=True, text=True)
+    if p.returncode == 0:
+        h["tree"] = p.stdout.strip()
+        d = subprocess.run(["git", "-C", root, "diff", "HEAD", "--", "."], capture_output=True)
+        h["diff"] = hashlib.sha1(d.stdout).hexdigest()
+    e = {**os.environ, **env}
+    h["javaHome"] = os.path.realpath(e["JAVA_HOME"]) if e.get("JAVA_HOME") else None
+    java = shutil.which("java", path=e.get("PATH"))
+    h["java"] = os.path.realpath(java) if java else None
+    return h
+
+
+def recorded_key(out, commit, env, template, harness_):
+    """The build directory key of `commit` in the campaign `out`, and a warning or None.
+
+    A commit's key is recorded in <out>/builds.json the first time it is built, and wins while its snapshot is kept:
+    a campaign measures the builds it started with, even when the harness has changed since (the warning says so).
+    A campaign from before builds.json has its snapshots under the key without a harness, which is then recorded.
+    Otherwise, the key with the current harness."""
+    keys = _read(out, BUILDS)
+    v, new = commit["variant"], build_key(commit, env, template, harness_)
+    have = lambda k: bool(k) and launch.reusable(os.path.join(out, launch.BUILD_DIR, k))
+    key = keys.get(v)
+    if not have(key):
+        old = build_key(commit, env, template)
+        key = old if have(old) else new
+    warning = None
+    if harness_part(key) and harness_part(key) != harness_part(new):
+        warning = f"{commit['short']}'s snapshot was built with another harness (the project or JDK) than this one's; measuring it still"
+    elif key == new:
+        # (a key from before builds.json says nothing of its harness)
+        others = {harness_part(k) for x, k in keys.items() if x != v and have(k)} - {harness_part(new), None}
+        if others:
+            warning = (f"{commit['short']} is built with another harness (the project or JDK) than earlier commits of this campaign "
+                       f"({' '.join(sorted(others))} vs {harness_part(new)})")
+    return key, warning
+
+
+def record_key(out, commit, key):
+    keys = _read(out, BUILDS)
+    if keys.get(commit["variant"]) != key:
+        keys[commit["variant"]] = key
+        _write(out, BUILDS, keys)
 
 
 def _read(out, name):
