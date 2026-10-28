@@ -355,9 +355,13 @@ def run(spec, dry):
 
 
 def done(dest):
-    """A cell has a result: an interrupted one can leave an empty result.json, and is run again."""
-    res = os.path.join(dest, "result.json")
-    return os.path.exists(res) and os.path.getsize(res) > 0
+    """A cell has a result: an interrupted one can leave an empty or truncated result.json, and is run again."""
+    try:
+        with open(os.path.join(dest, "result.json")) as f:
+            r = json.load(f)
+    except (OSError, ValueError):
+        return False
+    return isinstance(r, list) and len(r) > 0
 
 
 def build_commit(spec, commit):

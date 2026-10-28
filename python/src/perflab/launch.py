@@ -52,6 +52,7 @@ def snapshot(built, dir):
     """`built` (the build's launch.json) with its build outputs copied into <dir>/snapshot."""
     roots = [os.path.realpath(r) for r in built.get("roots", [])]
     snap = os.path.join(dir, "snapshot")
+    shutil.rmtree(snap, ignore_errors=True)  # what a build interrupted while it was copied left
     copies, external = {}, []
 
     def copy(p):
@@ -104,8 +105,10 @@ def build(dir, env=None, label=None):
     if rc or not os.path.exists(built_f):
         sys.exit(f"the build step failed (exit {rc}, see {staging}/build.log)")
     launch = snapshot(read(built_f), dir)
-    with open(path, "w") as f:
+    tmp = path + ".tmp"  # whole or not at all: a launch.json is what makes its snapshot reused
+    with open(tmp, "w") as f:
         json.dump(launch, f, indent=2)
+    os.replace(tmp, path)
     transcript.say(f"[perflab] build: snapshot of {describe(launch)} in {launch['snapshot']}")
     return launch
 

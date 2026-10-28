@@ -57,8 +57,12 @@ class DoneTest(unittest.TestCase):
         self.assertFalse(ab.done(d))
         open(os.path.join(d, "result.json"), "w").close()  # interrupted
         self.assertFalse(ab.done(d))
+        for partial in ("[]", '[{"primaryMetric": {"sco'):  # no result, or a truncated one
+            with open(os.path.join(d, "result.json"), "w") as f:
+                f.write(partial)
+            self.assertFalse(ab.done(d))
         with open(os.path.join(d, "result.json"), "w") as f:
-            f.write("[]")
+            f.write('[{"primaryMetric": {"score": 1.0}}]')
         self.assertTrue(ab.done(d))
 
 
