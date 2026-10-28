@@ -1,0 +1,26 @@
+{
+  "name": "pr27357",
+  "description": [
+    "[scala/scala3#27357](https://github.com/scala/scala3/pull/27357): bring denotations forward in one loop, skipping identity transformers, vs its base.",
+    "The PR measured `goForward` at 5.3% of cycles on scalaz and 10.1% on tastyQuery. A trial of perflab's launch mode: each variant built once by a batch sbt and run from its snapshot."
+  ],
+  "variantDescriptions": {
+    "base": "main @ `a98b104` (the PR's base)",
+    "pr": "PR head `fa97662`"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M",
+  "rounds": 3,
+  "corpora": {
+    "scalaz": "-f 1 -wi 12 -i 8 -w 3 -r 3",
+    "tastyQuery": "-f 1 -wi 12 -i 8 -w 3 -r 3"
+  },
+  "builds": {
+    "base": {"checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/pr27357-base", "env": {"SCALA3_CHECKOUT": "{checkout}"}},
+    "pr": {"checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/pr27357-pr", "env": {"SCALA3_CHECKOUT": "{checkout}"}}
+  },
+  "loadgate": {"maxCores": 1.5, "quietSecs": 30},
+  "gcLog": true
+}
