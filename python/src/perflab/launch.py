@@ -82,13 +82,32 @@ def snapshot(built, dir):
     return {**built, "classpath": cp, "javaOptions": opts, "snapshot": snap, "external": external, "built": built}
 
 
-def build(dir, env=None, label=None):
+def reusable(dir):
+    """`dir` holds a snapshot, which `build` reuses."""
+    try:
+        return "snapshot" in read(os.path.join(dir, LAUNCH))
+    except (OSError, ValueError):
+        return False
+
+
+class BuildFailed(SystemExit):
+    """The build step failed, or built what `validate` refused. A SystemExit, so a caller that doesn't handle it stops
+    with its message."""
+
+    def __init__(self, reason, log):
+        super().__init__(f"{reason} (see {log})")
+        self.reason, self.log = reason, log
+
+
+def build(dir, env=None, label=None, validate=None):
     """Runs [build] launch into `dir`, with the variables `env` set, and snapshots it there; the snapshot's launch.json.
-    `label` names the build on the index while it runs.
+    `label` names the build on the index while it runs. `validate(launch.json as built)` says what is wrong with a
+    build, or None; a refused build is never snapshotted (raises BuildFailed, as a failed one does).
     An existing snapshot in `dir` is reused (a campaign that resumes measures the build it started with)."""
     from . import jmh
     path = os.path.join(dir, LAUNCH)
-    if os.path.exists(path) and "snapshot" in (launch := read(path)):
+    if reusable(dir):
+        launch = read(path)
         transcript.say(f"[perflab] build: the snapshot in {dir} ({describe(launch)})")
         return launch
     tpl = config.get().get("build", "launch")
@@ -102,9 +121,13 @@ def build(dir, env=None, label=None):
     rc = jmh.run_build(tpl.replace("{out}", staging), os.path.join(staging, "build.log"), env=env,
                       label=label or os.path.relpath(dir, config.get().campaigns))
     built_f = os.path.join(staging, LAUNCH)
+    log = os.path.join(staging, "build.log")
     if rc or not os.path.exists(built_f):
-        sys.exit(f"the build step failed (exit {rc}, see {staging}/build.log)")
-    launch = snapshot(read(built_f), dir)
+        raise BuildFailed(f"the build step failed (exit {rc})" if rc else f"the build step wrote no {LAUNCH}", log)
+    built = read(built_f)
+    if validate and (problem := validate(built)):
+        raise BuildFailed(problem, log)
+    launch = snapshot(built, dir)
     tmp = path + ".tmp"  # whole or not at all: a launch.json is what makes its snapshot reused
     with open(tmp, "w") as f:
         json.dump(launch, f, indent=2)

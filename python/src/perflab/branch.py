@@ -14,6 +14,8 @@ from . import config
 
 BRANCH = "branch.json"
 WORKTREE = ".worktree"
+UNBUILDABLE = "unbuildable.json"
+FAILED_LOGS = ".unbuildable"  # their build.logs, <variant>.log: results, not builds, so dropping builds keeps them
 SHORT = 10
 
 
@@ -113,6 +115,41 @@ def build_key(commit, env, template):
     rebase that leaves a tree alone reuses its build)."""
     h = hashlib.sha1(json.dumps([commit["tree"], sorted(env.items()), template]).encode()).hexdigest()
     return h[:16]
+
+
+def _read(out, name):
+    try:
+        with open(os.path.join(out, name)) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def _write(out, name, d):
+    path = os.path.join(out, name)
+    with open(path + ".tmp", "w") as f:
+        json.dump(d, f, indent=2)
+    os.replace(path + ".tmp", path)
+
+
+def unbuildable(out):
+    """The campaign's commits that did not build: {variant: {"reason": ..., "log": <its build.log, relative to out>}}."""
+    return _read(out, UNBUILDABLE)
+
+
+def set_unbuildable(out, variant, reason=None, log=None):
+    """Records that `variant` did not build (keeping its build.log), or, with no `reason`, that it did."""
+    u = unbuildable(out)
+    if reason is None:
+        if u.pop(variant, None) is None:
+            return
+    else:
+        kept = os.path.join(FAILED_LOGS, f"{variant}.log")
+        os.makedirs(os.path.join(out, FAILED_LOGS), exist_ok=True)
+        if log and os.path.exists(log):
+            shutil.copy(log, os.path.join(out, kept))
+        u[variant] = {"reason": reason, "log": kept}
+    _write(out, UNBUILDABLE, u)
 
 
 def checkout(out, b, commit):

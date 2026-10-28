@@ -1,9 +1,10 @@
 """Campaigns: a benchmark under one profile, over corpora and variants, run round by round with the variants
 interleaved, each run checked against the spec.
 
-  perflab ab run    <spec.json> [--dry-run] [--local]
+  perflab ab run    <spec.json> [--dry-run] [--local] [--retry-unbuildable]
                                               runs every missing cell; resumable. On `perflab server`'s queue while
-                                              one runs (--local: here)
+                                              one runs (--local: here). --retry-unbuildable: a branch's commits that
+                                              did not build are built again (else their cells are skipped)
   perflab ab report <spec.json> [--per-op]    markdown summary, per "perUnit" if the spec has one (--per-op: per op);
                                               for async profiles, an index of flame graphs
 
@@ -38,7 +39,9 @@ A spec:
 
 A branch campaign ("branch", perflab.branch) has its commits as variants. Its profiles are a campaign of their own,
 "profileOf" it (written by `perflab branch profile`, perflab.branchprofile), whose variants are the commits profiled so
-far and whose builds are the branch campaign's.
+far and whose builds are the branch campaign's. A commit that does not build is recorded in <campaign>/unbuildable.json
+and its cells are skipped, by this run and later ones; the campaign goes on with the other commits. A run with
+--retry-unbuildable builds them again.
 
 Cells run round by round, corpus by corpus, variants interleaved within each, so drift hits every variant alike. Each
 run is checked: fresh results, the JVM, every JVM argument of the spec (JMH's -jvmArgsAppend replaces the benchmark's
@@ -256,7 +259,7 @@ def check_samples(spec, dest):
     return None
 
 
-def run(spec, dry):
+def run(spec, dry, retry_unbuildable=False):
     if spec.historical:
         sys.exit(f"{spec.name} is historical, kept for its results; not running it: {spec.historical}")
     cells = list(spec.cells())
@@ -293,13 +296,25 @@ def run(spec, dry):
                 log(f"build of {v}: {b['checkout'] or ''}")
                 built[v] = launch.build(os.path.join(spec.out, launch.BUILD_DIR, v), env,
                                         label=f"{spec.name}: {v} ({b['checkout'] or ''})")
+    # a branch's commits that did not build: their cells are skipped (until a run with --retry-unbuildable)
+    unbuildable = branch.unbuildable(spec.build_out) if spec.branch_info and not retry_unbuildable else {}
+    skipped = {}
     for r, corpus, iters, variant, flags in todo:
         dest = spec.cell_dir(corpus, variant, r)
+        if variant in unbuildable:
+            if variant not in skipped:
+                skipped[variant] = unbuildable[variant]["reason"]
+                log(f"{variant}: its cells are skipped, it did not build ({skipped[variant]})")
+            continue
         if os.environ.get("PERFLAB_CONTROL") and not dry:  # under perflab server: pause or cancel between cells
             from . import control
             control.checkpoint()
         if spec.branch_info and variant not in built and not dry:
             built[variant] = build_commit(spec, spec.builds[variant]["commit"])
+            if built[variant] is None:
+                unbuildable[variant] = branch.unbuildable(spec.build_out)[variant]
+                skipped[variant] = unbuildable[variant]["reason"]
+                continue
         cmd = spec.command(corpus, iters, variant, flags, dest, built.get(variant))
         if not dry:
             specs.tag(dest, version)
@@ -352,6 +367,10 @@ def run(spec, dry):
         s = summary(json.load(open(os.path.join(dest, "result.json")))[0])
         log(f"  {s['ms']:.1f} ± {s['err']:.1f} {s['unit']}" + (f", {s['cyc'] / 1e9:.2f}G cycles/op" if s.get("cyc") else "")
             + (f", other load {load:.2f} cores" if spec.loadgate else ""))
+    if skipped:
+        log(f"{spec.name}: {len(skipped)} commit{'s' if len(skipped) > 1 else ''} did not build, {'their' if len(skipped) > 1 else 'its'} cells skipped: "
+            + ", ".join(f"{v} ({why})" for v, why in skipped.items())
+            + f"; build logs in {os.path.join(spec.build_out, branch.FAILED_LOGS)}; `perflab ab run <spec> --retry-unbuildable` tries again")
 
 
 def done(dest):
@@ -367,23 +386,41 @@ def done(dest):
 def build_commit(spec, commit):
     """A branch commit's launch-mode build, in <campaign>/.build/<key>: checked out into the campaign's worktree and
     built there, unless a build with the same key (tree, variables, build command) is already kept. A profile campaign
-    has its branch campaign's builds and worktree (`build_out`)."""
+    has its branch campaign's builds and worktree (`build_out`).
+    None when the commit does not build (or builds something else than its tree, or a dirty one): it is recorded in
+    <campaign>/unbuildable.json, with its build.log, and nothing of it is kept in .build."""
     tpl = branch.template()
     probe = branch.env_for(spec.branch, os.path.join(spec.build_out, branch.WORKTREE))
     dir = os.path.join(spec.build_out, launch.BUILD_DIR, branch.build_key(commit, probe, tpl))
-    if not os.path.exists(os.path.join(dir, launch.LAUNCH)):
+
+    def validate(built):  # the build says what it built (launch.json's "build"): the commit's tree, clean
+        b = built.get("build") or {}
+        if b.get("dirty"):
+            return "the build was of a dirty checkout"
+        if b.get("commit"):
+            p = subprocess.run(["git", "-C", spec.branch["checkout"], "rev-parse", f"{b['commit']}^{{tree}}"],
+                               capture_output=True, text=True)
+            if p.returncode or p.stdout.strip() != commit["tree"]:
+                return f"built {b['commit'][:10]}, whose tree is not {commit['short']}'s"
+        return None
+    reuse = launch.reusable(dir)
+    if reuse and (problem := validate(launch.read(os.path.join(dir, launch.LAUNCH)))):
+        log(f"  the snapshot in {dir} is not {commit['short']}'s ({problem}); building it again")
+        shutil.rmtree(dir, ignore_errors=True)
+        reuse = False
+    wt = None
+    if not reuse:
         wt = branch.checkout(spec.build_out, spec.branch_info, commit)
         log(f"build of {commit['short']} {commit['subject'][:60]}")
-    else:
-        wt = None
-    built = launch.build(dir, branch.env_for(spec.branch, wt) if wt else probe,
-                         label=f"{spec.name}: {commit['short']} {commit['subject'][:60]}")
-    # the build says what it built (launch.json's "build"): the commit's tree, clean
-    b = built.get("build") or {}
-    if b.get("dirty"):
-        sys.exit(f"{dir}: the build of {commit['short']} was of a dirty checkout")
-    if b.get("commit") and branch.git(spec.branch["checkout"], "rev-parse", f"{b['commit']}^{{tree}}").strip() != commit["tree"]:
-        sys.exit(f"{dir}: built {b['commit'][:10]}, whose tree is not {commit['short']}'s")
+    try:
+        built = launch.build(dir, branch.env_for(spec.branch, wt) if wt else probe,
+                             label=f"{spec.name}: {commit['short']} {commit['subject'][:60]}", validate=validate)
+    except launch.BuildFailed as e:
+        branch.set_unbuildable(spec.build_out, commit["variant"], e.reason, e.log)
+        shutil.rmtree(dir, ignore_errors=True)  # never a snapshot to reuse: a resume (with --retry-unbuildable) builds it again
+        log(f"  {commit['short']} did not build: {e.reason} (see {os.path.join(spec.build_out, branch.FAILED_LOGS, commit['variant'] + '.log')})")
+        return None
+    branch.set_unbuildable(spec.build_out, commit["variant"])
     return built
 
 
@@ -579,7 +616,7 @@ def main(argv):
         sys.exit(__doc__)
     spec = Spec(argv[1])
     if argv[0] == "run":
-        run(spec, "--dry-run" in argv)
+        run(spec, "--dry-run" in argv, retry_unbuildable="--retry-unbuildable" in argv)
     else:
         report(spec, "--per-op" in argv)
     return 0

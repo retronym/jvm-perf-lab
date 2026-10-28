@@ -151,5 +151,65 @@ class BranchCampaignTest(unittest.TestCase):
             b = launch.read(os.path.join(spec.out, launch.BUILD_DIR, key, launch.LAUNCH))
             self.assertEqual(open(os.path.join(b["classpath"][0], "A.class")).read(), commits[v]["sha"])
 
+    def run_all(self, *flags):
+        """Runs the campaign with every cell succeeding; the commits it built."""
+        built = []
+        orig = jmh.run_build
+
+        def stub(cmd, log, *a, **k):
+            if "build.py" in cmd:
+                built.append(git(k["env"]["CO"], "rev-parse", "HEAD")[:branch.SHORT])
+                return orig(cmd, log, *a, **k)
+            json.dump([{"primaryMetric": {"score": 1.0, "scoreError": 0.1, "scoreUnit": "ms/op"}, "secondaryMetrics": {}}],
+                      open(os.path.join(os.path.dirname(log), "result.json"), "w"))
+            return 0
+        jmh.run_build, check = stub, ab.check
+        ab.check = lambda *a, **k: None
+        try:
+            ab.run(ab.Spec(self.spec_f), False, *flags)
+        finally:
+            jmh.run_build, ab.check = orig, check
+        return built
+
+    def test_a_commit_that_does_not_build_is_skipped_and_recorded(self):
+        # c1's build fails; the merge's builds a dirty checkout
+        with open(os.path.join(self.p.dir, "build.py")) as f:
+            good = f.read()
+        with open(os.path.join(self.p.dir, "build.py"), "w") as f:
+            f.write("import os, sys\nco = os.environ['CO']\n"
+                    "if os.path.exists(co + '/c1') and not os.path.exists(co + '/f1'): print('no'); sys.exit(1)\n"
+                    + good.replace("'dirty': False", "'dirty': os.path.exists(co + '/f1') and not os.path.exists(co + '/c3')"))
+        spec = ab.Spec(self.spec_f)
+        commits = spec.branch_info["commits"]
+        c1, merge = commits[1]["variant"], commits[2]["variant"]
+        self.assertEqual(sorted(self.run_all()), sorted(c["variant"] for c in commits))
+        u = branch.unbuildable(spec.out)
+        self.assertEqual(sorted(u), sorted([c1, merge]))
+        self.assertIn("exit 1", u[c1]["reason"])
+        self.assertIn("dirty", u[merge]["reason"])
+        self.assertIn("no", open(os.path.join(spec.out, u[c1]["log"])).read())
+        for v in (c1, merge):  # no cells, and nothing kept in .build
+            self.assertFalse(os.path.exists(os.path.join(spec.out, "x", v)))
+        self.assertEqual(len(os.listdir(os.path.join(spec.out, launch.BUILD_DIR))), 2)
+        for v in (commits[0]["variant"], commits[3]["variant"]):
+            self.assertTrue(ab.done(spec.cell_dir("y", v, 1)))
+        # a resume doesn't try them again; --retry-unbuildable does, and a commit that builds now leaves the list
+        self.assertEqual(self.run_all(), [])
+        with open(os.path.join(self.p.dir, "build.py"), "w") as f:
+            f.write(good)
+        self.assertEqual(sorted(self.run_all(True)), sorted([c1, merge]))
+        self.assertEqual(branch.unbuildable(spec.out), {})
+        self.assertTrue(ab.done(spec.cell_dir("x", c1, 1)))
+
+    def test_the_view_shows_a_failed_build(self):
+        from perflab import branchview
+        spec = ab.Spec(self.spec_f)
+        branch.save(spec.out, spec.branch_info)
+        log = os.path.join(tempfile.mkdtemp(), "build.log")
+        open(log, "w").write("boom")
+        v = spec.branch_info["commits"][1]["variant"]
+        branch.set_unbuildable(spec.out, v, "the build step failed (exit 1)", log)
+        u = branchview.branch_view(spec.out, os.path.dirname(spec.out))["unbuildable"]
+        self.assertEqual(u, {v: {"reason": "the build step failed (exit 1)", "log": f"br/.unbuildable/{v}.log"}})
 if __name__ == "__main__":
     unittest.main()

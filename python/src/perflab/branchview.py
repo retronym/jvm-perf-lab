@@ -91,7 +91,7 @@ def branch_view(campaign_dir, rel_to=None):
                                   "s": {k: [mean shown, CI shown]}, "raw": {k: [[x, ...] per fork, of every round]},
                                   "d": {k: [Δ%, half-width of its CI, verdict, a side pooled]},
                                   "prev": variant of the previous measured commit}}},
-     "diffs": [{name, href}]}
+     "diffs": [{name, href}], "unbuildable": {variant: {reason, log (href of its build.log)}}}
 
     `rel_to` is the directory the page's links are relative to (default `campaign_dir`)."""
     bf = os.path.join(campaign_dir, BRANCH_NAME)
@@ -186,7 +186,18 @@ def branch_view(campaign_dir, rel_to=None):
                         for i, (c, v) in reversed(list(enumerate(zip(commits, variants))))],
             "corpora": corpora, "metrics": [{"k": k, "h": label, "kind": kind} for k, label, kind, _ in cols.values()],
             "cells": cells, "diffs": diffs, "range": branch.get("range", ""), "perUnit": per_unit,
+            "unbuildable": unbuildable(campaign_dir, rel_to),
             "profile": profiles(campaign_dir, variants, rel_to)}
+
+
+def unbuildable(campaign_dir, rel_to):
+    """{variant: {"reason": ..., "log": href of its build.log}} of the commits that did not build (unbuildable.json)."""
+    try:
+        u = json.load(open(os.path.join(campaign_dir, "unbuildable.json")))
+    except (OSError, ValueError):
+        return {}
+    return {v: {"reason": x.get("reason", ""), "log": os.path.relpath(os.path.join(campaign_dir, x.get("log", "")), rel_to)}
+            for v, x in u.items()}
 
 
 PROFILE_SUFFIX = ".profile"  # the profile campaign beside a branch campaign (perflab.branchprofile)
@@ -316,6 +327,7 @@ table.bh-t tr.bh-sub td{padding-top:0;border-bottom:1px solid var(--line2)} tabl
 .bh-sub ul{margin:0;padding:0 0 0 26px;list-style:none;font-size:12px} .bh-sub li{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px}
 .bh-v{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end} .bh-v .pm{white-space:nowrap}
 .bh-pend{color:var(--muted);font-size:11.5px}
+.bh-fail{color:var(--bad);font-size:11.5px}
 svg.bh-dot{display:block;overflow:visible} svg.bh-dot .bl{stroke:var(--line)} svg.bh-dot .wh{stroke:var(--muted);stroke-width:1.2}
 svg.bh-dot .wh.pl{opacity:.45;stroke-dasharray:2 1.5} svg.bh-dot circle{fill:var(--fg)} svg.bh-dot circle.better{fill:var(--ok)} svg.bh-dot circle.worse{fill:var(--bad)}
 .bh-chart figure{margin:4px 0 8px} .bh-leg{display:flex;flex-wrap:wrap;gap:2px 14px;font-size:12px;color:var(--muted);margin:0 0 2px}
@@ -463,7 +475,8 @@ const BH = (() => {
   }
   function value(d, st, c, v, k, exts) {
     const x = cellOf(d, c, v);
-    if (!x) return '<span class="bh-pend">pending</span>';
+    const u = (d.unbuildable || {})[v];
+    if (!x) return u ? `<a class="bh-fail" href="${esc(u.log)}" title="${esc(u.reason)}">build failed</a>` : '<span class="bh-pend">pending</span>';
     if (x.state === 'running') return '<span class="badge running">running</span>';
     const m = x.m[k], s = x.s[k];
     if (!m) return '';
