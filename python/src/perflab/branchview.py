@@ -187,8 +187,8 @@ def profiles(campaign_dir, variants, rel_to):
 
     A diff is one `perflab branch diff` wrote (its pair.json names the commits and the corpus), so the view matches it
     to a pair of rows exactly."""
-    from . import compare
-    pdir = os.path.normpath(campaign_dir) + PROFILE_SUFFIX
+    from . import compare, regraph
+    pdir =os.path.normpath(campaign_dir) + PROFILE_SUFFIX
     if not os.path.isdir(pdir):
         return None
     try:
@@ -222,8 +222,10 @@ def profiles(campaign_dir, variants, rel_to):
             continue
         if not os.path.exists(os.path.join(d, "compare.html")):
             continue
-        events = sorted(os.path.basename(f)[len("diff-"):-len(".html")] for f in glob.glob(os.path.join(d, "diff-*.html"))
-                        if not f.endswith("-inverse.html"))
+        # in the profile's order of events (cpu before alloc), then any others
+        order = [label.removeprefix("hw-") for label, _ in regraph.events_of(spec.get("profile") or "", bool(spec.get("kperf")))]
+        events = sorted((os.path.basename(f)[len("diff-"):-len(".html")] for f in glob.glob(os.path.join(d, "diff-*.html"))
+                         if not f.endswith("-inverse.html")), key=lambda e: (order.index(e) if e in order else len(order), e))
         diffs.append({"a": pair.get("a"), "b": pair.get("b"), "corpus": pair.get("corpus"),
                       "href": os.path.relpath(os.path.join(d, "compare.html"), rel_to),
                       "events": [{"ev": ev, "slots": [[view, os.path.relpath(os.path.join(d, name.format(event=ev)), rel_to)]
