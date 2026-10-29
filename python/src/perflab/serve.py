@@ -117,7 +117,7 @@ def on_server(root):
         p = server.api("POST", "/api/projects", {"root": config.get().root}, url)
     except Exception:  # an older server, or one that went away: serve it here
         return None
-    return url.rstrip("/") + p["index"]
+    return server.public_url(url).rstrip("/") + p["index"]
 
 
 def stop(root=None):

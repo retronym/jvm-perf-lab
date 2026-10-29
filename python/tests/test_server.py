@@ -352,6 +352,33 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.call("POST", "/api/storage/cleanup", {"action": "nuke"})[0], 400)
 
 
+class PublicUrlTest(unittest.TestCase):
+    def setUp(self):
+        self.state = tempfile.mkdtemp()
+        self.env = {k: os.environ.get(k) for k in ("PORTLESS_STATE_DIR", server.PUBLIC_ENV)}
+        os.environ["PORTLESS_STATE_DIR"] = self.state
+        os.environ.pop(server.PUBLIC_ENV, None)
+
+    def tearDown(self):
+        for k, v in self.env.items():
+            os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
+
+    def test_a_portless_alias_of_the_port_names_the_server(self):
+        url = "http://127.0.0.1:8690/"
+        self.assertEqual(server.public_url(url), url)  # no portless
+        json.dump([{"hostname": "other.localhost", "port": 3000}, {"hostname": "perflab.localhost", "port": 8690}],
+                  open(os.path.join(self.state, "routes.json"), "w"))
+        open(os.path.join(self.state, "proxy.tls"), "w").write("1")
+        open(os.path.join(self.state, "proxy.port"), "w").write("443")
+        self.assertEqual(server.public_url(url), "https://perflab.localhost/")
+        self.assertEqual(server.public_url("http://127.0.0.1:8691/"), "http://127.0.0.1:8691/")  # another server
+        open(os.path.join(self.state, "proxy.tls"), "w").write("0")
+        open(os.path.join(self.state, "proxy.port"), "w").write("1355")
+        self.assertEqual(server.public_url(url), "http://perflab.localhost:1355/")
+        os.environ[server.PUBLIC_ENV] = "https://lab.example.test"
+        self.assertEqual(server.public_url(url), "https://lab.example.test/")
+
+
 class TailTest(unittest.TestCase):
     def test_tail_reads_back_from_the_end(self):
         f = os.path.join(tempfile.mkdtemp(), "t.txt")

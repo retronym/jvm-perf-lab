@@ -1673,7 +1673,8 @@ CONVENTIONS = {
                "~/.perflab/server/token), from the server's own origin only.",
     "project": "Every function on a project takes `project`: a project id (see projects) or its root directory; over HTTP "
                "only registered projects, and omitted only when there is one.",
-    "urls": "Fields named url are paths on the server (http://127.0.0.1:8690 by default): the index, timelines, flame graphs.",
+    "urls": "Fields named url are paths on the server (http://127.0.0.1:8690 by default, or the name a local proxy gives it, "
+            "such as https://perflab.localhost): the index, timelines, flame graphs.",
     "units": "A metric's unit is in its label (MetricInfo.label): the score in the benchmark's unit (e.g. ms/op), alloc in "
              "bytes per op, counts in events per op (per unit of perUnit when the spec has one), ratios and percents as such.",
     "statistics": "The unit of variation is the fork: a variant's mean, sd and 99.9% CI are over its forks' means; Δ is by "
@@ -1717,6 +1718,8 @@ def schema_of(name, examples=True):
 
 def openapi():
     """The OpenAPI 3.1 document of /api/v1, from SCHEMAS and FUNCTIONS."""
+    local = "http://127.0.0.1:8690/"
+    pub = srv.public_url(local)
     comp = json.loads(json.dumps(SCHEMAS).replace('"#/$defs/', '"#/components/schemas/'))
     paths = {"/api/v1": {"get": {"operationId": "index", "summary": "This API's index: every function, its parameters and result",
                                  "responses": {"200": _resp("ApiIndex")}}},
@@ -1741,7 +1744,8 @@ def openapi():
     return {"openapi": "3.1.0",
             "info": {"title": "perflab API", "version": str(API_VERSION),
                      "description": (__doc__ or "").split("\n\n")[0] + "\n\n" + "\n\n".join(f"**{k}**: {v}" for k, v in CONVENTIONS.items())},
-            "servers": [{"url": "http://127.0.0.1:8690", "description": "perflab server (its default port)"}],
+            "servers": ([{"url": pub.rstrip("/"), "description": "perflab server, behind a local proxy"}] if pub != local else [])
+                       + [{"url": local.rstrip("/"), "description": "perflab server (its default port)"}],
             "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
             "paths": paths,
             "components": {"schemas": comp,

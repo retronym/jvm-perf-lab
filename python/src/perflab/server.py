@@ -55,6 +55,7 @@ from . import config, control, httpd, storage, transcript
 
 DEFAULT_PORT = 8690
 HOME_ENV, PORT_ENV, GRACE_ENV = "PERFLAB_SERVER_HOME", "PERFLAB_SERVER_PORT", "PERFLAB_SERVER_GRACE"
+PUBLIC_ENV = "PERFLAB_SERVER_URL"  # the URL people are shown for the server (public_url)
 JOB_ENV = "PERFLAB_JOB"
 LOCAL_ENV = "PERFLAB_LOCAL"  # set by a command run in the foreground, so that the perflab commands it runs are too
 STATES = ("queued", "running", "paused", "done", "failed", "cancelled")
@@ -859,7 +860,7 @@ def submit_local(server, body, python=None, module=None):
 
 def status(server):
     jobs = server.q.jobs(include_final=False)
-    return {"pid": os.getpid(), "url": server.url, "home": server.home, "port": server.port,
+    return {"pid": os.getpid(), "url": server.url, "publicUrl": public_url(server.url), "home": server.home, "port": server.port,
             "running": next((public(j) for j in jobs if j["state"] in ACTIVE), None),
             "queued": sum(j["state"] == "queued" for j in jobs)}
 
@@ -913,6 +914,35 @@ def _read_json(path):
 
 
 # ---- the client: what the CLI (and later `perflab ab run`) calls
+
+def public_url(url):
+    """The URL to show people for the server at `url` (http://127.0.0.1:<port>/, which perflab itself talks to):
+    PERFLAB_SERVER_URL, else the name a portless alias gives its port (`portless alias perflab 8690`:
+    https://perflab.localhost/), else `url`. The server accepts the .localhost names such a proxy forwards (local_host)."""
+    env = os.environ.get(PUBLIC_ENV)
+    if env:
+        return env.rstrip("/") + "/"
+    if not url:
+        return url
+    port = urllib.parse.urlsplit(url).port
+    state = os.path.expanduser(os.environ.get("PORTLESS_STATE_DIR") or "~/.portless")
+    routes = _read_json(os.path.join(state, "routes.json"))
+    host = next((r.get("hostname") for r in routes or () if isinstance(r, dict) and r.get("port") == port), None)
+    if not host:
+        return url
+    tls = (_read_text(os.path.join(state, "proxy.tls")) or "1").strip() != "0"
+    pport = (_read_text(os.path.join(state, "proxy.port")) or "").strip()
+    scheme, default = ("https", "443") if tls else ("http", "80")
+    return f"{scheme}://{host}" + (f":{pport}" if pport and pport != default else "") + "/"
+
+
+def _read_text(path):
+    try:
+        with open(path) as f:
+            return f.read()
+    except OSError:
+        return None
+
 
 def running():
     """The server's URL if one is running for this user, else None."""
@@ -1003,9 +1033,10 @@ def submit(argv, cwd=None, env=None, priority=0, start=True):
         raise ConnectionError("no perflab server is running")
     j = api("POST", "/api/jobs", {"argv": list(argv), "cwd": os.path.abspath(cwd or os.getcwd()),
                                   "env": job_env() if env is None else env, "priority": priority}, url)
-    j["url"] = f"{url}#job-{j['id']}"
+    shown = public_url(url)
+    j["url"] = f"{shown}#job-{j['id']}"
     if j.get("index"):
-        j["indexUrl"] = url.rstrip("/") + j["index"]
+        j["indexUrl"] = shown.rstrip("/") + j["index"]
     return j
 
 
@@ -1094,7 +1125,7 @@ def main(argv):
         root = config.get().root
         if os.path.exists(os.path.join(root, "perflab.toml")):
             api("POST", "/api/projects", {"root": root}, url)
-        print(url)
+        print(public_url(url))
         return 0
     st = _read_json(os.path.join(home(), "server.json"))
     url = running()
@@ -1115,7 +1146,7 @@ def main(argv):
     if not url:
         print("not running")
         return 1
-    print(url)
+    print(public_url(url))
     print_jobs(api("GET", "/api/jobs?all=0", url=url))
     return 0
 
