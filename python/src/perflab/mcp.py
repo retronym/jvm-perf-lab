@@ -25,7 +25,8 @@ INSTRUCTIONS = (
     "`branch` and `changes` (the commits that moved a metric significantly). `cell` has a run's raw samples, iterations, "
     "load, GC and logs; `compare` any two variants or commits; `profiles` and `diff` flame graphs and the methods whose "
     "time changed. A disturbed cell can be voided (`void`, with a reason) and run again (`rerun`): actions need "
-    "`perflab server`. Lower counts as better for every metric. URLs are paths on the server, http://127.0.0.1:8690.")
+    "`perflab server`. Lower counts as better for every metric. URLs are paths on the server: http://127.0.0.1:8690, or the name a local proxy "
+    "gives it (https://perflab.localhost with `portless alias perflab 8690`).")
 RESOURCES = {"perflab://api/conventions": ("conventions", "How responses, errors, units and statistics work", lambda: api.CONVENTIONS),
              "perflab://api/openapi.json": ("openapi", "The HTTP API's OpenAPI 3.1 document (the same functions and schemas)", api.openapi)}
 
