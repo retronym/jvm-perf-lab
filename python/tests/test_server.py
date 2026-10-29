@@ -257,6 +257,12 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.call("POST", "/api/jobs", {}, {"X-Perflab-Token": "nope"})[0], 403)
         self.assertEqual(self.call("POST", "/api/jobs", {}, {"Origin": "http://evil.example"})[0], 403)
         self.assertEqual(self.call("GET", "/api/jobs", None, {"Host": "evil.example"})[0], 403)  # DNS rebinding
+        # behind a local proxy (portless): a .localhost name, and its https origin
+        self.assertEqual(self.call("GET", "/api/jobs", None, {"Host": "perflab.localhost"})[0], 200)
+        self.assertEqual(self.call("POST", "/api/jobs", {"argv": [], "cwd": self.root},
+                                   {"Host": "perflab.localhost", "Origin": "https://perflab.localhost"})[0], 400)
+        self.assertEqual(self.call("POST", "/api/jobs", {}, {"Host": "perflab.localhost", "Origin": "https://evil.example"})[0], 403)
+        self.assertEqual(self.call("GET", "/api/jobs", None, {"Host": "localhost.evil.example"})[0], 403)
         self.assertEqual(self.call("POST", "/api/jobs", {"argv": [], "cwd": self.root})[0], 400)
         self.assertEqual(self.call("GET", "/api/status")[1]["port"], self.srv.port)
         code, page = self.call("GET", "/")

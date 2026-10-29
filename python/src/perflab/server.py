@@ -635,11 +635,14 @@ class Server:
             # the boundary: 127.0.0.1 only (the bind), our own Host (DNS rebinding), and for POST our own Origin and the token
 
             def _host_ok(self):
-                return self.headers.get("Host") in (f"127.0.0.1:{server.port}", f"localhost:{server.port}")
+                return local_host(self.headers.get("Host"), server.port)
 
             def _origin_ok(self):
                 o = self.headers.get("Origin")
-                return o is None or o in (f"http://127.0.0.1:{server.port}", f"http://localhost:{server.port}")
+                if o is None:
+                    return True
+                scheme, _, host = o.partition("://")
+                return scheme in ("http", "https") and local_host(host, server.port)
 
             def _send(self, code, body, ctype="application/json; charset=utf-8", headers=()):
                 data = (json.dumps(body) if ctype.startswith("application/json") else body).encode()
@@ -859,6 +862,18 @@ def status(server):
     return {"pid": os.getpid(), "url": server.url, "home": server.home, "port": server.port,
             "running": next((public(j) for j in jobs if j["state"] in ACTIVE), None),
             "queued": sum(j["state"] == "queued" for j in jobs)}
+
+
+def local_host(host, port):
+    """Whether `host` (a Host header, or an Origin's host) names this server on this machine: 127.0.0.1 or localhost
+    on its port, or a name under .localhost (RFC 6761: loopback only, so no DNS rebinding) on any port or none, as a
+    local proxy such as portless (`portless alias perflab 8690`: https://perflab.localhost) forwards it."""
+    if not host:
+        return False
+    if host in (f"127.0.0.1:{port}", f"localhost:{port}"):
+        return True
+    name = (host.rsplit(":", 1)[0] if host.count(":") == 1 else host).lower()
+    return name.endswith(".localhost") and re.fullmatch(r"[a-z0-9.-]+", name) is not None
 
 
 def single_instance(home_dir):
