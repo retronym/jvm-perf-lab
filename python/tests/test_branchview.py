@@ -137,7 +137,7 @@ class BranchViewTest(unittest.TestCase):
         self.assertEqual(len(c0["raw"]["alloc"]), 4)
         self.assertEqual(c0["s"]["score"][0], "10.15")
         b = branchview.branch_view(self.camp)["cells"]["b"]
-        self.assertEqual(b[self.v[2]], {"state": "running"})
+        self.assertEqual(b[self.v[2]], {"state": "running", "rd": [{"round": 1, "state": "running", "links": {}}]})
 
     def test_one_fork_takes_the_pooled_spread(self):
         a = branchview.branch_view(self.camp)["cells"]["a"]
@@ -205,6 +205,210 @@ def page_deltas(t, cells):
             t.assertAlmostEqual(jhalf, half, msg=key)
         t.assertEqual((jverdict, jpooled), (verdict, pooled), key)
     return out
+
+
+def iterations(cell, forks, t0=1_000_000):
+    """An iterations.tsv for a cell of `forks` forks, each a warmup then its measurement iterations (as many as
+    rawData's), every iteration 1 s, the index running on over the forks as JMH's do; [(index, start, end)] of the
+    measurement iterations."""
+    rows, out, i, t = ["index\tkind\tvariant\tstart_ms\tend_ms\tscore\tops\tgc_ms\tpid\tunit\talloc_bytes"], [], 0, t0 * 1000
+    for f, n in enumerate(forks):
+        for kind in ["warmup"] + ["measure"] * n:
+            rows.append(f"{i}\t{kind}\t\t{t}\t{t + 1000}\t1.0\t1\t\t{100 + f}\tms/op\t")
+            if kind == "measure":
+                out.append((i, t / 1000, t / 1000 + 1))
+            i, t = i + 1, t + 1000
+    open(os.path.join(cell, "iterations.tsv"), "w").write("\n".join(rows) + "\n")
+    return out
+
+
+class WithinForkTest(unittest.TestCase):
+    """Each fork's 99.9% CI over its own iterations, and how it compares with the spread between forks."""
+    def setUp(self):
+        Project()
+        self.camp = fixture(config.get().campaigns)
+        self.v = [s[:10] for s in SHAS]
+        self.d = branchview.branch_view(self.camp)
+
+    def test_within_by_hand(self):
+        # x, x + .1, x - .1: sd .1 over 3 iterations, t999(2) = 31.599
+        h, se = branchview.within([10.0, 10.1, 9.9])
+        self.assertAlmostEqual(se, 0.1 / 3 ** 0.5)
+        self.assertAlmostEqual(h, 31.599 * 0.1 / 3 ** 0.5)
+        self.assertEqual(branchview.within([1.0]), (None, None))
+
+    def test_one_fork_and_nothing_pooled_has_its_within_ci(self):
+        b0 = self.d["cells"]["b"][self.v[0]]
+        self.assertIsNone(b0["m"]["score"][2])  # no interval over forks
+        ciw, ratio, shown = b0["w"]["score"]
+        self.assertAlmostEqual(ciw, 31.599 * 0.1 / 3 ** 0.5)  # 1.824
+        self.assertIsNone(ratio)  # nothing between forks to compare with
+        self.assertEqual(shown, "2")  # to the score's decimals, as its mean "5" is shown
+        self.assertEqual(b0["wf"]["score"], [1.82])
+        # and it never colours a Δ: commit 1's against it stays uncoloured
+        self.assertEqual(self.d["cells"]["b"][self.v[1]]["d"]["score"][1:3], [None, "flat"])
+
+    def test_between_within_ratio(self):
+        c0 = self.d["cells"]["a"][self.v[0]]
+        # forks' means 10.0, 10.2, 10.1, 10.3 (sd √(.05/3)); every fork's iterations have sd .1 over 3: se .1/√3
+        ciw, ratio, _ = c0["w"]["score"]
+        self.assertAlmostEqual(ratio, (0.05 / 3) ** 0.5 / (0.1 / 3 ** 0.5))  # √.05/.1 = 2.236
+        self.assertAlmostEqual(ciw, 31.599 * 0.1 / 3 ** 0.5)  # every fork's the same: their root mean square
+        self.assertEqual(len(c0["wf"]["score"]), 4)
+        # one fork, with the pooled sd: the ratio is against the pooled spread
+        a1 = self.d["cells"]["a"][self.v[1]]
+        self.assertAlmostEqual(a1["w"]["score"][1], a1["m"]["score"][1] / (0.1 / 3 ** 0.5))
+
+    def test_rounds_list_their_forks(self):
+        rd = self.d["cells"]["a"][self.v[0]]["rd"]
+        self.assertEqual([(r["round"], r["state"]) for r in rd], [(1, "done"), (2, "done")])
+        self.assertEqual([f["mean"] for f in rd[0]["forks"]], [10.0, 10.2])
+        self.assertEqual(rd[0]["forks"][0], {"mean": 10.0, "ci": 1.82, "n": 3})
+
+
+class LoadTest(unittest.TestCase):
+    """Competing load per measurement iteration: from load.json, else from load.tsv; on the chart's dots and the cells."""
+    def setUp(self):
+        Project()
+        self.camp = fixture(config.get().campaigns)
+        self.v = [s[:10] for s in SHAS]
+
+    def cell(self, i, rnd, corpus="a"):
+        return os.path.join(self.camp, corpus, self.v[i], str(rnd))
+
+    def test_the_constants_are_abs(self):
+        from perflab import ab
+        self.assertEqual(branchview.LOAD_CHECK, ab.LOAD_CHECK)
+
+    def test_load_json(self):
+        cell = self.cell(0, 1)
+        its = iterations(cell, [3, 3])  # indices 1-3 (fork 1) and 5-7 (fork 2)
+        json.dump({"maxCores": 1.5, "iterations": [{"index": i, "start": a, "end": b, "score": 1.0, "cores": 2.4 if i == 6 else 0.3,
+                                                    "top": "java 2.2" if i == 6 else ""} for i, a, b in its],
+                   "disturbed": [6]}, open(os.path.join(cell, "load.json"), "w"))
+        x = branchview.branch_view(self.camp)["cells"]["a"][self.v[0]]
+        r1 = x["rd"][0]
+        self.assertEqual(r1["disturbed"], [{"i": 6, "fork": 2, "j": 2, "cores": 2.4, "top": "java 2.2"}])
+        self.assertEqual((r1["load"], r1["maxCores"]), (2.4, 1.5))
+        self.assertEqual(x["hot"], [[1, 1]])  # round 1's second fork, its second iteration
+        self.assertNotIn("disturbed", x["rd"][1])
+        self.assertNotIn("load", x["rd"][1])
+
+    def test_load_tsv_of_an_older_cell(self):
+        # round 2 of commit 4: its forks are the third and fourth of the commit's raw
+        cell = self.cell(4, 2)
+        its = iterations(cell, [3, 3])
+        end = its[2][2]  # the last iteration of the first fork, index 3
+        # samples of 5 s without the window column (as before it), and one of 2 s with it; the spec has no maxCores: 1.5
+        open(os.path.join(cell, "load.tsv"), "w").write(f"{its[0][2]:.1f}\t0.40\tWindowServer 0.2\n{end:.1f}\t1.90\tjava 1.7, Python 0.1\n"
+                                                         f"{its[5][2]:.1f}\t0.20\tx 0.1\t2\n")
+        mc, rows, dist = branchview.cell_load(cell, 1.5)
+        self.assertEqual(mc, 1.5)
+        # the 5 s sample ending with index 3 covers 1-3 (and the warmup); the 2 s one the last iteration only
+        self.assertEqual([r["index"] for r in rows], [1, 2, 3, 5, 6, 7])
+        self.assertEqual(dist, [1, 2, 3])
+        x = branchview.branch_view(self.camp)["cells"]["a"][self.v[4]]
+        r2 = x["rd"][1]
+        self.assertEqual([(z["i"], z["fork"], z["j"], z["cores"]) for z in r2["disturbed"]], [(1, 1, 1, 1.9), (2, 1, 2, 1.9), (3, 1, 3, 1.9)])
+        self.assertEqual(r2["disturbed"][0]["top"], "java 1.7, Python 0.1")
+        self.assertEqual(x["hot"], [[2, 0], [2, 1], [2, 2]])
+        # the spec's own limit
+        spec = json.load(open(os.path.join(self.camp, "spec.json")))
+        json.dump({**spec, "loadgate": {"maxCores": 2.0}}, open(os.path.join(self.camp, "spec.json"), "w"))
+        self.assertNotIn("hot", branchview.branch_view(self.camp)["cells"]["a"][self.v[4]])
+
+    def test_iterations_by_order_when_the_pids_do_not_match(self):
+        cell = self.cell(0, 1)
+        iterations(cell, [6])  # one pid for what rawData has as two forks of 3
+        self.assertEqual(branchview.iteration_forks(cell, [3, 3]), {1: (0, 0), 2: (0, 1), 3: (0, 2), 4: (1, 0), 5: (1, 1), 6: (1, 2)})
+        self.assertEqual(branchview.iteration_forks(cell, [3, 2]), {})  # neither matches: none placed
+
+
+class VoidTest(unittest.TestCase):
+    """Voided cells, under <campaign>/.void/: listed with their reason, counted for nothing."""
+    def setUp(self):
+        Project()
+        self.camps = config.get().campaigns
+        self.camp = fixture(self.camps)
+        self.v = [s[:10] for s in SHAS]
+
+    def void(self, corpus, i, rnd, why, scores):
+        d = os.path.join(self.camp, ".void", corpus, self.v[i], f"{rnd}-20261029-095244")
+        os.makedirs(d)
+        json.dump([result(corpus, scores, [[1.0] * len(f) for f in scores])], open(os.path.join(d, "result.json"), "w"))
+        open(os.path.join(d, "void.txt"), "w").write(why + "\n")
+        open(os.path.join(d, "jmh.log"), "w").write("log")
+        return d
+
+    def test_listed_and_excluded(self):
+        before = branchview.branch_view(self.camp)["cells"]["a"][self.v[0]]["m"]["score"]
+        self.void("a", 0, 1, "other load up to 1.6 cores over iterations 17 and 18", [[50.0, 50.0]])
+        self.void("a", 2, 1, "disturbed by other load", [[50.0, 50.0]])
+        d = branchview.branch_view(self.camp, self.camps)
+        self.assertNotIn(".void", d["corpora"])
+        a0 = d["cells"]["a"][self.v[0]]
+        self.assertEqual(a0["m"]["score"], before)  # its 50s count for nothing
+        self.assertEqual(a0["rounds"], 2)
+        self.assertEqual(a0["void"], [{"round": 1, "when": "Thu 29 Oct 09:52", "why": "other load up to 1.6 cores over iterations 17 and 18",
+                                       "links": {"jmh": f"br/.void/a/{self.v[0]}/1-20261029-095244/jmh.log"}}])
+        # an unmeasured commit with only a voided cell: a cell of its own, with no score
+        a2 = d["cells"]["a"][self.v[2]]
+        self.assertEqual((a2["state"], a2["void"][0]["why"]), ("none", "disturbed by other load"))
+        self.assertNotIn("m", a2)
+        self.assertEqual(d["cells"]["a"][self.v[3]]["prev"], self.v[1])  # still skipped as unmeasured
+
+    def test_popover_data_of_a_round(self):
+        cell = os.path.join(self.camp, "a", self.v[0], "1")
+        for f in ("timeline.html", "jmh.log", "build.log"):
+            open(os.path.join(cell, f), "w").write("x")
+        failed = os.path.join(self.camp, "b", self.v[3], "1")
+        os.makedirs(failed)
+        open(os.path.join(failed, "failed.txt"), "w").write("JMH exited with 1\n")
+        d = branchview.branch_view(self.camp, self.camps)
+        r1 = d["cells"]["a"][self.v[0]]["rd"][0]
+        self.assertEqual(r1["links"], {"timeline": f"br/a/{self.v[0]}/1/timeline.html", "jmh": f"br/a/{self.v[0]}/1/jmh.log",
+                                       "build": f"br/a/{self.v[0]}/1/build.log"})
+        f = d["cells"]["b"][self.v[3]]
+        self.assertEqual((f["state"], f["rd"]), ("failed", [{"round": 1, "state": "failed", "why": "JMH exited with 1", "links": {}}]))
+
+    @unittest.skipUnless(shutil.which("node"), "needs node")
+    def test_the_page_renders_the_popover(self):
+        self.void("a", 0, 1, "disturbed <by> load", [[50.0, 50.0]])
+        cell = os.path.join(self.camp, "a", self.v[0], "1")
+        open(os.path.join(cell, "timeline.html"), "w").write("x")
+        its = iterations(cell, [3, 3])
+        json.dump({"maxCores": 1.5, "iterations": [{"index": i, "start": a, "end": b, "score": 1.0, "cores": 2.4 if i == 6 else 0.3, "top": "java 2.2"}
+                                                   for i, a, b in its], "disturbed": [6]}, open(os.path.join(cell, "load.json"), "w"))
+        # round 2: two neighbours of a fork disturbed, shown as one run
+        cell2 = os.path.join(self.camp, "a", self.v[0], "2")
+        its = iterations(cell2, [3, 3])
+        json.dump({"maxCores": 1.5, "iterations": [{"index": i, "start": a, "end": b, "score": 1.0, "cores": {1: 1.7, 2: 2.1}.get(i, 0.2),
+                                                    "top": "java" if i == 2 else "x"} for i, a, b in its], "disturbed": [1, 2]},
+                  open(os.path.join(cell2, "load.json"), "w"))
+        d = branchview.branch_view(self.camp, self.camps)
+        out = page_popover(self, d, self.v[0])
+        self.assertIn("iterations 1–2 (fork 1, measurements 1–2): up to 2.1 cores <span class=\"k\">java</span>", out["0"])
+        for server in ("0", "1"):
+            h = out[server]
+            self.assertIn("voided: <span class=\"why\">disturbed &lt;by&gt; load</span>", h)
+            self.assertIn('data-lb="timeline"', h)
+            self.assertIn("iteration 6 (fork 2, measurement 2): 2.4 cores", h)
+            self.assertIn("fork 2: <b>10.2</b> <span class=\"pm\">± 1.8</span>", h)  # round 1's, ± within it (1.82)
+            self.assertEqual(h.count("<li"), 3)  # two rounds and the voided one
+        self.assertNotIn("data-bvopen", out["0"])
+        self.assertEqual(out["1"].count("data-bvopen"), 2)  # a Void & rerun per round, on the server
+        self.assertIn("Served by <code>perflab server</code>", out["0"])
+
+
+def page_popover(t, d, v):
+    """The page's popover for `v` on corpus a, off the server and on it: {"0": html, "1": html}, in node with a stub DOM."""
+    stub = ("globalThis.document = {querySelector: () => null, querySelectorAll: () => [], addEventListener() {}};"
+            "globalThis.addEventListener = () => {}; globalThis.location = {pathname: '/', search: ''};\n")
+    js = stub + branchview.JS + (f"\nconst d = {json.dumps(d)};\n"
+                                 f"console.log(JSON.stringify({{0: BH.popover(d, 'br', 'a', {json.dumps(v)}, false), 1: BH.popover(d, 'br', 'a', {json.dumps(v)}, true)}}));")
+    r = subprocess.run(["node", "-e", js], capture_output=True, text=True)
+    t.assertEqual(r.returncode, 0, r.stderr)
+    return json.loads(r.stdout)
 
 
 def add_xctrace(cell, cycles, profile="xctrace:ipc"):

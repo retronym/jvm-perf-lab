@@ -20,10 +20,17 @@ weighted by its df), marked as pooled; with no such commit yet it has no interva
 A Δ is against the previous measured commit, and the comparison of two rows uses the same test (`metrics.welch`, and
 `welch` in the page): Welch's t on the forks' means, Welch–Satterthwaite df, a pooled sd for a side of one fork. Δ% is
 shown ± the half-width of its 99.9% CI and coloured only when significant at 99.9%.
+
+Within a fork, its iterations give an interval of their own (`within`: t(n-1)·sd/√n, JMH's error for one fork). It is
+no interval for the commit, since it leaves out the fork-to-fork variance, so it is shown muted (±~) only where there is
+nothing better (one fork, nothing to pool), never colours a Δ, and is drawn as a thin whisker on each fork's dash; the
+ratio of the between-fork sd to it says whether more forks would pay. Each measurement iteration's competing load comes
+from the cell's load.json (`ab.load_check`), or for an older cell from its load.tsv. Clicking a value opens the
+popover of its rounds (`rounds_of`) and voided cells (`voided`), with Void & rerun on the server (`bhVoid`).
 """
 import datetime, glob, html, json, math, os
 
-from . import metrics, ui
+from . import loadgate, metrics, ui
 
 BRANCH_NAME = "branch.json"
 esc = html.escape
@@ -105,7 +112,7 @@ def fork_units(rs, per_unit, prefix="", keep=lambda k, kind: True):
     {key: [[iteration, ...] per fork]}, [(key, label, kind)] in the order first seen). A metric without per-iteration
     samples has a value per round (JMH's mean over the round's forks)."""
     of = [metrics.of(r, per_unit, metrics.cached_hw_events(cell)) for r, cell in rs]
-    kinds, raw, us, cols = {}, {}, {}, []
+    kinds, raw, us, cols, wf = {}, {}, {}, [], {}
     for ms in of:
         for k, label, kind, _, _ in ms:
             if keep(k, kind) and prefix + k not in kinds:
@@ -116,8 +123,155 @@ def fork_units(rs, per_unit, prefix="", keep=lambda k, kind: True):
         forks = [f for (r, _) in rs for f in raw_of(r, k, metrics.units_per_op(r, per_unit) if per_unit else 1.0) if f]
         if forks:
             raw[pk] = [[sig(x) for x in f] for f in forks]
+            wf[pk] = [within(f) for f in forks]
         us[pk] = [sum(f) / len(f) for f in forks] or [x for ms in of for kk, _, _, _, x in ms if kk == k and fin(x) is not None]
-    return us, kinds, raw, cols
+    return us, kinds, raw, cols, wf
+
+
+def within(xs):
+    """A fork's spread over its measurement iterations: (the half-width of their 99.9% CI, t(n-1)·sd/√n, as JMH's
+    scoreError for a run of one fork; the standard error of its mean, sd/√n), both None under two iterations. It
+    takes the iterations as independent, which they are not quite, and it says nothing of the fork-to-fork variance:
+    an interval for that fork's mean, not the commit's."""
+    if len(xs) < 2:
+        return None, None
+    mean, sd = metrics.stats(xs)
+    se = sd / len(xs) ** 0.5
+    return metrics.t999(len(xs) - 1) * se, se
+
+
+def within_of(fs, sd):
+    """A commit's within-fork spread of a metric, from its forks' `within` [(half-width, se)] and the sd of its forks'
+    means `sd` (its own, or pooled; None without either): (the within-fork CI: its one fork's, else the root mean square
+    of its forks', the ratio of the between-fork sd to the within-fork one, sd / √mean(se²)), None without forks. The
+    ratio is about 1 when forks agree as closely as their iterations do, and far above it when each fork lands somewhere
+    of its own (JIT decisions, code layout): then more forks pay off, and more iterations do not."""
+    if not fs:
+        return None
+    hs = [h for h, _ in fs if h is not None]
+    ses = [se for _, se in fs if se is not None]
+    ciw = (hs[0] if len(fs) == 1 else (sum(h * h for h in hs) / len(hs)) ** 0.5) if hs else None
+    ws = (sum(se * se for se in ses) / len(ses)) ** 0.5 if ses else 0
+    return ciw, sd / ws if sd is not None and ws > 0 else None
+
+
+LOAD_CHECK = "load.json"  # ab.LOAD_CHECK: a cell's measurement iterations' competing load, and the gate's verdict
+MAX_CORES = 1.5  # the load gate's default maxCores
+VOID = ".void"  # <campaign>/.void/<corpus>/<variant>/<round>-<stamp>/: a cell set aside, with void.txt saying why
+VOID_REASON = "void.txt"
+
+
+def cell_load(cell, max_cores):
+    """A cell's competing load: (maxCores, [{"index", "start", "end", "score", "cores", "top"} per measurement
+    iteration], [indices of those over maxCores]), from its load.json (`ab.load_check`), else, for a cell from before
+    it, from its load.tsv and iterations.tsv over `max_cores` (the spec's); no iterations without either."""
+    try:
+        j = json.load(open(os.path.join(cell, LOAD_CHECK)))
+        return j.get("maxCores", max_cores), j.get("iterations") or [], list(j.get("disturbed") or [])
+    except (OSError, ValueError, AttributeError):
+        pass
+    if not os.path.exists(os.path.join(cell, "load.tsv")):
+        return max_cores, [], []
+    its = loadgate.per_iteration(os.path.join(cell, "load.tsv"), os.path.join(cell, "iterations.tsv"))
+    return max_cores, its, [i["index"] for i in its if i["cores"] is not None and i["cores"] > max_cores]
+
+
+def iteration_forks(cell, lengths):
+    """{iteration index: (fork, j)} for a cell's measurement iterations (iterations.tsv): its fork, from 0 in the order
+    they ran, and its place among that fork's measurement iterations, from 0, as in result.json's rawData, whose forks
+    have `lengths` iterations. By pid when the forks' counts match rawData's, else in order when the total does; {}
+    when neither does."""
+    try:
+        rows = open(os.path.join(cell, "iterations.tsv")).read().splitlines()
+    except OSError:
+        return {}
+    head = rows[0].split("\t") if rows else []
+    its = []
+    for r in rows[1:]:
+        x = dict(zip(head, r.split("\t")))
+        if x.get("kind") in ("measure", "measurement"):
+            try:
+                its.append((float(x.get("start_ms") or 0), int(x.get("index") or 0), x.get("pid", "")))
+            except ValueError:
+                continue
+    its.sort()
+    pids = list(dict.fromkeys(p for _, _, p in its))
+    groups = [[i for _, i, p in its if p == pid] for pid in pids]
+    if [len(g) for g in groups] != list(lengths):
+        if len(its) != sum(lengths):
+            return {}
+        flat, groups = [i for _, i, _ in its], []
+        for n in lengths:
+            groups.append(flat[:n])
+            flat = flat[n:]
+    return {i: (f, j) for f, g in enumerate(groups) for j, i in enumerate(g)}
+
+
+def cell_links(cell, rel_to):
+    """A cell's timeline and logs, {"timeline", "jmh", "build"}: those it has."""
+    names = {"timeline": "timeline.html", "jmh": "jmh.log", "build": "build.log"}
+    return {k: os.path.relpath(os.path.join(cell, n), rel_to) for k, n in names.items() if os.path.exists(os.path.join(cell, n))}
+
+
+def rounds_of(d, rel_to, per_unit=None, max_cores=MAX_CORES):
+    """A commit's rounds on a corpus (d is <campaign>/<corpus>/<variant>), as the cell's popover lists them, and where
+    other load disturbed their measurement iterations in the cell's rawData, for the chart: ([{"round", "state" (done,
+    failed with "why", running, pending), "forks": [{"mean", "ci" (within the fork, over its iterations), "n"}] of the
+    score, "load" (the most of any measurement iteration, cores) and "maxCores", "disturbed": [{"i" (its index in
+    iterations.tsv), "fork", "j" (from 1, when known), "cores", "top"}], "links", "graphs"}], [[fork, j] from 0, the
+    forks of every done round in turn, as `fork_units` has them])."""
+    rounds, hot, offset = [], [], 0
+    for cell in sorted(glob.glob(os.path.join(d, "*")), key=lambda c: (len(c), c)):
+        if not (os.path.isdir(cell) and os.path.basename(cell).isdigit()):
+            continue
+        r = load_cell(cell)
+        state = r if isinstance(r, str) else "done" if r else "pending"
+        x = {"round": int(os.path.basename(cell)), "state": state}
+        forks = []
+        if state == "done":
+            forks = [f for f in raw_of(r, "score", metrics.units_per_op(r, per_unit) if per_unit else 1.0) if f]
+            x["forks"] = [{"mean": sig(sum(f) / len(f)), "ci": None if h is None else sig(h, 3), "n": len(f)}
+                          for f in forks for h in [within(f)[0]]]
+        elif state == "failed":
+            x["why"] = open(os.path.join(cell, "failed.txt")).read().strip()
+        mc, its, dist = cell_load(cell, max_cores)
+        loads = [i["cores"] for i in its if i.get("cores") is not None]
+        if loads:
+            x["load"], x["maxCores"] = max(loads), mc
+        if dist:
+            where = iteration_forks(cell, [len(f) for f in forks]) if forks else {}
+            by = {i.get("index"): i for i in its}
+            x["disturbed"] = [{"i": i, **({"fork": where[i][0] + 1, "j": where[i][1] + 1} if i in where else {}),
+                               "cores": by.get(i, {}).get("cores"), "top": by.get(i, {}).get("top") or ""} for i in dist]
+            hot += [[offset + where[i][0], where[i][1]] for i in dist if i in where]
+        x["links"] = cell_links(cell, rel_to)
+        g = graph_links(cell, rel_to)
+        if g:
+            x["graphs"] = g
+        offset += len(forks)
+        rounds.append(x)
+    return rounds, hot
+
+
+def voided(campaign_dir, corpus, variant, rel_to):
+    """A commit's voided cells on a corpus (<campaign>/.void/<corpus>/<variant>/<round>-<stamp>/), which count for
+    nothing: [{"round", "when", "why" (void.txt), "links"}], oldest first."""
+    out = []
+    for cell in sorted(glob.glob(os.path.join(campaign_dir, VOID, corpus, variant, "*"))):
+        name = os.path.basename(cell)
+        rnd, _, stamp = name.partition("-")
+        if not (os.path.isdir(cell) and rnd.isdigit()):
+            continue
+        try:
+            why = open(os.path.join(cell, VOID_REASON)).read().strip()
+        except OSError:
+            why = ""
+        try:
+            when = datetime.datetime.strptime(stamp, "%Y%m%d-%H%M%S").strftime("%a %d %b %H:%M")
+        except ValueError:
+            when = stamp
+        out.append({"round": int(rnd), "when": when, "why": why, "links": cell_links(cell, rel_to)})
+    return out
 
 
 def own_graphs(rs, rel_to):
@@ -148,7 +302,12 @@ def branch_view(campaign_dir, rel_to=None):
                                   means something, n forks, df, sd pooled]} (sd, CI and df None without a spread),
                                   "s": {k: [mean shown, CI shown]}, "raw": {k: [[x, ...] per fork, of every round]},
                                   "d": {k: [Δ%, half-width of its CI, verdict, a side pooled]},
-                                  "prev": variant of the previous measured commit}}},
+                                  "prev": variant of the previous measured commit,
+                                  "w": {k: [within-fork CI (`within_of`), between/within-fork sd ratio, the CI shown]},
+                                  "wf": {k: [each fork's within-fork CI, as "raw" has the forks]},
+                                  "rd": [its rounds, `rounds_of`], "hot": [[fork, j] of "raw"'s iterations other load
+                                  disturbed], "void": [its voided cells, `voided`]}}},
+     a cell's "state" is "none" when it has only voided rounds,
 
     The profile pass (<campaign>.profile, `profiles`) contributes its cells' metrics, keyed "p:<key>", but not the
     score: a profiler perturbs it (allocation, PMU counters and their ratios it does not, or not much). They have the
@@ -167,6 +326,7 @@ def branch_view(campaign_dir, rel_to=None):
     except (OSError, ValueError):
         spec = {}
     per_unit = spec.get("perUnit")
+    max_cores = (spec.get("loadgate") or {}).get("maxCores", MAX_CORES)
     commits = sorted(branch.get("commits", []), key=lambda c: c.get("index", 0))
     variants = [c.get("variant") or c["short"] for c in commits]
     on_disk = sorted(os.path.basename(d.rstrip("/")) for d in glob.glob(os.path.join(campaign_dir, "*/"))
@@ -187,20 +347,26 @@ def branch_view(campaign_dir, rel_to=None):
             rs, running, failed = results(os.path.join(campaign_dir, corpus, v))
             # the profile pass's cells: their metrics, but not the score (or anything else timed: the profiler perturbs it)
             prs = results(os.path.join(pdir, corpus, v))[0] if pdir else []
+            # its rounds, for the popover, and the measurement iterations other load disturbed, for the chart's cloud
+            rd, hot = rounds_of(os.path.join(campaign_dir, corpus, v), rel_to, per_unit, max_cores)
+            extra = {k: x for k, x in (("rd", rd), ("void", voided(campaign_dir, corpus, v, rel_to)), ("hot", hot)) if x}
             if not rs and not prs:
                 if running:
-                    per_v[v] = {"state": "running"}
+                    per_v[v] = {"state": "running", **extra}
                 elif failed:
-                    per_v[v] = {"state": "failed", **failed_cell(failed, rel_to)}
+                    per_v[v] = {"state": "failed", **failed_cell(failed, rel_to), **extra}
+                elif extra:  # only voided rounds: nothing to show but them
+                    per_v[v] = {"state": "none", **extra}
                 continue
-            us, kinds, raw, cs = fork_units(rs, per_unit)
-            pus, pkinds, praw, pcs = fork_units(prs, per_unit, PROFILED, lambda k, kind: kind != "score")
+            us, kinds, raw, cs, wf = fork_units(rs, per_unit)
+            pus, pkinds, praw, pcs, pwf = fork_units(prs, per_unit, PROFILED, lambda k, kind: kind != "score")
             for c in cs:
                 cols.setdefault(c[0], c)
             for c in pcs:
                 pcols.setdefault(c[0], c)
             x = per_v[v] = {"state": "done", "rounds": len(rs), "forks": max((len(u) for u in us.values()), default=0),
-                            "m": {}, "s": {}, "raw": {**raw, **praw}, "d": {}, "prev": prev}
+                            "m": {}, "s": {}, "raw": {**raw, **praw}, "d": {}, "prev": prev, "w": {},
+                            "wf": {k: [None if h is None else sig(h, 3) for h, _ in fs] for k, fs in {**wf, **pwf}.items()}, **extra}
             if prs:
                 x["pr"] = len(prs)
             if not rs:  # profiled, not measured (yet): the score's state
@@ -210,15 +376,15 @@ def branch_view(campaign_dir, rel_to=None):
             g = own_graphs(rs, rel_to)
             if g:
                 x["graphs"] = g
-            units[v] = ({**us, **pus}, {**kinds, **pkinds})
+            units[v] = ({**us, **pus}, {**kinds, **pkinds}, {**wf, **pwf})
             if "score" in us:
                 prev = v
         # per metric, the fork-to-fork relative sd pooled over the commits with two forks or more, for those with one
-        stat = {v: {k: (*metrics.stats(xs), len(xs)) for k, xs in us.items() if xs} for v, (us, _) in units.items()}
+        stat = {v: {k: (*metrics.stats(xs), len(xs)) for k, xs in us.items() if xs} for v, (us, _, _) in units.items()}
         keys = {k for st in stat.values() for k in st}
         pool = {k: metrics.pooled_rel_sd([(st[k][0], st[k][1], st[k][2] - 1) for st in stat.values() if k in st]) for k in keys}
         last = {}  # per metric, the latest commit with it so far: a Δ is against it
-        for v, (us, kinds) in units.items():
+        for v, (us, kinds, wfs) in units.items():
             x = per_v[v]
             for k, (mean, sd, n) in stat[v].items():
                 kind, pooled, df = kinds[k], n < 2, n - 1
@@ -228,6 +394,9 @@ def branch_view(campaign_dir, rel_to=None):
                 ci = None if sd is None else metrics.t999(df) * sd / n ** 0.5
                 x["m"][k] = [fin(mean), fin(sd), fin(ci), metrics.delta_ok(mean, kind, per_unit), n, df if sd is not None else None, pooled and sd is not None]
                 x["s"][k] = [metrics.fmt(kind, mean), "" if ci is None else ci_shown(kind, ci, mean)]
+                w = within_of(wfs.get(k), sd)
+                if w:
+                    x["w"][k] = [fin(w[0]), fin(w[1]), "" if w[0] is None else ci_shown(kind, w[0], mean)]
             for k, m in x["m"].items():
                 if k in last:
                     pm = per_v[last[k]]["m"][k]
@@ -379,11 +548,19 @@ def parts(campaign_dir, rel_to, corpus_param="corpus"):
         "<p>The unit is the <b>fork</b>: each fork of each round counts once, as the mean of its measurement iterations (they vary "
         "far less within a fork than between forks, and are not independent). A value is the mean over forks ± a 99.9% confidence "
         "interval over forks. A commit with one fork has no spread of its own: † marks an interval from the fork-to-fork sd pooled "
-        "over this corpus's commits with two forks or more; until there is one, it has none.</p>"
+        "over this corpus's commits with two forks or more; until there is one, it has none, and shows instead, muted, <b>±~</b> the 99.9% "
+        "CI within its one fork, over its iterations (as JMH's error for one fork): it understates run-to-run uncertainty, and never "
+        "colours a Δ. A value's tooltip has the ratio of the between-fork to the within-fork sd: about 1, the forks agree; far above, "
+        "each fork lands somewhere of its own, and more forks pay off where more iterations do not.</p>"
+        "<p>A <span class='bh-hot'></span>ring marks a value with measurement iterations run while other load was over the load gate's "
+        "limit (in the chart, those iterations' dots). <b>Click a value</b> for its rounds: each fork's mean ± its CI within the fork, "
+        "the load, the timeline and logs, and voided cells (<code>.void/</code>, which count for nothing); served by "
+        "<code>perflab server</code>, <b>Void &amp; rerun</b> sets a round aside with a reason and queues the campaign's resume.</p>"
         "<p>Δ is against the previous (older) measured commit, ± its 99.9% CI (Welch's t over the forks' means), coloured only when "
         "significant at 99.9%. Comparing two rows uses the same test.</p>"
         "<p><b>Chart</b>: commits oldest to newest, gaps where a commit is unmeasured; error bars are the 99.9% CI over forks "
-        "(lighter when pooled), dashes each fork's mean, the faint cloud every iteration. Tick two rows (or one, against the commit "
+        "(lighter when pooled), dashes each fork's mean with a thin whisker for its CI over its own iterations, the faint cloud every "
+        "iteration. Tick two rows (or one, against the commit "
         "before it) to compare them. The view is kept in the "
         "page's URL.</p><p style='margin-bottom:0'><b>Profiles</b> are runs of their own (a profiler perturbs the score), in the "
         "campaign <i>&lt;name&gt;.profile</i> beside this one, from the same builds: <code>perflab branch profile</code>. A row's "
@@ -440,6 +617,29 @@ a.bh-pb:hover{text-decoration:none;border-color:var(--brand)} .bh-pb.run{color:v
 .bh-pd a.btn.dd{color:var(--brand)} .bh-act{margin:4px 0;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center}
 .bh-cmd{background:var(--line2);border-radius:4px;padding:1px 6px;overflow-wrap:anywhere}
 @media (max-width:700px){table.bh-t td.cm,table.bh-t th.cm{min-width:150px;max-width:170px} .bh-subj,.bh-who{max-width:130px}}
+:root{--bh-load:#c27c00} @media (prefers-color-scheme: dark){:root{--bh-load:#f0b040}}
+button.bh-v{font:inherit;color:inherit;border:0;background:none;cursor:pointer;width:calc(100% + 12px)}
+button.bh-v:hover .mv{text-decoration:underline} button.bh-v:focus-visible{outline:2px solid var(--link);outline-offset:-1px}
+button.bh-v[aria-expanded=true]{box-shadow:inset 0 0 0 1.5px var(--link)}
+.bh-v .wi{color:var(--muted);font-size:11.5px}
+.bh-hot{display:inline-block;width:7px;height:7px;border-radius:50%;border:1.5px solid var(--bh-load);margin-right:5px;vertical-align:1px}
+svg.bh-g .hot{fill:none;stroke:var(--bh-load);stroke-width:1.3} svg.bh-g .w1{stroke:var(--link);stroke-width:1;opacity:.4} svg.bh-g .w2{stroke:var(--brand);stroke-width:1;opacity:.4}
+.bh-leg i.hot{background:none;border:1.5px solid var(--bh-load);width:8px;height:8px} .bh-leg i.wh{width:1.5px;height:11px;border-radius:0;opacity:.5;vertical-align:-2px}
+#bh-pop{position:absolute;z-index:50;width:min(460px,calc(100vw - 16px));max-height:min(70vh,560px);overflow:auto;background:var(--panel);color:var(--fg);
+  border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.22);padding:8px 12px 10px;font-size:12.5px}
+#bh-pop[hidden]{display:none} #bh-pop:focus{outline:none}
+#bh-pop .ph{display:flex;gap:8px;align-items:baseline;margin:0 0 4px} #bh-pop .ph h4{margin:0;font-size:13px;flex:1;min-width:0;overflow-wrap:anywhere}
+#bh-pop .x{font:15px/22px inherit;width:28px;height:28px;flex:none;border:1px solid var(--line);border-radius:6px;background:none;color:var(--fg);cursor:pointer}
+#bh-pop ul{list-style:none;margin:0;padding:0} #bh-pop li{border-top:1px solid var(--line2);padding:6px 0}
+#bh-pop .rh{display:flex;flex-wrap:wrap;gap:2px 8px;align-items:baseline} #bh-pop .fk{font-variant-numeric:tabular-nums}
+#bh-pop .fk .pm{color:var(--muted)} #bh-pop .dz{color:var(--fg);margin:2px 0;font-size:12px} #bh-pop .dz .bh-hot{margin-left:1px}
+#bh-pop .btns{margin-top:4px} #bh-pop li.void{color:var(--muted)} #bh-pop li.void .why{color:var(--fg)}
+#bh-pop .act{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center;margin-top:5px}
+#bh-pop .act input{font:inherit;font-size:12px;flex:1 1 180px;min-width:0;padding:2px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
+#bh-pop .msg{flex-basis:100%;font-size:12px} #bh-pop .msg.err{color:var(--bad)}
+#bh-pop .chip.warn{border-color:var(--bad);color:var(--bad)}
+@media (max-width:600px){#bh-pop{position:fixed;left:0!important;right:0;top:auto!important;bottom:0;width:auto;max-height:75vh;border-radius:12px 12px 0 0;
+  padding-bottom:calc(10px + env(safe-area-inset-bottom))} #bh-pop .act .chip{padding:4px 12px}}
 """
 
 # `metrics.t999` and `metrics.welch` for the page, on a cell's metric as `branch_view` has it: [mean, sd, CI, Δ ok,
@@ -478,9 +678,40 @@ const BH_STATS = (() => {
 
 # draws each branch campaign's history (`section`) from its data (`branch_view`), in the state in the page's URL
 JS = STATS_JS + r"""
+// the server's endpoints the history's actions use (perflab server, under /p/<project>/)
+const BH_API = {projects: '/api/projects', void: '/api/v1/void', rerun: '/api/v1/rerun'};
+// Voids a cell and queues its campaign's resume, which measures it again: POST BH_API.void {project, campaign, corpus,
+// variant, round, reason}, then BH_API.rerun {project, campaign}, with the token of the server that served the page.
+// Resolves to {void, rerun} (their JSON replies); rejects with an Error whose message is the server's error text, and
+// whose `stage` is 'void' or 'rerun' (a rerun that fails leaves the cell voided).
+async function bhVoid(campaign, corpus, variant, round, reason) {
+  const m = document.querySelector('meta[name="perflab-token"]');
+  if (!m || !location.pathname.startsWith('/p/')) throw Object.assign(new Error('the page is not served by perflab server'), {stage: 'void'});
+  const id = decodeURIComponent(location.pathname.split('/')[2]);
+  const post = async (stage, url, body) => {
+    let r, text = '';
+    try {
+      r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Perflab-Token': m.content}, body: JSON.stringify(body)});
+      text = await r.text();
+    } catch (e) { throw Object.assign(new Error(e.message || String(e)), {stage}); }
+    let j = null;
+    try { j = text ? JSON.parse(text) : null; } catch (e) {}
+    if (!r.ok) throw Object.assign(new Error((j && j.error) || text.trim() || `${r.status} ${r.statusText}`), {stage});
+    return j;
+  };
+  let proj;
+  try { proj = (await (await fetch(BH_API.projects)).json()).find(p => String(p.id) === id); } catch (e) {}
+  if (!proj) throw Object.assign(new Error('this project is not registered with the server'), {stage: 'void'});
+  const v = await post('void', BH_API.void, {project: proj.id, campaign, corpus, variant, round, reason});
+  const q = await post('rerun', BH_API.rerun, {project: proj.id, campaign});
+  return {void: v, rerun: q};
+}
 const BH = (() => {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
   const mem = {};  // per campaign, for this page only: the merges opened, the commit hovered, the jobs queued by pair
+  // the cell whose popover is open, {camp, c, v}, and per round shown in one, its Void & rerun's state
+  let pop = null;
+  const act = {};
   const memOf = el => mem[el.dataset.campaign] = mem[el.dataset.campaign] || {open: new Set(), hover: null, jobs: {}};
   let filter = new Set();
   const key = n => 'b.' + n;
@@ -519,10 +750,11 @@ const BH = (() => {
   const unitFix = s => String(s).replace('us/', 'µs/');
   const sha = (c, n) => `<code title="${esc(c.sha)}">${esc(c.short.slice(0, n || 10))}</code>`;
   // a tick's label: three or four significant digits, with the unit's scale for sizes and counts
-  function tick(kind, x) {
-    const a = Math.abs(x), p = y => +y.toPrecision(3);
-    if (kind === 'alloc') return a >= 1e5 ? `${p(x / 1e6)}MB` : a >= 1e3 ? `${p(x / 1e3)}KB` : `${p(x)}B`;
-    if (kind === 'count') return a >= 1e9 ? `${p(x / 1e9)}G` : a >= 1e6 ? `${p(x / 1e6)}M` : a >= 1e3 ? `${p(x / 1e3)}K` : `${p(x)}`;
+  // (`s`, the step between ticks: enough digits that neighbours differ)
+  function tick(kind, x, s) {
+    const a = Math.abs(x), p = (y, div) => s ? `${+y.toFixed(Math.max(0, -Math.floor(Math.log10(s / div))))}` : `${+y.toPrecision(3)}`;
+    if (kind === 'alloc') return a >= 1e5 ? `${p(x / 1e6, 1e6)}MB` : a >= 1e3 ? `${p(x / 1e3, 1e3)}KB` : `${p(x, 1)}B`;
+    if (kind === 'count') return a >= 1e9 ? `${p(x / 1e9, 1e9)}G` : a >= 1e6 ? `${p(x / 1e6, 1e6)}M` : a >= 1e3 ? `${p(x / 1e3, 1e3)}K` : `${p(x, 1)}`;
     if (kind === 'pct') return `${p(x)}%`;
     return a >= 1e4 ? Math.round(x).toLocaleString('en') : `${+x.toPrecision(4)}`;
   }
@@ -546,7 +778,11 @@ const BH = (() => {
       const m = x.m && x.m[k];
       if (!m || m[0] == null) continue;
       const ys = [m[0] - (m[2] || 0), m[0] + (m[2] || 0)];
-      if (withRaw) for (const f of (x.raw || {})[k] || []) ys.push(...f);
+      if (withRaw) ((x.raw || {})[k] || []).forEach((f, fi) => {
+        ys.push(...f);
+        const h = ((x.wf || {})[k] || [])[fi], fm = f.length ? f.reduce((p, s) => p + s, 0) / f.length : null;
+        if (h != null && fm != null) ys.push(fm - h, fm + h);  // a fork's whisker
+      });
       for (const y of ys) { lo = Math.min(lo, y); hi = Math.max(hi, y); }
     }
     if (!isFinite(lo)) return null;
@@ -599,22 +835,59 @@ const BH = (() => {
     if (x.ms === 'failed') return `<a class="bh-fail" href="${esc(x.log)}" title="${esc(x.why)}">run failed</a>`;
     return u ? `<a class="bh-fail" href="${esc(u.log)}" title="${esc(u.reason)}">build failed</a>` : '<span class="bh-pend" title="profiled, not measured yet">pending</span>';
   }
+  // a cell's value is a button opening its popover (its rounds, `popover`)
+  const cellBtn = (c, v, cls, attrs, tip, inner) => `<button type="button" class="bh-v${cls}" data-bcell="${esc(c)}" data-bcv="${esc(v)}" aria-haspopup="dialog"`
+    + ` aria-expanded="${!!(pop && pop.c === c && pop.v === v)}"${attrs} title="${tip}">${inner}</button>`;
+  const WITHIN = 'within one fork, over its iterations; understates run-to-run uncertainty';
+  // the measurement iterations other load disturbed, over a cell's rounds: [[round, {i, fork, j, cores, top}]]
+  const disturbed = x => (x.rd || []).flatMap(r => (r.disturbed || []).map(z => [r, z]));
+  // a round's disturbed iterations, a run of consecutive ones of a fork as one: [{i, i1, fork, j, j1, cores (the most), top}]
+  function runs(zs) {
+    const out = [];
+    for (const z of zs) {
+      const p = out[out.length - 1];
+      if (p && z.i === p.i1 + 1 && z.fork === p.fork) {
+        Object.assign(p, {i1: z.i, j1: z.j});
+        if ((z.cores || 0) > (p.cores || 0)) Object.assign(p, {cores: z.cores, top: z.top});
+      } else out.push({...z, i1: z.i, j1: z.j});
+    }
+    return out;
+  }
+  const coresOf = z => z.cores == null ? '' : `${z.i1 !== z.i ? 'up to ' : ''}${(+z.cores).toFixed(1)} cores`;
+  const span = (a, b) => a === b ? `${a}` : `${a}–${b}`;
+  const itName = z => `iteration${z.i1 !== z.i ? 's' : ''} ${span(z.i, z.i1)}${z.fork ? ` (fork ${z.fork}, measurement${z.i1 !== z.i ? 's' : ''} ${span(z.j, z.j1)})` : ''}`;
+  function hotTip(x) {
+    const zs = disturbed(x);
+    if (!zs.length) return '';
+    const lim = zs[0][0].maxCores;
+    return `Other load over ${lim != null ? lim + ' cores' : 'the limit'} during ${zs.length} measurement iteration${zs.length > 1 ? 's' : ''}: `
+      + (x.rd || []).filter(r => (r.disturbed || []).length).flatMap(r => runs(r.disturbed).map(z => `#${r.round} ${itName(z)} ${coresOf(z)}${z.top ? ` (${z.top})` : ''}`)).join('; ');
+  }
   function value(d, st, c, v, k, exts) {
     const x = cellOf(d, c, v);
     const u = (d.unbuildable || {})[v];
     if (!x) return u ? `<a class="bh-fail" href="${esc(u.log)}" title="${esc(u.reason)}">build failed</a>` : '<span class="bh-pend">pending</span>';
-    if (x.state === 'running') return '<span class="badge running">running</span>';
-    if (x.state === 'failed') return `<a class="bh-fail" href="${esc(x.log)}" title="${esc(x.why)}">run failed</a>`;
+    const nv = (x.void || []).length, vd = nv ? ` <span class="bh-pend">· ${nv} voided</span>` : '';
+    if (x.state === 'running') return cellBtn(c, v, '', '', 'running: its rounds', '<span class="badge running">running</span>' + vd);
+    if (x.state === 'failed') return cellBtn(c, v, '', '', esc(x.why) + ' (its rounds and logs)', '<span class="bh-fail">run failed</span>' + vd);
+    if (x.state === 'none') return k === 'score' ? cellBtn(c, v, '', '', 'its voided rounds', '<span class="bh-pend">pending</span>' + vd) : '';
     const m = x.m[k];
     if (!m) return k === 'score' ? unmeasured(x, v, d) : '';
     const rounds = fromProfile(d, k) ? x.pr : x.rounds;
     const s = shown(d, k, m, x.s[k]), sc = scaleOf(d, k), un = sc ? ` ${sc.u}` : '';
-    const dag = m[6] ? '†' : '';
-    const n = `<span class="mv">${esc(s[0])}</span>${s[1] ? ` <span class="pm">± ${esc(s[1])}${dag}</span>` : ''}`;
+    const dag = m[6] ? '†' : '', w = (x.w || {})[k];
+    // one fork and nothing to pool: its interval over its own iterations, muted, for want of one over forks
+    const ws = w && w[0] != null ? (sc ? plainCI(w[0] / sc.div) : w[2]) : '';
+    const n = `<span class="mv">${esc(s[0])}</span>${s[1] ? ` <span class="pm">± ${esc(s[1])}${dag}</span>`
+      : ws ? ` <span class="pm wi" title="${WITHIN}">±~ ${esc(ws)}</span>` : ''}`;
+    const hot = k === 'score' && disturbed(x).length ? `<span class="bh-hot" role="img" aria-label="disturbed by other load"></span>` : '';
     const g = st.form === 'num' || !exts[c + '|' + k] ? '' : bar(m, exts[c + '|' + k]);
     const tip = `${esc(s[0])}${un}${s[1] ? ' ± ' + esc(s[1]) + un + dag + ' (99.9% CI over forks)' : ''}; ${m[4]} fork${m[4] > 1 ? 's' : ''}, ${rounds} round${rounds > 1 ? 's' : ''}${fromProfile(d, k) ? ' of the profile pass' : ''}`
-      + (m[1] == null ? '; 1 fork: no spread yet' : m[6] ? `. ${POOLED}: ${(100 * m[1] / m[0]).toFixed(1)}%` : `, sd of the forks’ means ${(100 * m[1] / m[0]).toFixed(1)}%`);
-    return `<span class="bh-v${g ? ' bar' : ''}${m[2] != null && m[6] ? ' pl' : ''}"${g} title="${tip}">${n}</span>`;
+      + (m[1] == null ? '; 1 fork: no spread yet' : m[6] ? `. ${POOLED}: ${(100 * m[1] / m[0]).toFixed(1)}%` : `, sd of the forks’ means ${(100 * m[1] / m[0]).toFixed(1)}%`)
+      + (ws ? `. ±~ ${esc(ws)}${un} ${m[4] > 1 ? '(root mean square over its forks) ' : ''}is the 99.9% CI ${WITHIN}` : '')
+      + (w && w[1] != null ? `. Between/within-fork sd ratio ${w[1].toFixed(1)}${m[6] ? ' (between: pooled)' : ''}: ≈1, forks agree; ≫1, forks land in different places, so more forks pay off` : '')
+      + (hot ? '. ' + esc(hotTip(x)) : '') + '. Click for its rounds';
+    return cellBtn(c, v, `${g ? ' bar' : ''}${m[2] != null && m[6] ? ' pl' : ''}`, g, tip, hot + n);
   }
   // the corpora the filter bar picked, all when it picked none of these
   function corpora(d) {
@@ -689,7 +962,7 @@ const BH = (() => {
     const off = e2 ? band * 0.17 : 0, spread = Math.min(band * (e2 ? 0.2 : 0.4), 26);
     const jit = (i, j) => { const s = Math.sin(i * 12.9898 + j * 78.233) * 43758.5453; return s - Math.floor(s) - 0.5; };
     const f1 = x => x.toFixed(1);
-    let g = '', bands = '', hits = '', xl = '';
+    let g = '', bands = '', hits = '', xl = '', hotSeen = false;
     const lines = ['', ''];
     const every = Math.max(1, Math.ceil(56 / band));
     order.forEach((cm, i) => {
@@ -708,10 +981,22 @@ const BH = (() => {
         if (!v || v[0] == null) { prev = null; return; }
         const cx = X(i) + dx;
         let j = 0;
-        const forks = (x.raw || {})[m.k] || [];
-        for (const f of forks) for (const s of f) g += `<circle class="c${n}" cx="${f1(cx + jit(i * 7 + n, j++) * spread)}" cy="${f1(y(s))}" r="1.7"/>`;
-        // each fork's mean, a short dash: the unit the interval is over
-        for (const f of forks) if (f.length) { const fy = f1(y(f.reduce((p, s) => p + s, 0) / f.length)); g += `<path class="f${n}" d="M${f1(cx - spread * 0.5)} ${fy}h${f1(spread)}"/>`; }
+        const forks = (x.raw || {})[m.k] || [], wf = (x.wf || {})[m.k] || [];
+        // the iterations other load disturbed (`hot`, of the measurement's forks; not the profile pass's) as rings
+        const hot = new Set(fromProfile(d, m.k) ? [] : (x.hot || []).map(p => p.join(',')));
+        forks.forEach((f, fi) => f.forEach((s, si) => {
+          const px = f1(cx + jit(i * 7 + n, j++) * spread), py = f1(y(s));
+          if (hot.has(fi + ',' + si)) { hotSeen = true; g += `<circle class="hot" cx="${px}" cy="${py}" r="2.6"><title>${esc(hotTip(x))}</title></circle>`; }
+          else g += `<circle class="c${n}" cx="${px}" cy="${py}" r="1.7"/>`;
+        }));
+        // each fork's mean, a short dash: the unit the interval is over; and its 99.9% CI over its own iterations, a thin
+        // whisker on the dash's right half (the commit's bar, over forks, is at its centre)
+        forks.forEach((f, fi) => {
+          if (!f.length) return;
+          const fm = f.reduce((p, s) => p + s, 0) / f.length, fy = f1(y(fm));
+          g += `<path class="f${n}" d="M${f1(cx - spread * 0.5)} ${fy}h${f1(spread)}"/>`;
+          if (wf[fi] != null) { const wx = f1(cx + spread * (0.12 + 0.36 * (fi + 0.5) / forks.length)); g += `<path class="w${n}" d="M${wx} ${f1(y(fm - wf[fi]))}V${f1(y(fm + wf[fi]))}"/>`; }
+        });
         if (v[2] != null) g += `<path class="e${n}${v[6] ? ' pl' : ''}" d="M${f1(cx)} ${f1(y(v[0] - v[2]))}V${f1(y(v[0] + v[2]))}M${f1(cx - 4)} ${f1(y(v[0] - v[2]))}h8M${f1(cx - 4)} ${f1(y(v[0] + v[2]))}h8"/>`;
         g += n === 1 ? `<circle class="p1" cx="${f1(cx)}" cy="${f1(y(v[0]))}" r="4"/>`
           : `<rect class="p2" x="${f1(cx - 3.5)}" y="${f1(y(v[0]) - 3.5)}" width="7" height="7" transform="rotate(45 ${f1(cx)} ${f1(y(v[0]))})"/>`;
@@ -724,20 +1009,22 @@ const BH = (() => {
     if (e1) {
       const y = Y(e1), s = step(e1[1] - e1[0]);
       for (let t = Math.ceil(e1[0] / s) * s; t <= e1[1]; t += s)
-        ax += `<line class="gl" x1="${L}" x2="${W - R}" y1="${f1(y(t))}" y2="${f1(y(t))}"/><text class="yl" x="${L - 5}" y="${f1(y(t) + 3.5)}" text-anchor="end">${tick(m1.kind, t)}</text>`;
+        ax += `<line class="gl" x1="${L}" x2="${W - R}" y1="${f1(y(t))}" y2="${f1(y(t))}"/><text class="yl" x="${L - 5}" y="${f1(y(t) + 3.5)}" text-anchor="end">${tick(m1.kind, t, s)}</text>`;
     }
     if (e2) {
       const y = Y(e2), s = step(e2[1] - e2[0]);
       ax += `<line class="ax" x1="${W - R}" x2="${W - R}" y1="${T}" y2="${H - B}"/>`;
       for (let t = Math.ceil(e2[0] / s) * s; t <= e2[1]; t += s)
-        ax += `<text class="yl" x="${W - R + 5}" y="${f1(y(t) + 3.5)}">${tick(m2.kind, t)}</text>`;
+        ax += `<text class="yl" x="${W - R + 5}" y="${f1(y(t) + 3.5)}">${tick(m2.kind, t, s)}</text>`;
     }
     const empty = !e1 && !e2 ? `<text x="${(L + W - R) / 2}" y="${H / 2}" text-anchor="middle">nothing measured on ${esc(c)} yet</text>` : '';
     const pick = d.corpora.length > 1 ? `<div class="bh-ctl"><span class="fg"><span class="fl">${esc(d.corpusParam || 'corpus')}</span>`
       + d.corpora.map(x => `<button class="chip" data-bc="${esc(x)}" aria-pressed="${x === c}">${esc(x)}</button>`).join('') + '</span></div>' : '';
     box.innerHTML = `<figure>${pick}<div class="bh-leg"><span><i></i>${esc(heading(d, 'score'))} (left)</span>`
       + (m2 ? `<span><i class="s2"></i>${esc(heading(d, m2.k))} (right)</span>` : '')
-      + '<span>oldest → newest · error bars: 99.9% CI over forks (lighter, †: one fork, a pooled spread) · dashes: each fork’s mean · faint dots: every iteration</span></div>'
+      + '<span>oldest → newest · error bars: 99.9% CI over forks (lighter, †: one fork, a pooled spread) · dashes: each fork’s mean, '
+      + '<i class="wh" style="background:var(--link)"></i>its own 99.9% CI over its iterations · faint dots: every iteration</span>'
+      + (hotSeen ? '<span><i class="hot"></i>an iteration while other load was over the gate’s limit</span>' : '') + '</div>'
       + `<svg class="bh-g" viewBox="0 0 ${W} ${H}">${bands}${ax}<path class="l1" d="${lines[0]}"/><path class="l2" d="${lines[1]}"/>${g}${xl}${empty}${hits}</svg>`
       + '<p class="bh-tip k">Hover a commit to see its numbers; click to select it.</p></figure>';
   }
@@ -842,6 +1129,143 @@ const BH = (() => {
       say(`queued as <a href="/">job ${esc(j.id)}</a>${j.position ? ` (#${esc(j.position)} in the queue)` : ''}; the diff appears here when it is done`);
     } catch (e) { say(`not queued: ${esc(e.message || e)}`); }
   }
+  // a score as `ui.num` shows it: four significant digits, whole numbers with separators from 1,000; with `like`, an
+  // error to its score's decimals
+  function num(x, like) {
+    if (like == null) return Math.abs(x) >= 1000 ? Math.round(x).toLocaleString('en') : `${+x.toPrecision(4)}`;
+    const dec = (num(like).split('.')[1] || '').length;
+    return x.toLocaleString('en', {minimumFractionDigits: dec, maximumFractionDigits: dec});
+  }
+  // a commit × corpus's popover: its rounds (forks, score ± the CI within each fork, load, state, timeline, logs and
+  // flame graphs, and on the server Void & rerun), then its voided cells, which count for nothing
+  function popover(d, name, c, v, server) {
+    const cm = d.commits.find(k => k.v === v) || {sha: v, short: v, subject: ''}, x = cellOf(d, c, v) || {};
+    const BADGE = {done: 'done', failed: 'failed', running: 'running'};
+    let h = `<div class="ph"><h4 id="bh-pop-t">${sha(cm, 7)} on ${esc(c)} <span class="k">${esc(cm.subject)}</span></h4>`
+      + '<button type="button" class="x" data-bpclose="1" aria-label="Close" title="Close (Esc)">✕</button></div>'
+      + `<div class="k">Each fork’s mean ${esc(heading(d, 'score'))} ± its 99.9% CI ${WITHIN}.</div><ul>`;
+    for (const r of x.rd || []) {
+      const key = [name, c, v, r.round].join('|');
+      const a = act[key] = act[key] || {camp: name, c, v, round: r.round, reason: (r.disturbed || []).length ? 'disturbed by other load' : ''};
+      const fks = (r.forks || []).map((f, i) => `<span class="fk">${r.forks.length > 1 ? `fork ${i + 1}: ` : ''}<b>${esc(num(f.mean))}</b>`
+        + `${f.ci != null ? ` <span class="pm">± ${esc(num(f.ci, f.mean))}</span>` : ''} <span class="k">${f.n} iteration${f.n > 1 ? 's' : ''}</span></span>`).join(' · ');
+      h += `<li><div class="rh"><b>#${esc(r.round)}</b> <span class="badge ${BADGE[r.state] || 'partial'}">${esc(r.state)}</span> ${fks}`
+        + (r.load != null ? ` <span class="k" title="the most other load over any of its measurement iterations">other load ≤ ${r.load.toFixed(1)} cores${r.maxCores != null ? `, limit ${esc(r.maxCores)}` : ''}</span>` : '')
+        + '</div>' + (r.why ? `<div class="dz bh-fail">${esc(r.why)}</div>` : '')
+        + runs(r.disturbed || []).map(z => `<div class="dz"><span class="bh-hot"></span>${esc(itName(z))}: ${esc(coresOf(z))}${z.top ? ` <span class="k">${esc(z.top)}</span>` : ''}</div>`).join('');
+      const L = r.links || {};
+      const links = (L.timeline ? `<a class="btn" href="${esc(L.timeline)}" data-lb="timeline" title="each fork from JVM start to exit: iterations, GC pauses, load">timeline</a>` : '')
+        + (L.jmh ? `<a class="btn" href="${esc(L.jmh)}">jmh.log</a>` : '') + (L.build ? `<a class="btn" href="${esc(L.build)}">build.log</a>` : '')
+        + (r.graphs || []).map(g => `<a class="btn" href="${esc(g[2])}" data-lb="${esc(g[0])}|${esc(g[1])}">${esc(g[0])} ${esc(g[1])}</a>`).join('');
+      if (links) h += `<div class="btns" data-lb-group="${esc(name)} · ${esc(c)} · ${esc(cm.short.slice(0, 7))} #${esc(r.round)}">${links}</div>`;
+      if (server && (r.state === 'done' || r.state === 'failed')) {
+        const k = esc(key);
+        h += '<div class="act">' + (a.done ? ''
+          : a.form ? `<input type="text" data-bvreason="${k}" value="${esc(a.reason)}" placeholder="why it is voided" aria-label="why round ${esc(r.round)} is voided"${a.busy ? ' disabled' : ''}>`
+            + `<button type="button" class="chip warn" data-bvgo="${k}"${a.busy ? ' disabled' : ''}>Void &amp; rerun</button><button type="button" class="chip" data-bvcancel="${k}"${a.busy ? ' disabled' : ''}>cancel</button>`
+          : `<button type="button" class="chip" data-bvopen="${k}" title="move this cell to .void with a reason, and queue the campaign’s resume, which measures it again">Void &amp; rerun…</button>`)
+          + (a.msg ? `<span class="msg${a.err ? ' err' : ''}" role="status">${a.msg}</span>` : '') + '</div>';
+      }
+      h += '</li>';
+    }
+    for (const z of x.void || []) {
+      const L = z.links || {};
+      const links = (L.timeline ? `<a class="btn" href="${esc(L.timeline)}" data-lb="timeline">timeline</a>` : '') + (L.jmh ? `<a class="btn" href="${esc(L.jmh)}">jmh.log</a>` : '');
+      h += `<li class="void"><div class="rh"><b>#${esc(z.round)}</b> <span>voided: <span class="why">${esc(z.why || 'no reason given')}</span></span> <span class="k">${esc(z.when)}</span></div>`
+        + (links ? `<div class="btns" data-lb-group="${esc(name)} · ${esc(c)} · ${esc(cm.short.slice(0, 7))} #${esc(z.round)} (voided)">${links}</div>` : '') + '</li>';
+    }
+    if (!(x.rd || []).length && !(x.void || []).length) h += '<li class="k">No rounds yet.</li>';
+    return h + '</ul>' + (server ? '' : '<div class="k" style="margin-top:4px">Served by <code>perflab server</code>, a round can be voided and measured again here.</div>');
+  }
+  const elOf = camp => [...document.querySelectorAll('.bh')].find(e => e.dataset.campaign === camp);
+  function popBox() {
+    let box = document.getElementById('bh-pop');
+    if (!box) {
+      box = document.createElement('div');
+      Object.assign(box, {id: 'bh-pop', hidden: true, tabIndex: -1});
+      box.setAttribute('role', 'dialog');
+      box.setAttribute('aria-labelledby', 'bh-pop-t');
+      document.body.appendChild(box);
+    }
+    return box;
+  }
+  function renderPop(el, force) {
+    const box = popBox(), a = document.activeElement;
+    if (!pop || !el || (!force && box.contains(a) && a.tagName === 'INPUT')) return;  // a refresh waits while its reason is typed
+    const h = popover(data(el), pop.camp, pop.c, pop.v, !!SERVER);
+    if (force || box._h !== h) { box.innerHTML = h; box._h = h; }
+  }
+  const triggers = () => document.querySelectorAll('[data-bcell]');
+  function openPop(el, c, v, trigger) {
+    pop = {camp: el.dataset.campaign, c, v};
+    const box = popBox();
+    renderPop(el, true);
+    box.hidden = false;
+    triggers().forEach(t => t.setAttribute('aria-expanded', String(t.dataset.bcell === c && t.dataset.bcv === v && t.closest('.bh') === el)));
+    if (!matchMedia('(max-width:600px)').matches) {  // beside its value; on a phone, a sheet along the bottom
+      const r = trigger.getBoundingClientRect(), w = box.offsetWidth, hgt = box.offsetHeight;
+      const left = Math.max(8, Math.min(r.right - w, innerWidth - w - 8));
+      const below = r.bottom + 4 + hgt <= innerHeight || r.top - 4 - hgt < 0;
+      box.style.left = `${left + scrollX}px`;
+      box.style.top = `${(below ? r.bottom + 4 : r.top - 4 - hgt) + scrollY}px`;
+    }
+    box.focus({preventScroll: true});
+  }
+  function closePop(refocus) {
+    const box = document.getElementById('bh-pop');
+    if (!pop || !box) return;
+    const was = pop;
+    pop = null;
+    box.hidden = true;
+    triggers().forEach(t => t.setAttribute('aria-expanded', 'false'));
+    const el = elOf(was.camp), t = el && [...el.querySelectorAll('[data-bcell]')].find(t => t.dataset.bcell === was.c && t.dataset.bcv === was.v);
+    if (refocus && t) t.focus({preventScroll: true});
+  }
+  async function voidRound(key) {
+    const a = act[key];
+    if (!a || a.busy) return;
+    const el = elOf(a.camp), redraw = () => { const box = document.getElementById('bh-pop'); if (box) box._h = null; renderPop(el, true); };
+    Object.assign(a, {busy: true, err: false, msg: 'voiding…'});
+    redraw();
+    try {
+      const r = await bhVoid(a.camp, a.c, a.v, a.round, a.reason.trim());
+      const j = r.rerun || {};
+      Object.assign(a, {done: true, msg: `voided; its rerun is queued${j.id != null ? ` as <a href="/">job ${esc(j.id)}</a>` : ''}. The round moves under “voided” when the index next refreshes.`});
+    } catch (e) {
+      Object.assign(a, {err: true, done: e.stage === 'rerun', msg: (e.stage === 'rerun' ? 'voided, but its rerun was not queued: ' : 'not voided: ') + esc(e.message || e)});
+    }
+    a.busy = false;
+    redraw();
+    const box = document.getElementById('bh-pop');  // its controls were redrawn: keep the focus in the popover
+    if (box && !box.hidden && !box.contains(document.activeElement)) box.focus({preventScroll: true});
+  }
+  document.addEventListener('click', e => {
+    const box = document.getElementById('bh-pop');
+    if (!pop || !box) return;
+    const t = e.target.closest && e.target.closest('[data-bpclose],[data-bvopen],[data-bvcancel],[data-bvgo]');
+    if (t && box.contains(t)) {
+      const a = act[t.dataset.bvopen || t.dataset.bvcancel || t.dataset.bvgo];
+      if (t.dataset.bpclose) return closePop(true);
+      if (!a) return;
+      if (t.dataset.bvgo) return voidRound(t.dataset.bvgo);
+      a.form = !!t.dataset.bvopen;
+      renderPop(elOf(a.camp), true);
+      const inp = box.querySelector('[data-bvreason]');
+      if (inp) { inp.focus(); inp.select(); }
+      return;
+    }
+    // a click elsewhere closes it (not one on a value, which opens its own, nor in the lightbox over it)
+    if (!box.contains(e.target) && !(e.target.closest && e.target.closest('[data-bcell],#lb'))) closePop(false);
+  });
+  document.addEventListener('input', e => { const k = e.target.dataset && e.target.dataset.bvreason; if (k && act[k]) act[k].reason = e.target.value; });
+  document.addEventListener('keydown', e => {
+    if (!pop || e.defaultPrevented) return;
+    const lb = document.getElementById('lb');
+    if (lb && !lb.hidden) return;  // Esc is the lightbox's first
+    const k = e.target.dataset && e.target.dataset.bvreason;
+    if (e.key === 'Enter' && k) { e.preventDefault(); voidRound(k); }
+    else if (e.key === 'Escape') { e.preventDefault(); closePop(true); }
+  });
   function drawOne(el) {
     const d = data(el), st = state(el), others = d.metrics.filter(m => m.k !== 'score');
     const opts = ms => ms.map(m => `<option value="${esc(m.k)}"${m.k === st.m2 ? ' selected' : ''}${m.src === 'profile' ? ` title="${esc(headTip(d, m.k))}"` : ''}>${esc(heading(d, m.k))}</option>`).join('');
@@ -855,6 +1279,7 @@ const BH = (() => {
       + (others.some(m => m.src === 'profile') ? `<optgroup label="profile pass (${esc((d.profile || {}).campaign || '')})">${opts(others.filter(m => m.src === 'profile'))}</optgroup>` : '')
       + '</select></label>';
     drawChart(el, d, st); drawTable(el, d, st); drawCompare(el, d, st);
+    if (pop && pop.camp === el.dataset.campaign) renderPop(el);
     if (memOf(el).hover) hover(el, memOf(el).hover);
   }
   function draw(cs) {
@@ -871,9 +1296,10 @@ const BH = (() => {
   function update(el, f) { const st = state(el); f(st); save(el, st); drawOne(el); }
   const toggle = (st, v) => { st.sel = st.sel.includes(v) ? st.sel.filter(x => x !== v) : [...st.sel, v].slice(-2); };
   document.addEventListener('click', e => {
-    const el = e.target.closest && e.target.closest('.bh'), t = el && e.target.closest('[data-bform],[data-bchart],[data-bc],[data-bmerge],[data-bhv],[data-bclear],[data-bprof],[data-bcopy]');
+    const el = e.target.closest && e.target.closest('.bh'), t = el && e.target.closest('[data-bform],[data-bchart],[data-bc],[data-bmerge],[data-bhv],[data-bclear],[data-bprof],[data-bcopy],[data-bcell]');
     if (!t) return;
-    if (t.dataset.bform) update(el, st => { st.form = t.dataset.bform; });
+    if (t.dataset.bcell != null) { if (pop && pop.camp === el.dataset.campaign && pop.c === t.dataset.bcell && pop.v === t.dataset.bcv) closePop(false); else openPop(el, t.dataset.bcell, t.dataset.bcv, t); }
+    else if (t.dataset.bform) update(el, st => { st.form = t.dataset.bform; });
     else if (t.dataset.bchart) update(el, st => { st.chart = !st.chart; });
     else if (t.dataset.bc) update(el, st => { st.c = t.dataset.bc; });
     else if (t.dataset.bclear) update(el, st => { st.sel = []; });
@@ -900,6 +1326,6 @@ const BH = (() => {
   });
   let rz = 0;
   addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => draw(), 150); });
-  return {draw};
+  return {draw, popover};
 })();
 """
