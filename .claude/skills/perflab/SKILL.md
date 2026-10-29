@@ -19,6 +19,8 @@ Send the user the URL it prints, in your next message, before results exist. It 
 
 While a `perflab server` runs (`perflab server status`), the project's page is on it (`serve` prints `http://127.0.0.1:8690/p/<project>/...`), and `perflab run` and `perflab ab run` go to its queue, one job at a time: they print `job N queued ...: <queue URL>` and the index URL, then follow the job's transcript (into `--transcript` too). Give the user both URLs. Ctrl-C (or killing the follower) only detaches: cancel a job from the queue page, not with `kill`. `--local` runs a command in the foreground instead; `--dry-run` always does.
 
+On macOS the server can run as a launchd agent, started at login and kept alive: `mise run server:install` (from a jvm-perf-lab checkout; the server then runs that checkout's code), `mise run server:restart` after changing perflab's code, `mise run server:uninstall`. Check with `launchctl print gui/$(id -u)/io.github.retronym.perflab.server`; its log is `~/.perflab/server/server.log`. A restart doesn't interrupt jobs: the new server adopts them. Restart the server only between campaigns unless the user asks, since a restart mid-campaign is the user's call. `perflab server stop` stops the agent, and it stays stopped until `server:restart`.
+
 When reporting, link the run or campaign on that page rather than only pasting numbers.
 
 Run long commands in the background with a transcript, and follow that file instead of waiting blind: `perflab --transcript <scratch>/t.txt ab run <spec>` (also `run`, `trees`). It gets perflab's progress, loadgate waits, the build's output as it comes (sbt compiling, a failing build or a server started without the lab's environment) and JMH's iterations. A loadgate wait also shows live on the index.

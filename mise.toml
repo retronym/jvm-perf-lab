@@ -54,3 +54,67 @@ make -C "$dir" -j"$(sysctl -n hw.ncpu 2>/dev/null || nproc)" >/dev/null
 git -C "$dir" rev-parse HEAD > "$dir/BUILT_COMMIT"
 echo "async-profiler $(cut -c1-10 "$dir/BUILT_COMMIT") ($ref): $dir/build/lib, $dir/build/bin"
 """
+
+# The perflab server as a launchd agent (macOS): started at login, restarted if it dies, run from this checkout's
+# python/src with this mise's Python and the PATH of the shell that installed it (jobs bring their submitter's own).
+# `perflab server stop` exits cleanly and launchd leaves it stopped; `mise run server:restart` brings it back. Jobs run
+# on through a restart (own session, AbandonProcessGroup) and the new server adopts them.
+[tasks."server:install"]
+description = "Install and start the perflab server as a launchd agent (~/Library/LaunchAgents), stopping any server started otherwise"
+run = """
+set -euo pipefail
+label=io.github.retronym.perflab.server
+plist="$HOME/Library/LaunchAgents/$label.plist"
+home="${PERFLAB_SERVER_HOME:-$HOME/.perflab/server}"
+python=$(command -v python3)
+mkdir -p "$home" "$(dirname "$plist")"
+launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+PYTHONPATH="{{config_root}}/python/src" "$python" -m perflab server stop || true
+cat > "$plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$label</string>
+  <key>ProgramArguments</key><array>
+    <string>$python</string><string>-m</string><string>perflab</string><string>server</string><string>run</string>
+  </array>
+  <key>EnvironmentVariables</key><dict>
+    <key>PYTHONPATH</key><string>{{config_root}}/python/src</string>
+    <key>PATH</key><string>$PATH</string>
+    <key>PERFLAB_SERVER_HOME</key><string>$home</string>
+  </dict>
+  <key>WorkingDirectory</key><string>$home</string>
+  <key>StandardOutPath</key><string>$home/server.log</string>
+  <key>StandardErrorPath</key><string>$home/server.log</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>AbandonProcessGroup</key><true/>
+  <key>ProcessType</key><string>Interactive</string>
+</dict></plist>
+PLIST
+plutil -lint -s "$plist"
+launchctl bootstrap "gui/$(id -u)" "$plist"
+for _ in $(seq 50); do test -f "$home/server.json" && break; sleep 0.2; done
+PYTHONPATH="{{config_root}}/python/src" "$python" -m perflab server status
+"""
+
+[tasks."server:restart"]
+description = "Restart the launchd perflab server (on this code); running jobs carry on and are adopted"
+run = """
+set -euo pipefail
+launchctl kickstart -k "gui/$(id -u)/io.github.retronym.perflab.server"
+home="${PERFLAB_SERVER_HOME:-$HOME/.perflab/server}"
+sleep 1; for _ in $(seq 50); do test -f "$home/server.json" && break; sleep 0.2; done
+PYTHONPATH="{{config_root}}/python/src" python3 -m perflab server status
+"""
+
+[tasks."server:uninstall"]
+description = "Stop the launchd perflab server and remove its agent; jobs, results and ~/.perflab/server stay"
+run = """
+set -euo pipefail
+label=io.github.retronym.perflab.server
+launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || echo "not loaded"
+rm -f "$HOME/Library/LaunchAgents/$label.plist"
+echo "removed $label"
+"""
