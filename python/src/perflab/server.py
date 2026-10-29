@@ -681,6 +681,13 @@ class Server:
                         return self._send(200, serverui.admin_page(server), "text/html; charset=utf-8")
                     if p.startswith("/p/"):
                         return self._static(p, url.query)
+                    if p == "/llms.txt":
+                        from . import api
+                        return self._send(200, api.llms_txt(), "text/plain; charset=utf-8")
+                    if p == "/skill.md":
+                        from . import api
+                        md = api.skill_md()
+                        return self._send(200, md, "text/plain; charset=utf-8") if md else self._error(404, "no perflab skill beside this perflab")
                     if p == "/api/v1" or p.startswith("/api/v1/"):
                         return self._api(lambda api: api.http_get(p, qs, server))
                     if p == "/api/status":

@@ -86,7 +86,7 @@ To read a campaign's results, use perflab's API rather than parsing `result.json
 
 - **MCP** (preferred): `claude mcp add perflab -- perflab mcp`, run in the project (or `perflab mcp --root <project>`). Every function is a tool with input and output schemas.
 - **CLI**: `perflab api --list` (functions and conventions), `perflab api <function> --<param> <value>...` prints JSON, `perflab api --schema <Name>` a response's schema.
-- **HTTP**, on a running server: `GET /api/v1` (the index), `/api/v1/openapi.json`, `/api/v1/docs`.
+- **HTTP**, on a running server: `GET /llms.txt` (where to start), `/api/v1` (the index), `/api/v1/openapi.json`, `/api/v1/docs`; `/skill.md` serves this skill.
 
 Start with `campaigns`, then `campaign <name>` (the summary), and for a branch campaign `branch` and `changes` (the commits that moved a metric significantly; `untested` lists steps with no spread to test, so "no changes" with a long `untested` list means "not enough forks", not "flat"). `cell` has one run's raw samples, iterations, competing load per iteration and logs; `compare` any two variants or commits; `profiles` and `diff` flame graphs and the methods whose time changed. Reads work without a server.
 

@@ -423,6 +423,20 @@ class HttpTest(Fixture, unittest.TestCase):
         self.assertEqual(s["$defs"]["CellSummary"]["type"], "object")
         self.assertEqual(self.http("GET", "/api/jobs")[0], 200)  # the old API stays
 
+    def test_llms_txt_and_skill(self):
+        code, txt, h = self.http("GET", "/llms.txt")
+        self.assertEqual(code, 200)
+        self.assertTrue(txt.startswith("# perflab server\n\n> "))
+        for link in ("(/skill.md)", "(/api/v1/docs)", "(/api/v1/openapi.json)", "(/api/v1/changes)", "(/api/v1/void)"):
+            self.assertIn(link, txt)
+        self.assertLess(txt.index("(/api/v1/changes)"), txt.index("## Actions"))
+        self.assertGreater(txt.index("(/api/v1/void)"), txt.index("## Actions"))
+        code, md, _ = self.http("GET", "/skill.md")
+        self.assertEqual((code, md.startswith("---")), (200, True))
+        self.assertIn("perflab api", md)
+        for page in ("/", "/admin", "/api/v1/docs"):
+            self.assertIn('href="/llms.txt"', self.http("GET", page)[1], page)
+
     def test_void_unvoid_and_rerun_once(self):
         body = {"project": self.pid, "campaign": "br", "corpus": "a", "variant": V[4], "round": 2, "reason": "load over 2 cores"}
         self.assertEqual(self.http("POST", "/api/v1/void", body, token=False)[0], 403)

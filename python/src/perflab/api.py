@@ -1813,7 +1813,58 @@ def docs_page():
             + f'<main><section class="card"><h2>perflab API v{API_VERSION}</h2><p class="facts">{esc(" ".join(doc["info"]["description"].split(chr(10) * 2)[0].split()))}</p>'
             f'<p>Machine-readable: <a href="/api/v1/openapi.json">openapi.json</a> (OpenAPI 3.1) · <a href="/api/v1">the index</a>. '
             f'Also an MCP server (<code>perflab mcp</code>) and a CLI (<code>perflab api</code>).</p><ul>{conv}</ul><p class="k">{toc}</p></section>'
-            f'<h2>Functions</h2>{"".join(fns)}<h2>Schemas</h2>{schemas}</main></body>')
+            f'<h2>Functions</h2>{"".join(fns)}<h2>Schemas</h2>{schemas}</main>' + ui.footer() + '</body>')
+
+
+# ---- for agents: /llms.txt (llmstxt.org) and the perflab skill, as /skill.md
+
+SKILL = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))),
+                     ".claude", "skills", "perflab", "SKILL.md")  # in the jvm-perf-lab checkout this perflab runs from
+
+
+def skill_md():
+    """The perflab skill (how to run, check and report benchmarks), or None outside a jvm-perf-lab checkout."""
+    try:
+        with open(SKILL, encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def llms_txt():
+    """/llms.txt: what this server is and where an agent reads on, from FUNCTIONS and CONVENTIONS."""
+    fns = lambda kind: "\n".join(f"- [{f.name}]({f.path}): {f.summary}" for f in FUNCTIONS.values() if f.kind == kind)
+    conv = "\n".join(f"- **{k}**: {v}" for k, v in CONVENTIONS.items())
+    return f"""# perflab server
+
+> A per-user server for perflab (jvm-perf-lab): a queue of JMH benchmark jobs run one at a time, every registered project's results (A/B campaigns, branch campaigns over a commit range, profiles and their diffs), and an API over them for agents.
+
+Read campaign results through the API rather than parsing files or HTML pages. The same functions are an MCP server (`claude mcp add perflab -- perflab mcp`) and a CLI (`perflab api --list`, `perflab api <function> --<param> <value>`). Before running or reporting benchmarks, read the perflab skill.
+
+## Docs
+
+- [perflab skill](/skill.md): how to run, check and report benchmarks with perflab, and which API function answers what
+- [API reference](/api/v1/docs): every function, its parameters, and the JSON schema of every response
+- [OpenAPI 3.1](/api/v1/openapi.json): the machine-readable API
+- [API index](/api/v1): the functions as JSON
+
+## Conventions
+
+{conv}
+
+## Reads (GET, no token)
+
+{fns("read")}
+
+## Actions (POST, X-Perflab-Token; they change what the user is measuring: ask first)
+
+{fns("action")}
+
+## Optional
+
+- [Queue](/): jobs, with pause, resume and cancel
+- [Storage](/admin): storage per campaign, with cleanup
+"""
 
 
 # ---- HTTP, for perflab.server's handler

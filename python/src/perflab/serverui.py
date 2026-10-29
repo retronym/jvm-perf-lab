@@ -273,7 +273,7 @@ def _page(server, title, tab, body, script, css="", head_script=""):
 {ui.style(ui.BASE, CSS, css)}
 {ui.masthead("server", home="/")}
 <div class="nav"><div class="tabsrow"><div class="in"><nav class="tabs">{tabs}</nav></div></div></div>
-<main>{body}</main><div id="toast" hidden></div>
+<main>{body}</main>{ui.footer()}<div id="toast" hidden></div>
 {f"<script>{head_script}</script>" if head_script else ""}<script>const TOKEN = {json.dumps(server.token)}, HOME = {json.dumps(os.path.expanduser("~"))};
 {COMMON_JS}
 {script}</script>"""

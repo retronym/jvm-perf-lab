@@ -946,7 +946,9 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       f"they turn into links when <code>perflab regraph</code> finishes.</p><p style='margin-bottom:0'>Graph kinds:</p><ul style='margin:2px 0;padding-left:18px'>{kinds}</ul>", right=True)
   tl_help = ui.help_popover("Each fork from JVM start to exit. Iterations appear as they finish; counter lanes (xctrace) once the fork has "
                             "finished. Wheel or pinch to zoom, drag to pan, double-click to reset.", right=True)
-  tabs = ((f'<a href="#overview" data-sec="overview">Overview</a>' if intro else "")
+  # Home: the perflab server's queue and projects, shown when the server serves this index (under /p/<project>/)
+  tabs = ('<a href="/" id="srv-home" hidden title="perflab server: the queue and every project">⌂ Home</a>'
+          + (f'<a href="#overview" data-sec="overview">Overview</a>' if intro else "")
           + f'<a href="#campaigns" data-sec="campaigns">Campaigns<span class="n" id="n-campaigns">{len(camp_sections)}</span></a>'
           + (f'<a href="#counters" data-sec="counters">Counters<span class="n">{n_counters}</span></a>' if n_counters else "")
           + f'<a href="#runs" data-sec="runs">Runs<span class="n" id="n-runs">{len(run_sections)}</span></a>')
@@ -987,7 +989,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   {counters_sec}
   <h2 class="sec" id="runs">Runs <span class="k">one benchmark under one profile, newest first</span></h2>
   {newest(run_sections) or '<p class="k">No runs yet: <code>perflab run</code>.</p>'}
-  </div></main>{f'<footer>{footer}</footer>' if footer else ''}
+  </div></main>{f'<footer>{footer}</footer>' if footer else ''}<div id="srv-foot" hidden>{ui.footer()}</div>
   <script>{timeline.script()}</script>{ui.lightbox_script()}
   <script>{SUMMARY_JS}</script>
   <script>{branchview.JS}</script>
@@ -1017,7 +1019,9 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
     for (const [id, s] of [['n-campaigns', 'campaign'], ['n-runs', 'run']]) {{ const e = document.getElementById(id); if (e) e.textContent = n(s); }}
   }}
   // the tab of the section in view
-  const tabs = [...document.querySelectorAll('nav.tabs a')];
+  if (location.protocol.startsWith('http') && location.pathname.startsWith('/p/'))
+    for (const id of ['srv-home', 'srv-foot']) {{ const e = document.getElementById(id); if (e) e.hidden = false; }}
+  const tabs = [...document.querySelectorAll('nav.tabs a[data-sec]')];
   function spy() {{
     let cur = tabs[0];
     for (const t of tabs) {{ const h = document.getElementById(t.dataset.sec); if (h && h.getBoundingClientRect().top < 140) cur = t; }}

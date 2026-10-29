@@ -212,6 +212,17 @@ BRAND_CSS = """
 FRAMED_JS = "<script>if (window !== window.top) document.documentElement.classList.add('framed')</script>"
 
 
+FOOTER_CSS = ("footer.agents{max-width:1100px;margin:0 auto;padding:12px 20px 28px;font-size:12px;color:var(--muted)}"
+              " footer.agents a{color:inherit}")
+
+
+def footer():
+    """The server pages' footer: where an agent reads on."""
+    return (f'<style>{FOOTER_CSS}</style><footer class="agents">For agents: <a href="/llms.txt">llms.txt</a> · '
+            '<a href="/skill.md">the perflab skill</a> · <a href="/api/v1/docs">API</a> · '
+            '<a href="/api/v1/openapi.json">OpenAPI</a> · MCP: <code>perflab mcp</code></footer>')
+
+
 def masthead(title=None, home=None, slim=False, tagline=True):
     """The brand band: mark, name (linking `home`), the project's title after it, tagline, GitHub and docs. Slim on the
     pages the index links (timeline, compare, reports), where it is hidden inside the index's lightbox."""
