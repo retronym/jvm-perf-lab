@@ -1,0 +1,1266 @@
+{
+ "ApiIndex": {
+  "schema": "ApiIndex",
+  "version": 1,
+  "openapi": "/api/v1/openapi.json",
+  "docs": "/api/v1/docs",
+  "conventions": {
+   "responses": "Every response is a JSON object with \"schema\" (its schema's name: #/components/schemas/<schema> in openapi.json) and \"version\" (the API version, 1). HTTP responses also link it: Link: <...openapi.json#/components/schemas/<schema>>; rel=\"describedby\".",
+   "errors": "A failure is {\"error\": {\"code\", \"message\", \"details\"?}} (#/components/schemas/Error) with the HTTP status of its code: bad_request 400, forbidden 403, not_found 404, conflict 409, no_server 503, internal 500.",
+   "reads": "GET /api/v1/<function>?<param>=<value>: no token; numbers and booleans as text (true/false), arrays as JSON.",
+   "actions": "POST /api/v1/<function> with a JSON object of the parameters, header X-Perflab-Token (the server's token, in ~/.perflab/server/token), from the server's own origin only.",
+   "project": "Every function on a project takes `project`: a project id (see projects) or its root directory; over HTTP only registered projects, and omitted only when there is one.",
+   "urls": "Fields named url are paths on the server (http://127.0.0.1:8690 by default): the index, timelines, flame graphs.",
+   "units": "A metric's unit is in its label (MetricInfo.label): the score in the benchmark's unit (e.g. ms/op), alloc in bytes per op, counts in events per op (per unit of perUnit when the spec has one), ratios and percents as such.",
+   "statistics": "The unit of variation is the fork: a variant's mean, sd and 99.9% CI are over its forks' means; Δ is by Welch's t, significant (better or worse) when |pct| > halfWidth."
+  },
+  "functions": [
+   {
+    "name": "projects",
+    "kind": "read",
+    "method": "GET",
+    "path": "/api/v1/projects",
+    "summary": "The projects the server knows, and the working directory's",
+    "params": [],
+    "result": "Projects"
+   },
+   {
+    "name": "campaigns",
+    "kind": "read",
+    "method": "GET",
+    "path": "/api/v1/campaigns",
+    "summary": "A project's campaigns: kind, plan, progress and status",
+    "params": [
+     {
+      "name": "project",
+      "type": "string",
+      "required": false,
+      "description": "The project: a server project id (see projects), or a project root directory (with perflab.toml); omitted, the project of the working directory (on the server: the only registered project)"
+     },
+     {
+      "name": "storage",
+      "type": "boolean",
+      "required": false,
+      "description": "Also count each campaign's bytes by tier (walks every file: slow for campaigns with builds)",
+      "default": false
+     }
+    ],
+    "result": "Campaigns"
+   }
+  ]
+ },
+ "Branch": {
+  "schema": "Branch",
+  "version": 1,
+  "campaign": "br",
+  "range": "base..tip",
+  "checkout": "/repo",
+  "corpora": [
+   "a",
+   "b"
+  ],
+  "perUnit": null,
+  "metrics": [
+   {
+    "key": "score",
+    "label": "ms/op",
+    "kind": "score"
+   },
+   {
+    "key": "alloc",
+    "label": "alloc/op",
+    "kind": "alloc"
+   }
+  ],
+  "commits": [
+   {
+    "index": 0,
+    "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "short": "aaaaaaaaaa",
+    "variant": "aaaaaaaaaa",
+    "subject": "Commit number 0",
+    "author": "Jason Zaugg",
+    "date": "2026-10-20T10:00:00+02:00",
+    "merged": [],
+    "unbuildable": null,
+    "corpora": {
+     "a": {
+      "state": "done",
+      "rounds": 2,
+      "forks": 4,
+      "why": null,
+      "metrics": {
+       "score": {
+        "mean": 10.15,
+        "sd": 0.12909944487358033,
+        "ci": 0.834240612773076,
+        "n": 4,
+        "df": 3,
+        "pooled": false,
+        "shown": "10.15",
+        "ciShown": "0.83",
+        "delta": null
+       },
+       "alloc": {
+        "mean": 1000000.25,
+        "sd": 0.28867513459481287,
+        "ci": 1.8654187197516807,
+        "n": 4,
+        "df": 3,
+        "pooled": false,
+        "shown": "1.0MB",
+        "ciShown": "2B",
+        "delta": null
+       }
+      },
+      "previous": null,
+      "raw": {
+       "score": [
+        [
+         10.0,
+         10.1
+        ],
+        [
+         10.2,
+         10.1
+        ]
+       ],
+       "alloc": [
+        [
+         1000000.0,
+         1000000.0
+        ],
+        [
+         1000000.0,
+         1000000.0
+        ]
+       ]
+      }
+     },
+     "b": {
+      "state": "done",
+      "rounds": 1,
+      "forks": 1,
+      "why": null,
+      "metrics": {
+       "score": {
+        "mean": 5.0,
+        "sd": null,
+        "ci": null,
+        "n": 1,
+        "df": null,
+        "pooled": false,
+        "shown": "5",
+        "ciShown": "",
+        "delta": null
+       },
+       "alloc": {
+        "mean": 2000000.0,
+        "sd": null,
+        "ci": null,
+        "n": 1,
+        "df": null,
+        "pooled": false,
+        "shown": "2.0MB",
+        "ciShown": "",
+        "delta": null
+       }
+      },
+      "previous": null,
+      "raw": {
+       "score": [
+        [
+         5.0,
+         5.1
+        ]
+       ],
+       "alloc": [
+        [
+         2000000.0,
+         2000000.0
+        ]
+       ]
+      }
+     }
+    },
+    "profiled": []
+   },
+   {
+    "index": 1,
+    "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "short": "bbbbbbbbbb",
+    "variant": "bbbbbbbbbb",
+    "subject": "Commit number 1",
+    "author": "Jason Zaugg",
+    "date": "2026-10-21T10:00:00+02:00",
+    "merged": [],
+    "unbuildable": null,
+    "corpora": {
+     "a": {
+      "state": "done",
+      "rounds": 1,
+      "forks": 1,
+      "why": null,
+      "metrics": {
+       "score": {
+        "mean": 10.0,
+        "sd": 0.13458604296540783,
+        "ci": 0.6434558714176147,
+        "n": 1,
+        "df": 9,
+        "pooled": true,
+        "shown": "10",
+        "ciShown": "1",
+        "delta": {
+         "pct": -1.4778325123152691,
+         "halfWidth": 6.39186835483137,
+         "verdict": "flat",
+         "against": "aaaaaaaaaa",
+         "pooled": true
+        }
+       },
+       "alloc": {
+        "mean": 1000000.0,
+        "sd": 0.31042685355668737,
+        "ci": 1.4841507868545223,
+        "n": 1,
+        "df": 9,
+        "pooled": true,
+        "shown": "1.0MB",
+        "ciShown": "1B",
+        "delta": {
+         "pct": -2.499999375293882e-05,
+         "halfWidth": 0.0001491048110254994,
+         "verdict": "flat",
+         "against": "aaaaaaaaaa",
+         "pooled": true
+        }
+       }
+      },
+      "previous": "aaaaaaaaaa",
+      "raw": {
+       "score": [
+        [
+         10.0,
+         10.1
+        ]
+       ],
+       "alloc": [
+        [
+         1000000.0,
+         1000000.0
+        ]
+       ]
+      }
+     },
+     "b": {
+      "state": "done",
+      "rounds": 1,
+      "forks": 1,
+      "why": null,
+      "metrics": {
+       "score": {
+        "mean": 5.5,
+        "sd": null,
+        "ci": null,
+        "n": 1,
+        "df": null,
+        "pooled": false,
+        "shown": "5.5",
+        "ciShown": "",
+        "delta": {
+         "pct": 10.000000000000009,
+         "halfWidth": null,
+         "verdict": "flat",
+         "against": "aaaaaaaaaa",
+         "pooled": false
+        }
+       },
+       "alloc": {
+        "mean": 2000000.0,
+        "sd": null,
+        "ci": null,
+        "n": 1,
+        "df": null,
+        "pooled": false,
+        "shown": "2.0MB",
+        "ciShown": "",
+        "delta": {
+         "pct": 0.0,
+         "halfWidth": null,
+         "verdict": "flat",
+         "against": "aaaaaaaaaa",
+         "pooled": false
+        }
+       }
+      },
+      "previous": "aaaaaaaaaa",
+      "raw": {
+       "score": [
+        [
+         5.5,
+         5.6
+        ]
+       ],
+       "alloc": [
+        [
+         2000000.0,
+         2000000.0
+        ]
+       ]
+      }
+     }
+    },
+    "profiled": []
+   }
+  ],
+  "profile": "br.profile",
+  "diffs": [
+   {
+    "name": "dddddddddd-eeeeeeeeee",
+    "campaign": "br",
+    "a": "dddddddddd",
+    "b": "eeeeeeeeee",
+    "corpus": null,
+    "url": "/p/lab-3f2a1c/ab/br/diff-dddddddddd-eeeeeeeeee/compare.html",
+    "path": "/Users/me/lab/out/perflab/ab/br/diff-dddddddddd-eeeeeeeeee"
+   },
+   {
+    "name": "a-dddddddddd-eeeeeeeeee",
+    "campaign": "br.profile",
+    "a": "dddddddddd",
+    "b": "eeeeeeeeee",
+    "corpus": "a",
+    "url": "/p/lab-3f2a1c/ab/br.profile/diff-a-dddddddddd-eeeeeeeeee/compare.html",
+    "path": "/Users/me/lab/out/perflab/ab/br.profile/diff-a-dddddddddd-eeeeeeeeee"
+   }
+  ]
+ },
+ "Campaign": {
+  "schema": "Campaign",
+  "version": 1,
+  "campaign": {
+   "name": "plain",
+   "kind": "plain",
+   "benchmark": "B",
+   "profile": "none",
+   "rounds": 2,
+   "corpora": [
+    "a",
+    "b"
+   ],
+   "variants": [
+    "base",
+    "tip"
+   ],
+   "description": "Is tip faster?",
+   "progress": {
+    "done": 4,
+    "running": 0,
+    "failed": 0,
+    "interrupted": 1,
+    "unbuildable": 0,
+    "void": 0,
+    "planned": 8
+   },
+   "status": "partial",
+   "updated": 1793233249.696012,
+   "updatedIso": "2026-10-29T10:20:49",
+   "bytes": null,
+   "profileOf": null,
+   "profiles": null,
+   "jobs": [],
+   "url": "/p/lab-3f2a1c/ab/index.html#c-plain"
+  },
+  "spec": {
+   "name": "plain",
+   "benchmark": "B",
+   "rounds": 2,
+   "corpora": {
+    "a": "-i 3",
+    "b": "-i 3"
+   },
+   "variants": {
+    "base": "",
+    "tip": "-Dx=1"
+   },
+   "variantDescriptions": {
+    "tip": "the **fast** one"
+   },
+   "description": [
+    "Is tip faster?"
+   ]
+  },
+  "variantInfo": [
+   {
+    "name": "base",
+    "description": null,
+    "flags": "",
+    "jmhArgs": "",
+    "build": null,
+    "baseline": true
+   },
+   {
+    "name": "tip",
+    "description": "the **fast** one",
+    "flags": "-Dx=1",
+    "jmhArgs": "",
+    "build": null,
+    "baseline": false
+   }
+  ],
+  "corpusInfo": [
+   {
+    "name": "a",
+    "jmhArgs": "-i 3"
+   },
+   {
+    "name": "b",
+    "jmhArgs": "-i 3"
+   }
+  ],
+  "baseline": "base",
+  "perUnit": null,
+  "metrics": [
+   {
+    "key": "score",
+    "label": "ms/op",
+    "kind": "score",
+    "main": true
+   },
+   {
+    "key": "alloc",
+    "label": "alloc/op",
+    "kind": "alloc",
+    "main": true
+   }
+  ],
+  "summary": [
+   {
+    "corpus": "a",
+    "variant": "base",
+    "rounds": 2,
+    "forks": 4,
+    "metrics": {
+     "score": {
+      "mean": 10.175,
+      "sd": 0.11902380714238028,
+      "ci": 0.7691318417540614,
+      "n": 4,
+      "df": 3,
+      "pooled": false,
+      "shown": "10.18",
+      "ciShown": "0.77"
+     },
+     "alloc": {
+      "mean": 1000000.25,
+      "sd": 0.28867513459481287,
+      "ci": 1.8654187197516807,
+      "n": 4,
+      "df": 3,
+      "pooled": false,
+      "shown": "1.0MB",
+      "ciShown": "2B"
+     }
+    },
+    "card": {
+     "score": {
+      "mean": 10.175,
+      "sd": 0.035355339059326626,
+      "pct": null,
+      "spread": 0.4914004914004809,
+      "verdict": ""
+     },
+     "alloc": {
+      "mean": 1000000.25,
+      "sd": 0.0,
+      "pct": null,
+      "spread": 0.0,
+      "verdict": ""
+     }
+    }
+   },
+   {
+    "corpus": "a",
+    "variant": "tip",
+    "rounds": 2,
+    "forks": 4,
+    "metrics": {
+     "score": {
+      "mean": 8.175,
+      "sd": 0.11902380714238028,
+      "ci": 0.7691318417540614,
+      "n": 4,
+      "df": 3,
+      "pooled": false,
+      "shown": "8.175",
+      "ciShown": "0.769",
+      "delta": {
+       "pct": -19.65601965601965,
+       "halfWidth": 4.928988528067104,
+       "verdict": "better",
+       "against": "base",
+       "pooled": false
+      }
+     },
+     "alloc": {
+      "mean": 1000000.25,
+      "sd": 0.28867513459481287,
+      "ci": 1.8654187197516807,
+      "n": 4,
+      "df": 3,
+      "pooled": false,
+      "shown": "1.0MB",
+      "ciShown": "2B",
+      "delta": {
+       "pct": 0.0,
+       "halfWidth": 0.00012163754773432105,
+       "verdict": "flat",
+       "against": "base",
+       "pooled": false
+      }
+     }
+    },
+    "card": {
+     "score": {
+      "mean": 8.175,
+      "sd": 0.035355339059326626,
+      "pct": -19.65601965601965,
+      "spread": 0.5547767298454299,
+      "verdict": "better"
+     },
+     "alloc": {
+      "mean": 1000000.25,
+      "sd": 0.0,
+      "pct": 0.0,
+      "spread": 0.0,
+      "verdict": "flat"
+     }
+    }
+   }
+  ],
+  "links": {
+   "card": "/p/lab-3f2a1c/ab/index.html#c-plain",
+   "spec": "/p/lab-3f2a1c/ab/plain/spec.json",
+   "report": null,
+   "timelines": [
+    {
+     "corpus": "a",
+     "variant": "base",
+     "round": 1,
+     "url": "/p/lab-3f2a1c/ab/plain/a/base/1/timeline.html"
+    },
+    {
+     "corpus": "a",
+     "variant": "base",
+     "round": 2,
+     "url": "/p/lab-3f2a1c/ab/plain/a/base/2/timeline.html"
+    }
+   ],
+   "graphs": [
+    {
+     "corpus": "a",
+     "variant": "base",
+     "round": 1,
+     "event": "cpu",
+     "kind": "bench",
+     "url": "/p/lab-3f2a1c/ab/plain/a/base/1/rec-cpu.html",
+     "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1/rec-cpu.html"
+    },
+    {
+     "corpus": "a",
+     "variant": "base",
+     "round": 1,
+     "event": "alloc",
+     "kind": "bench",
+     "url": "/p/lab-3f2a1c/ab/plain/a/base/1/rec-alloc.html",
+     "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1/rec-alloc.html"
+    }
+   ],
+   "diffs": [
+    {
+     "name": "base-tip",
+     "campaign": "plain",
+     "a": "base",
+     "b": "tip",
+     "corpus": null,
+     "url": "/p/lab-3f2a1c/ab/plain/diff-base-tip/compare.html",
+     "path": "/Users/me/lab/out/perflab/ab/plain/diff-base-tip"
+    }
+   ]
+  }
+ },
+ "Campaigns": {
+  "schema": "Campaigns",
+  "version": 1,
+  "project": {
+   "id": "lab-3f2a1c",
+   "name": "lab",
+   "root": "/Users/me/lab",
+   "campaigns": "/Users/me/lab/out/perflab/ab",
+   "runs": "/Users/me/lab/out/perflab/runs",
+   "registered": true,
+   "index": "/p/lab-3f2a1c/ab/index.html"
+  },
+  "campaigns": [
+   {
+    "name": "plain",
+    "kind": "plain",
+    "benchmark": "B",
+    "profile": "none",
+    "rounds": 2,
+    "corpora": [
+     "a",
+     "b"
+    ],
+    "variants": [
+     "base",
+     "tip"
+    ],
+    "description": "Is tip faster?",
+    "progress": {
+     "done": 4,
+     "running": 0,
+     "failed": 0,
+     "interrupted": 1,
+     "unbuildable": 0,
+     "void": 0,
+     "planned": 8
+    },
+    "status": "partial",
+    "updated": 1793233249.696012,
+    "updatedIso": "2026-10-29T10:20:49",
+    "bytes": null,
+    "profileOf": null,
+    "profiles": null,
+    "jobs": [],
+    "url": "/p/lab-3f2a1c/ab/index.html#c-plain"
+   },
+   {
+    "name": "br.profile",
+    "kind": "profile",
+    "benchmark": null,
+    "profile": "async:cpu,alloc",
+    "rounds": 1,
+    "corpora": [
+     "a"
+    ],
+    "variants": [
+     "dddddddddd",
+     "eeeeeeeeee"
+    ],
+    "description": null,
+    "progress": {
+     "done": 2,
+     "running": 0,
+     "failed": 0,
+     "interrupted": 0,
+     "unbuildable": 0,
+     "void": 0,
+     "planned": 2
+    },
+    "status": "finished",
+    "updated": 1793233249.6645012,
+    "updatedIso": "2026-10-29T10:20:49",
+    "bytes": null,
+    "profileOf": "br",
+    "profiles": null,
+    "jobs": [],
+    "url": "/p/lab-3f2a1c/ab/index.html#c-br.profile"
+   }
+  ]
+ },
+ "Cell": {
+  "schema": "Cell",
+  "version": 1,
+  "cell": {
+   "corpus": "a",
+   "variant": "base",
+   "round": 1,
+   "state": "done",
+   "score": 10.15,
+   "error": 0.1,
+   "unit": "ms/op",
+   "finished": 1793233249.6696844,
+   "why": null,
+   "voidId": null,
+   "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1",
+   "url": "/p/lab-3f2a1c/ab/plain/a/base/1",
+   "timeline": "/p/lab-3f2a1c/ab/plain/a/base/1/timeline.html"
+  },
+  "result": {
+   "benchmark": "b.Bench.compile",
+   "mode": "avgt",
+   "score": 10.15,
+   "error": 0.1,
+   "unit": "ms/op",
+   "params": {
+    "corpus": "a"
+   },
+   "jvm": null,
+   "jvmArgs": [],
+   "jdkVersion": null,
+   "vmName": null,
+   "vmVersion": null,
+   "forks": null,
+   "warmupIterations": null,
+   "warmupTime": null,
+   "measurementIterations": null,
+   "measurementTime": null
+  },
+  "metrics": [
+   {
+    "key": "score",
+    "label": "ms/op",
+    "kind": "score",
+    "value": 10.15
+   },
+   {
+    "key": "alloc",
+    "label": "alloc/op",
+    "kind": "alloc",
+    "value": 1000000.25
+   }
+  ],
+  "raw": {
+   "score": [
+    [
+     10.05,
+     10.15
+    ],
+    [
+     10.25,
+     10.15
+    ]
+   ],
+   "alloc": [
+    [
+     1000000.0,
+     1000000.0
+    ],
+    [
+     1000000.0,
+     1000001.0
+    ]
+   ]
+  },
+  "iterations": [
+   {
+    "index": 0,
+    "kind": "warmup",
+    "start_ms": 1000,
+    "end_ms": 2000,
+    "score": 11.0,
+    "ops": 1,
+    "pid": 7,
+    "unit": "ms/op"
+   },
+   {
+    "index": 1,
+    "kind": "measure",
+    "start_ms": 2000,
+    "end_ms": 3000,
+    "score": 10.0,
+    "ops": 1,
+    "gc_ms": 3,
+    "pid": 7,
+    "unit": "ms/op",
+    "alloc_bytes": 1000
+   }
+  ],
+  "load": {
+   "source": "load.tsv",
+   "maxCores": null,
+   "iterations": [
+    {
+     "index": 1,
+     "start": 2.0,
+     "end": 3.0,
+     "score": 10.0,
+     "cores": 2.0,
+     "top": "java 2.0"
+    }
+   ],
+   "disturbed": []
+  },
+  "gc": {
+   "metrics": {
+    "gc.alloc.rate.norm": {
+     "score": 1000000.25,
+     "unit": "B/op"
+    }
+   },
+   "log": null
+  },
+  "profile": {
+   "profiler": "async:cpu,alloc",
+   "recordings": [
+    {
+     "name": "rec.jfr",
+     "bytes": 3,
+     "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1/rec.jfr",
+     "url": "/p/lab-3f2a1c/ab/plain/a/base/1/rec.jfr"
+    }
+   ],
+   "graphs": [
+    {
+     "event": "cpu",
+     "kind": "bench",
+     "url": "/p/lab-3f2a1c/ab/plain/a/base/1/rec-cpu.html",
+     "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1/rec-cpu.html"
+    },
+    {
+     "event": "alloc",
+     "kind": "bench",
+     "url": "/p/lab-3f2a1c/ab/plain/a/base/1/rec-alloc.html",
+     "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1/rec-alloc.html"
+    }
+   ],
+   "hwEvents": {}
+  },
+  "logs": {
+   "jmh.log": {
+    "name": "jmh.log",
+    "bytes": 14,
+    "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1/jmh.log",
+    "url": "/p/lab-3f2a1c/ab/plain/a/base/1/jmh.log",
+    "tail": "two\nthree\n"
+   }
+  },
+  "files": [
+   {
+    "name": "iterations.tsv",
+    "bytes": 152,
+    "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1/iterations.tsv",
+    "url": "/p/lab-3f2a1c/ab/plain/a/base/1/iterations.tsv"
+   },
+   {
+    "name": "jmh.log",
+    "bytes": 14,
+    "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1/jmh.log",
+    "url": "/p/lab-3f2a1c/ab/plain/a/base/1/jmh.log"
+   }
+  ],
+  "specVersion": null,
+  "void": null
+ },
+ "Cells": {
+  "schema": "Cells",
+  "version": 1,
+  "campaign": "br",
+  "cells": [
+   {
+    "corpus": "a",
+    "variant": "aaaaaaaaaa",
+    "round": 1,
+    "state": "done",
+    "score": 10.1,
+    "error": 0.1,
+    "unit": "ms/op",
+    "finished": 1793233249.641082,
+    "why": null,
+    "voidId": null,
+    "path": "/Users/me/lab/out/perflab/ab/br/a/aaaaaaaaaa/1",
+    "url": "/p/lab-3f2a1c/ab/br/a/aaaaaaaaaa/1",
+    "timeline": null
+   },
+   {
+    "corpus": "a",
+    "variant": "bbbbbbbbbb",
+    "round": 1,
+    "state": "done",
+    "score": 10.0,
+    "error": 0.1,
+    "unit": "ms/op",
+    "finished": 1793233249.6455116,
+    "why": null,
+    "voidId": null,
+    "path": "/Users/me/lab/out/perflab/ab/br/a/bbbbbbbbbb/1",
+    "url": "/p/lab-3f2a1c/ab/br/a/bbbbbbbbbb/1",
+    "timeline": null
+   }
+  ]
+ },
+ "Changes": {
+  "schema": "Changes",
+  "version": 1,
+  "campaign": "br",
+  "metric": "score",
+  "changes": [
+   {
+    "corpus": "a",
+    "metric": "score",
+    "variant": "eeeeeeeeee",
+    "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "subject": "Commit number 4",
+    "index": 4,
+    "previous": "dddddddddd",
+    "mean": 8.15,
+    "previousMean": 10.100000000000001,
+    "shown": "8.15",
+    "delta": {
+     "pct": -19.30693069306931,
+     "halfWidth": 5.15771533382824,
+     "verdict": "better",
+     "against": "dddddddddd",
+     "pooled": false
+    }
+   }
+  ],
+  "untested": [
+   {
+    "corpus": "b",
+    "variant": "bbbbbbbbbb",
+    "previous": "aaaaaaaaaa",
+    "pct": 10.000000000000009
+   }
+  ]
+ },
+ "Compare": {
+  "schema": "Compare",
+  "version": 1,
+  "campaign": "plain",
+  "a": "base",
+  "b": "tip",
+  "corpora": [
+   {
+    "corpus": "a",
+    "metrics": [
+     {
+      "key": "score",
+      "label": "ms/op",
+      "kind": "score",
+      "a": {
+       "mean": 10.175,
+       "ci": 0.7691318417540614,
+       "n": 4,
+       "shown": "10.18"
+      },
+      "b": {
+       "mean": 8.175,
+       "ci": 0.7691318417540614,
+       "n": 4,
+       "shown": "8.175"
+      },
+      "delta": {
+       "pct": -19.65601965601965,
+       "halfWidth": 4.928988528067104,
+       "verdict": "better",
+       "against": "base",
+       "pooled": false
+      }
+     },
+     {
+      "key": "alloc",
+      "label": "alloc/op",
+      "kind": "alloc",
+      "a": {
+       "mean": 1000000.25,
+       "ci": 1.8654187197516807,
+       "n": 4,
+       "shown": "1.0MB"
+      },
+      "b": {
+       "mean": 1000000.25,
+       "ci": 1.8654187197516807,
+       "n": 4,
+       "shown": "1.0MB"
+      },
+      "delta": {
+       "pct": 0.0,
+       "halfWidth": 0.00012163754773432105,
+       "verdict": "flat",
+       "against": "base",
+       "pooled": false
+      }
+     }
+    ]
+   }
+  ],
+  "diffs": [
+   {
+    "name": "base-tip",
+    "campaign": "plain",
+    "a": "base",
+    "b": "tip",
+    "corpus": null,
+    "url": "/p/lab-3f2a1c/ab/plain/diff-base-tip/compare.html",
+    "path": "/Users/me/lab/out/perflab/ab/plain/diff-base-tip"
+   }
+  ]
+ },
+ "Diff": {
+  "schema": "Diff",
+  "version": 1,
+  "campaign": "plain",
+  "a": "base",
+  "b": "tip",
+  "diffs": [
+   {
+    "name": "base-tip",
+    "campaign": "plain",
+    "a": "base",
+    "b": "tip",
+    "corpus": null,
+    "url": "/p/lab-3f2a1c/ab/plain/diff-base-tip/compare.html",
+    "path": "/Users/me/lab/out/perflab/ab/plain/diff-base-tip",
+    "events": [
+     {
+      "event": "cpu",
+      "pages": {
+       "a": "/p/lab-3f2a1c/ab/plain/diff-base-tip/a-cpu.html",
+       "diff": "/p/lab-3f2a1c/ab/plain/diff-base-tip/diff-cpu.html",
+       "inverse": "/p/lab-3f2a1c/ab/plain/diff-base-tip/diff-cpu-inverse.html",
+       "b": "/p/lab-3f2a1c/ab/plain/diff-base-tip/b-cpu.html"
+      },
+      "summary": "cpu per op (benchmark threads): a 1.2k, b 1.0k, -16.7%  (ms/op a 10, b 8; ops a 3, b 3; a = base/1, b = tip/1)",
+      "rows": [
+       {
+        "delta": -150.0,
+        "a": 300.0,
+        "b": 150.0,
+        "pctOfTotal": -12.5,
+        "method": "a.B.slow",
+        "shown": "| -150 | 300 | 150 | -12.50% | `a.B.slow` |"
+       },
+       {
+        "delta": 10.0,
+        "a": 5.0,
+        "b": 15.0,
+        "pctOfTotal": 0.83,
+        "method": "a.B.fast",
+        "shown": "| +10 | 5 | 15 | +0.83% | `a.B.fast` |"
+       }
+      ],
+      "table": "cpu per op (benchmark threads): a 1.2k, b 1.0k, -16.7%  (ms/op a 10, b 8; ops a 3, b 3; a = base/1, b = tip/1)\n\nself cpu per op, biggest decreases then increases (b − a):\n\n| Δ | a | b | Δ of a's total | method |\n|---|---|---|---|---|\n| -150 | 300 | 150 | -12.50% | `a.B.slow` |\n| … | | | | |\n| +10 | 5 | 15 | +0.83% | `a.B.fast` |\n"
+     }
+    ]
+   }
+  ]
+ },
+ "JobResult": {
+  "schema": "JobResult",
+  "version": 1,
+  "job": {
+   "id": 1,
+   "project": "lab-3f2a1c",
+   "argv": [
+    "ab",
+    "run"
+   ],
+   "cwd": "/Users/me/lab",
+   "python": null,
+   "module": "perflab_fakejob",
+   "state": "running",
+   "priority": 0,
+   "seq": 1793233249.827444,
+   "created": 1793233249.827444,
+   "started": 1793233249.833496,
+   "ended": null,
+   "rc": null,
+   "pid": null,
+   "cancel_requested": null,
+   "dir": "/Users/me/.perflab/server/jobs/1",
+   "transcript": "/Users/me/.perflab/server/jobs/1/transcript.txt",
+   "note": null,
+   "pid_start": null,
+   "control": null,
+   "acked": false,
+   "envKeys": [
+    "ASYNC_PROFILER_DIR",
+    "HOME"
+   ]
+  }
+ },
+ "Jobs": {
+  "schema": "Jobs",
+  "version": 1,
+  "jobs": [
+   {
+    "id": 1,
+    "project": "lab-3f2a1c",
+    "argv": [
+     "ab",
+     "run"
+    ],
+    "cwd": "/Users/me/lab",
+    "python": null,
+    "module": "perflab_fakejob",
+    "state": "running",
+    "priority": 0,
+    "seq": 1793233249.827444,
+    "created": 1793233249.827444,
+    "started": 1793233249.833496,
+    "ended": null,
+    "rc": null,
+    "pid": 49537,
+    "cancel_requested": null,
+    "dir": "/Users/me/.perflab/server/jobs/1",
+    "transcript": "/Users/me/.perflab/server/jobs/1/transcript.txt",
+    "note": null,
+    "pid_start": "Thu Oct 29 10:20:49 2026",
+    "control": null,
+    "acked": false,
+    "envKeys": [
+     "ASYNC_PROFILER_DIR",
+     "HOME"
+    ]
+   }
+  ]
+ },
+ "Profiles": {
+  "schema": "Profiles",
+  "version": 1,
+  "campaign": "plain",
+  "graphs": [
+   {
+    "corpus": "a",
+    "variant": "base",
+    "round": 1,
+    "event": "cpu",
+    "kind": "bench",
+    "url": "/p/lab-3f2a1c/ab/plain/a/base/1/rec-cpu.html",
+    "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1/rec-cpu.html"
+   },
+   {
+    "corpus": "a",
+    "variant": "base",
+    "round": 1,
+    "event": "alloc",
+    "kind": "bench",
+    "url": "/p/lab-3f2a1c/ab/plain/a/base/1/rec-alloc.html",
+    "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1/rec-alloc.html"
+   }
+  ],
+  "diffs": [
+   {
+    "name": "base-tip",
+    "campaign": "plain",
+    "a": "base",
+    "b": "tip",
+    "corpus": null,
+    "url": "/p/lab-3f2a1c/ab/plain/diff-base-tip/compare.html",
+    "path": "/Users/me/lab/out/perflab/ab/plain/diff-base-tip"
+   }
+  ]
+ },
+ "Projects": {
+  "schema": "Projects",
+  "version": 1,
+  "projects": [
+   {
+    "id": "lab-3f2a1c",
+    "name": "lab",
+    "root": "/Users/me/lab",
+    "campaigns": "/Users/me/lab/out/perflab/ab",
+    "runs": "/Users/me/lab/out/perflab/runs",
+    "registered": true,
+    "index": "/p/lab-3f2a1c/ab/index.html"
+   }
+  ]
+ },
+ "Rerun": {
+  "schema": "Rerun",
+  "version": 1,
+  "campaign": "br",
+  "argv": [
+   "ab",
+   "run"
+  ],
+  "job": {
+   "id": 1,
+   "project": "lab-3f2a1c",
+   "argv": [
+    "ab",
+    "run"
+   ],
+   "cwd": "/Users/me/lab",
+   "python": null,
+   "module": "perflab_fakejob",
+   "state": "queued",
+   "priority": 0,
+   "seq": 1793233249.827444,
+   "created": 1793233249.827444,
+   "started": null,
+   "ended": null,
+   "rc": null,
+   "pid": null,
+   "cancel_requested": null,
+   "dir": "/Users/me/.perflab/server/jobs/1",
+   "transcript": "/Users/me/.perflab/server/jobs/1/transcript.txt",
+   "note": null,
+   "pid_start": null,
+   "control": null,
+   "acked": false,
+   "position": 1,
+   "index": "/p/lab-3f2a1c/ab/index.html",
+   "envKeys": [
+    "ASYNC_PROFILER_DIR",
+    "HOME"
+   ],
+   "url": "/#job-1"
+  },
+  "deduped": false,
+  "running": null
+ },
+ "Transcript": {
+  "schema": "Transcript",
+  "version": 1,
+  "id": 1,
+  "text": "[ab 10:12:22] br: 20 cells, 11 to run\n"
+ },
+ "Unvoided": {
+  "schema": "Unvoided",
+  "version": 1,
+  "campaign": "br",
+  "cell": {
+   "corpus": "a",
+   "variant": "eeeeeeeeee",
+   "round": 2,
+   "state": "done",
+   "score": 8.2,
+   "error": 0.1,
+   "unit": "ms/op",
+   "finished": 1793233249.6518488,
+   "why": null,
+   "voidId": null,
+   "path": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2",
+   "url": "/p/lab-3f2a1c/ab/br/a/eeeeeeeeee/2",
+   "timeline": null
+  },
+  "from": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261029-102049"
+ },
+ "Voided": {
+  "schema": "Voided",
+  "version": 1,
+  "campaign": "br",
+  "void": {
+   "id": "a/eeeeeeeeee/2-20261029-102049",
+   "corpus": "a",
+   "variant": "eeeeeeeeee",
+   "round": 2,
+   "reason": "other load up to 2.1 cores over iterations 3, 4",
+   "voided": 1793233249.821394,
+   "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261029-102049",
+   "restorable": true
+  },
+  "from": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2"
+ },
+ "Voids": {
+  "schema": "Voids",
+  "version": 1,
+  "campaign": "br",
+  "voids": [
+   {
+    "id": "a/eeeeeeeeee/2-20261029-102049",
+    "corpus": "a",
+    "variant": "eeeeeeeeee",
+    "round": 2,
+    "reason": "other load up to 2.1 cores over iterations 3, 4",
+    "voided": 1793233249.821394,
+    "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261029-102049",
+    "restorable": true
+   }
+  ]
+ }
+}

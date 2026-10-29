@@ -38,6 +38,8 @@ HTTP (JSON unless noted):
   GET  /api/storage                      perflab.storage's entries of every project
   POST /api/storage/cleanup              {action: builds|graphs|profiles|delete, dry_run (default true), target?, days?}
   POST /api/storage/pin                  {project, kind, name, pinned}
+  GET  /api/v1[/...]; POST /api/v1/...  perflab.api: campaigns, cells, branch history, comparisons, void and rerun
+                                         (GET /api/v1 lists it, /api/v1/openapi.json describes it, /api/v1/docs shows it)
   GET  /, /admin                         the queue page, the storage page
   GET  /p/<project>/...                  the project's campaigns and runs (its index), as `perflab serve` serves them
 
@@ -176,7 +178,7 @@ class Queue:
         if not os.path.exists(os.path.join(root, "perflab.toml")):
             raise ValueError(f"no perflab.toml in {root}")
         cfg = config.find(root)
-        pid = re.sub(r"[^A-Za-z0-9_.-]", "-", os.path.basename(root)) + "-" + hashlib.sha1(root.encode()).hexdigest()[:6]
+        pid = project_id(root)
         with self.lock, self._db() as db:
             db.execute("INSERT INTO projects(id, root, name, campaigns, runs, registered) VALUES(?,?,?,?,?,?) "
                        "ON CONFLICT(root) DO UPDATE SET campaigns=excluded.campaigns, runs=excluded.runs",
@@ -287,6 +289,11 @@ class Queue:
             else:
                 self.update(me["id"], priority=other["priority"], seq=other["seq"] + (-1e-6 if by < 0 else 1e-6))
             return self.get(jid)
+
+
+def project_id(root):
+    """A project's id on the server: its directory's name and a hash of its real path."""
+    return re.sub(r"[^A-Za-z0-9_.-]", "-", os.path.basename(root)) + "-" + hashlib.sha1(root.encode()).hexdigest()[:6]
 
 
 def _job(r):
@@ -634,10 +641,12 @@ class Server:
                 o = self.headers.get("Origin")
                 return o is None or o in (f"http://127.0.0.1:{server.port}", f"http://localhost:{server.port}")
 
-            def _send(self, code, body, ctype="application/json; charset=utf-8"):
+            def _send(self, code, body, ctype="application/json; charset=utf-8", headers=()):
                 data = (json.dumps(body) if ctype.startswith("application/json") else body).encode()
                 self.send_response(code)
                 self.send_header("Content-Type", ctype)
+                for k, v in headers:
+                    self.send_header(k, v)
                 self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "no-store")
                 self.send_header("X-Content-Type-Options", "nosniff")
@@ -672,6 +681,8 @@ class Server:
                         return self._send(200, serverui.admin_page(server), "text/html; charset=utf-8")
                     if p.startswith("/p/"):
                         return self._static(p, url.query)
+                    if p == "/api/v1" or p.startswith("/api/v1/"):
+                        return self._api(lambda api: api.http_get(p, qs, server))
                     if p == "/api/status":
                         return self._send(200, status(server))
                     if p == "/api/jobs":
@@ -700,6 +711,20 @@ class Server:
                     return self._error(404, "not found")
                 except (BrokenPipeError, ConnectionResetError):
                     pass
+
+            def _api(self, handle):
+                """An /api/v1 request (perflab.api): its result, described by its schema, or its error."""
+                from . import api
+                try:
+                    code, body, ctype, schema = handle(api)
+                except api.ApiError as e:
+                    return self._send(e.status, e.body(), headers=[("Link", api.described_by("Error"))])
+                except Exception as e:  # a bug: still the API's error shape
+                    traceback.print_exc()
+                    return self._send(500, {"error": {"code": "internal", "message": f"{type(e).__name__}: {e}"}})
+                if ctype.startswith("application/json"):
+                    ctype = "application/json; charset=utf-8"
+                return self._send(code, body, ctype, [("Link", api.described_by(schema))] if schema else [])
 
             def _static(self, p, query):
                 parts = p.split("/", 3)  # '', 'p', id, rest
@@ -746,6 +771,8 @@ class Server:
                 except ValueError:
                     return self._error(400, "bad JSON")
                 p = urllib.parse.urlsplit(self.path).path
+                if p.startswith("/api/v1/"):
+                    return self._api(lambda api: api.http_post(p, body, server))
                 try:
                     if p == "/api/jobs":  # always `perflab`, by the server's Python: what to run is not the request's to say
                         return self._send(201, public(submit_local(server, body)))
