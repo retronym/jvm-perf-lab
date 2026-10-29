@@ -60,6 +60,12 @@ JOB_ENV = "PERFLAB_JOB"
 LOCAL_ENV = "PERFLAB_LOCAL"  # set by a command run in the foreground, so that the perflab commands it runs are too
 STATES = ("queued", "running", "paused", "done", "failed", "cancelled")
 ACTIVE = ("running", "paused")
+
+
+def concurrent(argv):
+    """A job that only renders recordings already made (`branch diff`, `profdiff`): it starts as soon as it is queued,
+    beside the job that measures, which a diff would neither disturb much nor need to wait for."""
+    return argv[:1] == ["profdiff"] or argv[:2] == ["branch", "diff"]
 FINAL = ("done", "failed", "cancelled")
 TRANSITIONS = {"queued": {"running", "cancelled"},
                "running": {"paused", "done", "failed", "cancelled"},
@@ -215,13 +221,16 @@ class Queue:
         return _job(rows[0]) if rows else None
 
     def queued(self):
-        return [_job(r) for r in self._q("SELECT * FROM jobs WHERE state='queued' ORDER BY priority DESC, seq, id")]
+        """The jobs waiting their turn to measure, in order (a concurrent one does not wait: see `claim_concurrent`)."""
+        return [j for j in map(_job, self._q("SELECT * FROM jobs WHERE state='queued' ORDER BY priority DESC, seq, id"))
+                if not concurrent(j["argv"])]
 
     def jobs(self, include_final=True, limit=100):
         active = [_job(r) for r in self._q("SELECT * FROM jobs WHERE state IN ('running','paused') ORDER BY started")]
         queued = self.queued()
         for i, j in enumerate(queued):
             j["position"] = i + 1
+        queued += [j for j in map(_job, self._q("SELECT * FROM jobs WHERE state='queued' ORDER BY seq, id")) if concurrent(j["argv"])]
         final = [_job(r) for r in self._q("SELECT * FROM jobs WHERE state IN ('done','failed','cancelled') "
                                           "ORDER BY ended DESC, id DESC LIMIT ?", (limit,))] if include_final else []
         return active + queued + final
@@ -258,8 +267,17 @@ class Queue:
             return self.transition(q[0]["id"], "running", started=time.time())
 
     def active(self):
-        rows = self._q("SELECT * FROM jobs WHERE state IN ('running','paused') ORDER BY started LIMIT 1")
-        return _job(rows[0]) if rows else None
+        """The job measuring now, if any."""
+        return next((j for j in self.running() if not concurrent(j["argv"])), None)
+
+    def running(self):
+        return [_job(r) for r in self._q("SELECT * FROM jobs WHERE state IN ('running','paused') ORDER BY started")]
+
+    def claim_concurrent(self):
+        """Every queued concurrent job, now running."""
+        with self.lock:
+            return [self.transition(j["id"], "running", started=time.time())
+                    for j in map(_job, self._q("SELECT * FROM jobs WHERE state='queued' ORDER BY seq, id")) if concurrent(j["argv"])]
 
     def set_priority(self, jid, priority):
         with self.lock:
@@ -378,15 +396,40 @@ def cancel(q, jid):
 # ---- the worker
 
 class Worker(threading.Thread):
-    """Runs the queue's jobs one at a time; a job found running at start (the server restarted under it) is adopted
-    and watched until it exits."""
+    """Runs the queue's jobs that measure one at a time, and a concurrent one (`concurrent`) as soon as it is queued,
+    each watched by a thread of its own; a job found running at start (the server restarted under it) is adopted and
+    watched until it exits."""
 
     def __init__(self, q, grace=10.0, kill_after=20.0):
         super().__init__(daemon=True, name="perflab-worker")
         self.q, self.grace, self.kill_after = q, grace, kill_after
         self.wake, self.stopping = threading.Event(), threading.Event()
+        self.beside = set()  # the ids of the concurrent jobs being watched
+
+    def start_concurrent(self):
+        adopted = [j for j in self.q.running() if concurrent(j["argv"]) and j["id"] not in self.beside]
+        for job in adopted + self.q.claim_concurrent():
+            self.beside.add(job["id"])
+
+            def watch(job=job):
+                try:
+                    self.supervise(job)
+                except Exception:
+                    traceback.print_exc()
+                finally:
+                    self.beside.discard(job["id"])
+            threading.Thread(target=watch, daemon=True, name=f"perflab-job-{job['id']}").start()
+
+    def run_concurrent(self):
+        while not self.stopping.is_set():
+            try:
+                self.start_concurrent()
+            except Exception:
+                traceback.print_exc()
+            self.stopping.wait(0.5)
 
     def run(self):
+        threading.Thread(target=self.run_concurrent, daemon=True, name="perflab-concurrent").start()
         while not self.stopping.is_set():
             try:
                 job = self.q.active() or self.q.claim()

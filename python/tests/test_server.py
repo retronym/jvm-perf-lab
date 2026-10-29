@@ -227,6 +227,22 @@ class ServerTest(unittest.TestCase):
         j = self.until(bad["id"], "failed")
         self.assertEqual(j["rc"], 3)
 
+    def test_a_diff_runs_beside_the_job_that_measures(self):
+        blocker = self.submit("cells", "200", "0.1")
+        self.until(blocker["id"], "running")
+        waits = self.submit("cells", "1", "0")
+        diff = self.submit("profdiff", "2", "0.05")
+        self.assertIsNone(diff["position"])  # not in the line
+        self.assertEqual(waits["position"], 1)
+        j = self.until(diff["id"], "done")
+        self.assertEqual(j["rc"], 0)
+        self.assertIn("finished", self.transcript(diff["id"]))
+        self.assertEqual(self.job(blocker["id"])["state"], "running")
+        self.assertEqual(self.job(waits["id"])["state"], "queued")
+        self.assertEqual(server.status(self.srv)["running"]["id"], blocker["id"])
+        self.call("POST", f"/api/jobs/{blocker['id']}/cancel")
+        self.until(waits["id"], "done")
+
     def test_queue_api_reorders_and_cancels_queued_jobs(self):
         blocker = self.submit("cells", "200", "0.1")
         self.until(blocker["id"], "running")
