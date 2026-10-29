@@ -7,6 +7,7 @@ navigating away. The overlay's bar offers the other `a[data-lb]` of the closest 
 campaign's diffs) as chips, grouped by event; `↗` opens the current graph in a new tab, `[` and `]` step, Esc closes.
 A modified click (new tab, new window) is left to the browser.
 """
+import urllib.parse
 
 HEAD = '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
 
@@ -185,6 +186,10 @@ DOCS = "https://github.com/retronym/jvm-perf-lab/tree/main/doc"
 MARK = ('<svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1c2632"/>'
         '<rect x="5" y="21" width="22" height="5" rx="1.5" fill="#f59f00"/><rect x="5" y="14.5" width="15" height="5" rx="1.5" fill="#f76707"/>'
         '<rect x="21.5" y="14.5" width="5.5" height="5" rx="1.5" fill="#ffd43b"/><rect x="5" y="8" width="8" height="5" rx="1.5" fill="#e03131"/></svg>')
+# the mark as the pages' icon: inline, so that a static site, a file:// page and the server all have it (the server also
+# answers /favicon.ico with it, for what it serves that is not HTML)
+ICON_SVG = MARK.replace(' class="mark"', ' xmlns="http://www.w3.org/2000/svg"').replace(' aria-hidden="true"', "")
+HEAD += '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' + urllib.parse.quote(ICON_SVG) + '">'
 
 GITHUB = ('<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 '
           '6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 '

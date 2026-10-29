@@ -685,6 +685,9 @@ class Server:
                         return self._send(200, serverui.admin_page(server), "text/html; charset=utf-8")
                     if p.startswith("/p/"):
                         return self._static(p, url.query)
+                    if p == "/favicon.ico":
+                        from . import ui
+                        return self._send(200, ui.ICON_SVG, "image/svg+xml")
                     if p == "/llms.txt":
                         from . import api
                         return self._send(200, api.llms_txt(), "text/plain; charset=utf-8")
