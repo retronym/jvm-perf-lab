@@ -94,6 +94,18 @@ An admin page lists, per project and campaign, bytes by tier:
 
 Actions are "drop builds of finished campaigns", "drop rendered graphs", "drop profiles older than N days", and "delete campaign". Each shows the bytes it would reclaim before it runs. A pinned campaign is skipped by every bulk action. Bytes are counted as allocated blocks, hard links once. APFS clones still count once per clone, since there is no portable way to see shared extents, so the builds tier overstates what deleting reclaims.
 
+### 9. One API for agents, three transports
+
+An agent asked "which commit made scalaz faster, and is it real?" should not parse `result.json`, recompute intervals, or scrape the index's HTML: it would get the statistics subtly wrong (pooling iterations, ignoring the pooled spread of a one-fork commit), and every agent would get them wrong differently. Nor should voiding a disturbed cell mean an agent running `mv` on a directory the runner may be about to resume.
+
+- **One module, `perflab.api`, is the source of truth.** Plain functions over a project's files return JSON objects: projects, campaigns (kind, plan, progress, status), a campaign's summary, cells and one cell in full (result, every metric, raw samples, iterations, load per iteration, GC, profile, logs), a branch's history and its significant changes, a comparison of any two variants or commits, profiles and profdiff's tables. The statistics are `branchview`'s and `metrics`'s, called, not copied: a test holds the API's numbers to the branch view's.
+- **Three thin transports:** HTTP on `perflab server` (`/api/v1`), MCP on stdio (`perflab mcp`), and the CLI (`perflab api`). MCP is what an agent like Claude Code uses natively; the CLI serves agents without it and shell scripts; HTTP serves the index's own buttons and remote clients. None has logic of its own.
+- **Self-describing, from one schema registry.** Every request and response is a JSON Schema (2020-12) with a description on every field, units included (the score in the benchmark's unit, alloc in bytes per op), enums for states and verdicts, and an example generated from the tests' fixtures. OpenAPI 3.1 (`/api/v1/openapi.json`), the reference page (`/api/v1/docs`), MCP's input and output schemas and `perflab api --schema` are all generated from it, so they cannot drift. Each response names its schema (`"schema"`, `"version"`), and every error has one shape, `{"error": {"code", "message", "details"}}`, whose message says what to do instead.
+- **Reads need no server; actions go through it.** Reads work on the files (the server's registry and queue are read from its SQLite database read-only), so an agent can study results on a laptop. Actions change what the server owns, its queue and the cells a job may be about to run, so MCP and the CLI POST them to the server, with its token, and fail with `no_server` without one.
+- **Void, never delete.** `void` moves a cell to `<campaign>/.void/<corpus>/<variant>/<round>-<timestamp>/` with its reason, out of every summary and count; `unvoid` puts it back. The running cell is refused. `rerun` queues `ab run <campaign>/spec.json` once: deduplicated against a queued job for the campaign but not a running one, which chose its cells when it started. (So that a campaign's copy of its spec can be resumed, a campaign records where its spec came from, `spec.source`, for the relative checkouts in it.)
+
+Prior art: GitHub's and Stripe's APIs (one versioned surface, typed errors, OpenAPI generated from the source), and MCP servers that wrap an existing API rather than reimplementing it.
+
 ## Supporting changes
 
 - `metrics`/`index`: a cell's raw iterations (`rawData`) and CI reach the page's data, not just mean and sd.

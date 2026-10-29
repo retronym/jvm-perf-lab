@@ -14,6 +14,10 @@ While a `perflab server` runs (`perflab server status`), `perflab serve` prints 
 
 The page keeps itself current: `perflab ab run` rebuilds the index around every cell, `perflab run` every 10 s while it runs, the page refetches its tables every 10 s, and its timeline follows the running fork every 5 s. Each campaign shows how many of its planned cells have results, each run its status (running, finished, failed, interrupted). There is nothing to regenerate when a campaign or run finishes, so don't tell the user you will.
 
+## Reading results: the API
+
+Read campaign results through perflab's API, not by parsing result.json or the index: `perflab mcp` (register it with `claude mcp add perflab -- perflab mcp`), or `perflab api --list` and `perflab api <function> --<param> <value>` for JSON on the command line. It works without a server; its actions (void a cell, rerun a campaign, job control) need `perflab server`. The perflab skill (`.claude/skills/perflab/SKILL.md`, section 7) says which function answers what.
+
 ## Commits
 
 Say in the commit message that the change was made with an LLM. Do not add `Co-Authored-By` or "Generated with" trailers.

@@ -43,6 +43,10 @@ Design: [branch-explore.md](branch-explore.md). Test case: retronym/scala3 `scal
    - DONE (page side) **Void & rerun** per round, on the server: `bhVoid(campaign, corpus, variant, round, reason)` POSTs `/api/v1/void` then `/api/v1/rerun` (URLs in `BH_API`). The endpoints are server.py's.
    - Future work: a commit's CI with two forks is t(1) = 636.6 × sd/√2, wide enough to flatten the chart's scale; the chart could clip bars to the cloud's extent, or the explore order could give a commit its second fork in the same round.
 
+10. DONE An API for agents (design §9): `perflab.api` (functions, JSON Schema registry, examples from the tests' fixtures), `/api/v1` on the server (index, openapi.json, docs page, reads as GET, actions as POST with the token), `perflab mcp` (MCP stdio, 2025-06-18: tools with input and output schemas, structuredContent), `perflab api` (CLI). Void (to `.void/`), unvoid, rerun (deduped against a queued job), submit and job control. `ab run <campaign>/spec.json` resumes a campaign with relative checkouts (spec.source). Tests: test_api.py, test_mcp.py.
+    - The branch view's "Void & rerun" (step 9) calls POST /api/v1/void {project, campaign, corpus, variant, round, reason}, then POST /api/v1/rerun {project, campaign}.
+    - Future: within-fork uncertainty in the API's stats once the view has it (step 9); a `changes` over E-Divisive change points (§5).
+
 ## Future work
 
 - Adaptive exploration: refine where neighbours differ by more than their noise (Pinpoint).

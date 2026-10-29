@@ -19,6 +19,9 @@
   server     the per-user perflab server: a queue of jobs run one at a time, its UI and storage admin (start|stop|status)
   submit     queue `perflab <arguments>` on the server and follow it (`perflab submit -- ab run spec.json`)
   jobs       the server's queue
+  api        campaigns, cells, branch history, comparisons and profiles as JSON, and void/rerun/jobs (perflab.api):
+             `api --list`, `api <function> --<param> <value>...`, `api --schema <name>`
+  mcp        perflab.api as an MCP server on stdio, for agents (`claude mcp add perflab -- perflab mcp`)
 
 While `perflab server` runs, `run` and `ab run` go to its queue as `perflab submit` would and follow the job (Ctrl-C
 detaches; it runs on); `--local` runs one here instead, as do `--dry-run` and the commands a job runs.
@@ -36,7 +39,7 @@ COMMANDS = {"run": "jmh", "ab": "ab", "trees": "trees", "index": "index", "timel
             "profdiff": "profdiff", "inlinetree": "inlinetree", "frameweight": "frameweight", "subtree": "subtree", "analyze": "analyze",
             "auditfold": "auditfold", "loadgate": "loadgate", "site": "site", "serve": "serve", "defcosts": "defcosts",
             "server": "server", "submit": "server:submit_main", "jobs": "server:jobs_main",
-            "branch": "branchprofile"}
+            "branch": "branchprofile", "api": "api", "mcp": "mcp"}
 # the commands that become a job of a running `perflab server`: command -> the subcommands that do (None: all)
 SUBMITS = {"run": None, "ab": {"run"}, "branch": {"profile", "diff"}}
 LOCAL_ENV = "PERFLAB_LOCAL"  # server.LOCAL_ENV

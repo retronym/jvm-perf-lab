@@ -78,14 +78,26 @@ When variants do different amounts of work per op, set `"perUnit"` to the benchm
 
 Let perflab choose output directories (`--out` is optional; cells go under `[paths] campaigns`). Don't write scripts that assume a directory exists.
 
-## 7. Don't route around perflab
+## 7. Read results through the API, not the files
+
+To read a campaign's results, use perflab's API rather than parsing `result.json` or scraping the index: it computes the statistics the page shows (each metric's mean ± 99.9% CI over forks, Δ against the baseline or the previous commit by Welch's t, a verdict) and says what every field means.
+
+- **MCP** (preferred): `claude mcp add perflab -- perflab mcp`, run in the project (or `perflab mcp --root <project>`). Every function is a tool with input and output schemas.
+- **CLI**: `perflab api --list` (functions and conventions), `perflab api <function> --<param> <value>...` prints JSON, `perflab api --schema <Name>` a response's schema.
+- **HTTP**, on a running server: `GET /api/v1` (the index), `/api/v1/openapi.json`, `/api/v1/docs`.
+
+Start with `campaigns`, then `campaign <name>` (the summary), and for a branch campaign `branch` and `changes` (the commits that moved a metric significantly; `untested` lists steps with no spread to test, so "no changes" with a long `untested` list means "not enough forks", not "flat"). `cell` has one run's raw samples, iterations, competing load per iteration and logs; `compare` any two variants or commits; `profiles` and `diff` flame graphs and the methods whose time changed. Reads work without a server.
+
+A cell disturbed by other load (see its `load`) can be voided and run again: `void` (with a reason; it moves to `<campaign>/.void/`, never deleted) and `rerun` (queues one resume of the campaign). These are actions: they need `perflab server` and change what the user is measuring, so ask the user before voiding cells or queueing jobs.
+
+## 8. Don't route around perflab
 
 Never write `jmh.args` yourself, call the build's `Jmh/run` directly, or patch perflab's output to get past a failure. A run that bypasses perflab gets no checks, no timeline, no index entry, and its results can't be compared with the rest.
 
 - If a perflab feature fails, turn it off where perflab offers a switch, and say so in your report. For example, if `jfrsync` fails, set `[async] jfrsync = false` in `perflab.toml`, and the timeline then lacks the JDK's event lanes.
 - If there is no switch, or the failure looks like a perflab bug, stop and tell the user: the command, the error from `build.log` / `jmh.log`, and the JDK and async-profiler in use. Don't work around it.
 
-## 8. When it fails
+## 9. When it fails
 
 | Symptom | Look at |
 |---|---|
