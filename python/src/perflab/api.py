@@ -1810,7 +1810,7 @@ def docs_page():
     css = ("main{max-width:1100px;margin:0 auto;padding:16px 20px 40px} .m{font-size:11px;border-radius:4px;padding:0 5px;color:var(--panel)}"
            " .m.get{background:var(--ok)} .m.post{background:var(--warn)} table.t td{font-size:12.5px}")
     return (ui.HEAD + "<title>perflab API</title>" + ui.style(ui.BASE, css) + "<body>" + ui.masthead("API", "/", slim=False)
-            + f'<main><section class="card"><h2>perflab API v{API_VERSION}</h2><p class="facts">{esc(doc["info"]["description"].split(chr(10))[0])}</p>'
+            + f'<main><section class="card"><h2>perflab API v{API_VERSION}</h2><p class="facts">{esc(" ".join(doc["info"]["description"].split(chr(10) * 2)[0].split()))}</p>'
             f'<p>Machine-readable: <a href="/api/v1/openapi.json">openapi.json</a> (OpenAPI 3.1) · <a href="/api/v1">the index</a>. '
             f'Also an MCP server (<code>perflab mcp</code>) and a CLI (<code>perflab api</code>).</p><ul>{conv}</ul><p class="k">{toc}</p></section>'
             f'<h2>Functions</h2>{"".join(fns)}<h2>Schemas</h2>{schemas}</main></body>')
