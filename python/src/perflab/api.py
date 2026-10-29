@@ -741,7 +741,7 @@ def _forks(rs, per_unit):
 
 
 def _stats(per_v, per_unit):
-    """{variant: (forks' means by metric, cols)} -> {variant: {metric: Stat}}, the pooled sd for a variant of one fork."""
+    """{variant: (forks' means by metric, cols)} -> {variant: {metric: Stat}}, the pooled sd for one of few forks (metrics.fork_spread)."""
     stat = {v: {k: (*metrics.stats(xs), len(xs)) for k, xs in us.items() if xs} for v, (us, _) in per_v.items()}
     keys = {k for st in stat.values() for k in st}
     pool = {k: metrics.pooled_rel_sd([(st[k][0], st[k][1], st[k][2] - 1) for st in stat.values() if k in st]) for k in keys}
@@ -749,14 +749,12 @@ def _stats(per_v, per_unit):
     for v, (us, cols) in per_v.items():
         out[v] = {}
         for k, (mean, sd, n) in stat[v].items():
-            kind, pooled, df = cols[k][2], n < 2, n - 1
-            if pooled:
-                r, df = pool[k]
-                sd = None if r is None else r * abs(mean)
+            kind = cols[k][2]
+            sd, df, pooled = metrics.fork_spread(mean, sd, n, pool[k])
             ci = None if sd is None else metrics.t999(df) * sd / n ** 0.5
             f = branchview.fin
-            out[v][k] = {"mean": f(mean), "sd": f(sd), "ci": f(ci), "n": n, "df": f(df) if sd is not None else None,
-                         "pooled": bool(pooled and sd is not None), "shown": metrics.fmt(kind, mean),
+            out[v][k] = {"mean": f(mean), "sd": f(sd), "ci": f(ci), "n": n, "df": f(df),
+                         "pooled": pooled, "shown": metrics.fmt(kind, mean),
                          "ciShown": "" if ci is None else branchview.ci_shown(kind, ci, mean),
                          "_ok": metrics.delta_ok(mean, kind, per_unit)}
     return out

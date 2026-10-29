@@ -200,6 +200,20 @@ def ci999(xs):
     return mean, (t999(len(xs) - 1) * sd / len(xs) ** 0.5 if len(xs) > 1 else None)
 
 
+OWN_FORKS = 4  # from this many forks a group's spread is its own; before, the pooled one when it has more df
+
+
+def fork_spread(mean, sd, n, pool):
+    """(sd, df, pooled) of a group of `n` forks with mean `mean` and sd `sd`, given `pool` = pooled_rel_sd(...) of its
+    kind: its own from OWN_FORKS forks; with fewer, the pooled relative sd when that has more degrees of freedom (always
+    for one fork, which has none; with two, its own 99.9% CI would be t(1) = 637 sds, with three t(2) = 32). sd and df
+    are None without either."""
+    r, pdf = pool
+    if n < 2 or (n < OWN_FORKS and r is not None and pdf > n - 1):
+        return (None, None, False) if r is None else (r * abs(mean), pdf, True)
+    return sd, n - 1, False
+
+
 def pooled_rel_sd(groups):
     """(relative sd, df) pooled over groups of samples [(mean, sd, df)], each group's relative variance weighted by its
     df; (None, 0) when no group has df >= 1 and a nonzero mean. A spread for a group of one sample, from groups of the same

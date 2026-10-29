@@ -290,9 +290,6 @@ def date_shown(iso):
         return iso or ""
 
 
-OWN_FORKS = 4  # from this many forks a commit's interval is its own, before it the corpus's pooled one
-
-
 def branch_view(campaign_dir, rel_to=None):
     """What the page draws for a branch campaign, None when `campaign_dir` has no branch.json:
 
@@ -384,7 +381,7 @@ def branch_view(campaign_dir, rel_to=None):
             if "score" in us:
                 prev = v
         # per metric, the fork-to-fork relative sd pooled over the commits with two forks or more (ANOVA's within-group
-        # estimate, assuming a common relative spread), for a commit of fewer than OWN_FORKS forks when the pool has more
+        # estimate, assuming a common relative spread), for a commit of fewer than metrics.OWN_FORKS forks when the pool has more
         # degrees of freedom: with two forks a commit's own 99.9% CI is t(1) = 637 times its sd, with three t(2) = 32;
         # from four, its own spread says something (a commit whose forks land in two places should show it)
         stat = {v: {k: (*metrics.stats(xs), len(xs)) for k, xs in us.items() if xs} for v, (us, _, _) in units.items()}
@@ -394,13 +391,10 @@ def branch_view(campaign_dir, rel_to=None):
         for v, (us, kinds, wfs) in units.items():
             x = per_v[v]
             for k, (mean, sd, n) in stat[v].items():
-                kind, df = kinds[k], n - 1
-                pooled = n < 2 or (n < OWN_FORKS and pool[k][0] is not None and pool[k][1] > df)
-                if pooled:
-                    r, df = pool[k]
-                    sd = None if r is None else r * abs(mean)
+                kind = kinds[k]
+                sd, df, pooled = metrics.fork_spread(mean, sd, n, pool[k])
                 ci = None if sd is None else metrics.t999(df) * sd / n ** 0.5
-                x["m"][k] = [fin(mean), fin(sd), fin(ci), metrics.delta_ok(mean, kind, per_unit), n, df if sd is not None else None, pooled and sd is not None]
+                x["m"][k] = [fin(mean), fin(sd), fin(ci), metrics.delta_ok(mean, kind, per_unit), n, df, pooled]
                 x["s"][k] = [metrics.fmt(kind, mean), "" if ci is None else ci_shown(kind, ci, mean)]
                 w = within_of(wfs.get(k), sd)
                 if w:
