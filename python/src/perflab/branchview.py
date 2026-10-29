@@ -1231,8 +1231,9 @@ const BH = (() => {
     redraw();
     try {
       const r = await bhVoid(a.camp, a.c, a.v, a.round, a.reason.trim());
-      const j = r.rerun || {};
-      Object.assign(a, {done: true, msg: `voided; its rerun is queued${j.id != null ? ` as <a href="/">job ${esc(j.id)}</a>` : ''}. The round moves under “voided” when the index next refreshes.`});
+      const j = (r.rerun && r.rerun.job) || {}, again = r.rerun && r.rerun.deduped;  // api.rerun: {job, deduped}
+      Object.assign(a, {done: true, msg: `voided; ${again ? 'the rerun already queued measures it' : 'its rerun is queued'}`
+        + `${j.id != null ? ` as <a href="/#job-${esc(j.id)}">job ${esc(j.id)}</a>` : ''}. The round moves under “voided” when the index next refreshes.`});
     } catch (e) {
       Object.assign(a, {err: true, done: e.stage === 'rerun', msg: (e.stage === 'rerun' ? 'voided, but its rerun was not queued: ' : 'not voided: ') + esc(e.message || e)});
     }
