@@ -14,7 +14,9 @@ import argparse, collections, glob, io, json, math, os, re, subprocess, sys
 from . import compare, regraph
 
 
-LAMBDA_ADDRESS = re.compile(r"\$\$Lambda[./]0x[0-9a-f]+")
+# a hidden class named for its address in that JVM: a lambda (`Foo$$Lambda.0x0000f80140b6b0`) or a lambda form
+# (`java/lang/invoke/LambdaForm$MH.0x00000080010c4000`)
+HIDDEN_ADDRESS = re.compile(r"[./]0x[0-9a-f]{6,}")
 THREAD_ID = re.compile(r" tid=[0-9]+\]")
 FRAME_KIND = re.compile(r"_\[[a-z0-9]+\]$")
 
@@ -46,10 +48,10 @@ def load(run, event, jfrconv, out_dir, name):
     select = [s for label, s in regraph.events_of(d) if label.removeprefix("hw-") == event][0]
     subprocess.run([jfrconv, "-J-Xmx8g", *select, "--threads", "-I", ".*jmh-worker.*", "-o", "collapsed", jfr, collapsed],
                    check=True, capture_output=True)
-    # a lambda's hidden class is named for its address in that JVM (`Foo$$Lambda.0x0000f80140b6b0`), and a thread's
-    # frame (`--threads`) for its OS thread id (`[...-jmh-worker-1 tid=37123]`), which differ between the runs: without
-    # them, the same lambda or thread in both runs is one frame
-    lines = [THREAD_ID.sub("]", LAMBDA_ADDRESS.sub("$$Lambda", line)) for line in open(collapsed)]
+    # a hidden class (a lambda, a lambda form) is named for its address in that JVM, and a thread's frame
+    # (`--threads`) for its OS thread id (`[...-jmh-worker-1 tid=37123]`), which differ between the runs: without
+    # them, the same lambda, lambda form or thread in both runs is one frame
+    lines = [THREAD_ID.sub("]", HIDDEN_ADDRESS.sub("", line)) for line in open(collapsed)]
     with open(collapsed, "w") as f:
         f.writelines(lines)
     self_, total = collections.Counter(), 0
