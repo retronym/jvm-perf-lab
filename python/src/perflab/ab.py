@@ -69,6 +69,27 @@ def log(msg):
     transcript.say(f"[ab {time.strftime('%H:%M:%S')}] {msg}")
 
 
+SOURCE = "spec.source"  # in a campaign: the path of the spec its spec.json was copied from
+
+
+def is_copy(path, out):
+    """Whether the spec at `path` is the copy the campaign at `out` keeps (<campaign>/spec.json)."""
+    return os.path.abspath(path) == os.path.abspath(os.path.join(out, "spec.json"))
+
+
+def spec_dir(path, out):
+    """The directory a spec's relative paths (checkouts) are relative to: its own, but for the copy a campaign keeps,
+    that of the spec it was copied from (spec.source), so that `ab run <campaign>/spec.json` resumes it."""
+    if is_copy(path, out):
+        try:
+            src = open(os.path.join(out, SOURCE)).read().strip()
+        except OSError:
+            src = ""
+        if src:
+            return os.path.dirname(src)
+    return os.path.dirname(os.path.abspath(path))
+
+
 class Spec:
     def __init__(self, path):
         s = json.load(open(path))
@@ -92,17 +113,21 @@ class Spec:
         self.paired = s.get("paired")
         # "builds": {variant: {"checkout": <dir>, "env": {...}}}: each variant its own build, in launch mode
         # (doc/direct-launch.md); "{checkout}" in a value is the checkout's path, relative ones are to the spec's
-        here = os.path.dirname(os.path.abspath(path))
+        self.out = os.path.join(cfg.campaigns, self.name)
+        here = spec_dir(path, self.out)
         self.builds = {v: {**b, "checkout": os.path.normpath(os.path.join(here, b["checkout"])) if b.get("checkout") else None}
                        for v, b in (s.get("builds") or {}).items()}
-        self.out = os.path.join(cfg.campaigns, self.name)
         # "branch": the commits of a range as variants, each its own build (perflab.branch)
         self.branch = s.get("branch")
         self.branch_info = None
         if self.branch:
             if self.builds or self.paired or s.get("variants"):
                 sys.exit(f"{path}: \"branch\" makes the variants; it cannot have \"variants\", \"builds\" or \"paired\"")
-            self.branch = {**self.branch, "checkout": os.path.normpath(os.path.join(here, self.branch["checkout"]))}
+            co = self.branch["checkout"]
+            recorded = os.path.join(self.out, branch.BRANCH)
+            if not os.path.isabs(co) and is_copy(path, self.out) and not os.path.exists(os.path.join(self.out, SOURCE)) and os.path.exists(recorded):
+                co = json.load(open(recorded))["checkout"]  # a copy from before spec.source: the checkout the range was resolved in
+            self.branch = {**self.branch, "checkout": os.path.normpath(os.path.join(here, co))}
             self.branch_info = branch.load(self.out, self.branch, write=False)
             self.builds = {c["variant"]: {"checkout": self.branch["checkout"], "commit": c} for c in self.branch_info["commits"]}
         # "profileOf": the profiles of a branch campaign's commits (perflab.branchprofile), with its commits and builds
@@ -282,8 +307,10 @@ def run(spec, dry, retry_unbuildable=False):
     cells = list(spec.cells())
     # the campaign keeps its spec: the index orders variants by it, and a report can be rerun from the results alone
     os.makedirs(spec.out, exist_ok=True)
-    if os.path.abspath(spec.path) != os.path.abspath(os.path.join(spec.out, "spec.json")):
+    if not is_copy(spec.path, spec.out):
         shutil.copy(spec.path, os.path.join(spec.out, "spec.json"))
+        with open(os.path.join(spec.out, SOURCE), "w") as f:  # what its relative paths are relative to
+            f.write(os.path.abspath(spec.path) + "\n")
     # the spec version cells are tagged with; `perflab trees` records the user's spec once and passes its id down
     version = os.environ.get(specs.ENV) or specs.record(spec.out, spec.path)
     todo = [c for c in cells if not done(spec.cell_dir(c[1], c[3], c[0]))]

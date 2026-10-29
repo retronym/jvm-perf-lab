@@ -60,6 +60,8 @@ def branch_info(s, path):
         os.makedirs(branch_out(s), exist_ok=True)
         import shutil
         shutil.copy(path, copy)
+        with open(os.path.join(branch_out(s), ab.SOURCE), "w") as out:
+            out.write(os.path.abspath(path) + "\n")
     if os.path.exists(f):
         return json.load(open(f))
     b = {**s["branch"], "checkout": os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(path)), s["branch"]["checkout"]))}
