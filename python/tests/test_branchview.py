@@ -149,6 +149,20 @@ class BranchViewTest(unittest.TestCase):
         self.assertAlmostEqual(ci, metrics.t999(9) * 10.0 * r2 ** 0.5)
         self.assertNotEqual(a[self.v[1]]["s"]["score"][1], "")
 
+    def test_two_forks_take_the_pooled_spread(self):
+        # commit 2 with one round of two forks (as a campaign of two rounds of -f 1): its own CI would be t(1) = 637 sds
+        d = os.path.join(self.camp, "a", self.v[2], "1")
+        os.makedirs(d)
+        json.dump([result("a", [[10.0, 10.1, 9.9], [10.2, 10.1, 10.3]], [[1e6, 1e6], [1e6, 1e6 + 1]])], open(os.path.join(d, "result.json"), "w"))
+        a = branchview.branch_view(self.camp)["cells"]["a"]
+        mean, sd, ci, _, n, df, pooled = a[self.v[2]]["m"]["score"]
+        # relative variances of commits 0, 2 (1 df), 3 and 4, pooled by df
+        r2 = (3 * (0.05 / 3) / 10.15 ** 2 + 1 * 0.02 / 10.1 ** 2 + 3 * (0.04 / 3) / 10.1 ** 2 + 3 * (0.05 / 3) / 8.15 ** 2) / 10
+        self.assertEqual((n, df, pooled), (2, 10, True))
+        self.assertAlmostEqual(sd, 10.1 * r2 ** 0.5)
+        self.assertAlmostEqual(ci, metrics.t999(10) * 10.1 * r2 ** 0.5 / 2 ** 0.5)
+        self.assertFalse(a[self.v[0]]["m"]["score"][6])  # four forks: its own
+
     def test_one_fork_and_nothing_to_pool_has_no_spread(self):
         b = branchview.branch_view(self.camp)["cells"]["b"]
         self.assertEqual(b[self.v[0]]["m"]["score"][1:3], [None, None])

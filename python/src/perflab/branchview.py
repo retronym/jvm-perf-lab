@@ -13,9 +13,10 @@ The unit of variation is the fork: fork-to-fork variance (JIT decisions, code la
 iterations are autocorrelated, so pooling iterations would make the interval far too narrow. Per commit, corpus and
 metric, each fork of each round contributes the mean of its measurement iterations (`rawData` in result.json, the
 score's and those secondary metrics that have one; a metric without it, its round's value). The commit's mean is
-theirs, and its 99.9% CI is t(n-1)·sd/√n over its n forks. A commit with one fork has no spread of its own: it takes
-the fork-to-fork relative sd pooled over the campaign's commits with two forks or more (same corpus and metric, each
-weighted by its df), marked as pooled; with no such commit yet it has no interval.
+theirs, and its 99.9% CI is t(df)·sd/√n over its n forks. Its sd is its own from four forks; with fewer, when the pool has more
+degrees of freedom (always for one fork; with two its own CI would be t(1) = 637 times its sd, with three t(2) = 32), the fork-to-fork
+relative sd pooled over the campaign's commits with two forks or more (same corpus and metric, each weighted by its df,
+with the pool's df), marked as pooled; with no such commit yet one fork has no interval.
 
 A Δ is against the previous measured commit, and the comparison of two rows uses the same test (`metrics.welch`, and
 `welch` in the page): Welch's t on the forks' means, Welch–Satterthwaite df, a pooled sd for a side of one fork. Δ% is
@@ -289,6 +290,9 @@ def date_shown(iso):
         return iso or ""
 
 
+OWN_FORKS = 4  # from this many forks a commit's interval is its own, before it the corpus's pooled one
+
+
 def branch_view(campaign_dir, rel_to=None):
     """What the page draws for a branch campaign, None when `campaign_dir` has no branch.json:
 
@@ -379,7 +383,10 @@ def branch_view(campaign_dir, rel_to=None):
             units[v] = ({**us, **pus}, {**kinds, **pkinds}, {**wf, **pwf})
             if "score" in us:
                 prev = v
-        # per metric, the fork-to-fork relative sd pooled over the commits with two forks or more, for those with one
+        # per metric, the fork-to-fork relative sd pooled over the commits with two forks or more (ANOVA's within-group
+        # estimate, assuming a common relative spread), for a commit of fewer than OWN_FORKS forks when the pool has more
+        # degrees of freedom: with two forks a commit's own 99.9% CI is t(1) = 637 times its sd, with three t(2) = 32;
+        # from four, its own spread says something (a commit whose forks land in two places should show it)
         stat = {v: {k: (*metrics.stats(xs), len(xs)) for k, xs in us.items() if xs} for v, (us, _, _) in units.items()}
         keys = {k for st in stat.values() for k in st}
         pool = {k: metrics.pooled_rel_sd([(st[k][0], st[k][1], st[k][2] - 1) for st in stat.values() if k in st]) for k in keys}
@@ -387,7 +394,8 @@ def branch_view(campaign_dir, rel_to=None):
         for v, (us, kinds, wfs) in units.items():
             x = per_v[v]
             for k, (mean, sd, n) in stat[v].items():
-                kind, pooled, df = kinds[k], n < 2, n - 1
+                kind, df = kinds[k], n - 1
+                pooled = n < 2 or (n < OWN_FORKS and pool[k][0] is not None and pool[k][1] > df)
                 if pooled:
                     r, df = pool[k]
                     sd = None if r is None else r * abs(mean)
@@ -547,8 +555,8 @@ def parts(campaign_dir, rel_to, corpus_param="corpus"):
         "beside it.</p>"
         "<p>The unit is the <b>fork</b>: each fork of each round counts once, as the mean of its measurement iterations (they vary "
         "far less within a fork than between forks, and are not independent). A value is the mean over forks ± a 99.9% confidence "
-        "interval over forks. A commit with one fork has no spread of its own: † marks an interval from the fork-to-fork sd pooled "
-        "over this corpus's commits with two forks or more; until there is one, it has none, and shows instead, muted, <b>±~</b> the 99.9% "
+        "interval over forks. † marks an interval from the fork-to-fork sd pooled over this corpus's commits with two forks or more, "
+        "for a commit of fewer than four forks (one fork has no spread of its own; with two, its own CI is 637 times its sd). Until there is a pool, a commit of one fork has none, and shows instead, muted, <b>±~</b> the 99.9% "
         "CI within its one fork, over its iterations (as JMH's error for one fork): it understates run-to-run uncertainty, and never "
         "colours a Δ. A value's tooltip has the ratio of the between-fork to the within-fork sd: about 1, the forks agree; far above, "
         "each fork lands somewhere of its own, and more forks pay off where more iterations do not.</p>"
@@ -762,7 +770,7 @@ const BH = (() => {
   const pct = (d, sp) => `${d >= 0 ? '+' : ''}${d.toFixed(1)}%` + (sp != null ? ` <span class="pm">± ${sp.toFixed(1)}</span>` : '');
   const TITLE = {flat: 'inconclusive: not significant at 99.9% (Welch’s t over forks)', worse: 'higher, significant at 99.9% (Welch’s t over forks)',
                  better: 'lower, significant at 99.9% (Welch’s t over forks)'};
-  const POOLED = '† a commit with one fork: its spread is the fork-to-fork sd pooled over this corpus’s commits with two forks or more';
+  const POOLED = '† its spread is the fork-to-fork sd pooled over this corpus’s commits with two forks or more, which has more degrees of freedom than its own forks';
   function delta(x) {
     if (!x || x[0] == null) return '';
     if (x[2] === 'na') return '<span class="d na" title="the values are about zero: no percent change">–</span>';
@@ -1022,7 +1030,7 @@ const BH = (() => {
       + d.corpora.map(x => `<button class="chip" data-bc="${esc(x)}" aria-pressed="${x === c}">${esc(x)}</button>`).join('') + '</span></div>' : '';
     box.innerHTML = `<figure>${pick}<div class="bh-leg"><span><i></i>${esc(heading(d, 'score'))} (left)</span>`
       + (m2 ? `<span><i class="s2"></i>${esc(heading(d, m2.k))} (right)</span>` : '')
-      + '<span>oldest → newest · error bars: 99.9% CI over forks (lighter, †: one fork, a pooled spread) · dashes: each fork’s mean, '
+      + '<span>oldest → newest · error bars: 99.9% CI over forks (lighter, †: a spread pooled over the corpus’s commits) · dashes: each fork’s mean, '
       + '<i class="wh" style="background:var(--link)"></i>its own 99.9% CI over its iterations · faint dots: every iteration</span>'
       + (hotSeen ? '<span><i class="hot"></i>an iteration while other load was over the gate’s limit</span>' : '') + '</div>'
       + `<svg class="bh-g" viewBox="0 0 ${W} ${H}">${bands}${ax}<path class="l1" d="${lines[0]}"/><path class="l2" d="${lines[1]}"/>${g}${xl}${empty}${hits}</svg>`
