@@ -35,11 +35,13 @@ Design: [branch-explore.md](branch-explore.md). Test case: retronym/scala3 `scal
 7. RUNNING (job 1 on the server) The perfint campaign under the server: coarse pass on scalaz, then tastyQuery, then a second round; check the view against it.
 
 8. DONE The load gate per measurement iteration (2 s samples; a burst over any iteration reruns the cell; `load.json` per cell).
-9. TODO Branch view, from looking at perfint-branch:
-   - profile metrics in the table and chart, from the campaign's own profile and from a `.profile` pass (in progress);
-   - within-fork uncertainty: each fork's 99.9% CI over its iterations as a thin whisker on its dash; with one fork, the table shows it muted (`±~`), never used to colour Δ; the between/within-fork sd ratio in the tooltip;
-   - each iteration's dot coloured by the competing load over it (`load.json`), a marker on a cell with disturbed iterations;
-   - a cell popover (click a value): its rounds and forks, score, load, links to timeline and jmh.log, and on the server **Void & rerun**: the cell moves to `<campaign>/.void/` with a reason, and an `ab run` resume is queued (once).
+9. Branch view, from looking at perfint-branch:
+   - DONE profile metrics in the table and chart, from the campaign's own profile and from a `.profile` pass;
+   - DONE within-fork uncertainty: each fork's 99.9% CI over its iterations as a thin whisker on its dash; with one fork and nothing pooled, the table shows it muted (`±~`), never used to colour Δ; the between/within-fork sd ratio in the tooltip (`branchview.within`, `within_of`);
+   - DONE each iteration other load disturbed (`load.json`, else load.tsv for older cells) as an amber ring in the chart's cloud, a ring marker on the value with a tooltip naming iterations, cores and the top processes;
+   - DONE a cell popover (click a value; Esc closes; a bottom sheet on a phone): its rounds and forks (mean ± CI within the fork), load, disturbed iterations, state, timeline (lightbox), jmh.log, build.log, flame graphs, and its voided cells (`<campaign>/.void/<corpus>/<variant>/<round>-<stamp>/`, `void.txt`), which count for nothing;
+   - DONE (page side) **Void & rerun** per round, on the server: `bhVoid(campaign, corpus, variant, round, reason)` POSTs `/api/v1/void` then `/api/v1/rerun` (URLs in `BH_API`). The endpoints are server.py's.
+   - Future work: a commit's CI with two forks is t(1) = 636.6 × sd/√2, wide enough to flatten the chart's scale; the chart could clip bars to the cloud's extent, or the explore order could give a commit its second fork in the same round.
 
 ## Future work
 
