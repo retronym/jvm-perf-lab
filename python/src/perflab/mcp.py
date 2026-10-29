@@ -36,7 +36,7 @@ def tools():
         out.append({"name": f.name, "title": f.summary, "description": f.description + _fields(f.result)
                     + ("" if f.kind == "read" else "\n\nAn action: needs a running `perflab server`."),
                     "inputSchema": f.input_schema(),
-                    "outputSchema": api.schema_of(f.result),
+                    "outputSchema": api.schema_of(f.result, examples=False),
                     "annotations": {"readOnlyHint": f.kind == "read", "destructiveHint": f.name in ("void", "cancel"),
                                     "idempotentHint": f.kind == "read" or f.name == "rerun", "openWorldHint": False}})
     return out

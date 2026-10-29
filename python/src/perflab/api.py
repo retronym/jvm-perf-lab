@@ -1707,13 +1707,14 @@ def _deps(name, seen=None):
     return seen
 
 
-def schema_of(name):
-    """A schema with the definitions it refers to, standalone (JSON Schema 2020-12): an MCP tool's outputSchema."""
+def schema_of(name, examples=True):
+    """A schema with the definitions it refers to, standalone (JSON Schema 2020-12); without its example, an MCP tool's
+    outputSchema (tools/list stays small)."""
     if name not in SCHEMAS:
         raise ApiError("not_found", f"no schema {name!r}", {"schemas": sorted(SCHEMAS)})
-    deps = _deps(name)
-    return {"$schema": "https://json-schema.org/draft/2020-12/schema", **SCHEMAS[name],
-            "$defs": {k: v for k, v in deps.items() if k != name} | {name: SCHEMAS[name]}}
+    strip = lambda s: s if examples else {k: v for k, v in s.items() if k != "examples"}
+    return {"$schema": "https://json-schema.org/draft/2020-12/schema", **strip(SCHEMAS[name]),
+            "$defs": {k: strip(v) for k, v in _deps(name).items() if k != name}}
 
 
 def openapi():
