@@ -22,6 +22,10 @@ object Corpus:
     "re2s" -> Nil,
     "tastyQuery" -> List("-Yexplicit-nulls", "-Wconf:msg=Unnecessary .nn:s"),
     "scalaz" -> List("-nowarn", "-source", "3.0", "-Xkind-projector", "-language:implicitConversions"),
+    // the compiler's own `compiler/src/dotty/tools/dotc` (`-Dcompilerlab.corpus.dotc=<dir>`), with its build's options
+    // (Build.scala) but -Werror; it needs `compilerlab.extraJars` and more JDK modules than java.base
+    "dotc" -> List("-feature", "-deprecation", "-unchecked", "-encoding", "UTF8", "-language:implicitConversions", "--java-output-version:17",
+      "-Yexplicit-nulls", "-Wsafe-init"),
   )
 
   /** A corpus from a lampepfl/scala3-benchmarks checkout (`compilerlab.corpora` is its `bench-sources`), or, given an
@@ -30,9 +34,12 @@ object Corpus:
   def load(name: String): Corpus =
     if name == "scalaLibrary" then return scalaLibrary
     val absolute = Path.of(name).isAbsolute
+    // `-Dcompilerlab.corpus.<name>=<dir>`: a corpus outside the benchmarks checkout, under a short name (a campaign's
+    // corpus name is its cells' directory)
     val dir =
       if absolute then Path.of(name)
-      else Path.of(sys.props.getOrElse("compilerlab.corpora", sys.error("-Dcompilerlab.corpora=<scala3-benchmarks>/bench-sources not set"))).resolve(name)
+      else sys.props.get(s"compilerlab.corpus.$name").map(Path.of(_)).getOrElse(
+        Path.of(sys.props.getOrElse("compilerlab.corpora", sys.error("-Dcompilerlab.corpora=<scala3-benchmarks>/bench-sources not set"))).resolve(name))
     val opts = options.get(dir.getFileName.toString) match
       case Some(o) => o
       case None if absolute => Nil

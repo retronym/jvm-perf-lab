@@ -1,0 +1,39 @@
+{
+  "name": "batch-84-serial-dotc",
+  "description": [
+    "Serial batch compilation (no `-Yparallel-typer`) of the compiler's own sources: retronym/scala3#84's tip, after the parallel batch typer work up to the pickler, against its merge base on scala/scala3 main.",
+    "Corpus `dotc`: the 3.10.0 tag's `compiler/src/dotty/tools/dotc` (485 files) against the published 3.10.0 jars (scala3-compiler, tasty-core, interfaces, asm, compiler-interface) beside each build's own library, to `-Ystop-after:pickler`, with the compiler build's options but -Werror. The same input as the hand-rolled harness behind the #84 results page's serial row, now under perflab.",
+    "Both compilers built by the lab from a checkout, with the build's defaults (the backend inliner on), each with the library-stamps commit cherry-picked."
+  ],
+  "variantDescriptions": {
+    "base": "scala/scala3 main `d168df2a76` (merge base) + library stamps",
+    "tip": "retronym/scala3#84 `a084128416` + library stamps"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 4,
+  "corpora": {
+    "dotc": "-f 1 -wi 8 -i 8 -w 4 -r 4 -p scalacOptions=-Ystop-after:pickler"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-tip",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true
+}

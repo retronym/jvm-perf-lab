@@ -55,12 +55,17 @@ object InMemoryClasspath:
   private def jdkModules: List[String] =
     sys.props.getOrElse("compilerlab.jdkModules", "java.base").nn.split(",").toList.map(_.nn.trim.nn).filter(_.nonEmpty)
 
-  /** The scala-library jar (`compilerlab.scalaLibrary`) and the JDK modules in `compilerlab.jdkModules` (default `java.base`)
-   *  of the running JDK.
+  /** The scala-library jar (`compilerlab.scalaLibrary`), any `compilerlab.extraJars`, and the JDK modules in
+   *  `compilerlab.jdkModules` (default `java.base`) of the running JDK.
    */
   lazy val default: InMemoryClasspath =
     val lib = sys.props.getOrElse("compilerlab.scalaLibrary", sys.error("-Dcompilerlab.scalaLibrary=<jar> not set"))
-    load(List(Path.of(lib).nn), jdkModules)
+    load(Path.of(lib).nn :: extraJars, jdkModules)
+
+  /** `compilerlab.extraJars`: more jars for a corpus that needs them (the compiler's own sources need tasty-core, the
+   *  compiler interfaces, asm and the sbt interfaces), separated as on a classpath. */
+  private def extraJars: List[Path] =
+    sys.props.getOrElse("compilerlab.extraJars", "").nn.split(java.io.File.pathSeparator).toList.filter(_.nonEmpty).map(Path.of(_).nn)
 
   def load(jars: List[Path], jdkModules: List[String]): InMemoryClasspath =
     var files = 0
