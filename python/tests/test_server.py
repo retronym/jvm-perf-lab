@@ -50,6 +50,17 @@ class QueueTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.q.register(tempfile.mkdtemp())
 
+    def test_forget_only_a_project_with_nothing_queued_or_running(self):
+        j = self.submit("x")
+        with self.assertRaises(server.Conflict):
+            self.q.forget(self.p["id"])
+        self.q.transition(j["id"], "cancelled")
+        self.assertEqual(self.q.forget(self.p["id"])["id"], self.p["id"])
+        self.assertEqual(self.q.projects(), [])
+        self.assertEqual(self.q.get(j["id"])["project"], self.p["id"])  # its jobs stay
+        with self.assertRaises(KeyError):
+            self.q.forget(self.p["id"])
+
     def test_order_priority_and_moves(self):
         a, b, c = self.submit("a"), self.submit("b"), self.submit("c")
         self.assertEqual(self.ids(), [a["id"], b["id"], c["id"]])

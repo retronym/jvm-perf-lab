@@ -450,6 +450,19 @@ class HttpTest(Fixture, unittest.TestCase):
             self.assertIn('<div id="keys" hidden', page, path)
             self.assertIn('data-srv="/doc/optimising"', page, path)
 
+    def test_forget_a_project(self):
+        root = os.path.realpath(tempfile.mkdtemp())
+        open(os.path.join(root, "perflab.toml"), "w").write('[build]\njmh = "x"\n')
+        other = self.srv.q.register(root)
+        self.assertEqual(self.http("POST", "/api/v1/forget", {"project": other["id"]}, token=False)[0], 403)
+        code, r, _ = self.http("POST", "/api/v1/forget", {"project": other["root"]})
+        self.assertEqual((code, r["project"]["id"]), (200, other["id"]))
+        self.assertNotIn(other["id"], [p["id"] for p in self.http("GET", "/api/projects")[1]])
+        self.assertEqual(self.http("GET", other["index"])[0], 404)
+        self.assertTrue(os.path.exists(os.path.join(other["root"], "perflab.toml")))  # nothing on disk changes
+        self.assertEqual(self.http("POST", "/api/v1/forget", {"project": other["id"]})[0], 404)
+        self.assertIn('id="projects"', self.http("GET", "/admin")[1])
+
     def test_void_unvoid_and_rerun_once(self):
         body = {"project": self.pid, "campaign": "br", "corpus": "a", "variant": V[4], "round": 2, "reason": "load over 2 cores"}
         self.assertEqual(self.http("POST", "/api/v1/void", body, token=False)[0], 403)
@@ -591,6 +604,9 @@ def write_examples():
     ex["Rerun"] = r
     ex["JobResult"] = api.job(r["job"]["id"])
     ex["Jobs"] = api.jobs()
+    other = os.path.realpath(tempfile.mkdtemp())
+    open(os.path.join(other, "perflab.toml"), "w").write('[build]\njmh = "x"\n')
+    ex["Forgotten"] = api.call("forget", {"project": s.q.register(other)["id"]}, server=s)
     ex["Transcript"] = {"schema": "Transcript", "version": api.API_VERSION, "id": r["job"]["id"], "text": "[ab 10:12:22] br: 20 cells, 11 to run\n"}
     api.call("cancel", {"id": r["job"]["id"]}, server=s)
     s.stop()

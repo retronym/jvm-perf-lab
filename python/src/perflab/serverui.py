@@ -235,6 +235,37 @@ function row(e) {
     + (e.bytes.builds ? b('builds', 'builds', '', 'drop its builds') : '') + (e.graphs ? b('graphs', 'graphs', '', 'drop its rendered graphs') : '')
     + (e.pinned ? '' : b('delete', 'delete', 'bad', 'delete it, results and all')) + `</span></td></tr>`;
 }
+// projects: each with what it holds; Forget unregisters (after a confirmation in the pending card), results stay
+const TEMP = /^(\/private)?\/(tmp|var\/folders)\//;  // a test's or a scratch project
+function projectRow(p) {
+  const mine = entries.filter(e => e.project === p.id), total = mine.reduce((a, e) => a + e.total, 0);
+  const root = p.root.startsWith(HOME + '/') ? '~' + p.root.slice(HOME.length) : p.root;
+  return `<tr><td><input type="checkbox" data-pid="${esc(p.id)}"></td><td class="name"><a href="${esc(p.index)}">${esc(p.name)}</a>`
+    + `${TEMP.test(p.root) ? ' <span class="badge" title="under a temporary directory">temporary</span>' : ''}<div class="k"><code>${esc(root)}</code></div></td>`
+    + `<td class="n">${mine.filter(e => e.kind === 'campaign').length}</td><td class="n">${mine.filter(e => e.kind === 'run').length}</td>`
+    + `<td class="n">${bytes(total)}</td><td class="when">${ago(p.registered)}</td>`
+    + `<td class="acts"><button class="btn bad" data-forget="${esc(p.id)}" title="stop serving and listing it; its results stay">Forget</button></td></tr>`;
+}
+function confirmForget(ids) {
+  if (!ids.length) return toast('No projects selected.');
+  const el = document.getElementById('pending');
+  el.innerHTML = `<div class="card-h"><h2>Forget ${ids.length} project${ids.length === 1 ? '' : 's'}</h2></div>`
+    + `<p>The server stops serving and listing ${ids.map(id => `<b>${esc(projects[id] ? projects[id].name : id)}</b>`).join(', ')}. `
+    + 'Nothing on disk changes, and perflab registers a project again when it next runs there.</p>'
+    + `<p class="btns"><button class="btn bad" id="go">Forget</button><button class="btn" id="dismiss">Close</button></p>`;
+  el.hidden = false;
+  el.scrollIntoView({block: 'nearest'});
+  document.getElementById('dismiss').onclick = () => { el.hidden = true; };
+  document.getElementById('go').onclick = async () => {
+    const done = [];
+    for (const id of ids) if (await post('/api/v1/forget', {project: id})) done.push(id);
+    // the nav, drawn by the server, loses their tabs too
+    document.querySelectorAll('nav.tabs a').forEach(a => { if (done.some(id => a.getAttribute('href').startsWith(`/p/${id}/`))) a.remove(); });
+    el.innerHTML = `<p>Forgot ${done.length} of ${ids.length}.</p><p class="btns"><button class="btn" id="dismiss">Close</button></p>`;
+    document.getElementById('dismiss').onclick = () => { el.hidden = true; };
+    load();
+  };
+}
 async function load() {
   const st = document.getElementById('scan');
   st.textContent = 'scanning…';
@@ -245,10 +276,17 @@ async function load() {
   const sum = k => entries.reduce((a, e) => a + (k ? e.bytes[k] : e.total), 0);
   document.getElementById('tiles').innerHTML = [['total', sum()], ['results', sum('results')], ['profiles', sum('profiles')], ['builds', sum('builds')],
     ['rendered graphs', entries.reduce((a, e) => a + e.graphs, 0)]].map(([l, v]) => `<div class="tile"><div class="v">${bytes(v)}</div><div class="l">${l}</div></div>`).join('');
+  document.getElementById('projects').innerHTML = r.projects.map(projectRow).join('')
+    || '<tr><td colspan="7" class="k">No projects registered.</td></tr>';
   document.getElementById('rows').innerHTML = entries.length ? entries.map(row).join('')
     : '<tr><td colspan="7" class="k">No campaigns or runs. A project registers when it submits a job, or with <code>perflab server start</code> in it.</td></tr>';
 }
 document.addEventListener('click', async e => {
+  const f = e.target.closest('button[data-forget]');
+  if (f) return confirmForget([f.dataset.forget]);
+  if (e.target.id === 'sel-temp')
+    return document.querySelectorAll('#projects input[data-pid]').forEach(c => c.checked = !!projects[c.dataset.pid] && TEMP.test(projects[c.dataset.pid].root));
+  if (e.target.id === 'forget-sel') return confirmForget([...document.querySelectorAll('#projects input[data-pid]:checked')].map(c => c.dataset.pid));
   const a = e.target.closest('button[data-act]');
   if (a) return preview({action: a.dataset.act, target: JSON.parse(a.dataset.t)});
   const p = e.target.closest('button[data-pin]');
@@ -303,6 +341,9 @@ def admin_page(server):
                             "<b>builds</b>: launch-mode snapshots and worktrees, rebuildable from the commit. Each action shows "
                             "what it would remove first. A pinned campaign is skipped by the bulk actions; an active one "
                             "(running, building, or written in the last 10 minutes) is never touched.", right=True)
+    proj_help = ui.help_popover("The projects this server serves: each one's index is under /p/&lt;id&gt;/, and the nav lists it. "
+                                "<b>Forget</b> unregisters one: nothing on disk changes, and perflab registers it again when it "
+                                "next runs there. A project with a job queued or running cannot be forgotten.")
     body = (f'<h2 class="sec">Storage <span class="k" id="scan"></span> {help_}</h2><div class="tiles" id="tiles"></div>'
             '<h2 class="sec">Clean up</h2><section class="card"><div class="bulk">'
             '<button class="btn" data-bulk="builds" title="snapshots and worktrees of campaigns and runs that are not active">Drop builds of idle campaigns</button>'
@@ -311,6 +352,11 @@ def admin_page(server):
             '<label class="k"><input id="days" type="number" min="0" value="30"> days</label>'
             '<button class="btn" id="rescan" style="margin-left:auto">Rescan</button></div></section>'
             '<section class="card" id="pending" hidden></section>'
+            f'<h2 class="sec">Projects {proj_help}</h2><section class="card"><div class="bulk">'
+            '<button class="btn" id="sel-temp" title="tick the projects under a temporary directory: tests\' and scratch projects">Select temporary</button>'
+            '<button class="btn bad" id="forget-sel">Forget selected</button></div><div class="scroll"><table class="t"><thead><tr><th></th>'
+            '<th>project</th><th class="n">campaigns</th><th class="n">runs</th><th class="n">total</th><th>registered</th><th></th>'
+            '</tr></thead><tbody id="projects"></tbody></table></div></section>'
             '<h2 class="sec">By campaign and run <span class="k">largest first</span></h2>'
             '<section class="card"><div class="scroll"><table class="t"><thead><tr><th>campaign or run</th>'
             '<th class="n">total</th><th class="n">results</th><th class="n">profiles</th><th class="n">builds</th><th>newest</th><th></th>'

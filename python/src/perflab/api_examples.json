@@ -1038,6 +1038,19 @@
    }
   ]
  },
+ "Forgotten": {
+  "schema": "Forgotten",
+  "version": 1,
+  "project": {
+   "id": "lab-3f2a1c",
+   "name": "lab",
+   "root": "/Users/me/lab",
+   "campaigns": "/Users/me/lab/out/perflab/ab",
+   "runs": "/Users/me/lab/out/perflab/runs",
+   "registered": true,
+   "index": "/p/lab-3f2a1c/ab/index.html"
+  }
+ },
  "JobResult": {
   "schema": "JobResult",
   "version": 1,

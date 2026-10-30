@@ -199,6 +199,20 @@ class Queue:
     def projects(self):
         return [_project(r) for r in self._q("SELECT * FROM projects ORDER BY name")]
 
+    def forget(self, pid):
+        """Unregister a project: the server stops serving its index and listing it. Its campaigns, runs and finished
+        jobs stay, and it registers again when perflab next runs in it. Not while it has a job queued or running."""
+        with self.lock:
+            p = self.project(pid)
+            if p is None:
+                raise KeyError(pid)
+            busy = [r["id"] for r in self._q("SELECT id FROM jobs WHERE project=? AND state IN ('queued','running','paused')", (pid,))]
+            if busy:
+                raise Conflict(f"{p['name']} has jobs queued or running: {', '.join(f'#{i}' for i in busy)}")
+            with self._db() as db:
+                db.execute("DELETE FROM projects WHERE id=?", (pid,))
+            return p
+
     # jobs
 
     def submit(self, project, argv, cwd, env=None, priority=0, python=None, module="perflab", jobs_dir=None):

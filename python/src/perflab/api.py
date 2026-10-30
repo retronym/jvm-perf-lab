@@ -341,14 +341,17 @@ define("Void", "A voided cell", {"id": S("Its id for unvoid: <corpus>/<variant>/
 define("Voids", "A campaign's voided cells", {"campaign": S("The campaign"), "voids": A(ref("Void"), "Newest first")}, top=True)
 define("Voided", "A cell, voided: moved out of the campaign so that a resume runs it again", {
     "campaign": S("The campaign"), "void": ref("Void"), "from": PATH}, top=True)
+define("Forgotten", "A project the server no longer serves or lists; its results stay where they are", {
+    "project": ref("Project")}, top=True)
 define("Unvoided", "A voided cell, put back", {"campaign": S("The campaign"), "cell": ref("CellSummary"), "from": PATH}, top=True)
 define("Job", "A job of the server's queue: a perflab command line", {
     "id": I("Its id"), "project": S("Its project's id"), "argv": A(S("arg"), "`perflab <argv>`"), "cwd": S("Where it runs"),
     "state": S("queued, running, paused, done, failed, cancelled", enum=list(srv.STATES)), "priority": I("Higher runs first"),
     "created": WHEN, "started": WHEN, "ended": WHEN, "rc": null(I("Exit status")), "note": null(S("Why it failed to start, etc.")),
     "position": null(I("Its place in the queue, from 1, while queued")), "url": URL, "transcript": null(S("Its transcript file")),
-    "control": null(S("A pending control request: pause or cancel")), "envKeys": A(S("name"), "Its environment's names")},
-    optional=("position", "url", "control", "envKeys", "transcript", "note"), extra=True)
+    "control": null(S("A pending control request: pause or cancel")), "envKeys": A(S("name"), "Its environment's names"),
+    "campaign": null(S("The campaign it runs: the name in the spec its argv names"))},
+    optional=("position", "url", "control", "envKeys", "transcript", "note", "campaign"), extra=True)
 define("Jobs", "The server's queue: running and paused, then queued in order, then finished (newest first)", {
     "jobs": A(ref("Job"), "Jobs")}, top=True)
 define("JobResult", "A job", {"job": ref("Job")}, top=True)
@@ -1446,6 +1449,25 @@ def rerun(campaign, project=None, _server=None):
 
 
 _RERUN_RUNNER = {}  # tests: {"module": a stand-in for perflab}
+
+
+@endpoint("action", "Forgotten", "Unregister a project from the server (its results stay; perflab registers it again when run there)",
+          project=S("The project's id (see projects) or root directory"))
+def forget(project, _server=None):
+    """Unregister a project: the server stops serving its index (/p/<id>/) and listing it in the nav, the queue and
+    storage. Nothing on disk changes: its campaigns, runs and finished jobs stay, and `perflab` registers it again the next
+    time it runs there. Refused while the project has a job queued or running."""
+    s = _need_server(_server)
+    p = next((x for x in s.q.projects() if project in (x["id"], x["root"], os.path.realpath(project))), None)
+    if p is None:
+        raise ApiError("not_found", f"no registered project {project}")
+    try:
+        s.q.forget(p["id"])
+    except KeyError:
+        raise ApiError("not_found", f"no registered project {project}") from None
+    except srv.Conflict as e:
+        raise ApiError("conflict", str(e)) from None
+    return envelope("Forgotten", project=_public_project(p))
 
 
 @endpoint("action", "JobResult", "Queue any perflab command line on the server", project=PROJECT_P,
