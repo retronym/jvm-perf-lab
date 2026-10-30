@@ -131,7 +131,7 @@ def write(out, a, b):
             f'<button data-cols="2" class="on">2 columns</button><button data-cols="1">1 column</button><span class="sep"></span>'
             f'<span class="k">link</span><button data-link="event" class="on" title="Each graph\'s controls drive the other graphs of its event">event</button>'
             f'<button data-link="all" title="... and of every event">all</button><button data-link="off" title="Unlinked">off</button></header>'
-            f'<div id="grid">{"".join(widgets)}</div>{ui.lightbox_script()}<script>{SCRIPT}</script>')
+            f'<div id="grid">{"".join(widgets)}</div>{ui.lightbox_script()}<script>{SCRIPT}</script>{ui.shortcuts('lightbox', 'compare')}')
     path = os.path.join(out, "compare.html")
     with open(path, "w") as f:
         f.write(page)

@@ -1817,7 +1817,7 @@ def docs_page():
             + f'<main><section class="card"><h2>perflab API v{API_VERSION}</h2><p class="facts">{esc(" ".join(doc["info"]["description"].split(chr(10) * 2)[0].split()))}</p>'
             f'<p>Machine-readable: <a href="/api/v1/openapi.json">openapi.json</a> (OpenAPI 3.1) · <a href="/api/v1">the index</a>. '
             f'Also an MCP server (<code>perflab mcp</code>) and a CLI (<code>perflab api</code>).</p><ul>{conv}</ul><p class="k">{toc}</p></section>'
-            f'<h2>Functions</h2>{"".join(fns)}<h2>Schemas</h2>{schemas}</main>' + ui.footer() + '</body>')
+            f'<h2>Functions</h2>{"".join(fns)}<h2>Schemas</h2>{schemas}</main>' + ui.footer() + ui.shortcuts() + '</body>')
 
 
 # ---- for agents: /llms.txt (llmstxt.org) and the perflab skill, as /skill.md

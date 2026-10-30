@@ -264,7 +264,7 @@ load();
 """
 
 
-def _page(server, title, tab, body, script, css="", head_script=""):
+def _page(server, title, tab, body, script, css="", head_script="", keys=()):
     projects = server.q.projects()
     links = "".join(f'<a href="{html.escape(p["index"])}" title="{html.escape(p["root"])}">{html.escape(p["name"])}</a>' for p in projects)
     tabs = (f'<a href="/"{" class=on" if tab == "queue" else ""}>Queue<span class="n" id="n-queued"></span></a>'
@@ -276,7 +276,7 @@ def _page(server, title, tab, body, script, css="", head_script=""):
 <main>{body}</main>{ui.footer()}<div id="toast" hidden></div>
 {f"<script>{head_script}</script>" if head_script else ""}<script>const TOKEN = {json.dumps(server.token)}, HOME = {json.dumps(os.path.expanduser("~"))};
 {COMMON_JS}
-{script}</script>"""
+{script}</script>{ui.shortcuts(*keys)}"""
 
 
 def queue_page(server):
@@ -295,7 +295,7 @@ def queue_page(server):
             '<div class="tl-tip" id="tl-tip"></div>'
             f'<h2 class="sec">Queued {help_}</h2><section class="card" id="queued"></section>'
             f'<h2 class="sec">Finished <span class="k">newest first</span></h2><section class="card" id="history"></section>')
-    return _page(server, "queue", "queue", body, QUEUE_JS, timeline.CSS, timeline.script())
+    return _page(server, "queue", "queue", body, QUEUE_JS, timeline.CSS, timeline.script(), keys=("timeline",))
 
 
 def admin_page(server):

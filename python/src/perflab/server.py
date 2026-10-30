@@ -738,6 +738,10 @@ class Server:
                         from . import api
                         md = api.skill_md()
                         return self._send(200, md, "text/plain; charset=utf-8") if md else self._error(404, "no perflab skill beside this perflab")
+                    if p.startswith("/doc/"):
+                        from . import docs
+                        page = docs.page(p[len("/doc/"):])
+                        return self._send(200, page, "text/html; charset=utf-8") if page else self._error(404, "no such doc")
                     if p == "/api/v1" or p.startswith("/api/v1/"):
                         return self._api(lambda api: api.http_get(p, qs, server))
                     if p == "/api/status":

@@ -437,6 +437,19 @@ class HttpTest(Fixture, unittest.TestCase):
         for page in ("/", "/admin", "/api/v1/docs"):
             self.assertIn('href="/llms.txt"', self.http("GET", page)[1], page)
 
+    def test_docs_are_pages_and_every_page_has_the_shortcuts(self):
+        code, page, h = self.http("GET", "/doc/optimising")
+        self.assertEqual((code, h["Content-Type"]), (200, "text/html; charset=utf-8"))
+        self.assertIn('<h2 id="4-when-the-gap-stays-hardware-counters">', page)
+        for link in ('href="/doc/paired-ab"', 'href="/skill.md"', 'href="https://github.com/retronym/jvm-perf-lab/blob/main/README.md"'):
+            self.assertIn(link, page)
+        for path in ("/doc/nope", "/doc/", "/doc/..%2fREADME", "/doc/optimising.md"):
+            self.assertEqual(self.http("GET", path)[0], 404, path)
+        for path in ("/", "/admin", "/api/v1/docs", "/doc/optimising"):
+            page = self.http("GET", path)[1]
+            self.assertIn('<div id="keys" hidden', page, path)
+            self.assertIn('data-srv="/doc/optimising"', page, path)
+
     def test_void_unvoid_and_rerun_once(self):
         body = {"project": self.pid, "campaign": "br", "corpus": "a", "variant": V[4], "round": 2, "reason": "load over 2 cores"}
         self.assertEqual(self.http("POST", "/api/v1/void", body, token=False)[0], 403)

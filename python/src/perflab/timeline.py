@@ -59,7 +59,7 @@ def write(d, out=None):
 <script>{script()}
 BenchTimeline.mount(document.getElementById('chart'), document.getElementById('legend'), document.getElementById('tip'))
   .set(BenchTimeline.parse({json.dumps(files)}));
-</script>
+</script>{ui.shortcuts("timeline")}
 """
     open(out, "w").write(page)
     return out

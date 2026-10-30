@@ -3,7 +3,7 @@ import json, os, re, shutil, socket, subprocess, sys, tempfile, threading, time,
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "..", "src")
 sys.path.insert(0, SRC)
-from perflab import control, server, serverui, storage  # noqa: E402
+from perflab import control, docs, server, serverui, storage, ui  # noqa: E402
 
 
 def project(toml='[build]\njmh = "x"\n'):
@@ -581,7 +581,7 @@ class PageTest(unittest.TestCase):
     def test_the_pages_scripts_parse(self):
         srv = server.Server(tempfile.mkdtemp(), port=0)
         try:
-            for page in (serverui.queue_page(srv), serverui.admin_page(srv)):
+            for page in (serverui.queue_page(srv), serverui.admin_page(srv), docs.page("optimising")):
                 scripts = re.findall(r"<script>(.*?)</script>", page, re.S)
                 self.assertTrue(scripts)
                 for i, js in enumerate(scripts):
@@ -591,6 +591,25 @@ class PageTest(unittest.TestCase):
                     self.assertEqual(r.returncode, 0, r.stderr)
         finally:
             srv.httpd.server_close()
+
+    def test_markdown(self):
+        md = ("# Title\n\nA [doc](paired-ab.md#order), [the skill](../.claude/skills/perflab/SKILL.md), [a lab](../labs/scala3/README.md),\n"
+              "`a|b` and **bold**.\n\n| x | y |\n|---|---|\n| `p\\|q` | 2 |\n\n1. one\n   - nested\n2. two\n\n```\n<code>\n```\n")
+        h = docs.to_html(md)
+        self.assertIn('<h1 id="title">Title</h1>', h)
+        self.assertIn('<a href="/doc/paired-ab#order">doc</a>', h)
+        self.assertIn('<a href="/skill.md">the skill</a>', h)
+        self.assertIn('href="https://github.com/retronym/jvm-perf-lab/blob/main/labs/scala3/README.md"', h)
+        self.assertIn("<code>a|b</code> and <b>bold</b>.</p>", h)
+        self.assertIn("<tr><th>x</th><th>y</th></tr><tr><td><code>p|q</code></td><td>2</td></tr>", h)
+        self.assertIn("<ol><li>one<ul><li>nested</li></ul></li><li>two</li></ol>", h)
+        self.assertIn("<pre><code>&lt;code&gt;</code></pre>", h)
+
+    def test_shortcuts_list_the_page_s_keys(self):
+        self.assertNotIn("<h3>", ui.shortcuts())
+        h = ui.shortcuts("lightbox", "compare")
+        self.assertIn("<h3>A graph in the overlay</h3>", h)
+        self.assertIn("<kbd>1</kbd> – <kbd>9</kbd>", h)
 
 
 if __name__ == "__main__":

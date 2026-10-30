@@ -182,6 +182,7 @@ NAME = "jvm-perf-lab"
 TAGLINE = "JMH profilers, PMU counters and paired campaigns for the JVM"
 REPO = "https://github.com/retronym/jvm-perf-lab"
 DOCS = "https://github.com/retronym/jvm-perf-lab/tree/main/doc"
+GUIDE = "/doc/optimising"  # the guide to optimising a program, as the server serves doc/optimising.md (perflab.docs)
 
 MARK = ('<svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#1c2632"/>'
         '<rect x="5" y="21" width="22" height="5" rx="1.5" fill="#f59f00"/><rect x="5" y="14.5" width="15" height="5" rx="1.5" fill="#f76707"/>'
@@ -225,7 +226,8 @@ def footer():
     """The server pages' footer: where an agent reads on."""
     return (f'<style>{FOOTER_CSS}</style><footer class="agents">For agents: <a href="/llms.txt">llms.txt</a> · '
             '<a href="/skill.md">the perflab skill</a> · <a href="/api/v1/docs">API</a> · '
-            '<a href="/api/v1/openapi.json">OpenAPI</a> · MCP: <code>perflab mcp</code></footer>')
+            f'<a href="/api/v1/openapi.json">OpenAPI</a> · MCP: <code>perflab mcp</code> · <a href="{GUIDE}">optimising guide</a>'
+            ' · <kbd>?</kbd> keyboard shortcuts</footer>')
 
 
 def masthead(title=None, home=None, slim=False, tagline=True):
@@ -262,3 +264,61 @@ def lightbox_script():
 def help_popover(html_body, right=False):
     """A `?` that opens a short explanation."""
     return f'<details class="help{" right" if right else ""}"><summary title="What is this?">?</summary><div>{html_body}</div></details>'
+
+
+# `?`: the keyboard shortcuts of the page, and where to read on
+
+SHORTCUTS = {  # section: (heading, [(keys, what)]); keys as a tuple are keys, as a string a gesture
+    "lightbox": ("A graph in the overlay", [(("[", "]"), "the previous or next graph"), (("Esc",), "close the overlay")]),
+    "compare": ("A diff's graphs", [(("1", "–", "9"), "the graph's first to ninth view"),
+                                    (("[", "]"), "its previous or next view (of the graph under the pointer)")]),
+    "void": ("A branch campaign's cell popover", [(("Enter",), "in the reason, void the round"), (("Esc",), "close the popover")]),
+    "timeline": ("Timelines, by mouse", [("wheel or pinch", "zoom"), ("drag", "pan"), ("double-click", "reset")]),
+}
+
+SHORTCUTS_CSS = """
+#keys{position:fixed;inset:0;z-index:200;background:rgba(10,14,20,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+#keys[hidden]{display:none}
+#keys .box{background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:10px;width:min(460px,100%);max-height:100%;overflow:auto;
+  padding:12px 16px;box-shadow:0 10px 40px rgba(0,0,0,.35);font-size:13px}
+#keys .hd{display:flex;align-items:baseline} #keys h2{font-size:15px;margin:0} #keys .x{margin-left:auto;font:14px/20px inherit;width:26px;
+  border:1px solid var(--line);border-radius:6px;background:none;color:var(--fg);cursor:pointer}
+#keys h3{font-size:12px;color:var(--muted);font-weight:600;margin:12px 0 4px}
+#keys dl{display:grid;grid-template-columns:max-content 1fr;gap:3px 12px;margin:0} #keys dd{margin:0}
+kbd{font:11.5px ui-monospace,SFMono-Regular,Menlo,monospace;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--panel)}
+#keys .more{margin:12px 0 0;padding-top:8px;border-top:1px solid var(--line2)}
+"""
+
+SHORTCUTS_JS = r"""
+(() => {
+  const box = document.getElementById('keys');
+  // on the perflab server the guide and the skill are its own pages; elsewhere (file://, a static site) GitHub's
+  if (/^https?:$/.test(location.protocol) && /^\/(p\/|admin$|api\/|doc\/|$)/.test(location.pathname))
+    box.querySelectorAll('a[data-srv]').forEach(a => a.href = a.dataset.srv);
+  const typing = t => t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable);
+  const close = () => { box.hidden = true; };
+  // capture, so that Esc closes this before the overlays under it
+  document.addEventListener('keydown', e => {
+    if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target)) { box.hidden = !box.hidden; e.preventDefault(); }
+    else if (e.key === 'Escape' && !box.hidden) { close(); e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+  box.addEventListener('click', e => { if (e.target === box) close(); });
+  box.querySelector('.x').onclick = close;
+})();
+"""
+
+
+def shortcuts(*sections):
+    """The `?` overlay: the keys every page has, those of `sections` (keys of SHORTCUTS: what the page binds), and links
+    to the optimising guide and the perflab skill."""
+    def dl(keys):
+        kbd = lambda ks: ks if isinstance(ks, str) else " ".join(k if k == "–" else f"<kbd>{k}</kbd>" for k in ks)
+        return "<dl>" + "".join(f"<dt>{kbd(ks)}</dt><dd>{what}</dd>" for ks, what in keys) + "</dl>"
+    body = dl([(("?",), "show or hide this list"), (("Esc",), "close it")]) + "".join(
+        f"<h3>{SHORTCUTS[s][0]}</h3>{dl(SHORTCUTS[s][1])}" for s in sections)
+    more = (f'<p class="more">How to find out why one build is slower than another: <a href="{REPO}/blob/main/doc/optimising.md" '
+            f'data-srv="{GUIDE}">the optimising guide</a>. Running and reporting benchmarks: <a href="{REPO}/blob/main/.claude/skills/perflab/SKILL.md" '
+            'data-srv="/skill.md">the perflab skill</a>.</p>')
+    return (f'<style>{SHORTCUTS_CSS}</style><div id="keys" hidden role="dialog" aria-label="Keyboard shortcuts"><div class="box">'
+            f'<div class="hd"><h2>Keyboard shortcuts</h2><button class="x" title="Close (Esc)">✕</button></div>{body}{more}</div></div>'
+            f'<script>{SHORTCUTS_JS}</script>')

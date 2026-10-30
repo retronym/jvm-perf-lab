@@ -990,7 +990,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   <h2 class="sec" id="runs">Runs <span class="k">one benchmark under one profile, newest first</span></h2>
   {newest(run_sections) or '<p class="k">No runs yet: <code>perflab run</code>.</p>'}
   </div></main>{f'<footer>{footer}</footer>' if footer else ''}<div id="srv-foot" hidden>{ui.footer()}</div>
-  <script>{timeline.script()}</script>{ui.lightbox_script()}
+  <script>{timeline.script()}</script>{ui.lightbox_script()}{ui.shortcuts('lightbox', 'void', 'timeline')}
   <script>{SUMMARY_JS}</script>
   <script>{branchview.JS}</script>
   <script>
