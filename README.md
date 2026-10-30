@@ -9,7 +9,7 @@ JMH profilers, a Java agent and a command-line tool for finding out what a chang
 - spans a program marks around its own units of work, to break a flame graph down by them
 - `perflab`, which runs all of this through a project's build and shows the results on one page, live as they arrive
 
-Requires Java 17. Design and plan: [doc/design.md](doc/design.md).
+Requires Java 17. Design and plan: [doc/design.md](doc/design.md). To find out why one build is slower than another, step by step: [doc/optimising.md](doc/optimising.md).
 
 ## Sample results
 

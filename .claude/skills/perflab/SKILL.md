@@ -80,6 +80,8 @@ When variants do different amounts of work per op, set `"perUnit"` to the benchm
 
 Let perflab choose output directories (`--out` is optional; cells go under `[paths] campaigns`). Don't write scripts that assume a directory exists.
 
+To explain why one build is slower than another (a campaign to establish the gap, then profiles, spot fixes with a ceiling variant, hardware counters, field layouts), follow `doc/optimising.md` in the jvm-perf-lab checkout ([on GitHub](https://github.com/retronym/jvm-perf-lab/blob/main/doc/optimising.md)): it says what to run next given what you have measured.
+
 ## 7. Read results through the API, not the files
 
 To read a campaign's results, use perflab's API rather than parsing `result.json` or scraping the index: it computes the statistics the page shows (each metric's mean ± 99.9% CI over forks, Δ against the baseline or the previous commit by Welch's t, a verdict) and says what every field means.
