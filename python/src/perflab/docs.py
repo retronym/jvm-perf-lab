@@ -14,7 +14,7 @@ DOC = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirna
 SKILL_PATH = ".claude/skills/perflab/SKILL.md"
 
 CSS = """
-main{max-width:900px;margin:0 auto;padding:16px 20px 40px}
+main{max-width:900px;margin:0 auto;padding:16px 20px 40px} .tabsrow .in{max-width:900px}
 .doc{font-size:14px;line-height:1.6;padding:8px 28px 20px} .doc h1{font-size:22px;margin:12px 0 10px}
 .doc h2{font-size:17px;margin:26px 0 8px;padding-top:6px;border-top:1px solid var(--line2)} .doc h3{font-size:15px;margin:20px 0 6px}
 .doc code{font-size:12.5px;background:var(--line2);border-radius:4px;padding:0 3px}
@@ -140,8 +140,8 @@ def list_html(items, il):
     return "".join(out)
 
 
-def page(name):
-    """`doc/<name>.md` as a page of the server, or None."""
+def page(name, projects=()):
+    """`doc/<name>.md` as a page of the server, under its nav (`projects`: the server's), or None."""
     f = path(name)
     if f is None:
         return None
@@ -149,6 +149,7 @@ def page(name):
     m = re.search(r"^# +(.*)$", text, re.M)
     title = re.sub(r"[`*]", "", m[1]) if m else name
     src = f'<a class="src" href="{ui.REPO}/blob/main/doc/{name}.md">Markdown source</a>'
-    return (ui.HEAD + f"<title>{html.escape(title)} · perflab</title>" + ui.style(ui.BASE, CSS) + "<body>"
-            + ui.masthead("docs", "/", slim=False) + f'<main><article class="card doc">{src}{to_html(text)}</article></main>'
+    nav = f'<div class="nav"><div class="tabsrow"><div class="in"><nav class="tabs">{ui.nav_tabs(projects)}</nav></div></div></div>'
+    return (ui.HEAD + f"<title>{html.escape(title)} · perflab</title>" + ui.style(ui.BASE, ui.NAV_CSS, CSS) + "<body>"
+            + ui.masthead("docs", "/", slim=False) + nav + f'<main><article class="card doc">{src}{to_html(text)}</article></main>'
             + ui.footer() + ui.shortcuts() + "</body>")

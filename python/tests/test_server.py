@@ -165,6 +165,17 @@ class ServerTest(unittest.TestCase):
                                 module="perflab_fakejob")
         return server.public(j) | {"position": j["position"]}
 
+    def test_a_job_finds_the_server_that_runs_it(self):
+        j = self.submit("cells", "1", "0")
+        self.until(j["id"], "done")
+        self.assertEqual(self.srv.worker.environment(self.srv.q.get(j["id"]))[server.HOME_ENV], self.home)
+
+    def test_a_job_names_its_campaign(self):
+        json.dump({"name": "exp7", "rounds": 1}, open(os.path.join(self.root, "spec.json"), "w"))
+        self.assertEqual(server.public({"argv": ["ab", "run", "spec.json"], "cwd": self.root})["campaign"], "exp7")
+        self.assertIsNone(server.public({"argv": ["run", "--", "-foo"], "cwd": self.root})["campaign"])
+        self.assertIsNone(server.public({"argv": ["ab", "run", "gone.json"], "cwd": self.root})["campaign"])
+
     def test_a_request_cannot_choose_the_python_or_module(self):
         blocker = self.submit("cells", "200", "0.1")
         self.until(blocker["id"], "running")

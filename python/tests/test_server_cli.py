@@ -246,8 +246,10 @@ class PagesLinkTest(unittest.TestCase):
         root = project()
         config._config = config.find(root)
         html = open(index.build(os.path.join(root, "out", "perflab", "ab"))).read()
-        self.assertIn("fetch('/api/status'", html)  # only under /p/<project>/, served by the server
-        self.assertIn(r"/^\/p\/[^/]+\//.test(location.pathname)", html)
+        self.assertIn("'/api/status'", html)  # only under /p/<project>/, served by the server
+        self.assertIn(r"/^\/p\/([^/]+)\//.exec(location.pathname)", html)
+        self.assertIn("'/api/jobs'", html)  # each campaign's jobs, and a card for one queued
+        self.assertIn("href=\"/#job-${j.id}\"", html)
         if shutil.which("node"):
             for i, js in enumerate(re.findall(r"<script>(.*?)</script>", page + html, re.S)):
                 f = os.path.join(root, f"s{i}.js")

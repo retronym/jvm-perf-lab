@@ -48,7 +48,7 @@ a path with a segment that starts with `.` (worktrees, build snapshots), and eve
 carries the token, under a CSP sandbox: its scripts run in an opaque origin, so that a flame graph or a page a
 benchmark wrote cannot read the index (and its token) or call the API.
 """
-import argparse, fcntl, hashlib, json, os, re, secrets, signal, socket, sqlite3, subprocess, sys, threading, time, traceback
+import argparse, fcntl, functools, hashlib, json, os, re, secrets, signal, socket, sqlite3, subprocess, sys, threading, time, traceback
 import http.server, urllib.error, urllib.parse, urllib.request
 
 from . import config, control, httpd, storage, transcript
@@ -353,8 +353,32 @@ def _under(path, project):
 
 
 def public(job):
-    """A job as the API shows it: without its environment, which may name more than anyone needs to see."""
-    return {k: v for k, v in job.items() if k != "env"} | {"envKeys": sorted(job.get("env") or {})}
+    """A job as the API shows it: without its environment, which may name more than anyone needs to see, and with the
+    campaign it runs (`campaign`), for the queue and the project's index to link each other."""
+    return {k: v for k, v in job.items() if k != "env"} | {"envKeys": sorted(job.get("env") or {}), "campaign": campaign_of(job)}
+
+
+def campaign_of(job):
+    """The name of the campaign a job's command runs (`ab run <spec>`, `trees <spec>`, `branch profile <spec>`...): the
+    "name" of the first spec file among its arguments, or None."""
+    for a in job.get("argv") or ():
+        if a.endswith(".json"):
+            f = os.path.join(job.get("cwd") or "", a)
+            try:
+                return _spec_name(f, os.stat(f).st_mtime_ns)
+            except OSError:
+                return None
+    return None
+
+
+@functools.lru_cache(maxsize=256)
+def _spec_name(f, mtime):
+    try:
+        with open(f) as fh:
+            name = json.load(fh).get("name")
+        return name if isinstance(name, str) else None
+    except (OSError, ValueError, AttributeError):
+        return None
 
 
 # ---- control requests
@@ -400,9 +424,10 @@ class Worker(threading.Thread):
     each watched by a thread of its own; a job found running at start (the server restarted under it) is adopted and
     watched until it exits."""
 
-    def __init__(self, q, grace=10.0, kill_after=20.0):
+    def __init__(self, q, grace=10.0, kill_after=20.0, home_dir=None):
         super().__init__(daemon=True, name="perflab-worker")
         self.q, self.grace, self.kill_after = q, grace, kill_after
+        self.home = home_dir or home()
         self.wake, self.stopping = threading.Event(), threading.Event()
         self.beside = set()  # the ids of the concurrent jobs being watched
 
@@ -452,6 +477,9 @@ class Worker(threading.Thread):
         env.update(job["env"])
         env[control.ENV] = os.path.join(job["dir"], "control")
         env[JOB_ENV] = str(job["id"])
+        # this server's home, so that the perflab a job runs finds this server (registers its project here, links its
+        # index here), not the one in the default home: a test's server, or a second one, never reaches the user's
+        env[HOME_ENV] = self.home
         env["PYTHONUNBUFFERED"] = "1"
         return env
 
@@ -600,7 +628,7 @@ class Server:
         self.q = Queue(os.path.join(self.home, "jobs.sqlite"))
         self.token = token(self.home)
         g = grace if grace is not None else float(os.environ.get(GRACE_ENV) or 10)
-        self.worker = Worker(self.q, g)
+        self.worker = Worker(self.q, g, home_dir=self.home)
         self.httpd = http.server.ThreadingHTTPServer(("127.0.0.1", DEFAULT_PORT if port is None else port), self._handler())
         self.httpd.daemon_threads = True
         self.port = self.httpd.server_address[1]
@@ -740,7 +768,7 @@ class Server:
                         return self._send(200, md, "text/plain; charset=utf-8") if md else self._error(404, "no perflab skill beside this perflab")
                     if p.startswith("/doc/"):
                         from . import docs
-                        page = docs.page(p[len("/doc/"):])
+                        page = docs.page(p[len("/doc/"):], server.q.projects())
                         return self._send(200, page, "text/html; charset=utf-8") if page else self._error(404, "no such doc")
                     if p == "/api/v1" or p.startswith("/api/v1/"):
                         return self._api(lambda api: api.http_get(p, qs, server))

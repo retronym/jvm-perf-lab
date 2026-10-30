@@ -215,6 +215,33 @@ BRAND_CSS = """
   .brand .links{flex-wrap:nowrap} .brand .links a{padding:3px 7px}}
 """
 
+# the server's nav: Queue, Storage and its projects on every page it serves, then the page's own tabs (a project's index:
+# its sections). `nav_tabs` draws the server's part; the index draws it from the API when the server serves it
+NAV_CSS = """
+.nav{position:sticky;top:0;z-index:10}
+.tabsrow{background:var(--ink)} .tabsrow .in{margin:0 auto;padding:0 20px;display:flex;align-items:center;gap:8px}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex:1} nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs a{color:var(--ink-muted);padding:9px 12px 7px;border-bottom:2px solid transparent;font-weight:500;white-space:nowrap}
+nav.tabs a.on{color:#fff;border-bottom-color:var(--brand)} nav.tabs a:hover{color:#fff;text-decoration:none} nav.tabs a.cur{color:#fff}
+nav.tabs .n{font-size:11px;color:var(--ink-muted);margin-left:5px;font-weight:normal} nav.tabs .n .run{color:var(--brand)}
+nav.tabs .sep{border-left:1px solid var(--ink-line);margin:8px 6px} #srv-tabs{display:contents} #srv-tabs[hidden]{display:none}
+"""
+
+
+def nav_tabs(projects, on=None):
+    """The server's tabs: the queue (with ▶ while a job runs, and how many wait; the queue page keeps it current),
+    storage, and each project's index; `on` is "queue", "admin" or a project id."""
+    import html
+    cls = lambda k: ' class="on"' if on == k else ""
+    links = "".join(f'<a href="{html.escape(p["index"])}" title="{html.escape(p["root"])}"{cls(p["id"])}>{html.escape(p["name"])}</a>'
+                    for p in projects)
+    return (f'<a href="/"{cls("queue")} title="the perflab server\'s queue">Queue<span class="n" id="n-queued"></span></a>'
+            f'<a href="/admin"{cls("admin")}>Storage</a>' + (f'<span class="sep"></span>{links}' if links else "")
+            + "<script>fetch('/api/status', {cache: 'no-store'}).then(r => r.json()).then(s => { const n = document.getElementById('n-queued');"
+              " if (n && !n.innerHTML) n.innerHTML = (s.running ? '<span class=\"run\" title=\"a job is running\">▶</span> ' : '') + s.queued; })"
+              ".catch(() => {})</script>")
+
+
 FRAMED_JS = "<script>if (window !== window.top) document.documentElement.classList.add('framed')</script>"
 
 
@@ -299,7 +326,8 @@ SHORTCUTS_JS = r"""
   const close = () => { box.hidden = true; };
   // capture, so that Esc closes this before the overlays under it
   document.addEventListener('keydown', e => {
-    if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target)) { box.hidden = !box.hidden; e.preventDefault(); }
+    // `?`, or Shift and the key that has it on a US layout (some synthetic events carry no key)
+    if ((e.key === '?' || (!e.key && e.shiftKey && e.code === 'Slash')) && !e.ctrlKey && !e.metaKey && !e.altKey && !typing(e.target)) { box.hidden = !box.hidden; e.preventDefault(); }
     else if (e.key === 'Escape' && !box.hidden) { close(); e.preventDefault(); e.stopImmediatePropagation(); }
   }, true);
   box.addEventListener('click', e => { if (e.target === box) close(); });

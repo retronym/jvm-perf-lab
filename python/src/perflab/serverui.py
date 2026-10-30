@@ -7,19 +7,14 @@ from . import timeline, ui
 
 CSS = """
 main{max-width:1100px;margin:0 auto;padding:16px 20px 40px}
-.nav{position:sticky;top:0;z-index:10}
-.tabsrow{background:var(--ink)} .tabsrow .in{max-width:1100px;margin:0 auto;padding:0 20px;display:flex;align-items:center;gap:8px}
-nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex:1} nav.tabs::-webkit-scrollbar{display:none}
-nav.tabs a{color:var(--ink-muted);padding:9px 12px 7px;border-bottom:2px solid transparent;font-weight:500;white-space:nowrap}
-nav.tabs a.on{color:#fff;border-bottom-color:var(--brand)} nav.tabs a:hover{color:#fff;text-decoration:none}
-nav.tabs .n{font-size:11px;color:var(--ink-muted);margin-left:5px;font-weight:normal}
-nav.tabs .sep{border-left:1px solid var(--ink-line);margin:8px 6px}
+.tabsrow .in{max-width:1100px}
 h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 0 8px;font-weight:600}
 h2.sec .k{text-transform:none;letter-spacing:0;font-weight:normal}
 .badge.queued,.badge.cancelled{background:var(--line2);color:var(--muted)} .badge.paused{background:var(--link-bg);color:var(--link)}
 .badge.pinned{background:var(--link-bg);color:var(--link)} .badge.active{background:var(--warn-bg);color:var(--warn)}
 .job{border-top:1px solid var(--line2);padding:9px 0} .job:first-child{border-top:0;padding-top:2px}
-.jh{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px} .jh .id{font-weight:700;font-variant-numeric:tabular-nums}
+.jh{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px} .jh .id{font-weight:700;font-variant-numeric:tabular-nums;color:inherit}
+.job.hit{background:var(--link-bg);margin:0 -16px;padding-left:16px;padding-right:16px}
 .jh .btns{margin-left:auto}
 button.btn{font:inherit;font-size:12px;line-height:18px;cursor:pointer} button.btn:disabled{color:var(--muted);cursor:default;background:var(--panel)}
 button.btn.bad{color:var(--bad)} button.btn.bad:hover{background:var(--bad-bg)} button.btn.go{background:var(--link);border-color:var(--link);color:var(--panel)}
@@ -70,6 +65,9 @@ QUEUE_JS = r"""
 let projects = {}, jobs = [];
 const open = new Set();
 const proj = id => projects[id] ? `<a href="${esc(projects[id].index)}" title="${esc(projects[id].root)}">${esc(projects[id].name)}</a>` : esc(id);
+// the job's campaign, on its project's index (a card there shows the jobs that ran it, linking back here)
+const camp = j => j.campaign && projects[j.project]
+  ? `<a href="${esc(projects[j.project].index)}#c-${encodeURIComponent(j.campaign)}" title="the campaign on its project's index">${esc(j.campaign)}</a>` : '';
 function label(j) {
   if (j.state === 'running' && j.cancel_requested) return ['running', 'cancelling'];
   if (j.state === 'paused' && j.cancel_requested) return ['paused', 'cancelling'];
@@ -100,7 +98,7 @@ function jobHtml(j, tail) {
     : `started ${ago(j.started)} · ${dur(Date.now() / 1000 - j.started)}`;
   const body = tail ? `<pre class="tail" id="tail-${j.id}">…</pre>` : j.state === 'queued' ? ''
     : `<details class="more" data-id="${j.id}"${open.has(j.id) ? ' open' : ''}><summary>transcript ▾</summary><pre class="tail" id="tail-${j.id}">…</pre></details>`;
-  return `<div class="job" id="job-${j.id}"><div class="jh"><span class="id">#${j.id}</span><span class="badge ${cls}">${esc(text)}</span>${proj(j.project)}`
+  return `<div class="job${location.hash === '#job-' + j.id ? ' hit' : ''}" id="job-${j.id}"><div class="jh"><a class="id" href="#job-${j.id}" title="a link to this job">#${j.id}</a><span class="badge ${cls}">${esc(text)}</span>${proj(j.project)}${camp(j)}`
     + `<span class="when">${when}</span><span class="btns">${buttons(j)}</span></div>`
     + `<code class="argv">perflab ${esc(j.argv.join(' '))}<span class="cwd"> · in ${esc(j.cwd.startsWith(HOME + '/') ? '~' + j.cwd.slice(HOME.length) : j.cwd)}</span></code>`
     + (j.note ? `<p class="k">${esc(j.note)}</p>` : '') + body + `</div>`;
@@ -134,7 +132,7 @@ async function refresh() {
   section('active', active, true, 'Nothing is running.');
   section('queued', queued, false, 'The queue is empty. <code>perflab submit -- ab run &lt;spec&gt;</code> adds to it.');
   section('history', done, false, 'No finished jobs yet.');
-  document.getElementById('n-queued').textContent = queued.length;
+  document.getElementById('n-queued').innerHTML = (active.length ? '<span class="run" title="a job is running">▶</span> ' : '') + queued.length;
   document.title = (active.length ? `▶ #${active[0].id} · ` : '') + 'queue · perflab server';
   active.forEach(j => fillTail(j.id, 60));
   open.forEach(id => fillTail(id, 200));
@@ -185,7 +183,10 @@ document.addEventListener('toggle', e => {
   const id = +d.dataset.id;
   if (d.open) { open.add(id); fillTail(id, 200); } else open.delete(id);
 }, true);
-refresh().then(live);
+// a link to a job (#job-<id>) marks it, and scrolls to it once the jobs are drawn
+const toHash = () => { const t = location.hash && document.getElementById(location.hash.slice(1)); if (t) t.scrollIntoView(); };
+refresh().then(toHash).then(live);
+addEventListener('hashchange', () => refresh().then(toHash));
 setInterval(refresh, 3000);
 setInterval(live, 5000);
 """
@@ -266,11 +267,9 @@ load();
 
 def _page(server, title, tab, body, script, css="", head_script="", keys=()):
     projects = server.q.projects()
-    links = "".join(f'<a href="{html.escape(p["index"])}" title="{html.escape(p["root"])}">{html.escape(p["name"])}</a>' for p in projects)
-    tabs = (f'<a href="/"{" class=on" if tab == "queue" else ""}>Queue<span class="n" id="n-queued"></span></a>'
-            f'<a href="/admin"{" class=on" if tab == "admin" else ""}>Storage</a>' + (f'<span class="sep"></span>{links}' if links else ""))
+    tabs = ui.nav_tabs(projects, tab)
     return f"""{ui.HEAD}<title>{html.escape(title)} · perflab server</title>
-{ui.style(ui.BASE, CSS, css)}
+{ui.style(ui.BASE, ui.NAV_CSS, CSS, css)}
 {ui.masthead("server", home="/")}
 <div class="nav"><div class="tabsrow"><div class="in"><nav class="tabs">{tabs}</nav></div></div></div>
 <main>{body}</main>{ui.footer()}<div id="toast" hidden></div>

@@ -587,12 +587,7 @@ def progress_badge(prog, name):
 
 CSS = """
 main{max-width:1400px;margin:0 auto;padding:16px 20px 40px}
-.nav{position:sticky;top:0;z-index:10}
-.tabsrow{background:var(--ink)} .tabsrow .in{max-width:1400px;margin:0 auto;padding:0 20px;display:flex;align-items:center;gap:8px}
-nav.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;flex:1} nav.tabs::-webkit-scrollbar{display:none}
-nav.tabs a{color:var(--ink-muted);padding:9px 12px 7px;border-bottom:2px solid transparent;font-weight:500;white-space:nowrap}
-nav.tabs a.on{color:#fff;border-bottom-color:var(--brand)} nav.tabs a:hover{color:#fff;text-decoration:none}
-nav.tabs .n{font-size:11px;color:var(--ink-muted);margin-left:5px;font-weight:normal}
+.tabsrow .in{max-width:1400px}
 .tabsrow details.help>summary{border-color:var(--ink-line);color:var(--ink-muted)}
 .filterbar{background:var(--panel);border-bottom:1px solid var(--line);box-shadow:var(--shadow)}
 .filterbar .in{max-width:1400px;margin:0 auto;padding:7px 20px;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center}
@@ -617,9 +612,7 @@ table.t tr.has-sub td{border-bottom:0} table.t tr.sub td{padding-top:0} .cellg{d
 #tl .card-h{gap:6px 12px} #tl select{font:inherit;max-width:100%;padding:2px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
 #tl label{white-space:nowrap} #tl .help{margin-left:auto} #tl[hidden]{display:none}
 #bd[hidden]{display:none} #bd .card-h{gap:6px 12px} #bd .help{margin-left:auto} #bd-cmd{margin:2px 0 6px;word-break:break-all}
-.brand .links a.queue .qn{font-size:11px;line-height:16px;border-radius:999px;padding:0 7px;background:var(--ink2);color:var(--ink-muted)}
-.brand .links a.queue .qn.on{background:var(--brand);color:#fff}
-@media (max-width:700px){.brand .links a.queue{padding:3px 5px} .brand .links a.queue .ql,.brand .links a.queue .w{display:none}}
+.card-h .jobs{display:inline-flex;flex-wrap:wrap;gap:4px} section.card.queued{border-style:dashed}
 #bd pre{margin:0;max-height:16em;overflow:auto;font-size:12px;line-height:1.4;background:var(--line2);padding:6px 8px;border-radius:4px;white-space:pre-wrap;word-break:break-all}
 #lg[hidden]{display:none} #lg .card-h{gap:6px 12px} #lg .help{margin-left:auto} #lg-top{margin:2px 0 6px}
 #lg svg{display:block;width:100%;height:90px;overflow:visible} #lg .area{fill:var(--warn-bg)} #lg .ln{fill:none;stroke:var(--warn);stroke-width:1.5}
@@ -946,8 +939,8 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       f"they turn into links when <code>perflab regraph</code> finishes.</p><p style='margin-bottom:0'>Graph kinds:</p><ul style='margin:2px 0;padding-left:18px'>{kinds}</ul>", right=True)
   tl_help = ui.help_popover("Each fork from JVM start to exit. Iterations appear as they finish; counter lanes (xctrace) once the fork has "
                             "finished. Wheel or pinch to zoom, drag to pan, double-click to reset.", right=True)
-  # Home: the perflab server's queue and projects, shown when the server serves this index (under /p/<project>/)
-  tabs = ('<a href="/" id="srv-home" hidden title="perflab server: the queue and every project">⌂ Home</a>'
+  # the perflab server's tabs (queue, storage, its projects), drawn when the server serves this index (under /p/<project>/)
+  tabs = ('<span id="srv-tabs" hidden></span>'
           + (f'<a href="#overview" data-sec="overview">Overview</a>' if intro else "")
           + f'<a href="#campaigns" data-sec="campaigns">Campaigns<span class="n" id="n-campaigns">{len(camp_sections)}</span></a>'
           + (f'<a href="#counters" data-sec="counters">Counters<span class="n">{n_counters}</span></a>' if n_counters else "")
@@ -965,7 +958,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
                   f'CPU Counters template. Each run name links to its card.</p>{counters_html}</section>') if counters_html else ""
 
   page = f"""{ui.HEAD}<meta name="perflab-code" content="{code_version()}"><title>{esc(title)} · {ui.NAME}</title>
-  {ui.style(ui.BASE, ui.LIGHTBOX_CSS, CSS, INTRO_CSS, timeline.CSS, branchview.CSS)}
+  {ui.style(ui.BASE, ui.LIGHTBOX_CSS, ui.NAV_CSS, CSS, INTRO_CSS, timeline.CSS, branchview.CSS)}
   {ui.masthead(title)}
   <div class="nav"><div class="tabsrow"><div class="in"><nav class="tabs">{tabs}</nav>{help_html}</div></div>
   <div class="filterbar"><div class="in"><button class="chip ftoggle" onclick="this.closest('.filterbar').classList.toggle('open')">Filter ▾</button>{groups}
@@ -1020,7 +1013,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   }}
   // the tab of the section in view
   if (location.protocol.startsWith('http') && location.pathname.startsWith('/p/'))
-    for (const id of ['srv-home', 'srv-foot']) {{ const e = document.getElementById(id); if (e) e.hidden = false; }}
+    document.getElementById('srv-foot').hidden = false;
   const tabs = [...document.querySelectorAll('nav.tabs a[data-sec]')];
   function spy() {{
     let cur = tabs[0];
@@ -1119,21 +1112,47 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       sel.innerHTML = doc.getElementById('tl-cell').innerHTML;
       if (keep && ![...sel.options].some(o => o.value === keep)) sel.add(new Option(keep, keep), 0);
       sel.value = keep;
-      apply();
+      apply(); jobsOnCards();
     }} catch (e) {{}}
   }}
-  // served by `perflab server` (under /p/<project>/): a link to its queue, with what runs and waits there
-  async function queue() {{
-    let s = null;
-    try {{ const r = await fetch('/api/status', {{cache: 'no-store'}}); s = r.ok ? await r.json() : null; }} catch (e) {{}}
-    if (!s || typeof s.queued !== 'number') return;
-    let a = document.getElementById('queue-link');
-    if (!a) {{ a = document.createElement('a'); a.id = 'queue-link'; a.className = 'queue'; a.href = '/'; document.querySelector('.brand .links').prepend(a); }}
-    a.title = s.running ? `running: perflab ${{s.running.argv.join(' ')}}` : 'the perflab server: nothing running';
-    a.innerHTML = `<span class="ql">Queue </span><span class="qn${{s.running ? ' on' : ''}}">${{s.running ? '▶ 1<span class="w"> running</span>' : 'idle'}}`
-      + `${{s.queued ? ` · ${{s.queued}}<span class="w"> queued</span>` : ''}}</span>`;
+  // served by `perflab server` (under /p/<project>/): its tabs before this page's, and each campaign's jobs, #<id> linking
+  // to the job on the queue page; a campaign queued but not yet started has a card of its own until its first cell
+  const SRV = location.protocol.startsWith('http') && /^\\/p\\/([^/]+)\\//.exec(location.pathname);
+  let JOBS = [];
+  const escH = s => String(s).replace(/[&<>"]/g, c => ({{'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}})[c]);
+  async function server() {{
+    let st, jobs, projects;
+    try {{ [st, jobs, projects] = await Promise.all(['/api/status', '/api/jobs', '/api/projects'].map(u => fetch(u, {{cache: 'no-store'}}).then(r => r.ok ? r.json() : null))); }}
+    catch (e) {{ return; }}
+    if (!st || !Array.isArray(jobs) || !Array.isArray(projects)) return;
+    const nav = document.getElementById('srv-tabs');
+    nav.innerHTML = `<a href="/" title="the perflab server's queue">Queue<span class="n">${{st.running ? '<span class="run" title="a job is running">▶</span> ' : ''}}${{st.queued}}</span></a>`
+      + '<a href="/admin">Storage</a><span class="sep"></span>'
+      + projects.map(p => `<a href="${{escH(p.index)}}" title="${{escH(p.root)}}"${{p.id === SRV[1] ? ' class="cur"' : ''}}>${{escH(p.name)}}</a>`).join('')
+      + '<span class="sep"></span>';
+    nav.hidden = false;
+    JOBS = jobs.filter(j => j.project === SRV[1] && j.campaign).sort((a, b) => b.id - a.id);
+    jobsOnCards();
   }}
-  if (location.protocol.startsWith('http') && /^\\/p\\/[^/]+\\//.test(location.pathname)) {{ queue(); setInterval(queue, 10000); }}
+  function jobsOnCards() {{
+    document.querySelectorAll('.card-h .jobs, section.card.queued').forEach(e => e.remove());
+    const by = new Map();
+    for (const j of JOBS) {{ if (!by.has(j.campaign)) by.set(j.campaign, []); by.get(j.campaign).push(j); }}
+    for (const [name, js] of [...by].reverse()) {{
+      const links = '<span class="jobs">' + js.slice(0, 3).map(j => `<a class="btn" href="/#job-${{j.id}}" title="${{escH(j.state + ': perflab ' + j.argv.join(' '))}}">#${{j.id}} ${{escH(j.state)}}</a>`).join('') + '</span>';
+      let card = document.getElementById('c-' + name);
+      if (!card && js.some(j => j.state === 'queued' || j.state === 'running' || j.state === 'paused')) {{
+        card = document.createElement('section');
+        card.className = 'card campaign queued'; card.id = 'c-' + name;
+        card.innerHTML = `<div class="card-h"><span class="kind">campaign</span><h2>${{escH(name)}}</h2></div>`
+          + '<p class="k">On the perflab server\\'s queue: its cells show here once it starts.</p>';
+        document.getElementById('campaigns').after(card);
+      }}
+      const h = card && card.querySelector('.card-h h2');
+      if (h) h.insertAdjacentHTML('afterend', links);
+    }}
+  }}
+  if (SRV) {{ server(); setInterval(server, 10000); }}
   apply(); tick();
   // served (not from a file): follow what runs
   if (location.protocol.startsWith('http')) {{ setInterval(tick, 5000); setInterval(refresh, 10000); }}
