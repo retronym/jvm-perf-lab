@@ -842,6 +842,32 @@ class CurateTest(unittest.TestCase):
         ka, _ = kinds.aligned(kinds.shaped(kinds.base(self.st("main@0_[j];F.f@3_[i];G.g@17_[j] 2"))[0]), [])
         self.assertEqual(ka, {"main_[j];F.f_[i];G.g@17_[j]": 2})
 
+    def test_a_line_has_its_source_text_from_the_build_commit(self):
+        from perflab import sources
+        repo = tempfile.mkdtemp()
+        os.makedirs(os.path.join(repo, "src", "dc", "core"))
+        f = os.path.join(repo, "src", "dc", "core", "Types.scala")
+        open(f, "w").write("package dc.core\nobject Types:\n  def symbol = checked.value\n")
+        git = lambda *a: subprocess.run(["git", "-C", repo, *a], check=True, capture_output=True)
+        git("init", "-q"); git("add", "."); git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c")
+        sha = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+        open(f, "w").write("changed since\n")
+        camp = tempfile.mkdtemp()
+        os.makedirs(os.path.join(camp, ".build", "tip"))
+        json.dump({"build": {"checkout": repo, "commit": sha, "dirty": False}}, open(os.path.join(camp, ".build", "tip", "launch.json"), "w"))
+        src = sources.of_variant(camp, "tip")
+        self.assertEqual(src.line("dc/core/Types$NamedType.symbol", 3), "def symbol = checked.value")  # the commit's, not the tree's
+        self.assertIsNone(src.line("dc/core/Nowhere.f", 1))
+        self.assertIsNone(sources.of_variant(camp, "base"))
+        lines = [{"name": "dc/core/Types$NamedType.symbol", "a": 0, "b": 1, "delta": 1, "linesA": [], "linesB": [["3", 1.0], ["@7", 1.0]]}]
+        curate.add_text(lines, (None, src))
+        self.assertEqual(lines[0]["linesB"], [["3", 1.0, "def symbol = checked.value"], ["@7", 1.0, None]])
+        from perflab import compare
+        w = compare.lines_widget("ev", {"leaf": "line", "precise": {"a": 0.18, "b": None}, "lines": lines}, "base", "tip")
+        self.assertIn("<code>def symbol = checked.value</code>", w)
+        self.assertIn("precise PC: base 18%, tip ?", w)
+        self.assertEqual(compare.lines_widget("ev", {"lines": []}, "a", "b"), "")
+
     def test_stacks_lose_their_lines(self):
         self.assertEqual([stacks.LINE.sub("", f) for f in ("F.f:42_[j]", "F.f@17", "Thread::call_run", "F.f:9")],
                          ["F.f_[j]", "F.f", "Thread::call_run", "F.f"])

@@ -8,7 +8,7 @@ The graphs' controls are linked: async-profiler's flame graph (retronym/async-pr
 state of its toolbar (view toggles, search, highlights, filters, zoom) after each change, and the page relays it to the
 other graphs of the same event, or of every event, or to none (the header's "link" buttons).
 """
-import glob, html, os, re
+import glob, html, json, os, re
 
 from . import flamegraph, ui
 
@@ -41,6 +41,12 @@ header button.on{color:var(--fg);border-color:var(--accent)}
 .body iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
 .body iframe.hidden{visibility:hidden}
 .note{margin:0;padding:4px 12px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)}
+.lw{flex:1 1 100%;border:1px solid var(--line);border-radius:6px;background:var(--panel)}.lw .lb{overflow:auto;max-height:70vh}
+.lt{border-collapse:collapse;font-size:12px;width:100%}.lt th,.lt td{padding:2px 8px;border-bottom:1px solid var(--line);vertical-align:top;text-align:left}
+.lt td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.lt .up{color:var(--bad,#c0392b)}.lt .down{color:var(--good,#1e8449)}
+.lt .m{font:12px ui-monospace,monospace;white-space:nowrap}.lt td.s{width:50%;max-width:0}.lt ol{margin:0;padding:0;list-style:none}
+.lt li{font:12px ui-monospace,monospace;white-space:nowrap}.lt li b{font-weight:600;display:inline-block;min-width:4.5em}.lt li .v{color:var(--muted);display:inline-block;min-width:4.5em}
+.lt li{overflow:hidden;text-overflow:ellipsis}.lt li code{color:var(--fg)}.lt .sep td{color:var(--muted);text-align:center}
 """
 
 SCRIPT = """
@@ -148,6 +154,37 @@ def redirect(path, to):
                 f'<title>moved</title><p>Moved to <a href="{html.escape(to)}">{html.escape(to)}</a>.</p>')
 
 
+def si(x):
+    from .profdiff import si
+    return si(x)
+
+
+def lines_widget(event, t, a, b, top=25):
+    """A curated diff's table by method with each build's lines (perflab.curate.by_method), side by side, with their
+    source text; '' without one."""
+    esc = html.escape
+    ms = t.get("lines") or []
+    if not ms:
+        return ""
+
+    def side(xs):
+        return "<ol>" + "".join(f'<li title="{esc(x[2] or "") if len(x) > 2 else ""}"><b>{esc(str(x[0]))}</b><span class="v">{esc(si(x[1]))}</span>'
+                                f'{f"<code>{esc(x[2])}</code>" if len(x) > 2 and x[2] else ""}</li>' for x in xs) + "</ol>"
+
+    def row(m):
+        d = m["delta"]
+        return (f'<tr><td class="n {"up" if d > 0 else "down"}">{"+" if d > 0 else ""}{esc(si(d))}</td><td class="n">{esc(si(m["a"]))}</td>'
+                f'<td class="n">{esc(si(m["b"]))}</td><td class="m" title="{esc(m["name"])}">{esc(m["name"].rpartition("/")[2])}</td><td class="s">{side(m["linesA"])}</td><td class="s">{side(m["linesB"])}</td></tr>')
+    p = t.get("precise") or {}
+    share = lambda s: "?" if s is None else f"{100 * s:.0f}%"
+    body = "".join(row(m) for m in ms[::-1][:top]) + '<tr class="sep"><td colspan=6>…</td></tr>' + "".join(row(m) for m in ms[:top][::-1])
+    return (f'<div class="lw" data-event="{esc(event)} lines"><div class="tabs"><span class="ev">{esc(event)} by {esc(t.get("leaf") or "line")}</span>'
+            f'<span class="k" title="Samples whose leaf is the PC the PMU latched at the event (the rest: where the interrupt landed)">precise PC: '
+            f'{esc(a)} {share(p.get("a"))}, {esc(b)} {share(p.get("b"))}</span></div>'
+            f'<div class="lb"><table class="lt"><thead><tr><th>Δ/op</th><th>{esc(a)}</th><th>{esc(b)}</th><th>method (as owner)</th>'
+            f'<th>{esc(a)}\'s lines</th><th>{esc(b)}\'s lines</th></tr></thead><tbody>{body}</tbody></table></div></div>')
+
+
 def write(out, a, b, note=None):
     """(Re)writes <out>/compare.html for every event diffed in `out`; `a` and `b` name the two runs, `note` says how
     the stacks were curated (perflab.curate), shown under the header."""
@@ -170,6 +207,10 @@ def write(out, a, b, note=None):
             flamegraph.link_file(os.path.join(out, name))
         widgets.append(f'<div class="w" data-event="{esc(event)}"><div class="tabs"><span class="ev">{esc(event)}</span>{tabs}<span class="act">{links}</span></div>'
                        f'<div class="body">{frames}</div></div>')
+        try:
+            widgets.append(lines_widget(event, json.load(open(os.path.join(out, f"tables-{event}.json"))), a, b))
+        except (OSError, ValueError):
+            pass
         for (label, pattern), by_leaf in zip(PAIRS, (False, True)):
             names = [pattern.format(side=side, event=event) for side in ("a", "b")]
             if not all(os.path.exists(os.path.join(out, n)) for n in names):

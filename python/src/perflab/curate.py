@@ -69,7 +69,7 @@ the diff's pair.json and on its page.
 """
 import argparse, collections, glob, hashlib, json, os, re, subprocess, sys, tempfile
 
-from . import compare, config, flamegraph, jmh, kinds, profdiff, regraph, stacks
+from . import compare, config, flamegraph, jmh, kinds, profdiff, regraph, sources, stacks
 from .stacks import LINE
 
 SUFFIX = re.compile(r"_\[[a-z0-9]+\]$")
@@ -253,6 +253,15 @@ def summarize(rules, own_a, own_b, incl_a, incl_b, ta, tb, ops_a, ops_b):
     return out
 
 
+def add_text(lines, srcs):
+    """Each line of `lines` (by_method's) [line, events] → [line, events, its source text or None], from that build's
+    perflab.sources.Source."""
+    for m in lines:
+        for k, src in zip(("linesA", "linesB"), srcs):
+            for x in m[k]:
+                x.append(src.line(m["name"], int(x[0])) if src and x[0].isdigit() else None)
+
+
 def by_method(owners, top=5):
     """The owners by line, gathered by method: the line numbers of two builds of different sources rarely match, so
     each method's Δ and, per build, its lines with the most events."""
@@ -268,8 +277,8 @@ def by_method(owners, top=5):
     for m in ms.values():
         m["delta"] = m["b"] - m["a"]
         for k in ("linesA", "linesB"):
-            m[k] = sorted(m[k], key=lambda x: -x[1])[:top]
-    return sorted(ms.values(), key=lambda m: m["delta"])
+            m[k] = sorted(m[k], key=lambda x: (-x[1], x[0]))[:top]
+    return sorted(ms.values(), key=lambda m: (m["delta"], m["name"]))
 
 
 def table_md(event, t, la, lb, rules, top):
@@ -288,7 +297,7 @@ def table_md(event, t, la, lb, rules, top):
             "| Δ | a | b | Δ of a's total | method |", "|---|---|---|---|---|"]
     out += [row(r) for r in t["owners"][::-1][:top]] + ["| … | | | | |"] + [row(r) for r in t["owners"][:top][::-1]]
     if t.get("lines"):
-        ln = lambda xs: ", ".join(f"{at} {si(v)}" for at, v in xs)
+        ln = lambda xs: ", ".join(f"{x[0]} {si(x[1])}" for x in xs)
         mrow = lambda m: f"| {'+' if m['delta'] > 0 else ''}{si(m['delta'])} | {si(m['a'])} | {si(m['b'])} | {pct(m['delta'])} | `{m['name']}` | {ln(m['linesA'])} | {ln(m['linesB'])} |"
         out += ["", f"the same by method, with each build's {t['leaf']}s with the most (their sources differ, so their numbers may not match):", "",
                 "| Δ | a | b | Δ of a's total | method | a's | b's |", "|---|---|---|---|---|---|---|"]
@@ -373,9 +382,10 @@ def raw_diff(out, event, A, B, la, lb, jfrconv, top, jits=None):
                 os.unlink(f)
 
 
-def curated_diff(out, event, A, B, la, lb, jfrconv, rules, jits=None, precise=None):
+def curated_diff(out, event, A, B, la, lb, jfrconv, rules, jits=None, precise=None, srcs=None):
     """The curated graphs, table-<event>.md and tables-<event>.json of two cells' cached stacks (with lines, for a
-    `leaf` rule); the tables. `precise`: each build's share of samples with a precise PC, for the table."""
+    `leaf` rule); the tables. `precise`: each build's share of samples with a precise PC, for the table; `srcs`: each
+    build's perflab.sources.Source, for the text of a line."""
     c = Curator(rules)
     ba, outside_a = c.base(A)
     bb, outside_b = c.base(B)
@@ -397,6 +407,8 @@ def curated_diff(out, event, A, B, la, lb, jfrconv, rules, jits=None, precise=No
     t["oneSidedFrames"] = c.one_sided
     t["leaf"] = c.leaf
     t["precise"] = precise
+    if t.get("lines") and c.leaf == "line" and srcs:
+        add_text(t["lines"], srcs)
     open(os.path.join(out, f"table-{event}.md"), "w").write(table_md(event, t, la, lb, rules, rules.get("top", 25)))
     json.dump(t, open(os.path.join(out, f"tables-{event}.json"), "w"), indent=1)
     if c.kinds:
@@ -530,6 +542,7 @@ def main(argv):
             for e in events:
                 r = pc.get(e)
                 precise.setdefault(e, {})[side] = r["precise"] / r["samples"] if r and r["samples"] else None
+    srcs = (sources.of_variant(d, x.a), sources.of_variant(d, x.b)) if leaf == "line" else None
     curations = [] if x.raw else [(rules, name)]
     if not x.raw and not x.no_light and name != "light":
         light, _ = rules_for(spec, "light")
@@ -539,7 +552,7 @@ def main(argv):
         cur_out = os.path.join(d, f"{stem}-{name}{'-' + rules['leaf'] if rules.get('leaf') else ''}")
         os.makedirs(cur_out, exist_ok=True)
         for e in events:
-            t = curated_diff(cur_out, e, *(lined if rules.get("leaf") else loaded)[e], la, lb, jfrconv, rules, jits, precise.get(e))
+            t = curated_diff(cur_out, e, *(lined if rules.get("leaf") else loaded)[e], la, lb, jfrconv, rules, jits, precise.get(e), srcs)
             tot = t["total"]
             print(f"{e} ({name}): {profdiff.si(tot['a'])} → {profdiff.si(tot['b'])} per op ({100 * (tot['ratio'] - 1):+.1f}%)")
             for g in t["groups"]:
