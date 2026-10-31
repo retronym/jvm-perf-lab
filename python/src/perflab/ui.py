@@ -208,7 +208,9 @@ BRAND_CSS = """
 .brand .tag{color:var(--ink-muted);font-size:12.5px;margin-top:2px}
 .brand .links{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .brand .links a{border:1px solid var(--ink-line);border-radius:6px;padding:3px 10px;font-size:12.5px;display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
-.brand .links a:hover{background:var(--ink2);text-decoration:none}
+.brand .links button{font:600 12.5px inherit;color:var(--ink-fg);background:none;border:1px solid var(--ink-line);border-radius:6px;padding:3px 9px;cursor:pointer}
+.brand .links a[hidden],.brand .links button[hidden]{display:none}
+.brand .links a:hover,.brand .links button:hover{background:var(--ink2);text-decoration:none}
 .band.slim .brand{padding:8px 0} .band.slim .mark{width:24px;height:24px} .band.slim .name{font-size:15px}
 .framed .band.slim{display:none}
 @media (max-width:700px){.brand .tag{display:none} .band .in{padding:0 12px} .brand .name{font-size:16px} .brand .proj{display:block;font-size:14px}
@@ -265,8 +267,26 @@ def masthead(title=None, home=None, slim=False, tagline=True):
     proj = f' <span class="proj">/ {html.escape(title)}</span>' if title else ""
     tag = f'<div class="tag">{TAGLINE}</div>' if tagline and not slim else ""
     return (f'<div class="band{" slim" if slim else ""}"><div class="in"><div class="brand">{MARK}<div><div class="name">{name}{proj}</div>{tag}</div>'
-            f'<span class="links"><a href="{REPO}">{GITHUB} GitHub</a><a href="{DOCS}">Docs</a></span></div></div></div>'
-            + (FRAMED_JS if slim else ""))
+            f'<span class="links"><a href="/" class="srv" hidden>Home</a><a href="{DOCS}" data-srv="/doc/">Docs</a>'
+            f'<a href="{REPO}">{GITHUB} GitHub</a><button class="keys-btn" title="Keyboard shortcuts and where to read on (?)" hidden>?</button></span>'
+            f'</div></div></div><script>{MASTHEAD_JS}</script>' + (FRAMED_JS if slim else ""))
+
+
+# on the perflab server: Home (its queue) shows, Docs and the guide go to its own pages (perflab.docs) rather than GitHub's,
+# and `?` opens the shortcuts overlay where the page has one
+ON_SERVER = r"/^https?:$/.test(location.protocol) && /^\/(p\/|admin$|api\/|doc(\/|$)|$)/.test(location.pathname)"
+MASTHEAD_JS = f"""(() => {{
+  const links = document.currentScript.previousElementSibling.querySelector('.links');
+  if ({ON_SERVER}) {{
+    links.querySelectorAll('a[data-srv]').forEach(a => a.href = a.dataset.srv);
+    links.querySelectorAll('.srv').forEach(a => a.hidden = false);
+  }}
+  const b = links.querySelector('.keys-btn');
+  addEventListener('DOMContentLoaded', () => {{
+    const box = document.getElementById('keys');
+    if (box) {{ b.hidden = false; b.onclick = () => {{ box.hidden = !box.hidden; }}; }}
+  }});
+}})();"""
 
 
 def home_from(page_dir):
@@ -320,7 +340,7 @@ SHORTCUTS_JS = r"""
 (() => {
   const box = document.getElementById('keys');
   // on the perflab server the guide and the skill are its own pages; elsewhere (file://, a static site) GitHub's
-  if (/^https?:$/.test(location.protocol) && /^\/(p\/|admin$|api\/|doc\/|$)/.test(location.pathname))
+  if (/^https?:$/.test(location.protocol) && /^\/(p\/|admin$|api\/|doc(\/|$)|$)/.test(location.pathname))
     box.querySelectorAll('a[data-srv]').forEach(a => a.href = a.dataset.srv);
   const typing = t => t && (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable);
   const close = () => { box.hidden = true; };

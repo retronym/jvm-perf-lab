@@ -140,16 +140,32 @@ def list_html(items, il):
     return "".join(out)
 
 
+def title_of(f, name):
+    m = re.search(r"^# +(.*)$", open(f, encoding="utf-8").read(), re.M)
+    return re.sub(r"[`*]", "", m[1]) if m else name
+
+
+def chrome(title, projects, body):
+    nav = f'<div class="nav"><div class="tabsrow"><div class="in"><nav class="tabs">{ui.nav_tabs(projects)}</nav></div></div></div>'
+    return (ui.HEAD + f"<title>{html.escape(title)} · perflab</title>" + ui.style(ui.BASE, ui.NAV_CSS, CSS) + "<body>"
+            + ui.masthead("docs", "/", slim=False) + nav + f'<main><article class="card doc">{body}</article></main>'
+            + ui.footer() + ui.shortcuts() + "</body>")
+
+
+def index(projects=()):
+    """`/doc/`: every doc, the optimising guide first, and the perflab skill."""
+    names = sorted((n[:-3] for n in os.listdir(DOC) if n.endswith(".md") and path(n[:-3])),
+                   key=lambda n: (n != "optimising", n))
+    items = "".join(f'<li><a href="/doc/{n}">{html.escape(title_of(path(n), n))}</a> <code>doc/{n}.md</code></li>' for n in names)
+    return chrome("docs", projects, f'<h1>Docs</h1><ul>{items}<li><a href="/skill.md">The perflab skill</a> '
+                                    f'<code>{SKILL_PATH}</code></li></ul>')
+
+
 def page(name, projects=()):
     """`doc/<name>.md` as a page of the server, under its nav (`projects`: the server's), or None."""
     f = path(name)
     if f is None:
         return None
     text = open(f, encoding="utf-8").read()
-    m = re.search(r"^# +(.*)$", text, re.M)
-    title = re.sub(r"[`*]", "", m[1]) if m else name
     src = f'<a class="src" href="{ui.REPO}/blob/main/doc/{name}.md">Markdown source</a>'
-    nav = f'<div class="nav"><div class="tabsrow"><div class="in"><nav class="tabs">{ui.nav_tabs(projects)}</nav></div></div></div>'
-    return (ui.HEAD + f"<title>{html.escape(title)} · perflab</title>" + ui.style(ui.BASE, ui.NAV_CSS, CSS) + "<body>"
-            + ui.masthead("docs", "/", slim=False) + nav + f'<main><article class="card doc">{src}{to_html(text)}</article></main>'
-            + ui.footer() + ui.shortcuts() + "</body>")
+    return chrome(title_of(f, name), projects, src + to_html(text))

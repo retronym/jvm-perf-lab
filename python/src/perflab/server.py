@@ -780,6 +780,9 @@ class Server:
                         from . import api
                         md = api.skill_md()
                         return self._send(200, md, "text/plain; charset=utf-8") if md else self._error(404, "no perflab skill beside this perflab")
+                    if p in ("/doc", "/doc/"):
+                        from . import docs
+                        return self._send(200, docs.index(server.q.projects()), "text/html; charset=utf-8")
                     if p.startswith("/doc/"):
                         from . import docs
                         page = docs.page(p[len("/doc/"):], server.q.projects())

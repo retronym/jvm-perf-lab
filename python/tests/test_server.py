@@ -615,6 +615,10 @@ class PageTest(unittest.TestCase):
             srv.httpd.server_close()
 
     def test_markdown(self):
+        idx = docs.index()
+        self.assertIn('<a href="/doc/optimising">', idx)
+        self.assertLess(idx.index("/doc/optimising"), idx.index("/doc/paired-ab"))
+        self.assertIn('data-srv="/doc/"', idx)
         md = ("# Title\n\nA [doc](paired-ab.md#order), [the skill](../.claude/skills/perflab/SKILL.md), [a lab](../labs/scala3/README.md),\n"
               "`a|b` and **bold**.\n\n| x | y |\n|---|---|\n| `p\\|q` | 2 |\n\n1. one\n   - nested\n2. two\n\n```\n<code>\n```\n")
         h = docs.to_html(md)
