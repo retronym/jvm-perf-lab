@@ -712,6 +712,9 @@ class CampaignCardTest(unittest.TestCase):
         self.assertEqual(html.count('<tr class="sub" data-of="0"'), 2)  # base's round 1, and round 2 pending
         self.assertIn('<span class="badge pending">pending</span>', html)
         self.assertIn('hidden><td></td><td>#1', html)  # the cells hidden until their row is expanded
+        recs[0]["attrs"], recs[0]["detail"] = ' data-lb-group="c · k · base #1"', '<a data-lb href="t.html">timeline</a>'
+        html = index.card_summary(recs, ["base", "tip"], [])
+        self.assertIn('<tr class="sub sd" data-of="0" data-corpus="k" data-lb-group="c · k · base #1" hidden>', html)  # its links' lightbox: this cell's
         for stat in ("mean", "median", "min"):
             self.assertIn(f'class="st st-{stat}"', html)
         data = json.loads(re.search(r'<script type="application/json">(.*?)</script>', html).group(1))

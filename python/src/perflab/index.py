@@ -331,7 +331,9 @@ def card_summary(recs, order, planned, per_unit=None, norm=None):
                 if r.get("flags"):
                     extra += f'<details class="flags"><summary>flags</summary>{r["flags"]}</details>'
                 if extra:
-                    rows.append(f'<tr class="sub sd" data-of="{i}" data-corpus="{esc(corpus)}" hidden><td></td><td colspan="{2 + len(main)}">{extra}</td></tr>')
+                    # the cell's links: the lightbox offers the graphs of the closest [data-lb-group], this cell's
+                    group = re.search(r' data-lb-group="[^"]*"', r.get("attrs") or "")
+                    rows.append(f'<tr class="sub sd" data-of="{i}" data-corpus="{esc(corpus)}"{group.group(0) if group else ""} hidden><td></td><td colspan="{2 + len(main)}">{extra}</td></tr>')
             data_rows.append({"c": corpus, "v": v, "n": n, "base": base, "cells": cell_ids, "m": ms})
     units = {r["data"][7] for c in by.values() for rs in c.values() for r in rs if r["data"]}
     head = lambda k, label: (esc(unit(label)) if per_unit else score_head(units)) if k == "score" else esc(label)
