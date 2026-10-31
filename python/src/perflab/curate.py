@@ -2,7 +2,7 @@
 stacks made comparable, plus tables that say where an event moved.
 
   perflab ab diff <spec.json | campaign> <a> <b> [--corpus <c>] [--round <n>] [--event <e>]...
-                  [--curate <preset> | --curate '<json hints>' | --raw] [--by-leaf] [--force]
+                  [--curate <preset> | --curate '<json hints>' | --raw] [--by-leaf] [--leaf line|bci] [--force]
 
 A flame graph diff of a large program compares badly as recorded: interpreter frames, JDK plumbing
 (`java/lang/invoke`, reflection, lambdas, lazy-val initializers) in every stack, wrapper frames one build has and the
@@ -56,6 +56,13 @@ Every diff, raw and light, has the frame-kind flips table (perflab.kinds): per m
 its own frame in each build, ranked by the self events that changed kind, with C2's reasons when the cells have a
 "jitRecording".
 
+With `leaf` ("line" or "bci", or `--leaf`), the leaf frame is a line (`Class.method:42`) or bytecode index
+(`Class.method@17`) of its method, and the callers stay methods, so the towers still align: with a PMU event sampled
+with a precise PC (kperf's L1D misses), the leaf's line names the load that counted. A transparent leaf's events go to
+its caller's line, the call. The owner table is by owner method and line (the line in the owner method, a call if the
+event landed below it); groups match its method. The diff goes to `diff-<a>-<b>-<curated>-<leaf>/`, the raw one stays
+by method, and each table says what share of each build's samples had a precise PC, where the recording says.
+
 `fold`, `drop` and `transparent` add to the defaults (`"transparent": null` clears them), `groups` and `presets` merge by name, anything else replaces. Each cell's
 stacks are cached (perflab.stacks), so curating a pair again with other hints takes seconds. The rules applied are in
 the diff's pair.json and on its page.
@@ -63,6 +70,7 @@ the diff's pair.json and on its page.
 import argparse, collections, glob, hashlib, json, os, re, subprocess, sys, tempfile
 
 from . import compare, config, flamegraph, jmh, kinds, profdiff, regraph, stacks
+from .stacks import LINE
 
 SUFFIX = re.compile(r"_\[[a-z0-9]+\]$")
 DROP = [r"^interpreted$"]
@@ -121,27 +129,33 @@ class Curator:
         self.anchor_re = re.compile(rules["anchor"]) if rules.get("anchor") else None
         self.owners = tuple(as_list(rules.get("owner")))
         self.skip = tuple(as_list(rules.get("ownerSkip")))
-        self.names, self.plain, self.ids = [], [], {}
+        self.names, self.plain, self.lined, self.method, self.ids = [], [], [], [], {}
+        self.leaf = rules.get("leaf")
         self.kinds = bool(rules.get("kinds"))
         self.drop, self.fold, self.anchor, self.owner, self.skipped = [], [], [], [], []
 
     def gid(self, frame):
-        name = profdiff.HIDDEN_ADDRESS.sub("", SUFFIX.sub("", frame))
+        lined = profdiff.HIDDEN_ADDRESS.sub("", SUFFIX.sub("", frame))
+        name = LINE.sub("", lined) if self.leaf else lined
         if self.kinds:
             k = SUFFIX.search(frame)
-            frame, name = name + (k.group(0) if k else ""), name
+            frame = lined + (k.group(0) if k else "")
         else:
-            frame = name
+            frame = lined
         i = self.ids.get(frame)
         if i is None:
             i = self.ids[frame] = len(self.names)
             self.names.append(frame)
             self.plain.append(name)
+            self.lined.append(lined)
+            self.method.append(i)  # the frame without its line: below, once the frame's own entries are in
             self.drop.append(bool(self.drop_re and self.drop_re.search(name)))
             self.fold.append(bool(self.fold_re and self.fold_re.search(name)))
             self.anchor.append(bool(self.anchor_re and self.anchor_re.search(name)))
             self.owner.append(bool(self.owners) and name.startswith(self.owners) and not self.fold[i])
             self.skipped.append(name.startswith(self.skip) if self.skip else False)
+            if name != lined:
+                self.method[i] = self.gid(LINE.sub("", frame))
         return i
 
     def base(self, st):
@@ -162,10 +176,11 @@ class Curator:
         return out, outside
 
     def shaped(self, base):
-        """Steps 4-5: (body, leaf, count) per stack."""
+        """Steps 4-5: (body, leaf, count) per stack; only the leaf keeps its line."""
         out = []
+        m = self.method
         for g, n in base:
-            leaf, body = g[-1], [x for x in g[:-1] if not self.fold[x]]
+            leaf, body = g[-1], [m[x] for x in g[:-1] if not self.fold[x]]
             if self.r.get("recursion", True):
                 seen = set()
                 body = [x for x in body if not (x in seen or seen.add(x))]
@@ -205,7 +220,7 @@ class Curator:
         own, incl = collections.Counter(), collections.Counter()
         for g, n in base:
             o = self.owner_of(g)
-            own[NO_OWNER if o is None else self.plain[o]] += n
+            own[NO_OWNER if o is None else self.lined[o]] += n
             for name in {self.plain[x] for x in g if (self.owner[x] if self.owners else not self.fold[x])}:
                 incl[name] += n
         return own, incl
@@ -224,7 +239,7 @@ def summarize(rules, own_a, own_b, incl_a, incl_b, ta, tb, ops_a, ops_b):
         acc = {g: {"name": g, "a": 0.0, "b": 0.0, "members": 0} for g, _ in pats}
         rest = {"name": "(ungrouped)", "a": 0.0, "b": 0.0, "members": 0}
         for o in owners:
-            g = next((acc[g] for g, p in pats if p.search(o["name"])), rest)
+            g = next((acc[g] for g, p in pats if p.search(LINE.sub("", o["name"]))), rest)
             g["a"] += o["a"]; g["b"] += o["b"]; g["members"] += 1
         groups = sorted(list(acc.values()) + [rest], key=lambda g: -(g["b"] - g["a"]))
         for g in groups:
@@ -232,7 +247,29 @@ def summarize(rules, own_a, own_b, incl_a, incl_b, ta, tb, ops_a, ops_b):
     floor = rules.get("excessMin", 0.002) * TA
     excess = sorted(({"name": k, "a": pa(incl_a[k]), "b": pb(incl_b[k]), "excess": pb(incl_b[k]) - pa(incl_a[k]) * R}
                      for k in set(incl_a) & set(incl_b) if pa(incl_a[k]) + pb(incl_b[k]) > floor), key=lambda r: -r["excess"])
-    return {"total": {"a": TA, "b": TB, "ratio": R}, "owners": owners, "groups": groups, "excess": excess}
+    out = {"total": {"a": TA, "b": TB, "ratio": R}, "owners": owners, "groups": groups, "excess": excess}
+    if rules.get("leaf"):
+        out["lines"] = by_method(owners)
+    return out
+
+
+def by_method(owners, top=5):
+    """The owners by line, gathered by method: the line numbers of two builds of different sources rarely match, so
+    each method's Δ and, per build, its lines with the most events."""
+    ms = {}
+    for o in owners:
+        name = LINE.sub("", o["name"])
+        m = ms.setdefault(name, {"name": name, "a": 0.0, "b": 0.0, "linesA": [], "linesB": []})
+        m["a"] += o["a"]; m["b"] += o["b"]
+        at = o["name"][len(name):] or "?"
+        for side in ("a", "b"):
+            if o[side]:
+                m["lines" + side.upper()].append([at.lstrip(":"), o[side]])
+    for m in ms.values():
+        m["delta"] = m["b"] - m["a"]
+        for k in ("linesA", "linesB"):
+            m[k] = sorted(m[k], key=lambda x: -x[1])[:top]
+    return sorted(ms.values(), key=lambda m: m["delta"])
 
 
 def table_md(event, t, la, lb, rules, top):
@@ -241,10 +278,21 @@ def table_md(event, t, la, lb, rules, top):
     pct = lambda d: f"{100 * d / tot['a']:+.2f}%" if tot["a"] else ""
     out = [f"{event} per op (benchmark threads, curated): a {si(tot['a'])}, b {si(tot['b'])}, {100 * (tot['ratio'] - 1):+.1f}%  "
            f"(a = {la}, b = {lb}; {'owner ' + ', '.join(as_list(rules['owner'])) if rules.get('owner') else 'by leaf method'})", ""]
+    if t.get("leaf"):
+        p = t.get("precise") or {}
+        share = lambda s: "not recorded" if s is None else f"{100 * s:.0f}%"
+        out += [f"by {t['leaf']}: the leaf frame is `method:{'line' if t['leaf'] == 'line' else '@bci'}`, the owner its line; samples "
+                f"with a precise PC (the PMU's, so the leaf is the instruction that counted): a {share(p.get('a'))}, b {share(p.get('b'))}", ""]
     row = lambda r: f"| {'+' if r['delta'] > 0 else ''}{si(r['delta'])} | {si(r['a'])} | {si(r['b'])} | {pct(r['delta'])} | `{r['name']}` |"
     out += [f"self {event} per op by {'owner' if rules.get('owner') else 'method'}, biggest increases then decreases (b − a):", "",
             "| Δ | a | b | Δ of a's total | method |", "|---|---|---|---|---|"]
     out += [row(r) for r in t["owners"][::-1][:top]] + ["| … | | | | |"] + [row(r) for r in t["owners"][:top][::-1]]
+    if t.get("lines"):
+        ln = lambda xs: ", ".join(f"{at} {si(v)}" for at, v in xs)
+        mrow = lambda m: f"| {'+' if m['delta'] > 0 else ''}{si(m['delta'])} | {si(m['a'])} | {si(m['b'])} | {pct(m['delta'])} | `{m['name']}` | {ln(m['linesA'])} | {ln(m['linesB'])} |"
+        out += ["", f"the same by method, with each build's {t['leaf']}s with the most (their sources differ, so their numbers may not match):", "",
+                "| Δ | a | b | Δ of a's total | method | a's | b's |", "|---|---|---|---|---|---|---|"]
+        out += [mrow(m) for m in t["lines"][::-1][:top]] + ["| … | | | | | | |"] + [mrow(m) for m in t["lines"][:top][::-1]]
     if t["groups"]:
         out += ["", f"groups (net self {event} per op of their owners):", "", "| group | Δ | a | b | Δ of a's total | owners |", "|---|---|---|---|---|---|"]
         out += [f"| {g['name']} | {'+' if g['delta'] > 0 else ''}{si(g['delta'])} | {si(g['a'])} | {si(g['b'])} | {pct(g['delta'])} | {g['members']} |"
@@ -325,8 +373,9 @@ def raw_diff(out, event, A, B, la, lb, jfrconv, top, jits=None):
                 os.unlink(f)
 
 
-def curated_diff(out, event, A, B, la, lb, jfrconv, rules, jits=None):
-    """The curated graphs, table-<event>.md and tables-<event>.json of two cells' cached stacks; the tables."""
+def curated_diff(out, event, A, B, la, lb, jfrconv, rules, jits=None, precise=None):
+    """The curated graphs, table-<event>.md and tables-<event>.json of two cells' cached stacks (with lines, for a
+    `leaf` rule); the tables. `precise`: each build's share of samples with a precise PC, for the table."""
     c = Curator(rules)
     ba, outside_a = c.base(A)
     bb, outside_b = c.base(B)
@@ -346,10 +395,12 @@ def curated_diff(out, event, A, B, la, lb, jfrconv, rules, jits=None):
     t = summarize(rules, own_a, own_b, incl_a, incl_b, sum(n for _, n in ba), sum(n for _, n in bb), A.ops, B.ops)
     t["outsideAnchor"] = {"a": outside_a / A.ops, "b": outside_b / B.ops} if rules.get("anchor") else None
     t["oneSidedFrames"] = c.one_sided
+    t["leaf"] = c.leaf
+    t["precise"] = precise
     open(os.path.join(out, f"table-{event}.md"), "w").write(table_md(event, t, la, lb, rules, rules.get("top", 25)))
     json.dump(t, open(os.path.join(out, f"tables-{event}.json"), "w"), indent=1)
     if c.kinds:
-        write_flips(out, event, A, B, la, lb, jits)
+        write_flips(out, event, *((stacks.without_lines(A), stacks.without_lines(B)) if c.leaf else (A, B)), la, lb, jits)
         template = os.path.join(out, f"a-{event}.html")  # jfrconv's, just rendered: the viewer of the graphs beside them
         try:
             viewer = open(template).read()
@@ -380,6 +431,8 @@ def banner(rules):
         parts.append("recursion collapsed to each method's outermost frame")
     if rules.get("align", True):
         parts.append("frames above the leaf in only one build dropped")
+    if rules.get("leaf"):
+        parts.append(f"the leaf by {rules['leaf']} (callers by method)")
     if rules.get("owner"):
         parts.append(f"tables by owner {', '.join(as_list(rules['owner']))}"
                      + (f" (skipping {', '.join(as_list(rules['ownerSkip']))})" if rules.get("ownerSkip") else ""))
@@ -410,6 +463,7 @@ def main(argv):
     ap.add_argument("--no-light", action="store_true", help="without the light diff (the `light` preset) beside the curated one")
     ap.add_argument("--by-leaf", action="store_true", help="also the leaf-rooted differential graph")
     ap.add_argument("--force", action="store_true", help="render the raw diff again even when it is there")
+    ap.add_argument("--leaf", choices=sorted(stacks.LEAVES), help="the leaf frame by line or bytecode index (the callers by method)")
     x = ap.parse_args(argv)
     path = x.spec if os.path.isfile(x.spec) else os.path.join(config.get().campaigns, x.spec, "spec.json")
     if not os.path.isfile(path):
@@ -430,6 +484,11 @@ def main(argv):
     rules, name = rules_for(spec, x.curate)
     if x.by_leaf:
         rules["byLeaf"] = True
+    if x.leaf:
+        rules["leaf"] = x.leaf
+    leaf = rules.get("leaf")
+    if leaf and leaf not in stacks.LEAVES:
+        sys.exit(f"leaf {leaf}: not one of {', '.join(stacks.LEAVES)}")
     pair = {"a": x.a, "b": x.b, "corpus": corpus, "cells": [os.path.relpath(c, d) for c in (ca, cb)]}
     raw_out = os.path.join(d, stem)
     jits = None
@@ -439,9 +498,13 @@ def main(argv):
             jits = (jfrevents.jit(ca), jfrevents.jit(cb))
         except (RuntimeError, OSError, ValueError) as e:
             print(f"JIT recordings not read: {e}", file=sys.stderr)
-    loaded = {}
+    loaded, lined, precise = {}, {}, {}
     for e in events:
-        loaded[e] = (stacks.load(ca, e, jfrconv), stacks.load(cb, e, jfrconv))
+        if leaf:
+            lined[e] = (stacks.load(ca, e, jfrconv, leaf), stacks.load(cb, e, jfrconv, leaf))
+            loaded[e] = tuple(stacks.without_lines(s) for s in lined[e])
+        else:
+            loaded[e] = (stacks.load(ca, e, jfrconv), stacks.load(cb, e, jfrconv))
         print(f"{e}: {len(loaded[e][0].stacks):,} and {len(loaded[e][1].stacks):,} stacks", flush=True)
     raw_done = (not x.force and os.path.exists(os.path.join(raw_out, "pair.json"))
                 and json.load(open(os.path.join(raw_out, "pair.json"))).get("cells") == pair["cells"]
@@ -457,14 +520,26 @@ def main(argv):
                 write_flips(raw_out, e, *loaded[e], la, lb, jits)
     compare.write(raw_out, la, lb)  # again for a diff already there: the page's keys and links are its own
     print(f"raw: {os.path.join(raw_out, 'compare.html')}{' (there already)' if raw_done else ''}")
+    if leaf:
+        for side, c in (("a", ca), ("b", cb)):
+            try:
+                pc = jfrevents.precise(c)
+            except (RuntimeError, OSError, ValueError, subprocess.TimeoutExpired) as ex:
+                print(f"precise PCs not read: {ex}", file=sys.stderr)
+                pc = {}
+            for e in events:
+                r = pc.get(e)
+                precise.setdefault(e, {})[side] = r["precise"] / r["samples"] if r and r["samples"] else None
     curations = [] if x.raw else [(rules, name)]
     if not x.raw and not x.no_light and name != "light":
-        curations.append(rules_for(spec, "light"))
+        light, _ = rules_for(spec, "light")
+        light["leaf"] = leaf
+        curations.append((light, "light"))
     for rules, name in curations:
-        cur_out = os.path.join(d, f"{stem}-{name}")
+        cur_out = os.path.join(d, f"{stem}-{name}{'-' + rules['leaf'] if rules.get('leaf') else ''}")
         os.makedirs(cur_out, exist_ok=True)
         for e in events:
-            t = curated_diff(cur_out, e, *loaded[e], la, lb, jfrconv, rules, jits)
+            t = curated_diff(cur_out, e, *(lined if rules.get("leaf") else loaded)[e], la, lb, jfrconv, rules, jits, precise.get(e))
             tot = t["total"]
             print(f"{e} ({name}): {profdiff.si(tot['a'])} → {profdiff.si(tot['b'])} per op ({100 * (tot['ratio'] - 1):+.1f}%)")
             for g in t["groups"]:

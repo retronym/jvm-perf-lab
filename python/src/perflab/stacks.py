@@ -6,14 +6,20 @@ The cache is `<cell>/stacks-<event>.gz`: the frames interned once (names as prof
 addresses and thread ids stripped, jfrconv's `_[j]`-style suffixes kept for the graphs' colours), then each distinct
 stack as frame ids and its count, as packed integers. A recording with ~100k stacks of ~200 frames takes some tens of
 MB. It is rebuilt when the recording is newer, or the format changes.
+
+With `leaf` ("line" or "bci"), jfrconv names every frame with its line (`Class.method:42_[j]`) or bytecode index
+(`Class.method@17_[j]`), cached as `stacks-<event>-<leaf>.gz`; `without_lines` makes the plain stacks of those.
 """
-import array, gzip, json, os
+import array, gzip, json, os, re
+
+LEAVES = {"line": "--lines", "bci": "--bci"}
+LINE = re.compile(r"(?::|@)\d+(?=(?:_\[[a-z0-9]+\])?$)")  # a frame's `:line` or `@bci`, before its kind suffix
 
 FORMAT = 1
 
 
-def path(cell, event):
-    return os.path.join(cell, f"stacks-{event}.gz")
+def path(cell, event, leaf=None):
+    return os.path.join(cell, f"stacks-{event}{'-' + leaf if leaf else ''}.gz")
 
 
 class Stacks:
@@ -92,12 +98,24 @@ def of_lines(pairs, ops, score):
     return b.done(ops, score)
 
 
-def load(cell, event, jfrconv=None):
+def without_lines(st):
+    """`st` with its frames' lines (or bcis) stripped, and the stacks that become equal merged."""
+    names, ids = {}, []
+    for fr in st.frames:
+        ids.append(names.setdefault(LINE.sub("", fr), len(names)))
+    merged = {}
+    for s, n in st.stacks:
+        k = tuple(ids[i] for i in s)
+        merged[k] = merged.get(k, 0) + n
+    return Stacks(list(names), list(merged.items()), st.ops, st.score)
+
+
+def load(cell, event, jfrconv=None, leaf=None):
     """The cell's stacks of `event` (as profdiff labels it: `cycles`, `cache-misses`, `cpu`), from the cache, else from
-    its recording through jfrconv (and cached)."""
+    its recording through jfrconv (and cached); every frame with its line or bci with `leaf` ("line", "bci")."""
     import glob
     from . import profdiff
-    f = path(cell, event)
+    f = path(cell, event, leaf)
     d = profdiff.profile_dir(cell)
     jfrs = glob.glob(os.path.join(d, "**", "*.jfr"), recursive=True)
     if not jfrs:
@@ -108,7 +126,7 @@ def load(cell, event, jfrconv=None):
         except (OSError, ValueError, EOFError):
             pass
     b = Builder()
-    r = profdiff.load(cell, event, jfrconv, None, "stacks", keep=False, sink=b.add)
+    r = profdiff.load(cell, event, jfrconv, None, "stacks", keep=False, sink=b.add, extra=[LEAVES[leaf]] if leaf else ())
     st = b.done(r["ops"], r["score"])
     write(f, st)
     return st

@@ -46,11 +46,11 @@ def stacks(lines):
     return (p for p in map(parse, lines) if p)
 
 
-def load(run, event, jfrconv, out_dir, name, keep=True, sink=None):
+def load(run, event, jfrconv, out_dir, name, keep=True, sink=None, extra=()):
     """A run's `event` on the benchmark threads, per method and in total, with its ops. jfrconv's collapsed stacks are
     read as they come, so a large recording is never held in memory; with `keep`, they are also written to
     `<out_dir>/<name>-<event>.collapsed` (its "collapsed"), else nothing is written. `sink(stack, count)` sees each
-    stack as normalized."""
+    stack as normalized. `extra`: more jfrconv options (`--lines`, `--bci`)."""
     if not jfrconv:
         from . import jmh
         jfrconv = jmh.jfrconv(jmh.async_lib())
@@ -63,7 +63,7 @@ def load(run, event, jfrconv, out_dir, name, keep=True, sink=None):
     collapsed = os.path.join(out_dir, f"{name}-{event}.collapsed") if keep else None
     select = [s for label, s in regraph.events_of(d) if label.removeprefix("hw-") == event][0]
     err = tempfile.TemporaryFile("w+")  # not a pipe: unread, a full one would stop jfrconv
-    p = subprocess.Popen([jfrconv, "-J-Xmx8g", *select, "--threads", "-I", ".*jmh-worker.*", "-o", "collapsed", jfr, "/dev/stdout"],
+    p = subprocess.Popen([jfrconv, "-J-Xmx8g", *select, "--threads", "-I", ".*jmh-worker.*", *extra, "-o", "collapsed", jfr, "/dev/stdout"],
                          stdout=subprocess.PIPE, stderr=err, text=True, errors="replace")
     self_, total, skipped = collections.Counter(), 0, 0
     out = open(collapsed, "w") if keep else None

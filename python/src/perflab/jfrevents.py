@@ -15,6 +15,7 @@ import glob, json, os, shutil, subprocess
 TOOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "JfrEvents.java")
 CENSUS = "promotion.json"  # <cell>/promotion.json: the census, cached while it is newer than the recording
 JIT = "jit.json"  # <cell>/jit.json: the JIT summary, cached while it is newer than the recording
+PRECISE = "precise.json"  # <cell>/precise.json: the PMU samples with a precise PC, cached likewise
 
 
 def recording(cell):
@@ -37,8 +38,8 @@ def java_for(cell):
     return shutil.which("java") or "java"
 
 
-def run(java, *args, timeout=600):
-    r = subprocess.run([java, "-Xmx2g", TOOL, *args], capture_output=True, text=True, timeout=timeout)
+def run(java, *args, timeout=600, heap="2g"):
+    r = subprocess.run([java, f"-Xmx{heap}", TOOL, *args], capture_output=True, text=True, timeout=timeout)
     if r.returncode:
         raise RuntimeError(f"JfrEvents {args[0]}: {(r.stderr or r.stdout).strip()[-1500:]}")
     return json.loads(r.stdout)
@@ -92,6 +93,25 @@ def jit(cell):
         except ValueError:
             pass
     c = {"source": "fork" if forks else "measured", "recording": jfr, "forks": len(forks), **run(java_for(cell), "jit", jfr)}
+    with open(f + ".tmp", "w") as out:
+        json.dump(c, out)
+    os.replace(f + ".tmp", f)
+    return c
+
+
+def precise(cell):
+    """{event: {"samples", "precise", "value", "preciseValue"}} of the cell's kperf samples on the benchmark threads
+    (async-profiler's profiler.HardwareSample), cached in <cell>/precise.json; {} for a recording without them."""
+    jfr = recording(cell)
+    if not jfr:
+        raise FileNotFoundError(f"{cell}: no recording")
+    f = os.path.join(cell, PRECISE)
+    if os.path.exists(f) and os.path.getmtime(f) >= os.path.getmtime(jfr):
+        try:
+            return json.load(open(f))
+        except ValueError:
+            pass
+    c = run(java_for(cell), "precise", jfr, "jmh-worker", heap="8g")["events"]  # a kperf recording's constant pools are large
     with open(f + ".tmp", "w") as out:
         json.dump(c, out)
     os.replace(f + ".tmp", f)

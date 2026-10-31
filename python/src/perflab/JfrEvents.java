@@ -8,6 +8,11 @@
 //   jit <file.jfr>                the JIT's work from jdk.Compilation, jdk.Deoptimization and jdk.CompilerInlining: per
 //                                 tier, per reason, and per method its compilations, deopts and its last C2 compile
 //                                 (tier 4, OSR only if it had no other) with that compile's inlining decisions
+//   precise <file.jfr> <thread regex>
+//                                 per profiler.HardwareSample event (async-profiler's kperf samples) on the matching
+//                                 threads: samples and value, and how many of them have a precise PC (the PMU's own,
+//                                 so the leaf's line or bci is the instruction that counted): {"events": {event:
+//                                 {"samples", "precise", "value", "preciseValue"}}}
 //
 // JSON on stdout. Events are streamed, so a large recording is never held in memory.
 import java.nio.file.Path;
@@ -15,6 +20,37 @@ import java.util.*;
 import jdk.jfr.consumer.*;
 
 public class JfrEvents {
+    static void precise(Path file, java.util.regex.Pattern threads, StringBuilder out) throws Exception {
+        Map<String, long[]> byEvent = new TreeMap<>();  // event -> [samples, precise, value, precise value]
+        try (RecordingFile rf = new RecordingFile(file)) {
+            while (rf.hasMoreEvents()) {
+                RecordedEvent e = rf.readEvent();
+                if (!e.getEventType().getName().equals("profiler.HardwareSample")) continue;
+                RecordedThread t = e.getThread("sampledThread");
+                String tn = t == null ? null : t.getJavaName() != null ? t.getJavaName() : t.getOSName();
+                if (tn == null || !threads.matcher(tn).find()) continue;
+                long[] row = byEvent.computeIfAbsent(e.getString("event"), k -> new long[4]);
+                long v = e.getLong("value");
+                boolean p = e.getBoolean("precise");
+                row[0] += 1;
+                row[2] += v;
+                if (p) {
+                    row[1] += 1;
+                    row[3] += v;
+                }
+            }
+        }
+        out.append("{\"events\": {");
+        int i = 0;
+        for (Map.Entry<String, long[]> en : byEvent.entrySet()) {
+            long[] r = en.getValue();
+            out.append(i++ == 0 ? "" : ", ").append(str(en.getKey())).append(": {\"samples\": ").append(r[0])
+               .append(", \"precise\": ").append(r[1]).append(", \"value\": ").append(r[2])
+               .append(", \"preciseValue\": ").append(r[3]).append("}");
+        }
+        out.append("}}");
+    }
+
     public static void main(String[] args) throws Exception {
         String mode = args[0];
         Path file = Path.of(args[1]);
@@ -73,8 +109,10 @@ public class JfrEvents {
             out.append("}}");
         } else if (mode.equals("jit")) {
             jit(file, out);
+        } else if (mode.equals("precise")) {
+            precise(file, java.util.regex.Pattern.compile(args[2]), out);
         } else {
-            throw new IllegalArgumentException("mode: count, promotion or jit, not " + mode);
+            throw new IllegalArgumentException("mode: count, promotion, jit or precise, not " + mode);
         }
         System.out.println(out);
     }

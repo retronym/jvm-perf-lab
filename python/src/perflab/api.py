@@ -448,7 +448,14 @@ define("Diff", "The profdiff outputs of a pair: per event its pages and the tabl
             "excess": A(O("A frame's inclusive growth beyond the overall ratio", {**DIFF_ROW, "excess": N("b − a × ratio")},
                           optional=("delta",)), "Frames of both builds, biggest excess first"),
             "outsideAnchor": null(O("Events left out for want of the anchor", {"a": N("a"), "b": N("b")})),
-            "oneSidedFrames": I("Frames dropped above the leaf for being in one build only")})),
+            "oneSidedFrames": I("Frames dropped above the leaf for being in one build only"),
+            "leaf": null(S("\"line\" or \"bci\": the leaf frame (and the owners) by line or bytecode index, the owner names `method:line` or `method@bci`")),
+            "lines": null(A(O("A method's self events (as owner) with its lines", {**DIFF_ROW,
+                "linesA": A(A({"type": ["string", "number"]}, "[line or @bci, events per op]"), "a's lines with the most, at most 5"),
+                "linesB": A(A({"type": ["string", "number"]}, "[line or @bci, events per op]"), "b's lines with the most, at most 5")}),
+                "With a leaf: the owners gathered by method, biggest increases then decreases (the builds' line numbers differ where their sources do)")),
+            "precise": null(O("Each build's share of samples with a precise PC (kperf), with a leaf; null where the recording does not say",
+                              {"a": null(N("a's")), "b": null(N("b's"))}))})),
         "flips": O("Frame-kind flips (flips-<event>.json): methods whose self events moved between running inlined (_[i]) and "
                    "in their own frame (_[j] C2, _[1] C1, _[0] interpreted), per op, most moved into their own frames first", {
             "total": O("The event per op", {"a": N("a"), "b": N("b")}),
@@ -1701,7 +1708,8 @@ def diff(campaign, a, b, project=None, corpus=None):
                     top = lambda rs: [{k: r[k] for k in ("name", "a", "b", "delta")} for r in rs]
                     e["curated"] = {"total": t["total"], "owners": top(t["owners"][::-1][:25] + t["owners"][:25][::-1]),
                                     "groups": t["groups"], "excess": t["excess"][:25], "outsideAnchor": t.get("outsideAnchor"),
-                                    "oneSidedFrames": t.get("oneSidedFrames", 0)}
+                                    "oneSidedFrames": t.get("oneSidedFrames", 0), "leaf": t.get("leaf"), "precise": t.get("precise"),
+                                    "lines": t["lines"][::-1][:25] + t["lines"][:25][::-1] if t.get("lines") else None}
                 fl = _json(os.path.join(x["path"], f"flips-{ev}.json"), None)
                 if fl:
                     e["flips"] = fl
@@ -1863,9 +1871,10 @@ _RERUN_RUNNER = {}  # tests: {"module": a stand-in for perflab}
           project=PROJECT_P, campaign=CAMPAIGN_P, a=S("Variant a"), b=S("Variant b"), corpus=S("The corpus (default: the first)"),
           round=I("The round of both cells (default: the last both have a recording of)"),
           event=A(S("event"), "Events (default: every event of the recording)"),
-          curate=S("A preset of the [diff] / spec \"diff\" presets, or hints as JSON (owner, ownerSkip, groups, anchor, fold, drop, byLeaf)"),
-          raw=B("The raw diff only"), byLeaf=B("Also the leaf-rooted differential graph"))
-def make_diff(campaign, a, b, project=None, corpus=None, round=None, event=None, curate=None, raw=False, byLeaf=False, _server=None):
+          curate=S("A preset of the [diff] / spec \"diff\" presets, or hints as JSON (owner, ownerSkip, groups, anchor, fold, drop, transparent, byLeaf, leaf)"),
+          raw=B("The raw diff only"), byLeaf=B("Also the leaf-rooted differential graph"),
+          leaf=S("The leaf frame by \"line\" or \"bci\" (bytecode index), the callers by method: with a precise-PC PMU event, the instruction that counted", enum=["line", "bci"]))
+def make_diff(campaign, a, b, project=None, corpus=None, round=None, event=None, curate=None, raw=False, byLeaf=False, leaf=None, _server=None):
     """Queue `perflab ab diff <campaign> <a> <b>` on the server; it runs at once, beside any measuring job. It writes
     the raw diff to <campaign>/diff-<a>-<b>/ and the curated one to diff-<a>-<b>-<curated | preset>/ (see `ab diff
     --help` for the curation and its hints); read them with diff. A branch campaign's commits are diffed by
@@ -1877,7 +1886,7 @@ def make_diff(campaign, a, b, project=None, corpus=None, round=None, event=None,
     if spec.get("branch"):
         raise ApiError("bad_request", f"{campaign} is a branch campaign: submit branch profile {campaign} {a} {b} --diff")
     argv = ["ab", "diff", campaign, a, b]
-    for flag, v in (("--corpus", corpus), ("--round", round), ("--curate", curate)):
+    for flag, v in (("--corpus", corpus), ("--round", round), ("--curate", curate), ("--leaf", leaf)):
         if v is not None:
             argv += [flag, str(v)]
     for e in event or []:

@@ -824,6 +824,31 @@ class CurateTest(unittest.TestCase):
         self.assertIn("transparent", curate.banner(curate.DEFAULTS))
         self.assertNotIn("transparent", curate.banner(light))
 
+    def test_the_leaf_by_line_keeps_its_line_and_the_callers_are_methods(self):
+        a = self.st("main:1;N.denot:10;java/lang/invoke/VarHandleGuards.guard_L_I:5;java/lang/invoke/VarHandleInts$Ro.getAcquire:7 3",
+                    "main:1;N.denot:12;L.leaf:20 2", "main:2;N.denot:12;L.leaf:21 1", "main:1;N.denot:13;L.leaf:20 4")
+        ca, _ = self.curated(a, self.st("main:1;N.denot:10 1"), leaf="line", align=False)
+        self.assertEqual(ca, {"main;N.denot:10": 3, "main;N.denot;L.leaf:20": 6, "main;N.denot;L.leaf:21": 1})
+        rules = curate.merge(curate.DEFAULTS, {"leaf": "line", "owner": "N.", "groups": {"denot": r"\.denot$"}})
+        c = curate.Curator(rules)
+        own, incl = c.tables(c.base(a)[0])
+        self.assertEqual(own, {"N.denot:10": 3, "N.denot:12": 3, "N.denot:13": 4})  # the owner's line: the call below it
+        self.assertEqual(incl, {"N.denot": 10})
+        t = curate.summarize(rules, own, own, incl, incl, 10, 10, 1, 1)
+        self.assertEqual([(g["name"], g["members"]) for g in t["groups"]], [("denot", 3), ("(ungrouped)", 0)])
+        self.assertEqual([(m["name"], m["linesA"]) for m in t["lines"]], [("N.denot", [["13", 4.0], ["10", 3.0], ["12", 3.0]])])
+        self.assertIn("by line", curate.table_md("cache-misses", {**t, "leaf": "line", "precise": {"a": 0.19, "b": None}}, "a", "b", rules, 5))
+        kinds = curate.Curator(curate.merge(curate.merge(curate.DEFAULTS, curate.LIGHT), {"leaf": "bci"}))
+        ka, _ = kinds.aligned(kinds.shaped(kinds.base(self.st("main@0_[j];F.f@3_[i];G.g@17_[j] 2"))[0]), [])
+        self.assertEqual(ka, {"main_[j];F.f_[i];G.g@17_[j]": 2})
+
+    def test_stacks_lose_their_lines(self):
+        self.assertEqual([stacks.LINE.sub("", f) for f in ("F.f:42_[j]", "F.f@17", "Thread::call_run", "F.f:9")],
+                         ["F.f_[j]", "F.f", "Thread::call_run", "F.f"])
+        st = stacks.without_lines(self.st("main:1;F.f:2 3", "main:4;F.f:5 1", "main;G.g 2", ops=2))
+        self.assertEqual(sorted(st.named()), [(["main", "F.f"], 4), (["main", "G.g"], 2)])
+        self.assertEqual(st.ops, 2)
+
     def test_recursion_keeps_the_outermost_frame(self):
         a, _ = self.curated(self.st("main;T.typed;T.adapt;T.typed;T.adapt;T.typed;L.leaf 1", "main;T.typed;T.adapt;T.typed 2"), self.st("main 1"), align=False)
         self.assertEqual(a, {"main;T.typed;T.adapt;L.leaf": 1, "main;T.typed;T.adapt;T.typed": 2})
