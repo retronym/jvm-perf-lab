@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A campaign's "jitRecording": the JIT's events over a whole fork, from JVM start, in <cell>/jit-<pid>.jitrec
+  (perflab.jfrevents reads them): every compilation, failure and deoptimization, and every inlining decision.
+
+  An async run's jfrsync recording starts at the first measured iteration, after warmup has compiled the hot code, so it
+  cannot say what the hot methods inlined. jdk.CompilerInlining is one event per call site considered in each
+  compilation, too many for every run: a pilot cell records it.
+-->
+<configuration version="2.0" label="perflab-jit" description="The JIT's decisions over a whole fork" provider="perflab">
+  <event name="jdk.Compilation"><setting name="enabled">true</setting><setting name="threshold">0 ms</setting></event>
+  <event name="jdk.CompilationFailure"><setting name="enabled">true</setting></event>
+  <event name="jdk.Deoptimization"><setting name="enabled">true</setting><setting name="stackTrace">false</setting></event>
+  <event name="jdk.CompilerInlining"><setting name="enabled">true</setting></event>
+  <event name="jdk.CompilerConfiguration"><setting name="enabled">true</setting><setting name="period">beginChunk</setting></event>
+  <event name="jdk.CodeCacheFull"><setting name="enabled">true</setting></event>
+  <event name="jdk.DataLoss"><setting name="enabled">true</setting></event>
+</configuration>

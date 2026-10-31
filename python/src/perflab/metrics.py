@@ -20,6 +20,11 @@ CYCLE_EVENT = re.compile(r"WAITING|STALL|BUBBLE|CYCLE")
 JMH_TIME_MS = {"ns": 1e-6, "us": 1e-3, "ms": 1, "s": 1000, "min": 60_000, "hr": 3_600_000, "day": 86_400_000}
 GROUPS = ("jit", "gc", "other")
 TOP_DOWN = ("useful", "processing", "delivery", "discarded")  # Instruments' "CPU Counters" template, % of the bench's
+# JitProfiler's per-fork totals (jit.<name> in result.json): compilations, compile time and deopts while measuring and
+# in the last warmup iteration; (name, label)
+JIT = (("compilations", "JIT compilations while measuring"), ("compileTime", "JIT compile ms while measuring"),
+       ("deopts", "deopts while measuring"), ("lastWarmup.compilations", "JIT compilations, last warmup"),
+       ("lastWarmup.deopts", "deopts, last warmup"))
 EVENTS_NAME = "hw-events.json"  # per cell: an async kperf profile's events per op on the benchmark threads
 
 
@@ -98,7 +103,7 @@ def cached_hw_events(cell):
 
 def of(r, per_unit=None, hw=None):
     """A JMH result's metrics: [(key, label, kind, main, value)]. `kind` picks the format and Δ floor (score, count,
-    alloc, ratio, pct); `main` ones are the summary table's columns. `hw` is an async kperf profile's events per op."""
+    alloc, ratio, pct, total); `main` ones are the summary table's columns. `hw` is an async kperf profile's events per op."""
     m = r.get("secondaryMetrics", {})
     get = lambda k: m[k]["score"] if k in m else None
     u, per = 1.0, "op"
@@ -148,12 +153,18 @@ def of(r, per_unit=None, hw=None):
             out += [("cycles:all", f"cycles/{per}, all threads", "count", False, norm(all_cyc)),
                     ("instructions:all", f"instructions/{per}, all threads", "count", False, norm(all_ins)),
                     ("ipc:all", "IPC, all threads", "ratio", False, all_ins / all_cyc if all_ins else None)]
+    for name, label in JIT:
+        jm = m.get(f"jit.{name}")
+        if jm:
+            # JMH's score of these is the largest fork's (AggregationPolicy.MAX), so take the mean of the forks' own
+            forks = [f[0] for f in jm.get("rawData") or [] if f and isinstance(f[0], (int, float))]
+            out.append((f"jit:{name}", label, "total", False, sum(forks) / len(forks) if forks else jm["score"]))
     return [x for x in out if x[4] is not None]
 
 
 def fmt(kind, x):
     from . import ui
-    return {"score": ui.num, "count": ui.si, "alloc": ui.size, "ratio": lambda y: f"{y:.3g}", "pct": lambda y: f"{y:.1f}%"}[kind](x)
+    return {"score": ui.num, "count": ui.si, "alloc": ui.size, "ratio": lambda y: f"{y:.3g}", "total": ui.num, "pct": lambda y: f"{y:.1f}%"}[kind](x)
 
 
 def delta_ok(base, kind, per_unit):

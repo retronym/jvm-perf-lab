@@ -5,6 +5,9 @@
 //                                 jdk.PromoteObjectInNewPLAB (one event per new PLAB: its plabSize stands for the bytes
 //                                 promoted into it) and jdk.PromoteObjectOutsidePLAB (objectSize); and the survivor
 //                                 space's bytes per age from jdk.TenuringDistribution, summed over GCs
+//   jit <file.jfr>                the JIT's work from jdk.Compilation, jdk.Deoptimization and jdk.CompilerInlining: per
+//                                 tier, per reason, and per method its compilations, deopts and its last C2 compile
+//                                 (tier 4, OSR only if it had no other) with that compile's inlining decisions
 //
 // JSON on stdout. Events are streamed, so a large recording is never held in memory.
 import java.nio.file.Path;
@@ -68,10 +71,145 @@ public class JfrEvents {
                 out.append(i++ == 0 ? "" : ", ").append("\"").append(a.getKey()).append("\": ").append(a.getValue());
             }
             out.append("}}");
+        } else if (mode.equals("jit")) {
+            jit(file, out);
         } else {
-            throw new IllegalArgumentException("mode: count or promotion, not " + mode);
+            throw new IllegalArgumentException("mode: count, promotion or jit, not " + mode);
         }
         System.out.println(out);
+    }
+
+    static final class Compile {
+        long id, codeSize, inlinedBytes; int level; boolean osr, ok; double ms;
+    }
+
+    static final class Method {
+        final List<Compile> compiles = new ArrayList<>();
+        final Map<String, Long> deoptReasons = new TreeMap<>();
+        long deopts;
+        Compile c2() {  // the last tier 4 compile that succeeded, not OSR unless all were
+            Compile best = null;
+            for (Compile c : compiles)
+                if (c.level == 4 && c.ok && (best == null || best.osr || !c.osr)) best = c;
+            return best;
+        }
+    }
+
+    // per decision (caller -> callee): [inlined, not inlined], and the messages
+    static final class Decision {
+        long inlined, notInlined; final Map<String, Long> messages = new TreeMap<>();
+    }
+
+    static void jit(Path file, StringBuilder out) throws Exception {
+        Map<String, Long> events = new TreeMap<>();
+        Map<String, Method> methods = new HashMap<>();
+        // tier -> [compilations, osr, failed, code bytes, inlined bytes], compile ms
+        Map<Integer, long[]> tiers = new TreeMap<>();
+        Map<Integer, Double> tierMs = new TreeMap<>();
+        Map<String, Long> deoptReasons = new TreeMap<>(), deoptActions = new TreeMap<>();
+        Map<Long, Map<String, Decision>> inlining = new HashMap<>();  // compileId -> decisions (C2 threads only)
+        Map<String, String> names = new HashMap<>();
+        try (RecordingFile rf = new RecordingFile(file)) {
+            while (rf.hasMoreEvents()) {
+                RecordedEvent e = rf.readEvent();
+                String name = e.getEventType().getName();
+                switch (name) {
+                    case "jdk.Compilation" -> {
+                        events.merge(name, 1L, Long::sum);
+                        Compile c = new Compile();
+                        c.id = e.getLong("compileId");
+                        c.level = e.getInt("compileLevel");
+                        c.osr = e.getBoolean("isOsr");
+                        c.ok = e.getBoolean("succeded");
+                        c.codeSize = e.getLong("codeSize");
+                        c.inlinedBytes = e.getLong("inlinedBytes");
+                        c.ms = e.getDuration().toNanos() / 1e6;
+                        methods.computeIfAbsent(method(e.getValue("method"), names), k -> new Method()).compiles.add(c);
+                        long[] t = tiers.computeIfAbsent(c.level, k -> new long[5]);
+                        t[0]++; t[1] += c.osr ? 1 : 0; t[2] += c.ok ? 0 : 1; t[3] += c.codeSize; t[4] += c.inlinedBytes;
+                        tierMs.merge(c.level, c.ms, Double::sum);
+                    }
+                    case "jdk.Deoptimization" -> {
+                        events.merge(name, 1L, Long::sum);
+                        String reason = e.getString("reason");
+                        deoptReasons.merge(reason, 1L, Long::sum);
+                        deoptActions.merge(e.getString("action"), 1L, Long::sum);
+                        Method m = methods.computeIfAbsent(method(e.getValue("method"), names), k -> new Method());
+                        m.deopts++;
+                        m.deoptReasons.merge(reason, 1L, Long::sum);
+                    }
+                    case "jdk.CompilerInlining" -> {
+                        events.merge(name, 1L, Long::sum);
+                        RecordedThread t = e.getThread();
+                        if (t != null && t.getJavaName() != null && t.getJavaName().startsWith("C1")) break;
+                        RecordedObject callee = e.getValue("callee");
+                        String to = names.computeIfAbsent(javaName(callee.getString("type").replace('/', '.')) + "." + callee.getString("name")
+                                                          + callee.getString("descriptor"), k -> k);
+                        String key = method(e.getValue("caller"), names) + " -> " + to;
+                        Decision d = inlining.computeIfAbsent(e.getLong("compileId"), k -> new HashMap<>()).computeIfAbsent(key, k -> new Decision());
+                        if (e.getBoolean("succeeded")) d.inlined++; else d.notInlined++;
+                        String msg = e.getString("message");
+                        if (msg != null) d.messages.merge(names.computeIfAbsent(msg, k -> k), 1L, Long::sum);
+                    }
+                    case "jdk.CompilationFailure", "jdk.CodeCacheFull", "jdk.DataLoss" -> events.merge(name, 1L, Long::sum);
+                    default -> { }
+                }
+            }
+        }
+        out.append("{\"events\": ").append(map(events)).append(", \"tiers\": {");
+        int i = 0;
+        for (Map.Entry<Integer, long[]> t : tiers.entrySet()) {
+            long[] v = t.getValue();
+            out.append(i++ == 0 ? "" : ", ").append("\"").append(t.getKey()).append("\": {\"compilations\": ").append(v[0])
+               .append(", \"osr\": ").append(v[1]).append(", \"failed\": ").append(v[2]).append(", \"codeBytes\": ").append(v[3])
+               .append(", \"inlinedBytes\": ").append(v[4]).append(", \"compileMs\": ").append(String.format("%.3f", tierMs.get(t.getKey()))).append("}");
+        }
+        out.append("}, \"deopts\": {\"byReason\": ").append(map(deoptReasons)).append(", \"byAction\": ").append(map(deoptActions))
+           .append("}, \"methods\": [");
+        List<Map.Entry<String, Method>> rows = new ArrayList<>(methods.entrySet());
+        rows.sort(Map.Entry.comparingByKey());
+        i = 0;
+        for (Map.Entry<String, Method> r : rows) {
+            Method m = r.getValue();
+            Map<String, Long> levels = new TreeMap<>();
+            long osr = 0, maxCode = 0;
+            for (Compile c : m.compiles) {
+                levels.merge(String.valueOf(c.level), 1L, Long::sum);
+                osr += c.osr ? 1 : 0;
+                maxCode = Math.max(maxCode, c.codeSize);
+            }
+            out.append(i++ == 0 ? "" : ", ").append("{\"method\": ").append(str(r.getKey())).append(", \"compilations\": ").append(m.compiles.size())
+               .append(", \"levels\": ").append(map(levels)).append(", \"osr\": ").append(osr).append(", \"maxCodeSize\": ").append(maxCode)
+               .append(", \"deopts\": ").append(m.deopts).append(", \"deoptReasons\": ").append(map(m.deoptReasons)).append(", \"c2\": ");
+            Compile c = m.c2();
+            if (c == null) {
+                out.append("null");
+            } else {
+                out.append("{\"compileId\": ").append(c.id).append(", \"osr\": ").append(c.osr).append(", \"codeSize\": ").append(c.codeSize)
+                   .append(", \"inlinedBytes\": ").append(c.inlinedBytes).append(", \"compileMs\": ").append(String.format("%.3f", c.ms))
+                   .append(", \"inlining\": [");
+                Map<String, Decision> ds = inlining.getOrDefault(c.id, Map.of());
+                List<String> keys = new ArrayList<>(ds.keySet());
+                Collections.sort(keys);
+                int j = 0;
+                for (String k : keys) {
+                    Decision d = ds.get(k);
+                    int arrow = k.indexOf(" -> ");
+                    out.append(j++ == 0 ? "" : ", ").append("{\"caller\": ").append(str(k.substring(0, arrow))).append(", \"callee\": ")
+                       .append(str(k.substring(arrow + 4))).append(", \"inlined\": ").append(d.inlined).append(", \"notInlined\": ")
+                       .append(d.notInlined).append(", \"messages\": ").append(map(d.messages)).append("}");
+                }
+                out.append("]}");
+            }
+            out.append("}");
+        }
+        out.append("]}");
+    }
+
+    // `pkg.Class.name(descriptor)`, a hidden class without its address
+    static String method(RecordedMethod m, Map<String, String> names) {
+        if (m == null) return "?";
+        return names.computeIfAbsent(javaName(m.getType().getName()) + "." + m.getName() + m.getDescriptor(), k -> k);
     }
 
     // `[Ljava.lang.Object;` as `java.lang.Object[]`, `[B` as `byte[]`; a hidden class without its address in this JVM
@@ -92,7 +230,7 @@ public class JfrEvents {
                 default: base = base.startsWith("L") && base.endsWith(";") ? base.substring(1, base.length() - 1) : base;
             }
         }
-        return base.replaceAll("\\.0x[0-9a-f]+$", "") + "[]".repeat(dims);
+        return base.replaceAll("[./]0x[0-9a-f]+$", "") + "[]".repeat(dims);
     }
 
     static String map(Map<String, Long> m) {

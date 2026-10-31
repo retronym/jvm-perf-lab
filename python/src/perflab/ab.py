@@ -20,6 +20,9 @@ A spec:
     "jfrsync": "+jdk.PromoteObjectInNewPLAB",  # optional, for async: the JDK events in its .jfr, instead of the lab's
                                               # [async] jfrsync: a .jfc, false, or `+event...` added to the lab's .jfc
                                               # (written to <campaign>/jfrsync.jfc); recorded in <cell>/jfrsync.json
+    "jitRecording": true,                     # optional: record the JIT over each whole fork, from JVM start (perflab-jit.jfc:
+                                              # compilations, deopts, inlining decisions) in <cell>/jit-<pid>.jitrec, for
+                                              # `perflab api jit` and `jitDiff`; any profile. Large: for a pilot of one fork
     "lib": "<libasyncProfiler>",              # optional, for async
     "jvm": "<java>",                          # optional: JMH -jvm for every run (checked against result.json)
     "jvmArgs": "-Xms4G -Xmx4G -Xss2M",        # given to every variant; default: [benchmark] jvmArgs
@@ -111,6 +114,7 @@ class Spec:
         self.profile = p
         self.kperf, self.lib = s.get("kperf"), s.get("lib")
         self.jfrsync = s.get("jfrsync", jmh.LAB)  # the campaign's, else the lab's [async] jfrsync
+        self.jit_recording = bool(s.get("jitRecording"))
         self.jvm_args = s.get("jvmArgs", cfg.get("benchmark", "jvmArgs") or "")
         self.jvm = s.get("jvm")
         self.rounds = s.get("rounds", 2)
@@ -184,6 +188,8 @@ class Spec:
             extra.append(f"-Xlog:gc:file={dest}/gc.log:time,uptime")
         # the fork appends its iterations to <dest>/iterations.tsv as they finish (PairedProfiler)
         extra.append(f"-Dperflab.cell={dest}")
+        if self.jit_recording:
+            extra.append(jmh.jit_recording(dest))
         jvm_args = " ".join(x for x in [self.jvm_args, flags, *extra] if x)
         args = (["-jvm", self.jvm] if self.jvm else []) + ["-p", f"{self.corpus_param}={corpus}"]
         args += shlex.split(iters) + shlex.split(self.variant_jmh_args.get(variant, "")) + [self.benchmark]

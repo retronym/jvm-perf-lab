@@ -1,5 +1,9 @@
 """Reads an async run's .jfr with the JDK's own reader (JfrEvents.java, run as a single-file program by the JDK that
-recorded it): how many of some events it has, and G1's promotion census.
+recorded it): how many of some events it has, G1's promotion census, and the JIT's work.
+
+The JIT summary prefers a spec's "jitRecording" (<cell>/jit-<pid>.jitrec, perflab-jit.jfc), which covers the whole fork
+with every inlining decision; an async run's recording starts at the first measured iteration, after warmup compiled
+the hot code, and has no inlining decisions (perflab.jfc does not record jdk.CompilerInlining).
 
 The census needs `jdk.PromoteObjectInNewPLAB`, `jdk.PromoteObjectOutsidePLAB` and `jdk.TenuringDistribution` in the
 recording, e.g. from a campaign's `"jfrsync": "+jdk.PromoteObjectInNewPLAB+jdk.PromoteObjectOutsidePLAB+jdk.TenuringDistribution"`.
@@ -10,6 +14,7 @@ import glob, json, os, shutil, subprocess
 
 TOOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "JfrEvents.java")
 CENSUS = "promotion.json"  # <cell>/promotion.json: the census, cached while it is newer than the recording
+JIT = "jit.json"  # <cell>/jit.json: the JIT summary, cached while it is newer than the recording
 
 
 def recording(cell):
@@ -59,6 +64,34 @@ def promotion(cell):
         except ValueError:
             pass
     c = run(java_for(cell), "promotion", jfr)
+    with open(f + ".tmp", "w") as out:
+        json.dump(c, out)
+    os.replace(f + ".tmp", f)
+    return c
+
+
+def jit_recordings(cell):
+    """The cell's whole-fork JIT recordings (a spec's "jitRecording"), one per fork."""
+    from . import jmh
+    return sorted(glob.glob(os.path.join(cell, jmh.JIT_RECORDING)))
+
+
+def jit(cell):
+    """The cell's JIT summary (cached in <cell>/jit.json): JfrEvents' `jit` of its first fork's whole-fork recording,
+    else of its async recording, with "source" ("fork" or "measured"), "recording" and "forks" (whole-fork recordings)."""
+    forks = jit_recordings(cell)
+    jfr = forks[0] if forks else recording(cell)
+    if not jfr:
+        raise FileNotFoundError(f"{cell}: no recording")
+    f = os.path.join(cell, JIT)
+    if os.path.exists(f) and os.path.getmtime(f) >= os.path.getmtime(jfr):
+        try:
+            c = json.load(open(f))
+            if c.get("recording") == jfr:
+                return c
+        except ValueError:
+            pass
+    c = {"source": "fork" if forks else "measured", "recording": jfr, "forks": len(forks), **run(java_for(cell), "jit", jfr)}
     with open(f + ".tmp", "w") as out:
         json.dump(c, out)
     os.replace(f + ".tmp", f)

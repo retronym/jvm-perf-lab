@@ -54,6 +54,14 @@ def jfrconv(lib=None):
 
 
 PERFLAB_JFC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "perflab.jfc")
+JIT_JFC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "perflab-jit.jfc")
+# a spec's "jitRecording": not .jfr, which every reader of an async profile's recording would take for it
+JIT_RECORDING = "jit-*.jitrec"
+
+
+def jit_recording(out):
+    """The JVM argument that records the JIT over a whole fork (perflab-jit.jfc) in <out>/jit-<pid>.jitrec."""
+    return f"-XX:StartFlightRecording:settings={JIT_JFC},filename={os.path.join(out, 'jit-%p.jitrec')}"
 
 
 LAB = object()  # jfrsync's setting: the lab's ([async] jfrsync)
@@ -210,7 +218,7 @@ def write_args(path, args):
 
 # what a run writes into its directory: cleared before the next run there, so nothing stale is merged into its results
 JFRSYNC = "jfrsync.json"  # <cell>/jfrsync.json: the jfrsync the run was given, and what its recording has of what it added
-OUTPUTS = ["jmh.log", JFRSYNC, "result.json", "report.md", "audit-*.json", "**/*.jfr", "**/*.html", "**/*.regraph", "*.trace", "*.trace.*",
+OUTPUTS = ["jmh.log", JFRSYNC, JIT_RECORDING, "jit.json", "result.json", "report.md", "audit-*.json", "**/*.jfr", "**/*.html", "**/*.regraph", "*.trace", "*.trace.*",
            "iterations.tsv", "timeline.tsv", "gc.log", "gc-*.log", "run.json"]
 
 

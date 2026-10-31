@@ -487,8 +487,8 @@
     "planned": 8
    },
    "status": "partial",
-   "updated": 1793426746.9876065,
-   "updatedIso": "2026-10-31T16:05:46",
+   "updated": 1793442348.5259752,
+   "updatedIso": "2026-10-31T20:25:48",
    "bytes": null,
    "profileOf": null,
    "profiles": null,
@@ -584,6 +584,26 @@
       "pooled": false,
       "shown": "1.0MB",
       "ciShown": "2B"
+     },
+     "jit:compilations": {
+      "mean": 910.0,
+      "sd": 11.547005383792516,
+      "ci": 74.61674879006723,
+      "n": 4,
+      "df": 3,
+      "pooled": false,
+      "shown": "910",
+      "ciShown": "74.62"
+     },
+     "jit:deopts": {
+      "mean": 2.0,
+      "sd": 1.1547005383792515,
+      "ci": 7.461674879006723,
+      "n": 4,
+      "df": 3,
+      "pooled": false,
+      "shown": "2",
+      "ciShown": "7.462"
      }
     },
     "card": {
@@ -596,6 +616,20 @@
      },
      "alloc": {
       "mean": 1000000.25,
+      "sd": 0.0,
+      "pct": null,
+      "spread": 0.0,
+      "verdict": ""
+     },
+     "jit:compilations": {
+      "mean": 910.0,
+      "sd": 0.0,
+      "pct": null,
+      "spread": 0.0,
+      "verdict": ""
+     },
+     "jit:deopts": {
+      "mean": 2.0,
       "sd": 0.0,
       "pct": null,
       "spread": 0.0,
@@ -642,6 +676,40 @@
        "against": "base",
        "pooled": false
       }
+     },
+     "jit:compilations": {
+      "mean": 810.0,
+      "sd": 11.547005383792516,
+      "ci": 74.61674879006723,
+      "n": 4,
+      "df": 3,
+      "pooled": false,
+      "shown": "810",
+      "ciShown": "74.62",
+      "delta": {
+       "pct": -10.989010989010994,
+       "halfWidth": 5.34670673159156,
+       "verdict": "better",
+       "against": "base",
+       "pooled": false
+      }
+     },
+     "jit:deopts": {
+      "mean": 2.0,
+      "sd": 1.1547005383792515,
+      "ci": 7.461674879006723,
+      "n": 4,
+      "df": 3,
+      "pooled": false,
+      "shown": "2",
+      "ciShown": "7.462",
+      "delta": {
+       "pct": 0.0,
+       "halfWidth": 243.27515628741597,
+       "verdict": "flat",
+       "against": "base",
+       "pooled": false
+      }
      }
     },
     "card": {
@@ -654,6 +722,20 @@
      },
      "alloc": {
       "mean": 1000000.25,
+      "sd": 0.0,
+      "pct": 0.0,
+      "spread": 0.0,
+      "verdict": "flat"
+     },
+     "jit:compilations": {
+      "mean": 810.0,
+      "sd": 0.0,
+      "pct": -10.989010989010994,
+      "spread": 0.0,
+      "verdict": "better"
+     },
+     "jit:deopts": {
+      "mean": 2.0,
       "sd": 0.0,
       "pct": 0.0,
       "spread": 0.0,
@@ -751,8 +833,8 @@
      "planned": 8
     },
     "status": "partial",
-    "updated": 1793426746.9876065,
-    "updatedIso": "2026-10-31T16:05:46",
+    "updated": 1793442348.5259752,
+    "updatedIso": "2026-10-31T20:25:48",
     "bytes": null,
     "profileOf": null,
     "profiles": null,
@@ -783,8 +865,8 @@
      "planned": 2
     },
     "status": "finished",
-    "updated": 1793426746.9802802,
-    "updatedIso": "2026-10-31T16:05:46",
+    "updated": 1793442348.5202925,
+    "updatedIso": "2026-10-31T20:25:48",
     "bytes": null,
     "profileOf": "br",
     "profiles": null,
@@ -804,7 +886,7 @@
    "score": 10.15,
    "error": 0.1,
    "unit": "ms/op",
-   "finished": 1793426746.9837258,
+   "finished": 1793442348.522455,
    "why": null,
    "voidId": null,
    "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1",
@@ -864,6 +946,22 @@
     [
      1000000.0,
      1000001.0
+    ]
+   ],
+   "jit:compilations": [
+    [
+     900.0
+    ],
+    [
+     920.0
+    ]
+   ],
+   "jit:deopts": [
+    [
+     3.0
+    ],
+    [
+     1.0
     ]
    ]
   },
@@ -989,7 +1087,7 @@
     "score": 10.1,
     "error": 0.1,
     "unit": "ms/op",
-    "finished": 1793426746.9756398,
+    "finished": 1793442348.5164332,
     "why": null,
     "voidId": null,
     "path": "/Users/me/lab/out/perflab/ab/br/a/aaaaaaaaaa/1",
@@ -1004,7 +1102,7 @@
     "score": 10.0,
     "error": 0.1,
     "unit": "ms/op",
-    "finished": 1793426746.9761302,
+    "finished": 1793442348.5169902,
     "why": null,
     "voidId": null,
     "path": "/Users/me/lab/out/perflab/ab/br/a/bbbbbbbbbb/1",
@@ -1174,14 +1272,290 @@
   "schema": "Forgotten",
   "version": 1,
   "project": {
-   "id": "tmp0tili6k5-5b42bf",
-   "name": "tmp0tili6k5",
+   "id": "tmpdc155exr-40f81b",
+   "name": "tmpdc155exr",
    "root": "/tmp/perflab-server",
    "campaigns": "/tmp/perflab-server/out/perflab/ab",
    "runs": "/tmp/perflab-server/out/perflab/runs",
    "registered": true,
-   "index": "/p/tmp0tili6k5-5b42bf/ab/index.html"
+   "index": "/p/tmpdc155exr-40f81b/ab/index.html"
   }
+ },
+ "Jit": {
+  "schema": "Jit",
+  "version": 1,
+  "cell": "a/tip/1",
+  "recording": "/Users/me/lab/out/perflab/ab/plain/a/tip/1/jit-7.jitrec",
+  "source": "fork",
+  "forks": 1,
+  "events": {
+   "jdk.Compilation": 7,
+   "jdk.CompilerInlining": 2,
+   "jdk.Deoptimization": 1
+  },
+  "tiers": {
+   "3": {
+    "compilations": 2,
+    "osr": 0,
+    "failed": 0,
+    "codeBytes": 3000,
+    "inlinedBytes": 10,
+    "compileMs": 1.0
+   },
+   "4": {
+    "compilations": 4,
+    "osr": 0,
+    "failed": 0,
+    "codeBytes": 16000,
+    "inlinedBytes": 300,
+    "compileMs": 9.0
+   }
+  },
+  "c2": {
+   "methods": 1,
+   "codeBytes": 9000,
+   "inlinedBytes": 300
+  },
+  "largest": [
+   {
+    "method": "a.Typer.findRef(I)I",
+    "compilations": 6,
+    "levels": {
+     "3": 2,
+     "4": 4
+    },
+    "osr": 0,
+    "maxCodeSize": 9000,
+    "deopts": 1,
+    "deoptReasons": {
+     "unstable_if": 1
+    },
+    "c2": {
+     "compileId": 40,
+     "osr": false,
+     "codeSize": 9000,
+     "inlinedBytes": 300,
+     "compileMs": 5.0
+    }
+   }
+  ],
+  "churn": [
+   {
+    "method": "a.Typer.findRef(I)I",
+    "compilations": 6,
+    "levels": {
+     "3": 2,
+     "4": 4
+    },
+    "osr": 0,
+    "maxCodeSize": 9000,
+    "deopts": 1,
+    "deoptReasons": {
+     "unstable_if": 1
+    },
+    "c2": {
+     "compileId": 40,
+     "osr": false,
+     "codeSize": 9000,
+     "inlinedBytes": 300,
+     "compileMs": 5.0
+    }
+   },
+   {
+    "method": "a.Util.small()V",
+    "compilations": 1,
+    "levels": {
+     "1": 1
+    },
+    "osr": 0,
+    "maxCodeSize": 100,
+    "deopts": 0,
+    "deoptReasons": {},
+    "c2": null
+   }
+  ],
+  "deopts": {
+   "byReason": {
+    "unstable_if": 1
+   },
+   "byAction": {
+    "reinterpret": 1
+   },
+   "methods": [
+    {
+     "method": "a.Typer.findRef(I)I",
+     "compilations": 6,
+     "levels": {
+      "3": 2,
+      "4": 4
+     },
+     "osr": 0,
+     "maxCodeSize": 9000,
+     "deopts": 1,
+     "deoptReasons": {
+      "unstable_if": 1
+     },
+     "c2": {
+      "compileId": 40,
+      "osr": false,
+      "codeSize": 9000,
+      "inlinedBytes": 300,
+      "compileMs": 5.0
+     }
+    }
+   ]
+  },
+  "inlining": {
+   "recorded": true,
+   "failures": {
+    "hot method too big": 1,
+    "too big": 1
+   },
+   "methods": [
+    {
+     "method": "a.Typer.findRef(I)I",
+     "codeSize": 9000,
+     "failed": [
+      {
+       "caller": "a.Typer.findRef(I)I",
+       "callee": "a.Typer.selection(I)I",
+       "inlined": 0,
+       "notInlined": 1,
+       "messages": {
+        "hot method too big": 1
+       }
+      },
+      {
+       "caller": "a.Typer.findRef(I)I",
+       "callee": "a.Typer.big(I)I",
+       "inlined": 0,
+       "notInlined": 1,
+       "messages": {
+        "too big": 1
+       }
+      }
+     ]
+    }
+   ]
+  },
+  "methods": [
+   {
+    "method": "a.Typer.findRef(I)I",
+    "compilations": 6,
+    "levels": {
+     "3": 2,
+     "4": 4
+    },
+    "osr": 0,
+    "maxCodeSize": 9000,
+    "deopts": 1,
+    "deoptReasons": {
+     "unstable_if": 1
+    },
+    "c2": {
+     "compileId": 40,
+     "osr": false,
+     "codeSize": 9000,
+     "inlinedBytes": 300,
+     "compileMs": 5.0,
+     "inlining": [
+      {
+       "caller": "a.Typer.findRef(I)I",
+       "callee": "a.Typer.selection(I)I",
+       "inlined": 0,
+       "notInlined": 1,
+       "messages": {
+        "hot method too big": 1
+       }
+      },
+      {
+       "caller": "a.Typer.findRef(I)I",
+       "callee": "a.Typer.big(I)I",
+       "inlined": 0,
+       "notInlined": 1,
+       "messages": {
+        "too big": 1
+       }
+      }
+     ]
+    }
+   }
+  ],
+  "note": null
+ },
+ "JitDiff": {
+  "schema": "JitDiff",
+  "version": 1,
+  "campaign": "plain",
+  "corpus": "a",
+  "round": 1,
+  "a": "base",
+  "b": "tip",
+  "recordings": {
+   "a": "/Users/me/lab/out/perflab/ab/plain/a/base/1/jit-7.jitrec",
+   "b": "/Users/me/lab/out/perflab/ab/plain/a/tip/1/jit-7.jitrec"
+  },
+  "source": {
+   "a": "fork",
+   "b": "fork"
+  },
+  "totals": {
+   "compilations": {
+    "a": 6,
+    "b": 6
+   },
+   "c2Methods": {
+    "a": 1,
+    "b": 1
+   },
+   "c2CodeBytes": {
+    "a": 7000,
+    "b": 9000
+   },
+   "deopts": {
+    "a": 1,
+    "b": 1
+   },
+   "inliningFailures": {
+    "a": 1,
+    "b": 2
+   }
+  },
+  "methods": [
+   {
+    "method": "a.Typer.findRef(I)I",
+    "a": {
+     "codeSize": 7000,
+     "inlinedBytes": 300,
+     "compilations": 4,
+     "deopts": 1
+    },
+    "b": {
+     "codeSize": 9000,
+     "inlinedBytes": 300,
+     "compilations": 6,
+     "deopts": 1
+    },
+    "codeDelta": 2000,
+    "changes": [
+     {
+      "caller": "a.Typer.findRef(I)I",
+      "callee": "a.Typer.selection(I)I",
+      "a": "inlined",
+      "b": "not inlined",
+      "aMessages": {
+       "inline (hot)": 1
+      },
+      "bMessages": {
+       "hot method too big": 1
+      }
+     }
+    ]
+   }
+  ],
+  "onlyA": [],
+  "onlyB": [],
+  "note": null
  },
  "JobResult": {
   "schema": "JobResult",
@@ -1198,8 +1572,8 @@
    "module": "perflab_fakejob",
    "state": "queued",
    "priority": 0,
-   "seq": 1793426747.073854,
-   "created": 1793426747.073854,
+   "seq": 1793442348.603413,
+   "created": 1793442348.603413,
    "started": null,
    "ended": null,
    "rc": null,
@@ -1234,8 +1608,8 @@
     "module": "perflab_fakejob",
     "state": "queued",
     "priority": 0,
-    "seq": 1793426747.073854,
-    "created": 1793426747.073854,
+    "seq": 1793442348.603413,
+    "created": 1793442348.603413,
     "started": null,
     "ended": null,
     "rc": null,
@@ -1369,8 +1743,8 @@
    "module": "perflab_fakejob",
    "state": "queued",
    "priority": 0,
-   "seq": 1793426747.073854,
-   "created": 1793426747.073854,
+   "seq": 1793442348.603413,
+   "created": 1793442348.603413,
    "started": null,
    "ended": null,
    "rc": null,
@@ -1412,27 +1786,27 @@
    "score": 8.2,
    "error": 0.1,
    "unit": "ms/op",
-   "finished": 1793426746.9773767,
+   "finished": 1793442348.5179682,
    "why": null,
    "voidId": null,
    "path": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2",
    "url": "/p/lab-3f2a1c/ab/br/a/eeeeeeeeee/2",
    "timeline": null
   },
-  "from": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-160547"
+  "from": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-202548"
  },
  "Voided": {
   "schema": "Voided",
   "version": 1,
   "campaign": "br",
   "void": {
-   "id": "a/eeeeeeeeee/2-20261031-160547",
+   "id": "a/eeeeeeeeee/2-20261031-202548",
    "corpus": "a",
    "variant": "eeeeeeeeee",
    "round": 2,
    "reason": "other load up to 2.1 cores over iterations 3, 4",
-   "voided": 1793426747.070148,
-   "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-160547",
+   "voided": 1793442348.600054,
+   "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-202548",
    "restorable": true
   },
   "from": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2"
@@ -1443,13 +1817,13 @@
   "campaign": "br",
   "voids": [
    {
-    "id": "a/eeeeeeeeee/2-20261031-160547",
+    "id": "a/eeeeeeeeee/2-20261031-202548",
     "corpus": "a",
     "variant": "eeeeeeeeee",
     "round": 2,
     "reason": "other load up to 2.1 cores over iterations 3, 4",
-    "voided": 1793426747.070148,
-    "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-160547",
+    "voided": 1793442348.600054,
+    "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-202548",
     "restorable": true
    }
   ]

@@ -530,6 +530,44 @@ class JfrsyncTest(unittest.TestCase):
         self.assertEqual(jfrevents.promotion(cell), c)  # from the cache
 
 
+class JitRecordingTest(unittest.TestCase):
+    """A spec's "jitRecording": the JIT over a whole fork, and jfrevents' summary of it."""
+
+    def test_a_spec_records_the_jit_over_each_fork(self):
+        d = tempfile.mkdtemp()
+        spec = os.path.join(d, "spec.json")
+        json.dump({"name": "j", "benchmark": "B", "profile": "none", "corpora": {"c": ""}, "variants": {"a": ""}, "jitRecording": True},
+                  open(spec, "w"))
+        sp = ab.Spec(spec)
+        dest = sp.cell_dir("c", "a", 1)
+        sp.command("c", "", "a", "", dest)
+        self.assertIn(jmh.jit_recording(dest), open(os.path.join(dest, "jmh.args")).read())
+
+    @unittest.skipUnless(shutil.which("java"), "no java")
+    def test_c2_inlining_decisions_from_a_recording(self):
+        d = tempfile.mkdtemp()
+        src = os.path.join(d, "Hot.java")
+        open(src, "w").write("public class Hot {\n"
+                             "  static int small(int x) { return x * 31 + 7; }\n"
+                             "  static int big(int x) { int s = x; for (int i = 0; i < 3; i++) { s ^= s << 13; s ^= s >>> 17; s ^= s << 5;"
+                             " s += i * x; s = s * 17 + (s >>> 3); s ^= 0x5bd1e995; } return s; }\n"
+                             "  static int loop(int n) { int s = 0; for (int i = 0; i < n; i++) s += small(i) + big(i); return s; }\n"
+                             "  public static void main(String[] a) { long end = System.nanoTime() + 1_000_000_000L; int s = 0;\n"
+                             "    while (System.nanoTime() < end) s += loop(10_000); System.out.println(s); } }\n")
+        cell = os.path.join(d, "cell")
+        os.makedirs(cell)
+        r = subprocess.run(["java", "-XX:FreqInlineSize=30", jmh.jit_recording(cell), src], capture_output=True, text=True, timeout=120)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        j = jfrevents.jit(cell)
+        self.assertEqual((j["source"], j["forks"]), ("fork", 1))
+        self.assertGreater(j["tiers"]["4"]["compilations"], 0)
+        [loop] = [m for m in j["methods"] if m["method"] == "Hot.loop(I)I"]
+        decisions = {x["callee"]: x for x in loop["c2"]["inlining"]}
+        self.assertEqual(decisions["Hot.small(I)I"]["inlined"], 1)
+        self.assertEqual(decisions["Hot.big(I)I"]["messages"], {"too big": 1})  # beyond FreqInlineSize
+        self.assertEqual(jfrevents.jit(cell), j)  # from the cache
+
+
 class CurateTest(unittest.TestCase):
     """Each step of a curated diff, on small synthetic collapsed stacks (root first)."""
 

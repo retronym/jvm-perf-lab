@@ -45,7 +45,12 @@ def plain_fixture(campaigns, name="plain"):
             if r == 1:
                 fake_profile_cell(d)  # a profile too: its recording and graphs
             os.makedirs(d, exist_ok=True)
-            json.dump([result("a", forks(x + 0.05 * r), alloc(1e6))], open(os.path.join(d, "result.json"), "w"))
+            res = result("a", forks(x + 0.05 * r), alloc(1e6))
+            # JitProfiler's per-fork totals; JMH's score is the larger fork's (AggregationPolicy.MAX)
+            comp = [[900.0], [920.0]] if v == "base" else [[800.0], [820.0]]
+            res["secondaryMetrics"]["jit.compilations"] = {"score": 920.0, "scoreUnit": "#", "rawData": comp}
+            res["secondaryMetrics"]["jit.deopts"] = {"score": 3.0, "scoreUnit": "#", "rawData": [[3.0], [1.0]]}
+            json.dump([res], open(os.path.join(d, "result.json"), "w"))
             open(os.path.join(d, "iterations.tsv"), "w").write(
                 "index\tkind\tvariant\tstart_ms\tend_ms\tscore\tops\tgc_ms\tpid\tunit\talloc_bytes\n"
                 "0\twarmup\t\t1000\t2000\t11.0\t1\t\t7\tms/op\t\n1\tmeasure\t\t2000\t3000\t10.0\t1\t3\t7\tms/op\t1000\n")
@@ -59,6 +64,26 @@ def plain_fixture(campaigns, name="plain"):
                            "tenuringDistribution": {"1": 4096, "2": 512}}, open(os.path.join(d, "promotion.json"), "w"))
                 json.dump({"jfrsync": "/Users/me/lab/out/perflab/ab/plain/jfrsync.jfc", "added": ["jdk.PromoteObjectInNewPLAB"],
                            "counts": {"jdk.PromoteObjectInNewPLAB": 3}}, open(os.path.join(d, "jfrsync.json"), "w"))
+                # a whole-fork JIT recording and its summary, as jfrevents caches it: tip's findRef grew, lost an inlining
+                rec = os.path.join(d, "jit-7.jitrec")
+                open(rec, "w").close()
+                grew = v == "tip"
+                find_ref = {"method": "a.Typer.findRef(I)I", "compilations": 6 if grew else 4, "levels": {"3": 2, "4": 4 if grew else 2},
+                            "osr": 0, "maxCodeSize": 9000 if grew else 7000, "deopts": 1, "deoptReasons": {"unstable_if": 1},
+                            "c2": {"compileId": 40, "osr": False, "codeSize": 9000 if grew else 7000, "inlinedBytes": 300, "compileMs": 5.0,
+                                   "inlining": [{"caller": "a.Typer.findRef(I)I", "callee": "a.Typer.selection(I)I",
+                                                 "inlined": 0 if grew else 1, "notInlined": 1 if grew else 0,
+                                                 "messages": {"hot method too big" if grew else "inline (hot)": 1}},
+                                                {"caller": "a.Typer.findRef(I)I", "callee": "a.Typer.big(I)I", "inlined": 0, "notInlined": 1,
+                                                 "messages": {"too big": 1}}]}}
+                small = {"method": "a.Util.small()V", "compilations": 1, "levels": {"1": 1}, "osr": 0, "maxCodeSize": 100, "deopts": 0,
+                         "deoptReasons": {}, "c2": None}
+                json.dump({"source": "fork", "recording": rec, "forks": 1,
+                           "events": {"jdk.Compilation": 7, "jdk.CompilerInlining": 2, "jdk.Deoptimization": 1},
+                           "tiers": {"3": {"compilations": 2, "osr": 0, "failed": 0, "codeBytes": 3000, "inlinedBytes": 10, "compileMs": 1.0},
+                                     "4": {"compilations": 4, "osr": 0, "failed": 0, "codeBytes": 16000, "inlinedBytes": 300, "compileMs": 9.0}},
+                           "deopts": {"byReason": {"unstable_if": 1}, "byAction": {"reinterpret": 1}},
+                           "methods": [find_ref, small]}, open(os.path.join(d, "jit.json"), "w"))
             else:  # a caller audit of its fork (pid 7: 2 ops)
                 json.dump({"counters": {"lookups": 100 if v == "base" else 150, "misses": 10},
                            "probes": {"denot": {"kind": "callers", "hits": 40, "sample": 1, "sites": {"A.f:1 <- B.g:2": 30, "C.h:3": 10}}}},
@@ -118,7 +143,9 @@ def every_read(t):
             ("profiles", {"campaign": "plain"}), ("profiles", {"campaign": "br"}),
             ("diff", {"campaign": "plain", "a": "base", "b": "tip"}), ("diff", {"campaign": "br", "a": V[4], "b": V[3]}),
             ("voids", {"campaign": "br"}), ("jobs", {}), ("audit", {"campaign": "plain"}),
-            ("promotion", {"campaign": "plain", "corpus": "a", "variant": "base", "round": 1})]
+            ("promotion", {"campaign": "plain", "corpus": "a", "variant": "base", "round": 1}),
+            ("jit", {"campaign": "plain", "corpus": "a", "variant": "tip", "round": 1, "method": "findRef"}),
+            ("jit_diff", {"campaign": "plain", "a": "base", "b": "tip", "corpus": "a", "round": 1})]
 
 
 class ReadTest(Fixture, unittest.TestCase):
@@ -149,6 +176,37 @@ class ReadTest(Fixture, unittest.TestCase):
         self.assertIsNone(pr["note"])
         self.assertEqual(api.cell("plain", "a", "base", 1)["profile"]["jfrsync"]["counts"], {"jdk.PromoteObjectInNewPLAB": 3})
         self.assertIsNone(api.cell("plain", "a", "base", 2)["profile"]["jfrsync"])
+
+    def test_jit_metrics(self):
+        """JitProfiler's totals are the mean of the forks', not JMH's score (the larger fork's), and compare like scores."""
+        ms = {m["key"]: m for m in api.cell("plain", "a", "base", 1)["metrics"]}
+        self.assertEqual(ms["jit:compilations"]["value"], 910.0)
+        self.assertEqual(ms["jit:compilations"]["kind"], "total")
+        self.assertEqual(api.cell("plain", "a", "base", 1)["raw"]["jit:compilations"], [[900.0], [920.0]])
+        c = {m["key"]: m for m in api.compare("plain", "base", "tip")["corpora"][0]["metrics"]}
+        self.assertAlmostEqual(c["jit:compilations"]["delta"]["pct"], 100 * (810 / 910 - 1))
+        self.assertEqual(c["jit:deopts"]["a"]["mean"], 2.0)
+        self.assertIn("jit:compilations", {m["key"] for m in api.campaign("plain")["metrics"]})
+
+    def test_jit_summary(self):
+        j = api.jit("plain", "a", "tip", 1, method="findRef")
+        self.assertEqual(j["source"], "fork")
+        self.assertIsNone(j["note"])
+        self.assertEqual(j["c2"], {"methods": 1, "codeBytes": 9000, "inlinedBytes": 300})
+        self.assertEqual([m["method"] for m in j["largest"]], ["a.Typer.findRef(I)I"])
+        self.assertNotIn("inlining", j["largest"][0]["c2"])
+        self.assertEqual(j["churn"][0]["compilations"], 6)
+        self.assertEqual(j["inlining"]["failures"], {"hot method too big": 1, "too big": 1})
+        self.assertEqual(len(j["methods"][0]["c2"]["inlining"]), 2)
+
+    def test_jit_diff(self):
+        jd = api.jit_diff("plain", "base", "tip", "a", 1)
+        self.assertEqual(jd["totals"]["c2CodeBytes"], {"a": 7000, "b": 9000})
+        [m] = jd["methods"]
+        self.assertEqual(m["codeDelta"], 2000)
+        self.assertEqual(m["changes"], [{"caller": "a.Typer.findRef(I)I", "callee": "a.Typer.selection(I)I", "a": "inlined", "b": "not inlined",
+                                         "aMessages": {"inline (hot)": 1}, "bMessages": {"hot method too big": 1}}])
+        self.assertEqual(api.jit_diff("plain", "base", "tip", "a", 1, method="Util")["methods"], [])
 
     def test_campaigns(self):
         cs = {c["name"]: c for c in api.campaigns()["campaigns"]}

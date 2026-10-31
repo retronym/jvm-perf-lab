@@ -41,6 +41,8 @@ RAW_SOURCE = {"score": None, "alloc": "gc.alloc.rate.norm", "cycles": "xctrace.C
 
 
 def raw_source(k):
+    if k.startswith("jit:"):
+        return f"jit.{k[4:]}"  # one sample per fork
     return RAW_SOURCE.get(k, f"xctrace.{k[3:]}" if k.startswith("ev:") and "/" not in k else False)
 
 
@@ -50,6 +52,8 @@ def raw_of(r, k, u):
     if src is False:
         return []
     m = r["primaryMetric"] if src is None else r.get("secondaryMetrics", {}).get(src)
+    if k.startswith("jit:"):
+        u = 1.0  # a fork's total, not per op
     raw = (m or {}).get("rawData") or []
     return [[x / u for x in fork if isinstance(x, (int, float)) and math.isfinite(x)] for fork in raw] if u else []
 

@@ -106,7 +106,9 @@ PROJECT_P = S("The project: a server project id (see projects), or a project roo
               "the project of the working directory (on the server: the only registered project)")
 CAMPAIGN_P = S("The campaign's name: its directory under the project's campaigns directory")
 METRIC_KEY = S("A metric's key (see `metrics`): score, cycles, instructions, ipc, alloc, ev:<event>, ev:<event>/kinst, "
-               "ev:<event>/cycles, td:<slot>, cyc%:<group>, ipc:<group>, cycles:all, instructions:all, ipc:all")
+               "ev:<event>/cycles, td:<slot>, cyc%:<group>, ipc:<group>, cycles:all, instructions:all, ipc:all, jit:<name> "
+               "(JitProfiler's per-fork totals: jit:compilations, jit:compileTime, jit:deopts, jit:lastWarmup.compilations, "
+               "jit:lastWarmup.deopts)")
 
 define("Error", "An error: the body of every non-2xx response, and of an MCP tool result with isError", {
     "error": O("What went wrong", {
@@ -187,7 +189,8 @@ define("Stat", "One metric of one variant (or commit) on one corpus, over its fo
 define("MetricInfo", "A metric the cells recorded (perflab.metrics.of)", {
     "key": METRIC_KEY, "label": S("Its label, with its unit: e.g. ms/op, cycles/op, alloc/op (bytes), IPC, JIT % of cycles"),
     "kind": S("score: the benchmark's primary score (its unit in the label); count: events per op; alloc: bytes per op; "
-              "ratio: a ratio (IPC, events per 1,000 instructions); pct: percent", enum=["score", "count", "alloc", "ratio", "pct"]),
+              "ratio: a ratio (IPC, events per 1,000 instructions); pct: percent; total: a fork's total, not per op (JIT "
+              "compilations, compile ms, deopts)", enum=["score", "count", "alloc", "ratio", "pct", "total"]),
     "main": B("Whether the index's summary table shows it (the others are in its pivot and chart)")})
 define("SummaryRow", "One corpus × variant of a campaign's summary", {
     "corpus": S("The corpus"), "variant": S("The variant"), "rounds": I("Rounds with a result"),
@@ -270,6 +273,58 @@ define("Promotion", "G1's promotion census of an async cell's recording: bytes p
                  "The classes that promoted most, most first. A new PLAB's event stands for the plabSize bytes promoted into it, so a class's bytes are an estimate"),
     "tenuringDistribution": M(I("bytes"), "Survivor-space bytes per age, summed over GCs"),
     "note": null(S("Why the census is empty, when it is"))}, top=True)
+
+
+define("JitDecision", "C2's decisions at one caller's calls of one callee, in a method's compile (jdk.CompilerInlining)", {
+    "caller": S("The caller: the compiled method or a method inlined into it"), "callee": S("The callee, pkg.Class.name(descriptor)"),
+    "inlined": I("Call sites inlined"), "notInlined": I("Call sites not inlined"),
+    "messages": M(I("call sites"), "C2's reasons: inline (hot), too big, callee is too large, hot method too big, recursive inlining is too deep, ...")})
+define("JitMethod", "A method's JIT history in a fork: its compilations and deoptimizations, and its last C2 compile", {
+    "method": S("pkg.Class.name(descriptor)"), "compilations": I("Compilations, every tier"), "levels": M(I("compilations"), "By tier (0-4)"),
+    "osr": I("OSR compilations"), "maxCodeSize": I("Its largest compile, bytes of code"), "deopts": I("Deoptimizations"),
+    "deoptReasons": M(I("deopts"), "By reason"),
+    "c2": null(O("Its last C2 (tier 4) compile that succeeded, an OSR one only if it had no other", {
+        "compileId": I("Compile id"), "osr": B("An OSR compile"), "codeSize": I("Bytes of code"), "inlinedBytes": I("Bytecode bytes inlined"),
+        "compileMs": N("Compile time, ms"), "inlining": A(ref("JitDecision"), "Its inlining decisions (a recording with jdk.CompilerInlining)")},
+        optional=("inlining",)))})
+define("Jit", "The JIT's work in a cell, from its whole-fork JIT recording (a spec's \"jitRecording\") or its async recording", {
+    "cell": S("corpus/variant/round"), "recording": PATH,
+    "source": S("fork: a whole-fork JIT recording (its first fork's); measured: an async recording, from the first measured iteration "
+                "(warmup's compiles are missing)", enum=["fork", "measured"]),
+    "forks": I("Whole-fork JIT recordings in the cell"), "events": M(I("events"), "The JIT events in it"),
+    "tiers": M(O("One tier", {"compilations": I("Compilations"), "osr": I("OSR ones"), "failed": I("Failed ones"), "codeBytes": I("Code, bytes"),
+                              "inlinedBytes": I("Bytecode inlined, bytes"), "compileMs": N("Compile time, ms")}), "By tier (0-4)"),
+    "c2": O("The methods' last C2 compiles", {"methods": I("Methods with one"), "codeBytes": I("Their code, bytes"), "inlinedBytes": I("Bytecode inlined into them")}),
+    "largest": A(ref("JitMethod"), "Methods by the size of their last C2 compile, largest first (without decisions)"),
+    "churn": A(ref("JitMethod"), "Methods by compilations, most first: recompilation churn (without decisions)"),
+    "deopts": O("Deoptimizations", {"byReason": M(I("deopts"), "By reason"), "byAction": M(I("deopts"), "By action"),
+                                    "methods": A(ref("JitMethod"), "Methods by deopts, most first (without decisions)")}),
+    "inlining": O("C2's inlining decisions in the methods' last C2 compiles", {
+        "recorded": B("Whether the recording has jdk.CompilerInlining (a whole-fork JIT recording has)"),
+        "failures": M(I("call sites"), "Call sites not inlined, by C2's reason"),
+        "methods": A(O("One of the largest methods", {"method": S("The method"), "codeSize": I("Its last C2 compile's code, bytes"),
+                                                       "failed": A(ref("JitDecision"), "Its decisions with a call site not inlined")}),
+                     "The largest methods' failed decisions")}),
+    "methods": null(A(ref("JitMethod"), "With `method`: the methods it matches, with their decisions")),
+    "note": null(S("What the recording cannot say"))}, top=True)
+define("JitChange", "A decision of one method's last C2 compile that differs between two variants", {
+    "caller": S("The caller"), "callee": S("The callee"),
+    "a": null(S("In a: inlined, not inlined, mixed (some call sites each), or null when a's compile did not consider it")),
+    "b": null(S("In b, as a")), "aMessages": M(I("call sites"), "a's reasons"), "bMessages": M(I("call sites"), "b's reasons")})
+define("JitDiff", "Two variants' JIT: methods whose last C2 compile differs in size or inlining decisions", {
+    "campaign": S("The campaign"), "corpus": S("The corpus"), "round": I("The round"), "a": S("Variant a"), "b": S("Variant b"),
+    "recordings": O("Each side's recording", {"a": PATH, "b": PATH}),
+    "source": O("Each side's source, as Jit.source", {"a": S("fork or measured"), "b": S("fork or measured")}),
+    "totals": M(O("a and b", {"a": N("a"), "b": N("b")}), "compilations, c2Methods, c2CodeBytes, deopts, inliningFailures"),
+    "methods": A(O("A method C2 compiled in both", {
+        "method": S("The method"),
+        "a": O("a's last C2 compile", {"codeSize": I("Code, bytes"), "inlinedBytes": I("Bytecode inlined"), "compilations": I("Compilations"), "deopts": I("Deopts")}),
+        "b": O("b's", {"codeSize": I("Code, bytes"), "inlinedBytes": I("Bytecode inlined"), "compilations": I("Compilations"), "deopts": I("Deopts")}),
+        "codeDelta": I("b's code size − a's, bytes"), "changes": A(ref("JitChange"), "Decisions that differ")}),
+        "Methods whose code size or decisions differ, by |codeDelta| then by changes, largest first"),
+    "onlyA": A(O("A method", {"method": S("The method"), "codeSize": I("Its C2 code, bytes")}), "C2-compiled in a only, largest first"),
+    "onlyB": A(O("A method", {"method": S("The method"), "codeSize": I("Its C2 code, bytes")}), "C2-compiled in b only, largest first"),
+    "note": null(S("Caveats: a side without a whole-fork recording, or without inlining decisions"))}, top=True)
 
 
 define("Cell", "One cell in full: its result, every metric and sample, its iterations, load, GC, profile and logs", {
@@ -1278,6 +1333,133 @@ def promotion(campaign, corpus, variant, round, project=None, top=30):
     return envelope("Promotion", cell=f"{corpus}/{variant}/{int(round)}", recording=jfr, events=events, gcs=census.get("gcs", 0), ops=ops,
                     total={"survivorBytes": sb, "tenuredBytes": tb, "survivorPerOp": per(sb), "tenuredPerOp": per(tb)},
                     classes=classes, tenuringDistribution={str(k): v for k, v in (census.get("tenuringDistribution") or {}).items()}, note=note)
+
+
+def _jit_cell(p, d, spec, campaign, corpus, variant, round):
+    from . import jfrevents
+    variant = _variant_ref(d, spec, _segment("variant", variant))
+    _segment("corpus", corpus)
+    c = os.path.join(d, corpus, variant, str(int(round)))
+    if not os.path.isdir(c) or not (jfrevents.jit_recordings(c) or jfrevents.recording(c)):
+        raise ApiError("not_found", f"{campaign}: no recording in cell {corpus}/{variant}/{round} (a spec's \"jitRecording\", "
+                       "or an async profile's .jfr)")
+    try:
+        return variant, jfrevents.jit(c)
+    except (RuntimeError, OSError, ValueError) as e:
+        raise ApiError("internal", f"reading the JIT recording of {c}: {e}")
+
+
+def _jit_brief(m):
+    """A JitMethod without its decisions."""
+    return {**m, "c2": {k: v for k, v in m["c2"].items() if k != "inlining"} if m.get("c2") else None}
+
+
+def _jit_note(j):
+    if j["source"] == "measured":
+        return ("an async recording, from the first measured iteration: warmup's compiles, the hot code's among them, are "
+                'missing, and it has no inlining decisions; a spec\'s "jitRecording": true records the whole fork')
+    if not j["events"].get("jdk.CompilerInlining"):
+        return "the recording has no jdk.CompilerInlining events"
+    return None
+
+
+@endpoint("read", "Jit", "The JIT's work in a cell: compilations per tier, largest C2 compiles, recompilation churn, deopts, inlining failures",
+          project=PROJECT_P, campaign=CAMPAIGN_P, corpus=S("The corpus"), variant=S("The variant (or a commit's sha prefix)"),
+          round=I("The round", minimum=1), top=I("Methods per list (default 20)", minimum=0),
+          method=S("Methods whose name contains this (e.g. Typer.findRef): their full history and every inlining decision"))
+def jit(campaign, corpus, variant, round, project=None, top=20, method=None):
+    """From jdk.Compilation, jdk.Deoptimization and jdk.CompilerInlining in the cell's whole-fork JIT recording (a
+    spec's "jitRecording": true, <cell>/jit-<pid>.jitrec, its first fork's), else its async recording, which starts at the
+    first measured iteration. Read by the JDK that recorded it (perflab.jfrevents), cached in the cell. A method's C2
+    view is its last C2 compile: the code the benchmark ran at the end. Its decisions are keyed by caller and callee,
+    not bci. perflab inlinetree shows where samples fell in the compiled code; this is what C2 decided and why."""
+    p = resolve(project)
+    with _config(p):
+        d = _camp_dir(p, campaign)
+        spec = _json(os.path.join(d, "spec.json"), {}) or {}
+        variant, j = _jit_cell(p, d, spec, campaign, corpus, variant, round)
+    top = int(top)
+    ms = j["methods"]
+    c2 = [m for m in ms if m["c2"]]
+    largest = sorted(c2, key=lambda m: -m["c2"]["codeSize"])
+    failures = {}
+    for m in c2:
+        for dd in m["c2"].get("inlining") or []:
+            for msg, n in dd["messages"].items():
+                if dd["notInlined"] and not msg.startswith("inline"):
+                    failures[msg] = failures.get(msg, 0) + n
+    failures = dict(sorted(failures.items(), key=lambda kv: -kv[1]))
+    found = None
+    if method:
+        found = [m for m in ms if method in m["method"]]
+    return envelope("Jit", cell=f"{corpus}/{variant}/{int(round)}", recording=j["recording"], source=j["source"], forks=j["forks"],
+                    events=j["events"], tiers=j["tiers"],
+                    c2={"methods": len(c2), "codeBytes": sum(m["c2"]["codeSize"] for m in c2), "inlinedBytes": sum(m["c2"]["inlinedBytes"] for m in c2)},
+                    largest=[_jit_brief(m) for m in largest[:top]],
+                    churn=[_jit_brief(m) for m in sorted(ms, key=lambda m: (-m["compilations"], m["method"]))[:top]],
+                    deopts={**j["deopts"], "methods": [_jit_brief(m) for m in sorted((m for m in ms if m["deopts"]), key=lambda m: (-m["deopts"], m["method"]))[:top]]},
+                    inlining={"recorded": bool(j["events"].get("jdk.CompilerInlining")), "failures": failures,
+                              "methods": [{"method": m["method"], "codeSize": m["c2"]["codeSize"],
+                                           "failed": [dd for dd in m["c2"].get("inlining") or [] if dd["notInlined"]]} for m in largest[:top]]},
+                    methods=found, note=_jit_note(j))
+
+
+def _decision(dd):
+    if dd is None:
+        return None
+    return "inlined" if not dd["notInlined"] else "not inlined" if not dd["inlined"] else "mixed"
+
+
+@endpoint("read", "JitDiff", "Two variants' JIT in a round: methods whose last C2 compile grew, shrank or inlined differently",
+          project=PROJECT_P, campaign=CAMPAIGN_P, a=S("Variant a (the base)"), b=S("Variant b"), corpus=S("The corpus"),
+          round=I("The round", minimum=1), top=I("Methods (default 30)", minimum=0),
+          method=S("Only methods whose name contains this"), minDelta=I("Smallest |code size change| shown without a decision change (default 0)", minimum=0))
+def jit_diff(campaign, a, b, corpus, round, project=None, top=30, method=None, minDelta=0):
+    """The two cells' JIT summaries (as `jit`) joined by method: per method both C2-compiled, the code size of each
+    side's last C2 compile and every inlining decision (caller -> callee) whose outcome differs: inlined in a, not in b
+    (with C2's reason, e.g. hot method too big) is how a method that grew loses an inlining, and with it, say, the scalar
+    replacement of a closure. Profile pollution makes some decisions differ between any two forks: compare with an
+    A/A pair before reading much into one."""
+    p = resolve(project)
+    with _config(p):
+        d = _camp_dir(p, campaign)
+        spec = _json(os.path.join(d, "spec.json"), {}) or {}
+        a, ja = _jit_cell(p, d, spec, campaign, corpus, a, round)
+        b, jb = _jit_cell(p, d, spec, campaign, corpus, b, round)
+    ma = {m["method"]: m for m in ja["methods"] if m["c2"]}
+    mb = {m["method"]: m for m in jb["methods"] if m["c2"]}
+    side = lambda m: {"codeSize": m["c2"]["codeSize"], "inlinedBytes": m["c2"]["inlinedBytes"], "compilations": m["compilations"], "deopts": m["deopts"]}
+    rows = []
+    for name in ma.keys() & mb.keys():
+        if method and method not in name:
+            continue
+        x, y = ma[name], mb[name]
+        da = {(dd["caller"], dd["callee"]): dd for dd in x["c2"].get("inlining") or []}
+        db = {(dd["caller"], dd["callee"]): dd for dd in y["c2"].get("inlining") or []}
+        changes = []
+        for k in sorted(da.keys() | db.keys()):
+            sa, sb = _decision(da.get(k)), _decision(db.get(k))
+            if sa != sb:
+                changes.append({"caller": k[0], "callee": k[1], "a": sa, "b": sb,
+                                "aMessages": (da.get(k) or {}).get("messages", {}), "bMessages": (db.get(k) or {}).get("messages", {})})
+        delta = y["c2"]["codeSize"] - x["c2"]["codeSize"]
+        if changes or (delta and abs(delta) >= int(minDelta)):
+            rows.append({"method": name, "a": side(x), "b": side(y), "codeDelta": delta, "changes": changes})
+    rows.sort(key=lambda r: (-abs(r["codeDelta"]), -len(r["changes"]), r["method"]))
+    only = lambda xs, ys: [{"method": n, "codeSize": xs[n]["c2"]["codeSize"]}
+                           for n in sorted(xs.keys() - ys.keys(), key=lambda n: -xs[n]["c2"]["codeSize"]) if not method or method in n][:int(top)]
+
+    def totals(j, ms):
+        fails = sum(1 for m in ms.values() for dd in m["c2"].get("inlining") or [] if dd["notInlined"])
+        return {"compilations": sum(t["compilations"] for t in j["tiers"].values()), "c2Methods": len(ms),
+                "c2CodeBytes": sum(m["c2"]["codeSize"] for m in ms.values()), "deopts": sum(j["deopts"]["byReason"].values()),
+                "inliningFailures": fails}
+    ta, tb = totals(ja, ma), totals(jb, mb)
+    notes = [f"{v}: {n}" for v, j in ((a, ja), (b, jb)) for n in [_jit_note(j)] if n]
+    return envelope("JitDiff", campaign=campaign, corpus=corpus, round=int(round), a=a, b=b,
+                    recordings={"a": ja["recording"], "b": jb["recording"]}, source={"a": ja["source"], "b": jb["source"]},
+                    totals={k: {"a": ta[k], "b": tb[k]} for k in ta}, methods=rows[:int(top)],
+                    onlyA=only(ma, mb), onlyB=only(mb, ma), note="; ".join(notes) or None)
 
 
 # ---- branch campaigns
