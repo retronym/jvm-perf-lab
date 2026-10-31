@@ -714,8 +714,9 @@ class Server:
             time.sleep(RELOAD_POLL)
             if code_stamp() != now:  # still being written
                 continue
+            changed = sorted({os.path.relpath(f, PKG) for f, *_ in set(seen) ^ set(now)})
             seen = code_stamp()
-            self.reload("its code changed")
+            self.reload("its code changed: " + ", ".join(changed[:5]) + (" …" if len(changed) > 5 else ""))
 
     def reload(self, why):
         """Restarts on the code on disk, once it is known to import; else keeps serving and returns why not."""
@@ -730,10 +731,10 @@ class Server:
         return None
 
     def _exec(self):
+        self.httpd.server_close()  # refuse connections now rather than leave them in the backlog
         self.worker.stopping.set()  # the jobs run on; the next image adopts them
         self.worker.wake.set()
         self.worker.join(5)
-        self.httpd.server_close()
         sys.stdout.flush(), sys.stderr.flush()
         os.execv(sys.executable, sys.orig_argv)
 
@@ -1237,9 +1238,17 @@ def follow(job, out=None, poll=1.0):
     """Prints the job's transcript as it grows until the job ends, and appends it to this command's own transcript if
     it has one (`perflab --transcript`); its exit status (1 if it failed without one, 130 if it was cancelled)."""
     out = _Tee(out or sys.stdout, os.environ.get(transcript.ENV))
-    offset = 0
+    offset, lost = 0, None
     while True:
-        j = api("GET", f"/api/jobs/{job['id']}")
+        try:
+            j = api("GET", f"/api/jobs/{job['id']}")
+            lost = None
+        except OSError:  # the server is away for a moment (a reload, a restart): the job runs on
+            lost = lost or time.time()
+            if time.time() - lost > 60:
+                raise
+            time.sleep(poll)
+            continue
         try:
             with open(j["transcript"], "rb") as f:
                 f.seek(offset)

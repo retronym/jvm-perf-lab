@@ -614,6 +614,18 @@ class ReloadTest(unittest.TestCase):
         self.assertIn("reloaded", r.stdout)
         self.assertGreater(self.status()["started"], third["started"])
 
+    def test_a_job_and_its_follower_ride_out_a_reload(self):
+        root = project('[build]\njmh = "sh -c \'sleep 6\' {args}"\n')
+        sub = subprocess.Popen([sys.executable, "-m", "perflab", "submit", "--", "run", "--", "-foo"], env=self.env, cwd=root,
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        wait_for(lambda: (self.status() or {}).get("running"), what="the job to run")
+        self.edit("X = 3\n")
+        st = wait_for(lambda: self.reloaded(self.first), what="a reload")
+        self.assertEqual(st["running"]["id"], 1)  # adopted
+        out, _ = sub.communicate(timeout=60)
+        self.assertIn("job 1 ", out)
+        self.assertNotIn("Traceback", out)
+
 
 class CliTest(unittest.TestCase):
     """`perflab server start|status|stop`, `submit` and `jobs`, as a shell runs them."""

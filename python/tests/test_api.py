@@ -443,9 +443,12 @@ class HttpTest(Fixture, unittest.TestCase):
         self.assertIn('<h2 id="4-when-the-gap-stays-hardware-counters">', page)
         for link in ('href="/doc/paired-ab"', 'href="/skill.md"', 'href="https://github.com/retronym/jvm-perf-lab/blob/main/README.md"'):
             self.assertIn(link, page)
-        for path in ("/doc/nope", "/doc/", "/doc/..%2fREADME", "/doc/optimising.md"):
+        code, page, _ = self.http("GET", "/doc/")  # the docs' index
+        self.assertEqual(code, 200)
+        self.assertIn('href="/doc/optimising"', page)
+        for path in ("/doc/nope", "/doc/..%2fREADME", "/doc/optimising.md"):
             self.assertEqual(self.http("GET", path)[0], 404, path)
-        for path in ("/", "/admin", "/api/v1/docs", "/doc/optimising"):
+        for path in ("/", "/admin", "/api/v1/docs", "/doc/optimising", "/doc/"):
             page = self.http("GET", path)[1]
             self.assertIn('<div id="keys" hidden', page, path)
             self.assertIn('data-srv="/doc/optimising"', page, path)
