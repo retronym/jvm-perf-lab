@@ -354,9 +354,8 @@ def curated_diff(out, event, A, B, la, lb, jfrconv, rules, jits=None):
                 kinds.toggle_graphs(viewer, os.path.join(out, f"toggle-a-{event}{sfx}.html"),
                                     os.path.join(out, f"toggle-b-{event}{sfx}.html"), event, la, lb,
                                     kinds.tree(ca, cb, A.ops, B.ops, by_leaf), by_leaf)
-                stale = os.path.join(out, f"toggle-{event}{sfx}.html")  # the first toggle page, its own viewer
-                if os.path.exists(stale):
-                    os.unlink(stale)
+                # the first toggle page's name, handed out before the pairs: to the pair's widget on the compare page
+                compare.redirect(os.path.join(out, f"toggle-{event}{sfx}.html"), f"compare.html#{compare.pair_id(event, by_leaf)}")
     return t
 
 

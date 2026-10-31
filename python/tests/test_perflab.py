@@ -672,6 +672,18 @@ class FlameGraphTest(unittest.TestCase):
         with self.assertRaises(flamegraph.TemplateError):
             flamegraph.page("<html></html>", "t", [("all", 0, 0, 1)])
 
+    def test_a_renamed_page_redirects_to_its_widget(self):
+        """The first toggle pages' URLs (toggle-<event>[-byleaf].html), handed out before the pairs, still lead there."""
+        d = tempfile.mkdtemp()
+        for side in "ab":
+            for sfx in ("", "-byleaf"):
+                open(os.path.join(d, f"toggle-{side}-cpu{sfx}.html"), "w").write("<html></html>")
+        open(os.path.join(d, "diff-cpu.html"), "w").write("<html></html>")  # the event
+        compare.redirect(os.path.join(d, "toggle-cpu-byleaf.html"), f"compare.html#{compare.pair_id('cpu', True)}")
+        self.assertIn('url=compare.html#cpu-pair-byleaf"', open(os.path.join(d, "toggle-cpu-byleaf.html")).read())
+        compare.write(d, "base", "tip")
+        self.assertIn('id="cpu-pair-byleaf"', open(os.path.join(d, "compare.html")).read())
+
     def test_no_page_draws_its_own_canvas(self):
         """A flame graph drawn by perflab's own code would drift from the viewer's controls (zoom, search, filters, short
         names, help, the compare page's link): pages draw through flamegraph.page."""

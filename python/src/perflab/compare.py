@@ -8,7 +8,7 @@ The graphs' controls are linked: async-profiler's flame graph (retronym/async-pr
 state of its toolbar (view toggles, search, highlights, filters, zoom) after each change, and the page relays it to the
 other graphs of the same event, or of every event, or to none (the header's "link" buttons).
 """
-import glob, html, os
+import glob, html, os, re
 
 from . import flamegraph, ui
 
@@ -71,6 +71,9 @@ function onKey(e, from) {
   if (t) { show(w, t.dataset.view); if (e.preventDefault) e.preventDefault(); }
 }
 document.addEventListener('keydown', onKey);
+// compare.html#<widget id> (a pair: perflab.compare.pair_id) opens on that widget
+if (location.hash) { const w = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+  if (w) { hovered = w; addEventListener('load', () => w.scrollIntoView()); } }
 // ↗ opens the widget's current graph in a new tab; ⤢ opens the widget's graphs in the lightbox (not when this page is
 // itself shown in one)
 for (const w of document.querySelectorAll('.w')) {
@@ -133,6 +136,18 @@ for (const b of document.querySelectorAll('header button[data-cols]'))
 """
 
 
+def pair_id(event, by_leaf=False):
+    """The id of an event's pair widget on the compare page, a URL fragment (compare.html#<id>)."""
+    return re.sub(r"[^A-Za-z0-9_-]", "-", f"{event}-pair{'-byleaf' if by_leaf else ''}")
+
+
+def redirect(path, to):
+    """A page at `path` that sends the browser to `to` (relative): a page perflab renamed keeps its URL working."""
+    with open(path, "w") as f:
+        f.write(f'<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url={html.escape(to)}">'
+                f'<title>moved</title><p>Moved to <a href="{html.escape(to)}">{html.escape(to)}</a>.</p>')
+
+
 def write(out, a, b, note=None):
     """(Re)writes <out>/compare.html for every event diffed in `out`; `a` and `b` name the two runs, `note` says how
     the stacks were curated (perflab.curate), shown under the header."""
@@ -155,7 +170,7 @@ def write(out, a, b, note=None):
             flamegraph.link_file(os.path.join(out, name))
         widgets.append(f'<div class="w" data-event="{esc(event)}"><div class="tabs"><span class="ev">{esc(event)}</span>{tabs}<span class="act">{links}</span></div>'
                        f'<div class="body">{frames}</div></div>')
-        for label, pattern in PAIRS:
+        for (label, pattern), by_leaf in zip(PAIRS, (False, True)):
             names = [pattern.format(side=side, event=event) for side in ("a", "b")]
             if not all(os.path.exists(os.path.join(out, n)) for n in names):
                 continue
@@ -166,7 +181,7 @@ def write(out, a, b, note=None):
             frames = "".join(f'<iframe src="{esc(n)}" data-view="{side}"{"" if side == "a" else " class=hidden"}></iframe>' for side, n in zip("ab", names))
             act = ('<a class="btn open" href="#" target="_blank" rel="noopener" title="Open this graph in a new tab">↗</a>'
                    '<button class="btn big" title="Enlarge, over this page (Esc closes)">⤢</button>')
-            widgets.append(f'<div class="w pair" data-event="{esc(event)} {esc(label)}"><div class="tabs"><span class="ev">{esc(event)} {esc(label)}</span>'
+            widgets.append(f'<div class="w pair" id="{pair_id(event, by_leaf)}" data-event="{esc(event)} {esc(label)}"><div class="tabs"><span class="ev">{esc(event)} {esc(label)}</span>'
                            f'{tabs}<span class="act">{act}</span></div><div class="body">{frames}</div></div>')
     help_html = ui.help_popover(
         f"The flame graphs of <b>{esc(a)}</b> and <b>{esc(b)}</b> per op on the benchmark threads, and the differential graphs "
