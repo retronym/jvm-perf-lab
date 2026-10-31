@@ -252,20 +252,22 @@ def table_md(event, t, la, lb, rules, top):
     return "\n".join(out) + "\n"
 
 
-def write_collapsed(path, counter):
+def write_collapsed(path, counter, factor=1.0):
     with open(path, "w") as f:
         for k, n in counter.items():
-            f.write(f"{k} {n}\n")
+            f.write(f"{k} {profdiff.scaled(n, factor)}\n")
 
 
-def render(jfrconv, out, event, fa, fb, la, lb, by_leaf=False, note=""):
+def render(jfrconv, out, event, fa, fb, la, lb, by_leaf=False, note="", k=None):
+    """The four graphs (and the by-leaf diff) of two collapsed files, whose counts are per op × `k` (profdiff.per_op)."""
     graph = lambda title, *args: subprocess.run([jfrconv, "-J-Xmx8g", "--minwidth", "0.2", "--title", title, *args], capture_output=True)
-    graph(f"{event}{note}: {la} → {lb}", "--diff", fa, fb, os.path.join(out, f"diff-{event}.html"))
-    graph(f"{event}{note}: {lb} → {la}", "--diff", fb, fa, os.path.join(out, f"diff-{event}-inverse.html"))
-    graph(f"{event}{note}: {la}", fa, os.path.join(out, f"a-{event}.html"))
-    graph(f"{event}{note}: {lb}", fb, os.path.join(out, f"b-{event}.html"))
+    what = (profdiff.per_op_title(event, k) if k else event) + note
+    graph(f"{what}: {la} → {lb}", "--diff", fa, fb, os.path.join(out, f"diff-{event}.html"))
+    graph(f"{what}: {lb} → {la}", "--diff", fb, fa, os.path.join(out, f"diff-{event}-inverse.html"))
+    graph(f"{what}: {la}", fa, os.path.join(out, f"a-{event}.html"))
+    graph(f"{what}: {lb}", fb, os.path.join(out, f"b-{event}.html"))
     if by_leaf:
-        subprocess.run([jfrconv, "-J-Xmx8g", "--minwidth", "0.05", "--reverse", "--title", f"{event}{note} by leaf: {la} → {lb}",
+        subprocess.run([jfrconv, "-J-Xmx8g", "--minwidth", "0.05", "--reverse", "--title", f"{what} by leaf: {la} → {lb}",
                         "--diff", fa, fb, os.path.join(out, f"diff-{event}-byleaf.html")], capture_output=True)
 
 
@@ -293,14 +295,15 @@ def scratch(out, name, event):
 def raw_diff(out, event, A, B, la, lb, jfrconv, top, jits=None):
     """profdiff's output for two cells' cached stacks."""
     tmp = []
-    for st, name in ((A, "a"), (B, "b")):
+    fa, fb, k = profdiff.per_op(A.ops, B.ops)
+    for st, name, factor in ((A, "a", fa), (B, "b", fb)):
         f = scratch(out, name, event)
         with open(f, "w") as w:
             for s, n in st.stacks:
-                w.write(";".join(st.frames[i] for i in s) + f" {n}\n")
+                w.write(";".join(st.frames[i] for i in s) + f" {profdiff.scaled(n, factor)}\n")
         tmp.append(f)
     try:
-        render(jfrconv, out, event, *tmp, la, lb)
+        render(jfrconv, out, event, *tmp, la, lb, k=k)
         selfs = []
         for st in (A, B):
             c = collections.Counter()
@@ -324,10 +327,11 @@ def curated_diff(out, event, A, B, la, lb, jfrconv, rules, jits=None):
     bb, outside_b = c.base(B)
     ca, cb = c.aligned(c.shaped(ba), c.shaped(bb))
     tmp = [scratch(out, n, event) for n in ("a", "b")]
-    write_collapsed(tmp[0], ca)
-    write_collapsed(tmp[1], cb)
+    fa, fb, k = profdiff.per_op(A.ops, B.ops)
+    write_collapsed(tmp[0], ca, fa)
+    write_collapsed(tmp[1], cb, fb)
     try:
-        render(jfrconv, out, event, *tmp, la, lb, rules.get("byLeaf"), " (curated)")
+        render(jfrconv, out, event, *tmp, la, lb, rules.get("byLeaf"), " (curated)", k)
     finally:
         for f in tmp:
             if os.path.exists(f):

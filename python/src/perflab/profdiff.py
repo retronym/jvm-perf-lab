@@ -99,6 +99,36 @@ def load(run, event, jfrconv, out_dir, name, keep=True, sink=None):
             "score": res["primaryMetric"]["score"], "dir": d}
 
 
+def per_op(ops_a, ops_b):
+    """The graphs' scale for two runs of `ops_a` and `ops_b` ops: each side's counts × its factor are its events per op
+    × k, k the larger op count, so that the differential graph compares work, not runs of different lengths, and no
+    count is rounded below what jfrconv's --minwidth drops (the run with fewer ops is scaled up). (factor a, factor b, k)."""
+    k = max(ops_a, ops_b) or 1
+    return k / (ops_a or 1), k / (ops_b or 1), k
+
+
+def scaled(n, factor):
+    return max(1, round(n * factor)) if n else 0
+
+
+def rescale(path, factor):
+    """A collapsed file's counts × factor, in place."""
+    if factor == 1:
+        return
+    tmp = path + ".scaled"
+    with open(path) as inp, open(tmp, "w") as out:
+        for line in inp:
+            stack, _, n = line.rstrip("\n").rpartition(" ")
+            if stack and n.isdigit():
+                out.write(f"{stack} {scaled(int(n), factor)}\n")
+    os.replace(tmp, path)
+
+
+def per_op_title(event, k):
+    """What a graph of per_op's counts shows."""
+    return f"{event} per op (counts for {k:,.0f} ops)"
+
+
 def label(run):
     """A run's name in titles: a campaign cell's variant and round (`base/1`), else its directory."""
     parts = os.path.normpath(run).split(os.sep)
@@ -123,11 +153,15 @@ def main(argv):
     la, lb = label(x.a), label(x.b)
     graph = lambda title, *args: subprocess.run([x.jfrconv, "-J-Xmx8g", "--minwidth", "0.2", "--title", title, *args],
                                                 capture_output=True)
+    fa, fb, k = per_op(A["ops"], B["ops"])
+    rescale(A["collapsed"], fa)
+    rescale(B["collapsed"], fb)
+    ev = per_op_title(x.event, k)
     diff_html = os.path.join(x.out, f"diff-{x.event}.html")
-    graph(f"{x.event}: {la} → {lb}", "--diff", A["collapsed"], B["collapsed"], diff_html)
-    graph(f"{x.event}: {lb} → {la}", "--diff", B["collapsed"], A["collapsed"], os.path.join(x.out, f"diff-{x.event}-inverse.html"))
-    graph(f"{x.event}: {la}", A["collapsed"], os.path.join(x.out, f"a-{x.event}.html"))
-    graph(f"{x.event}: {lb}", B["collapsed"], os.path.join(x.out, f"b-{x.event}.html"))
+    graph(f"{ev}: {la} → {lb}", "--diff", A["collapsed"], B["collapsed"], diff_html)
+    graph(f"{ev}: {lb} → {la}", "--diff", B["collapsed"], A["collapsed"], os.path.join(x.out, f"diff-{x.event}-inverse.html"))
+    graph(f"{ev}: {la}", A["collapsed"], os.path.join(x.out, f"a-{x.event}.html"))
+    graph(f"{ev}: {lb}", B["collapsed"], os.path.join(x.out, f"b-{x.event}.html"))
     ta, tb = per_op(A, A["total"]), per_op(B, B["total"])
     table = io.StringIO()
     out = lambda s="": (print(s), table.write(s + "\n"))

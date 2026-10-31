@@ -603,8 +603,8 @@ class KindsTest(unittest.TestCase):
         self.assertIn("too big 2", kinds.table_md("cpu", t, "base", "tip"))
 
     def test_light_keeps_kinds_and_one_sided_frames(self):
-        rules, name = curate.rules_for({}, "light")
-        self.assertEqual(name, "light")
+        self.assertEqual(curate.rules_for({}, "light")[1], "light")
+        rules = curate.merge(curate.DEFAULTS, curate.LIGHT)  # not the lab's [diff] of whatever config is current
         c = curate.Curator(rules)
         a, b = self.pair()
         ba, _ = c.base(a)
@@ -653,6 +653,44 @@ u(9,8)
 
 render(levels[0][0]);
 </script></body></html>"""
+
+
+class PerOpGraphsTest(unittest.TestCase):
+    """The diffs' flame graphs compare work: each side's counts per op, on one scale."""
+
+    st = staticmethod(lambda *lines, ops=1: stacks.of_lines([[l.rsplit(" ", 1)[0], int(l.rsplit(" ", 1)[1])] for l in lines], ops, 1.0))
+
+    def rendered(self, fn, *args):
+        """{name: {stack: count}} of the collapsed files `fn` hands to curate.render, and the k it says."""
+        seen = {}
+        def fake(jfrconv, out, event, fa, fb, la, lb, by_leaf=False, note="", k=None):
+            for name, f in (("a", fa), ("b", fb)):
+                seen[name] = dict((l.rsplit(" ", 1)[0], int(l.rsplit(" ", 1)[1])) for l in open(f).read().splitlines())
+            seen["k"] = k
+        real = curate.render
+        curate.render = fake
+        try:
+            fn(*args)
+        finally:
+            curate.render = real
+        return seen
+
+    def test_two_runs_of_different_lengths_compare_per_op(self):
+        # a: 10 ops, 300 samples of main;f; b: 30 ops, 600: per op, b does less (20 vs 30)
+        a, b = self.st("main;f 300", ops=10), self.st("main;f 600", ops=30)
+        self.assertEqual(profdiff.per_op(10, 30), (3.0, 1.0, 30))
+        out = tempfile.mkdtemp()
+        seen = self.rendered(curate.raw_diff, out, "cpu", a, b, "a", "b", "jfrconv", 5)
+        self.assertEqual((seen["a"], seen["b"], seen["k"]), ({"main;f": 900}, {"main;f": 600}, 30))  # per op × 30: 30 vs 20
+        seen = self.rendered(curate.curated_diff, out, "cpu", a, b, "a", "b", "jfrconv", curate.merge(curate.DEFAULTS, curate.LIGHT))
+        self.assertEqual((seen["a"], seen["b"]), ({"main;f": 900}, {"main;f": 600}))
+        self.assertEqual(profdiff.per_op_title("cpu", 30), "cpu per op (counts for 30 ops)")
+
+    def test_a_collapsed_file_is_rescaled_in_place(self):
+        f = os.path.join(tempfile.mkdtemp(), "a.collapsed")
+        open(f, "w").write("main;f 3\nmain;g 1\n")
+        profdiff.rescale(f, 2.5)
+        self.assertEqual(open(f).read(), "main;f 8\nmain;g 2\n")  # rounded, a sample never to 0
 
 
 class FlameGraphTest(unittest.TestCase):
