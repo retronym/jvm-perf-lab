@@ -68,8 +68,10 @@ def jfrsync():
     return cfg.path("async", "jfrsync") if v.endswith(".jfc") else v
 
 
-def async_events(spec):
-    """`cpu,alloc` -> JMH async options; a `+`-joined list is one multi-event (kperf) session."""
+def async_events(spec, kperf=False):
+    """`cpu,alloc` -> JMH async options; a `+`-joined list is one multi-event (kperf) session. A kperf event with no
+    period gets perflab's default for it (`kperf.DEFAULT_PERIODS`), not async-profiler's."""
+    from . import kperf as kp
     opts = []
     for e in [e for e in spec.split(",") if e]:
         if e == "alloc":
@@ -79,10 +81,12 @@ def async_events(spec):
         elif e == "cpu":
             opts.append("event=cpu;interval=1000000")
         elif "+" in e:
-            opts.append(f"event={e}")
+            opts.append(f"event={kp.with_periods(e)}")
         elif "@" in e:
             name, interval = e.split("@", 1)
             opts.append(f"event={name};interval={interval}")
+        elif kperf:
+            opts.append(f"event={e};interval={kp.default_period(e)}")
         else:
             opts.append(f"event={e}")
     return opts
@@ -115,7 +119,7 @@ def profile_args(profile, out, kperf=None, lib=None):
         if sync:
             raw.append(f"jfrsync={sync}")
         opts.append("rawCommand=" + ",".join(raw))
-        return ["-prof", "async:" + ";".join(opts + async_events(arg or "cpu"))], jvm
+        return ["-prof", "async:" + ";".join(opts + async_events(arg or "cpu", bool(kperf)))], jvm
     if kind == "audit":
         jar = config.get().path("agent", "jar")
         if not jar or not os.path.exists(jar):

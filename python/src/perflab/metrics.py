@@ -79,13 +79,11 @@ def hw_events(cell, profile, jfrconv=None):
         return {}
     if os.path.exists(f) and os.path.getmtime(f) >= os.path.getmtime(os.path.join(cell, "result.json")):
         return json.load(open(f))
-    import tempfile
     from . import profdiff
     out = {}
-    with tempfile.TemporaryDirectory() as tmp:
-        for e in events:
-            r = profdiff.load(cell, e, jfrconv, tmp, "events")
-            out[e] = r["total"] / r["ops"]
+    for e in events:  # streamed: a recording's collapsed stacks can run to gigabytes
+        r = profdiff.load(cell, e, jfrconv, None, "events", keep=False)
+        out[e] = r["total"] / r["ops"]
     json.dump(out, open(f, "w"), indent=1)
     return out
 

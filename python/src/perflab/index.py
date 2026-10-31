@@ -9,7 +9,7 @@ each cell, `perflab run` at its start and end, and the page refreshes itself.
 """
 import glob, html, json, math, os, re, sys, time
 
-from . import ab, branchview, config, jmh, loadgate, metrics, regraph, runinfo, specs, timeline, ui
+from . import ab, branchview, config, jmh, kperf, loadgate, metrics, regraph, runinfo, specs, timeline, ui
 
 root = None  # the directory of the page being built: its links are relative to it
 CAMPAIGNS = None
@@ -250,6 +250,13 @@ def norm_toggle(per_unit):
     return ('<span class="sv-tg sv-norm" role="group" aria-label="per unit or per op">'
             f'<button data-sn="unit" title="divided by the {esc(per_unit)} counter per op" aria-pressed="false">per {esc(metrics.unit_name(per_unit))}</button>'
             '<button data-sn="op" title="per op, as JMH measured" aria-pressed="false">per op</button></span>')
+
+
+def kperf_note(spec_dir):
+    """A warning when a cell's kperf recording took far more samples of an event than a profdiff needs."""
+    ws = kperf.campaign_warnings(spec_dir)
+    return (f'<div class="kwarn" title="a large recording slows every graph and diff of it, and its collapsed stacks can fill the disk">'
+            f'⚠ more kperf samples than needed: {"; ".join(esc(w) for w in ws)}</div>') if ws else ""
 
 
 def mixed(variants):
@@ -597,7 +604,7 @@ h2.sec{font-size:18px;margin:28px 0 10px;display:flex;align-items:baseline;gap:8
 h2.sec:first-child{margin-top:8px}
 .about{margin:8px 0 12px} .about>p:first-child{margin-top:0} .about table.variants{border-collapse:collapse;width:100%} .about table.variants th{text-align:left;white-space:nowrap;padding:4px 12px 4px 0;vertical-align:top} .about table.variants td{padding:4px 12px 4px 0;vertical-align:top} .about table.variants td p{margin:0 0 4px} .about table.variants tr+tr{border-top:1px solid var(--line)}\n.card .notes{border-left:3px solid var(--link);padding:0 12px;margin:8px 0 12px} .notes h3{margin:6px 0;font-size:13px}
 #findings{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--brand);border-radius:10px;padding:4px 16px;margin:0 0 14px}
-.mixed{color:var(--warn);font-size:11px} details.specs{margin:2px 0 6px;font-size:12px} details.specs summary{cursor:pointer;color:var(--muted)}
+.mixed{color:var(--warn);font-size:11px} .kwarn{color:var(--warn);font-size:12px;margin:4px 0 8px} details.specs{margin:2px 0 6px;font-size:12px} details.specs summary{cursor:pointer;color:var(--muted)}
 details.specs ul{margin:2px 0 6px;padding-left:20px}
 .diffs{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin:4px 0 8px}
 table.summary td:nth-child(n+3),table.summary th:nth-child(n+3){text-align:right}
@@ -905,7 +912,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
                                   f'data-benchmark="{esc(" ".join(sorted(benches)))}" data-tool="{esc(" ".join(sorted(tools)))}" '
                                   f'data-corpus="{esc(" ".join(sorted(corpora)))}" data-profiled="{1 if profiled else 0}">'
                                   f'{card_head("campaign", name, progress_badge(prog, name), when, buttons)}'
-                                  f'{variants_panel(spec_dir)}{notes(os.path.join(spec_dir, "NOTES.md"))}{diff_html}{spec_history(spec_dir, counts, sid)}'
+                                  f'{variants_panel(spec_dir)}{notes(os.path.join(spec_dir, "NOTES.md"))}{kperf_note(spec_dir)}{diff_html}{spec_history(spec_dir, counts, sid)}'
                                   f'{summary_block(about, summ, history, norm_toggle(per_unit) if per_unit and not paired else "")}{cells_html}</section>'))
   run_dirs = sorted(glob.glob(os.path.join(runs, "*/"))) if runs and os.path.isdir(runs) else []
   RUN_NAMES.clear(); RUN_NAMES.update(os.path.basename(r.rstrip("/")) for r in run_dirs)

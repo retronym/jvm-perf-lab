@@ -37,9 +37,7 @@ def main(argv):
         r = profdiff.load(run, x.event, x.jfrconv, tmp, "st")
         incl = 0
         callers, inside = collections.Counter(), collections.Counter()
-        for line in open(r["collapsed"]):
-            stack, _, n = line.rstrip().rpartition(" ")
-            n = int(n)
+        for stack, n in profdiff.stacks(open(r["collapsed"])):
             fr = stack.split(";")
             idx = next((i for i, f in enumerate(fr) if pat.search(f)), None)
             if idx is None:

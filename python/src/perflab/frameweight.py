@@ -21,9 +21,7 @@ def weigh(run, event, patterns, jfrconv, tmp, until=None):
     self_ = [0] * len(patterns)
     stubbed = [0] * len(patterns)  # self, plus itable/vtable stubs called from the frame (dispatch it pays for)
     incl = [0] * len(patterns)
-    for line in open(r["collapsed"]):
-        stack, _, n = line.rstrip().rpartition(" ")
-        n = int(n)
+    for stack, n in profdiff.stacks(open(r["collapsed"])):
         frames = stack.split(";")
         k = len(frames) - 1
         while k > 0 and frames[k] in STUBS:

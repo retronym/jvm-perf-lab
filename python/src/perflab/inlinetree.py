@@ -55,11 +55,7 @@ def units(lines, short=shortener()):
     """{unit key: Node} from collapsed stacks (`frame;frame;... count`). A unit's kids are what was inlined into it, as
     a tree; its calls, the units it called directly, by key."""
     roots = collections.defaultdict(Node)
-    for line in lines:
-        stack, _, n = line.rstrip().rpartition(" ")
-        if not stack:
-            continue
-        n = int(n)
+    for stack, n in profdiff.stacks(lines):
         # the stack's compilation units, outermost first: a C2/C1 frame and the inlined frames above it; an
         # interpreted or native frame ends the current unit
         segs, cur = [], None

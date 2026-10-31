@@ -65,10 +65,9 @@ def collapsed(jfr, kind):
     args = ["--hw", kind[3:]] if kind.startswith("hw:") else [f"--{kind}"]
     out = subprocess.run([jmh.jfrconv(jmh.async_lib()), *args, "--threads", "-I", ".*jmh-worker.*", "-o", "collapsed", jfr, "/dev/stdout"],
                          capture_output=True, text=True).stdout
-    for line in out.splitlines():
-        stack, _, n = line.rpartition(" ")
-        if stack and n.isdigit():
-            yield stack.split(";"), int(n)
+    from . import profdiff
+    for stack, n in profdiff.stacks(out.splitlines()):
+        yield stack.split(";"), n
 
 
 def clean(fr):

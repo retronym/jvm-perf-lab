@@ -21,6 +21,8 @@ perflab ab run campaigns/memory-paired.json
 perflab run --profile async:cycles+instructions+cache-misses+branch-misses --kperf /tmp/asprof-kperf.sock -- -p size=100000 WordCountBenchmark
 ```
 
+Events without a period (`cycles@2000000`) take perflab's default for each; [choosing a sampling period](../../doc/pmu-counters.md#choosing-a-sampling-period) says how to size one for your benchmark.
+
 `WordCountBenchmark` also marks each op's two parts, counting and looking up, as async-profiler spans with perflab-spans. With the lab's async-profiler build (`mise run tools:async-profiler`), its `bench` flame graphs have a span panel that splits the samples by part (`[async] spans` in `perflab.toml`).
 
 `site.sh` (`mise run site`) runs every benchmark under each profile and its campaigns, then builds the static site: the same results page, with `site-intro.html` as its overview, published by `mise run publish-site` to [retronym.github.io/jvm-perf-lab](https://retronym.github.io/jvm-perf-lab/).

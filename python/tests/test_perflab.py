@@ -2,7 +2,7 @@ import json, os, re, shlex, shutil, signal, socket, subprocess, sys, tempfile, t
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab server`: commands run here, not on its queue
-from perflab import ab, analyze, auditfold, compare, config, defcosts, index, inlinetree, jmh, jvmevents, launch, loadgate, metrics, regraph, serve, specs, timeline, transcript, trees  # noqa: E402
+from perflab import ab, analyze, auditfold, compare, config, defcosts, index, inlinetree, jmh, jvmevents, kperf, launch, loadgate, metrics, profdiff, regraph, serve, specs, timeline, transcript, trees  # noqa: E402
 
 
 def _ensure_then_stop(root=None, port=None, _ensure=serve.ensure):
@@ -73,7 +73,7 @@ class RunTest(unittest.TestCase):
         jmh.prepare(out, "async:cycles+cache-misses@10000", ["B"], kperf="/tmp/k.sock", lib="/x/lib.dylib")
         a = self.args(out)
         prof = a[a.index("-prof") + 1]
-        self.assertIn("event=cycles+cache-misses@10000", prof)
+        self.assertIn("event=cycles@2000000+cache-misses@10000", prof)  # perflab's default period where none is given
         self.assertIn("rawCommand=kperf=/tmp/k.sock", prof)
         self.assertIn("-XX:+PreserveFramePointer", a[a.index("-jvmArgsPrepend") + 1])
         self.assertEqual(regraph.events_of(out), [("hw-cycles", ["--hw", "cycles"]), ("hw-cache-misses", ["--hw", "cache-misses"])])
@@ -86,6 +86,8 @@ class RunTest(unittest.TestCase):
         self.assertEqual(regraph.events_of("async:cycles@10000000", kperf=True), [("hw-cycles", ["--hw", "cycles"])])
         jmh.prepare(out, "async:cpu", ["B"], lib="/x/lib.dylib")
         self.assertEqual(regraph.events_of(out), [("cpu", ["--cpu"])])
+        jmh.prepare(out, "async:cache-misses", ["B"], kperf="/tmp/k.sock", lib="/x/lib.dylib")
+        self.assertIn("event=cache-misses;interval=50000", self.args(out)[self.args(out).index("-prof") + 1])
 
     def test_async_records_the_jdk_events_by_jfrsync(self):
         out = os.path.join(self.p.dir, "run")
@@ -366,6 +368,89 @@ class InlineTreeTest(unittest.TestCase):
         json.dump({"name": "c", "rounds": 1, "corpora": {"k": ""}, "variants": {"v": ""}}, open(os.path.join(camp, "c", "spec.json"), "w"))
         open(os.path.join(camp, "c", "inlinetree-cycles.html"), "w").close()
         self.assertIn('<a class="btn" href="c/inlinetree-cycles.html" data-lb="inlinetree|cycles"', open(index.build(camp)).read())
+
+
+class KperfTest(unittest.TestCase):
+    # the helper's lines in a cell's jmh.log: the warmup's session, then the measurement's, one line garbled by the
+    # fork's output interleaving with it
+    LOG = """# Warmup Iteration   1: [INFO] kperf: cycles (CORE_ACTIVE_CYCLE) every 1000000 on PMC2
+[INFO] kperf: cache-misses (L1D_CACHE_MISS_LD_NONSPEC) every 10000 on PMC5, precise PC
+# Warmup Iteration  13: [INFO] kperf: cycles: 565820 samples, 0 with precise PC, 0 used as leaf
+[INFO] kperf: cache-misses: 1713467 saIteration   1: mples, 1713294 with precise PC, 659568 used as leaf
+Iteration  16: [INFO] kperf: cycles: 350472 samples, 0 with precise PC, 0 used as leaf
+[INFO] kperf: cache-misses: 968341 samples, 968263 with precise PC, 236829 used as leaf
+"""
+
+    def cell(self, root, variant="base", log=LOG):
+        d = os.path.join(root, "dotc", variant, "1")
+        os.makedirs(d)
+        open(os.path.join(d, "jmh.log"), "w").write(log)
+        return d
+
+    def test_default_periods(self):
+        self.assertEqual(kperf.with_periods("cycles+cache-misses+PL2_CACHE_MISS_LD@10000"),
+                         "cycles@2000000+cache-misses@50000+PL2_CACHE_MISS_LD@10000")
+        self.assertEqual(kperf.default_period("instructions"), 5_000_000)
+        self.assertEqual(kperf.default_period("LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS"), 1_000_000)  # counts cycles
+        self.assertEqual(kperf.default_period("L1D_TLB_MISS"), 20_000)
+
+    def test_too_many_samples_warn_with_a_period_that_would_do(self):
+        d = tempfile.mkdtemp()
+        cell = self.cell(d)
+        self.assertEqual(kperf.check(cell), ["cache-misses: 968,341 samples per fork at period 10,000; @100000 would take about 100k"])
+        self.assertEqual(json.load(open(os.path.join(cell, kperf.SAMPLES_NAME)))["cycles"], {"samples": 350472, "period": 1000000})
+        self.assertEqual(kperf.suggest(2_400_000, 10_000), 200_000)
+        self.assertEqual(kperf.check(self.cell(d, "tip", self.LOG.replace("968341", "90000"))), [])
+        self.assertEqual(kperf.campaign_warnings(d), kperf.check(cell))  # the worst cell's
+
+    def test_the_index_shows_the_warning(self):
+        Project('[build]\njmh = "x"\n')
+        camp = config.get().campaigns
+        cell = self.cell(os.path.join(camp, "c"))
+        json.dump(MetricsTest.cell(1, 20e9, 66e9, 16.4, 7.5), open(os.path.join(cell, "result.json"), "w"))
+        kperf.check(cell)
+        json.dump({"name": "c", "rounds": 1, "corpora": {"dotc": ""}, "variants": {"base": ""}, "benchmark": "B"},
+                  open(os.path.join(camp, "c", "spec.json"), "w"))
+        self.assertIn("⚠ more kperf samples than needed: cache-misses: 968,341 samples per fork", open(index.build(camp)).read())
+
+
+class CollapsedTest(unittest.TestCase):
+    """Collapsed stacks as jfrconv writes them, with the lines a recording cut short or a full disk leaves."""
+    LINES = ["a;b;c 10\n", "\n", "a;b \n", "a;b;c\n", "a;d 5\n", "a;e 1x\n", "x;y;z 2"]
+
+    def test_malformed_lines_are_skipped(self):
+        self.assertEqual(list(profdiff.stacks(self.LINES)), [("a;b;c", 10), ("a;d", 5), ("x;y;z", 2)])
+        self.assertIsNone(profdiff.parse(" 12"))
+
+    def run_dir(self):
+        """A run with a kperf recording, and a jfrconv that writes LINES (with a hidden class and a thread id) where it
+        is told to."""
+        d = tempfile.mkdtemp()
+        open(os.path.join(d, "x.jfr"), "w").close()
+        open(os.path.join(d, "profile.txt"), "w").write("async:cycles+cache-misses\n")
+        open(os.path.join(d, "jmh.args"), "w").write("rawCommand=kperf=/tmp/k.sock\n")
+        json.dump([{"measurementTime": "10 s", "primaryMetric": {"score": 5000.0, "rawData": [[5000.0, 5000.0]]}}],
+                  open(os.path.join(d, "result.json"), "w"))
+        conv = os.path.join(d, "jfrconv")
+        lines = "".join(self.LINES).replace("a;d 5", "[main-jmh-worker-1 tid=37123];F$$Lambda.0x0000f80140b6b0;a;d 5")
+        open(conv, "w").write("#!/bin/sh\nfor last; do :; done\nprintf '%s' " + shlex.quote(lines) + " > \"$last\"\n")
+        os.chmod(conv, 0o755)
+        return d, conv
+
+    def test_load_streams_and_skips_malformed_lines(self):
+        d, conv = self.run_dir()
+        r = profdiff.load(d, "cache-misses", conv, d, "a")
+        self.assertEqual((r["total"], r["skipped"], r["ops"]), (17, 3, 4))
+        self.assertEqual(r["self"]["d"], 5)
+        self.assertIn("[main-jmh-worker-1];F$$Lambda;a;d 5\n", open(r["collapsed"]).read())
+        self.assertIsNone(profdiff.load(d, "cycles", conv, d, "b", keep=False)["collapsed"])
+        self.assertFalse(os.path.exists(os.path.join(d, "b-cycles.collapsed")))
+
+    def test_hw_events_leaves_no_collapsed_stacks(self):
+        d, conv = self.run_dir()
+        before = set(os.listdir(d)) | {metrics.EVENTS_NAME}
+        self.assertEqual(metrics.hw_events(d, "async:cycles+cache-misses", conv), {"cycles": 17 / 4, "cache-misses": 17 / 4})
+        self.assertEqual(set(os.listdir(d)), before)
 
 
 class MetricsTest(unittest.TestCase):

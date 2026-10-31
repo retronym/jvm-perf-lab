@@ -9,7 +9,7 @@ A run is a directory written by `perflab run` or a campaign cell, with an async 
 normalized per op (each iteration has ceil(iteration time / its mean op time) ops), so runs of different lengths or speeds compare;
 with hardware events the table is in events per op.
 """
-import argparse, collections, glob, io, json, math, os, re, subprocess, sys
+import argparse, collections, glob, io, json, math, os, re, subprocess, sys, tempfile
 
 from . import compare, regraph
 
@@ -34,7 +34,22 @@ def profile_dir(run):
     return open(p).read().strip() if os.path.exists(p) else run
 
 
-def load(run, event, jfrconv, out_dir, name):
+def parse(line):
+    """A collapsed line (`frame;frame;... count`) as (stack, count), or None for a blank or malformed one (a recording
+    cut short, jfrconv's own output on stdout)."""
+    stack, _, n = line.rstrip().rpartition(" ")
+    return (stack, int(n)) if stack and n.isdigit() else None
+
+
+def stacks(lines):
+    """(stack, count) of each well-formed collapsed line."""
+    return (p for p in map(parse, lines) if p)
+
+
+def load(run, event, jfrconv, out_dir, name, keep=True):
+    """A run's `event` on the benchmark threads, per method and in total, with its ops. jfrconv's collapsed stacks are
+    read as they come, so a large recording is never held in memory; with `keep`, they are also written to
+    `<out_dir>/<name>-<event>.collapsed` (its "collapsed"), else nothing is written."""
     if not jfrconv:
         from . import jmh
         jfrconv = jmh.jfrconv(jmh.async_lib())
@@ -44,24 +59,40 @@ def load(run, event, jfrconv, out_dir, name):
     # JMH runs whole ops until the iteration time is up, so an iteration with mean op time t has ceil(time / t) ops
     iteration_ms = float(res["measurementTime"].split()[0]) * 1000
     ops = sum(math.ceil(iteration_ms / t) for t in res["primaryMetric"]["rawData"][0])
-    collapsed = os.path.join(out_dir, f"{name}-{event}.collapsed")
+    collapsed = os.path.join(out_dir, f"{name}-{event}.collapsed") if keep else None
     select = [s for label, s in regraph.events_of(d) if label.removeprefix("hw-") == event][0]
-    subprocess.run([jfrconv, "-J-Xmx8g", *select, "--threads", "-I", ".*jmh-worker.*", "-o", "collapsed", jfr, collapsed],
-                   check=True, capture_output=True)
-    # a hidden class (a lambda, a lambda form) is named for its address in that JVM, and a thread's frame
-    # (`--threads`) for its OS thread id (`[...-jmh-worker-1 tid=37123]`), which differ between the runs: without
-    # them, the same lambda, lambda form or thread in both runs is one frame
-    lines = [THREAD_ID.sub("]", HIDDEN_ADDRESS.sub("", line)) for line in open(collapsed)]
-    with open(collapsed, "w") as f:
-        f.writelines(lines)
-    self_, total = collections.Counter(), 0
-    for line in lines:
-        stack, _, n = line.rstrip().rpartition(" ")
-        n = int(n)
-        total += n
-        # by method, however it was compiled (jfrconv's _[j] JIT, _[i] inlined, _[1] C1, ...)
-        self_[FRAME_KIND.sub("", stack.rsplit(";", 1)[-1])] += n
-    return {"collapsed": collapsed, "ops": ops, "self": self_, "total": total,
+    err = tempfile.TemporaryFile("w+")  # not a pipe: unread, a full one would stop jfrconv
+    p = subprocess.Popen([jfrconv, "-J-Xmx8g", *select, "--threads", "-I", ".*jmh-worker.*", "-o", "collapsed", jfr, "/dev/stdout"],
+                         stdout=subprocess.PIPE, stderr=err, text=True, errors="replace")
+    self_, total, skipped = collections.Counter(), 0, 0
+    out = open(collapsed, "w") if keep else None
+    try:
+        for line in p.stdout:
+            s = parse(line)
+            if not s:
+                skipped += bool(line.strip())
+                continue
+            # a hidden class (a lambda, a lambda form) is named for its address in that JVM, and a thread's frame
+            # (`--threads`) for its OS thread id (`[...-jmh-worker-1 tid=37123]`), which differ between the runs:
+            # without them, the same lambda, lambda form or thread in both runs is one frame
+            stack, n = THREAD_ID.sub("]", HIDDEN_ADDRESS.sub("", s[0])), s[1]
+            if out:
+                out.write(f"{stack} {n}\n")
+            total += n
+            # by method, however it was compiled (jfrconv's _[j] JIT, _[i] inlined, _[1] C1, ...)
+            self_[FRAME_KIND.sub("", stack.rsplit(";", 1)[-1])] += n
+    except BaseException:
+        p.kill()
+        raise
+    finally:
+        if out:
+            out.close()
+        p.stdout.close()
+        p.wait()
+    if p.returncode:
+        err.seek(0)
+        raise subprocess.CalledProcessError(p.returncode, p.args, stderr=err.read()[-2000:])
+    return {"collapsed": collapsed, "ops": ops, "self": self_, "total": total, "skipped": skipped,
             "score": res["primaryMetric"]["score"], "dir": d}
 
 

@@ -59,6 +59,6 @@ A stack of frames kept in step with the compiler (phase, unit, typing a definiti
   jfrconv --cpu --spans --threads -I '.*jmh-worker.*' <run>/<benchmark>/jfr-cpu.jfr spans.html
   ```
 
-  With kperf events (`--kperf <socket>`, `async:cycles+instructions@1000000`), use `SpanCostListener$All`, which records every span: async-profiler does not yet tell the sampled thread about kperf samples, so the default listener would drop them all. Render with `jfrconv --hw cycles` (or `instructions`) in place of `--cpu`.
+  With kperf events (`--kperf <socket>`, `async:cycles+instructions`), use `SpanCostListener$All`, which records every span: async-profiler does not yet tell the sampled thread about kperf samples, so the default listener would drop them all. Render with `jfrconv --hw cycles` (or `instructions`) in place of `--cpu`.
 
 Either option without the agent fails the compile rather than writing an empty table.

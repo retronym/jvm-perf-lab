@@ -59,7 +59,7 @@ compares the work, not the op. The index's summary toggles between per unit and 
 """
 import atexit, glob, json, os, re, shlex, shutil, subprocess, sys, time
 
-from . import branch, config, jmh, launch, loadgate, metrics, specs, transcript
+from . import branch, config, jmh, kperf, launch, loadgate, metrics, specs, transcript
 
 JMH_LOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "jmh.lock")
 MAX_ATTEMPTS = 10
@@ -293,8 +293,7 @@ def check_samples(spec, dest):
     """A kperf recording can come back nearly empty (samples lost in the helper): the benchmark threads must show at
     least 0.5 GHz worth of cycles per op."""
     from . import profdiff
-    r = profdiff.load(dest, "cycles", jmh.jfrconv(jmh.async_lib(spec.lib)), dest, "check")
-    os.unlink(r["collapsed"])
+    r = profdiff.load(dest, "cycles", jmh.jfrconv(jmh.async_lib(spec.lib)), None, "check", keep=False)
     cycles = r["total"] / r["ops"]
     if cycles < 0.5e6 * r["score"]:
         return f"only {cycles / 1e9:.2f}G cycles/op sampled on the benchmark threads at {r['score']:.0f} ms/op: lost samples?"
@@ -400,7 +399,13 @@ def run(spec, dry, retry_unbuildable=False):
             sys.exit(f"{dest}: no clean run in {MAX_ATTEMPTS} attempts")
         problem = f"build exited with {rc} (see {dest}/build.log)" if rc else check(spec, dest, started, flags, variant, built.get(variant))
         if not problem and spec.kperf and spec.profile.startswith("async:cycles"):
-            problem = check_samples(spec, dest)
+            try:
+                problem = check_samples(spec, dest)
+            except Exception as e:  # a check that cannot read the recording is no reason to stop the campaign
+                log(f"  warning: lost-sample check failed: {e}")
+        if not problem and spec.kperf:
+            for w in kperf.check(dest):
+                log(f"  warning: {w}")
         if problem and spec.branch_info:
             # a commit whose run fails is a result of the branch, not the end of the campaign: recorded in the cell (the
             # view shows it), the other cells run, and a resume tries it again
@@ -423,7 +428,10 @@ def run(spec, dry, retry_unbuildable=False):
             timeline.write(dest)
         jmh.finish(dest, spec.profile, spec.lib)
         if spec.kperf:
-            metrics.hw_events(dest, spec.profile, jmh.jfrconv(jmh.async_lib(spec.lib)))  # for the index's summary
+            try:
+                metrics.hw_events(dest, spec.profile, jmh.jfrconv(jmh.async_lib(spec.lib)))  # for the index's summary
+            except Exception as e:  # the summary lacks the cell's events; its result stands
+                log(f"  warning: counting the cell's kperf events failed: {e}")
         set_running(spec, None)
         s = summary(json.load(open(os.path.join(dest, "result.json")))[0])
         log(f"  {s['ms']:.1f} ± {s['err']:.1f} {s['unit']}" + (f", {s['cyc'] / 1e9:.2f}G cycles/op" if s.get("cyc") else "")
