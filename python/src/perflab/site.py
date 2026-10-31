@@ -11,7 +11,7 @@ import argparse, os, re, shutil
 
 from . import config, index
 
-RAW = re.compile(r"(\.trace$|\.trace/|\.counters\.xml$|\.toc\.xml$|\.bythread\.xml$|\.jfr$|\.collapsed$)")
+RAW = re.compile(r"(\.trace$|\.trace/|\.counters\.xml$|\.toc\.xml$|\.bythread\.xml$|\.jfr$|\.collapsed$|(^|/)stacks-[^/]+\.gz$)")
 TEXT = (".html", ".json", ".tsv", ".txt", ".md", ".log", ".args", ".js")
 
 

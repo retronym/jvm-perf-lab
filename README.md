@@ -47,6 +47,7 @@ java -javaagent:perflab-agent.jar=spec=envelope.audit,out=audit-{pid}.json ...
 |---|---|
 | `perflab run --profile <p> -- <jmh args>` | one run under a profile: `none`, `xctrace:<template>`, `async:<events>`, `audit:<spec>`; flame graphs or an audit report afterwards; serves the index first and shows the run there live |
 | `perflab ab run\|report <spec>` | campaigns: variants over corpora, interleaved by round or paired within forks, each run checked; the summary shows every counter the cells recorded, per op or per unit of work |
+| `perflab ab diff <spec> <a> <b>` | two variants' profile diff, raw and curated (stacks aligned between the builds, events credited to owners and groups; [doc/optimising.md](doc/optimising.md#curated-diffs)) |
 | `perflab trees <spec>` | campaigns across checkouts |
 | `perflab branch profile\|diff <spec>` | a branch campaign's profiles, in a campaign of their own beside it from the same builds, and the differential flame graphs of two commits ([doc/branch-explore.md](doc/branch-explore.md) §4) |
 | `perflab serve` | serve the results page (one server per checkout) on 127.0.0.1 and print its URL, the same every time; the page updates itself as results arrive and follows the running fork's timeline (`run` and `ab run` do this first) |

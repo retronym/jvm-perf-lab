@@ -22,7 +22,7 @@ import json, os, re, shutil, time
 PIN = ".pinned"
 BUILD_DIRS = (".build", ".worktree")
 ACTIVE_SECS = 600
-RECORDING = re.compile(r"(\.jfr$|\.collapsed$|\.trace$|\.trace\.|\.counters\.xml$|\.toc\.xml$|\.bythread\.xml$)")
+RECORDING = re.compile(r"(\.jfr$|\.collapsed$|(^|/)stacks-[^/]+\.gz$|\.trace$|\.trace\.|\.counters\.xml$|\.toc\.xml$|\.bythread\.xml$)")
 PROFDIFF_PAGE = re.compile(r"^(diff|a|b)-.*\.html$")
 NOT_GRAPHS = {"timeline.html", "index.html", "compare.html", "report.html"}
 TIERS = ("results", "profiles", "builds")

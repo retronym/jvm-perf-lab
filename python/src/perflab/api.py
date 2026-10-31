@@ -316,10 +316,14 @@ define("Compare", "Two variants (or commits) of a campaign: every metric's Δ of
         "key": METRIC_KEY, "label": S("Label with unit"), "kind": S("As MetricInfo.kind"), "a": SIDE, "b": SIDE,
         "delta": null({**ref("Delta"), "description": "Δ of b against a; null when a's mean is zero"})}), "Metrics both have")}), "Corpora both have results on"),
     "diffs": A(ref("DiffRef"), "profdiff outputs of this pair (see diff)")}, top=True)
+DIFF_ROW = {"name": S("Method (owner), group or frame"), "a": N("a's events per op"), "b": N("b's"), "delta": N("b − a")}
+define("DiffRow", "A row of a curated diff's table", DIFF_ROW)
 define("DiffRef", "A profdiff output: differential flame graphs of two cells", {
     "name": S("Its directory's name, without diff-"), "campaign": S("The campaign it is in"),
     "a": null(S("Variant a, when known")), "b": null(S("Variant b")), "corpus": null(S("corpus, when known")),
-    "url": URL, "path": PATH})
+    "url": URL, "path": PATH,
+    "curated": null(S("For a curated diff (`ab diff`): its name (`curated`, a preset's), else null")),
+    "note": null(S("How its stacks were curated"))}, optional=("curated", "note"))
 define("Profiles", "A campaign's profiled cells and their diffs (for a branch campaign: those of its profile campaign too)", {
     "campaign": S("The campaign"), "graphs": A(ref("Graph"), "Flame graphs of every profiled cell"),
     "diffs": A(ref("DiffRef"), "Diffs")}, top=True)
@@ -333,7 +337,16 @@ define("Diff", "The profdiff outputs of a pair: per event its pages and the tabl
                                  "b": null(N("b's")), "pctOfTotal": null(N("Δ as % of a's total")), "method": S("The method"),
                                  "shown": S("The row as profdiff printed it")}),
                   "Biggest decreases, then biggest increases (table-<event>.md)"),
-        "table": null(S("table-<event>.md, as text"))}), "Events diffed")}), "One per corpus diffed")}, top=True)
+        "table": null(S("table-<event>.md, as text")),
+        "curated": null(O("A curated diff's tables (tables-<event>.json), per op", {
+            "total": O("The event per op", {"a": N("a"), "b": N("b"), "ratio": N("b / a")}),
+            "owners": A(ref("DiffRow"), "Self events by owner: the biggest increases, then the biggest decreases"),
+            "groups": A(O("A group's net self events of its owners", {**DIFF_ROW, "members": I("Owners in it")}), "Groups, biggest Δ first; (ungrouped) is the rest"),
+            "excess": A(O("A frame's inclusive growth beyond the overall ratio", {**DIFF_ROW, "excess": N("b − a × ratio")},
+                          optional=("delta",)), "Frames of both builds, biggest excess first"),
+            "outsideAnchor": null(O("Events left out for want of the anchor", {"a": N("a"), "b": N("b")})),
+            "oneSidedFrames": I("Frames dropped above the leaf for being in one build only")}))},
+        optional=("curated",)), "Events diffed")}, optional=("curated", "note")), "One per corpus diffed")}, top=True)
 
 define("Void", "A voided cell", {"id": S("Its id for unvoid: <corpus>/<variant>/<round>-<timestamp>"), "corpus": S("corpus"),
                                  "variant": S("variant"), "round": I("round"), "reason": S("Why it was voided"), "voided": WHEN,
@@ -918,7 +931,8 @@ def _diff_refs(p, d):
             a, b = hit[0] if hit else (None, None)
         page = os.path.join(dd, "compare.html")
         out.append({"name": name, "campaign": os.path.basename(d), "a": a, "b": b, "corpus": pair.get("corpus"),
-                    "url": _url(p, page if os.path.exists(page) else dd), "path": dd})
+                    "url": _url(p, page if os.path.exists(page) else dd), "path": dd,
+                    **({"curated": pair["curated"], "note": pair.get("note")} if pair.get("curated") else {})})
     return out
 
 
@@ -1278,8 +1292,9 @@ def _table(path):
 def diff(campaign, a, b, project=None, corpus=None):
     """The existing profdiff outputs of variants (or commits) a and b, in either order: per event (cpu, alloc,
     cycles, ...) the URLs of a's graph, the differential graph a → b, its inverse and b's graph, and the table of the
-    methods whose self samples (or events) per op decreased and increased most. None yet: for a branch campaign,
-    submit `branch profile <campaign> <a> <b> --diff`."""
+    methods whose self samples (or events) per op decreased and increased most; for a curated diff (`ab diff`), its
+    tables by owner and group and of growth beyond the overall ratio. None yet: make_diff queues one (for a branch
+    campaign, `branch profile <campaign> <a> <b> --diff`)."""
     p = resolve(project)
     with _config(p):
         d = _camp_dir(p, campaign)
@@ -1291,17 +1306,26 @@ def diff(campaign, a, b, project=None, corpus=None):
                 continue
             evs = []
             for f in sorted(glob.glob(os.path.join(x["path"], "diff-*.html"))):
-                if f.endswith("-inverse.html"):
+                if f.endswith(("-inverse.html", "-byleaf.html")):
                     continue
                 ev = os.path.basename(f)[len("diff-"):-len(".html")]
                 summary, rows, text = _table(os.path.join(x["path"], f"table-{ev}.md"))
                 pages = {view: _url(p, os.path.join(x["path"], name.format(event=ev)))
-                         for view, name in (("a", "a-{event}.html"), ("diff", "diff-{event}.html"), ("inverse", "diff-{event}-inverse.html"), ("b", "b-{event}.html"))
+                         for view, name in (("a", "a-{event}.html"), ("diff", "diff-{event}.html"), ("inverse", "diff-{event}-inverse.html"),
+                                            ("b", "b-{event}.html"), ("byleaf", "diff-{event}-byleaf.html"))
                          if os.path.exists(os.path.join(x["path"], name.format(event=ev)))}
-                evs.append({"event": ev, "pages": pages, "summary": summary, "rows": rows, "table": text})
+                e = {"event": ev, "pages": pages, "summary": summary, "rows": rows, "table": text}
+                t = _json(os.path.join(x["path"], f"tables-{ev}.json"), None)
+                if t:
+                    top = lambda rs: [{k: r[k] for k in ("name", "a", "b", "delta")} for r in rs]
+                    e["curated"] = {"total": t["total"], "owners": top(t["owners"][::-1][:25] + t["owners"][:25][::-1]),
+                                    "groups": t["groups"], "excess": t["excess"][:25], "outsideAnchor": t.get("outsideAnchor"),
+                                    "oneSidedFrames": t.get("oneSidedFrames", 0)}
+                evs.append(e)
             out.append({**x, "events": evs})
     if not out:
-        raise ApiError("not_found", f"{campaign}: no diff of {a} and {b}", {"submit": ["branch", "profile", campaign, a, b, "--diff"]})
+        submit = (["branch", "profile", campaign, a, b, "--diff"] if spec.get("branch") else ["ab", "diff", campaign, a, b])
+        raise ApiError("not_found", f"{campaign}: no diff of {a} and {b}", {"submit": submit, "action": "make_diff"})
     return envelope("Diff", campaign=campaign, a=a, b=b, diffs=out)
 
 
@@ -1449,6 +1473,34 @@ def rerun(campaign, project=None, _server=None):
 
 
 _RERUN_RUNNER = {}  # tests: {"module": a stand-in for perflab}
+
+
+@endpoint("action", "JobResult", "Queue a profile diff of two variants of a campaign, raw and curated, as a job beside the measuring one",
+          project=PROJECT_P, campaign=CAMPAIGN_P, a=S("Variant a"), b=S("Variant b"), corpus=S("The corpus (default: the first)"),
+          round=I("The round of both cells (default: the last both have a recording of)"),
+          event=A(S("event"), "Events (default: every event of the recording)"),
+          curate=S("A preset of the [diff] / spec \"diff\" presets, or hints as JSON (owner, ownerSkip, groups, anchor, fold, drop, byLeaf)"),
+          raw=B("The raw diff only"), byLeaf=B("Also the leaf-rooted differential graph"))
+def make_diff(campaign, a, b, project=None, corpus=None, round=None, event=None, curate=None, raw=False, byLeaf=False, _server=None):
+    """Queue `perflab ab diff <campaign> <a> <b>` on the server; it runs at once, beside any measuring job. It writes
+    the raw diff to <campaign>/diff-<a>-<b>/ and the curated one to diff-<a>-<b>-<curated | preset>/ (see `ab diff
+    --help` for the curation and its hints); read them with diff. A branch campaign's commits are diffed by
+    `branch profile <campaign> <a> <b> --diff` (submit)."""
+    s = _need_server(_server)
+    p = resolve(project)
+    d = _camp_dir(p, campaign)
+    spec = _json(os.path.join(d, "spec.json"), {}) or {}
+    if spec.get("branch"):
+        raise ApiError("bad_request", f"{campaign} is a branch campaign: submit branch profile {campaign} {a} {b} --diff")
+    argv = ["ab", "diff", campaign, a, b]
+    for flag, v in (("--corpus", corpus), ("--round", round), ("--curate", curate)):
+        if v is not None:
+            argv += [flag, str(v)]
+    for e in event or []:
+        argv += ["--event", e]
+    argv += ["--raw"] * bool(raw) + ["--by-leaf"] * bool(byLeaf)
+    j = srv.submit_local(s, {"argv": argv, "cwd": p["root"], "env": srv.job_env()}, **_RERUN_RUNNER)
+    return envelope("JobResult", job=_pub(j, s))
 
 
 @endpoint("action", "Forgotten", "Unregister a project from the server (its results stay; perflab registers it again when run there)",

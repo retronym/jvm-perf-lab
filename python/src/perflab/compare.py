@@ -12,7 +12,8 @@ from . import ui
 
 # what profdiff writes per event, in tab order
 SLOTS = [("a", "{a}", "a-{event}.html", "side"), ("diff", "DIFF", "diff-{event}.html", "diff"),
-         ("inverse", "DIFF⁻¹", "diff-{event}-inverse.html", "diff"), ("b", "{b}", "b-{event}.html", "side")]
+         ("inverse", "DIFF⁻¹", "diff-{event}-inverse.html", "diff"), ("b", "{b}", "b-{event}.html", "side"),
+         ("byleaf", "by leaf", "diff-{event}-byleaf.html", "diff")]
 
 CSS = """
 :root{--accent:var(--link);--diff:#b4560b;--diffbg:#fdf0e3}
@@ -35,6 +36,7 @@ header button.on{color:var(--fg);border-color:var(--accent)}
 .body{position:relative;flex:1;min-height:420px}
 .body iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
 .body iframe.hidden{visibility:hidden}
+.note{margin:0;padding:4px 12px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line)}
 """
 
 SCRIPT = """
@@ -102,11 +104,12 @@ for (const b of document.querySelectorAll('header button[data-cols]'))
 """
 
 
-def write(out, a, b):
-    """(Re)writes <out>/compare.html for every event diffed in `out`; `a` and `b` name the two runs."""
+def write(out, a, b, note=None):
+    """(Re)writes <out>/compare.html for every event diffed in `out`; `a` and `b` name the two runs, `note` says how
+    the stacks were curated (perflab.curate), shown under the header."""
     esc = html.escape
     events = sorted(os.path.basename(f)[len("diff-"):-len(".html")] for f in glob.glob(os.path.join(out, "diff-*.html"))
-                    if not f.endswith("-inverse.html"))
+                    if not f.endswith(("-inverse.html", "-byleaf.html")))
     widgets = []
     for event in events:
         slots = [(view, label.format(a=a, b=b), name.format(event=event), kind) for view, label, name, kind in SLOTS
@@ -131,7 +134,7 @@ def write(out, a, b):
             f'<button data-cols="2" class="on">2 columns</button><button data-cols="1">1 column</button><span class="sep"></span>'
             f'<span class="k">link</span><button data-link="event" class="on" title="Each graph\'s controls drive the other graphs of its event">event</button>'
             f'<button data-link="all" title="... and of every event">all</button><button data-link="off" title="Unlinked">off</button></header>'
-            f'<div id="grid">{"".join(widgets)}</div>{ui.lightbox_script()}<script>{SCRIPT}</script>{ui.shortcuts('lightbox', 'compare')}')
+            f'{f"<p class=note>{esc(note)}</p>" if note else ""}<div id="grid">{"".join(widgets)}</div>{ui.lightbox_script()}<script>{SCRIPT}</script>{ui.shortcuts('lightbox', 'compare')}')
     path = os.path.join(out, "compare.html")
     with open(path, "w") as f:
         f.write(page)

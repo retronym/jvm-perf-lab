@@ -22,6 +22,37 @@ Run a second campaign of the same two builds with `"profile": "async:cpu"` (fewe
 
 The caveat that costs time: a frame's self time includes the cost of the loads it makes. A sample lands on whichever instruction is waiting, and an instruction waiting on a cache miss is charged with the miss, whoever caused the line to be cold. In the scala3 investigation `VarHandle.getAcquire` showed 2.4% of the tip's profile, which looked like the cost of acquire ordering; but its callers' self time fell by about 0.7 points against the base, so part of what moved into `getAcquire` was the cost of loading the field, which the callers had paid before. A frame that grows while its callers shrink by a similar amount is a moved load, not new work.
 
+### Curated diffs
+
+For a large program the raw differential graph is often unreadable: interpreter frames, JDK plumbing (`java/lang/invoke`, reflection, lambdas, lazy-val initializers) in every stack, wrapper frames that one build has and the other lacks (so a whole tower shows as new), and deep recursion that splits every tower. `perflab ab diff <campaign> <a> <b>` (or the `make_diff` action) writes the raw diff to `<campaign>/diff-<a>-<b>/` and a curated one beside it, `diff-<a>-<b>-curated/`, where those frames are folded or dropped, recursion is collapsed, and frames above the leaf that only one build has are dropped, so the towers of both builds line up. Its page says which rules were applied. In the scala3 L1D-miss diff, every stack of both builds had a frame the other lacked; after curation none did, and the stacks were 60 frames deep instead of 164.
+
+Its tables say where the event moved, given hints about the program:
+
+- `owner`: credit each stack's events to its nearest frame under a package prefix (skipping accessors listed in `ownerSkip`), so events that moved between methods inlined into one another stay in one bucket: in base, `NamedType.denot`'s miss was inlined into `widenSingleton`, and in the tip it was in `getAcquire`;
+- `groups`: named regexes over the owners, one net row each;
+- `anchor`: compare one subsystem, cutting each stack above its first frame matching it;
+- `fold` and `drop`: more frames to fold into their caller or drop.
+
+The table of inclusive growth beyond the overall ratio (b − a × (b's total / a's)) picks out subtrees that grew more than the whole: in scala3, `Typer.findRef`'s grew 10% in L1D misses against 4.4% overall. Put the hints in perflab.toml for the lab and in the spec for a campaign, named presets in either:
+
+```toml
+[diff]
+owner = "dotty/tools/dotc/"
+ownerSkip = ["dotty/tools/dotc/core/Contexts$Context.", "dotty/tools/dotc/Reader."]
+[diff.groups]
+"denot/symbol" = 'Types\$NamedType\.(denot|symbol)$|Symbols\$Symbol\.(denot|latestDenot)$'
+"Stamped caches" = 'SymDenotations\$ClassDenotation\.(memberCache|baseData|myMemberCache)$'
+[diff.presets.typer]
+anchor = 'Typer\.typed'
+```
+
+```json
+"diff": {"groups": {"findRef/imports": "Typer\\.(findRef|wildImportRef\\$1)$|typer/ImportInfo\\."},
+         "presets": {"typer": {"anchor": "Typer\\.typed", "byLeaf": true}}}
+```
+
+`--curate typer` picks a preset (written to `diff-<a>-<b>-typer/`); `--curate '<json>'` adds hints for one diff. Each cell's stacks are cached once (`stacks-<event>.gz`, a few MB), so curating again with other hints takes seconds. `perflab api diff` returns the tables.
+
 To see where a hot leaf's samples come from, collapse the cell's JFR (`jfrconv -o collapsed <cell>/*.jfr out.collapsed`, with the `jfrconv` of the async-profiler that recorded it) and group the stacks ending in that frame by their caller: each call site's share tells you whether one site or all of them pay, and so whether a local fix can help.
 
 ## 3. Try spot fixes as variants of one campaign, with a ceiling
@@ -41,7 +72,7 @@ If no local fix moves the gap, the cost is spread out, and the question becomes 
 
 In the scala3 investigation, `ipc` showed the same instructions per op in both builds (46.6 to 47.9 billion) with about 5% more cycles in the tip: the regression was CPI, not extra code, which ruled out hunting for new code paths and pointed at memory.
 
-The counts say which level misses more, not where. xctrace's per-method attribution charges each 1 ms window's counts to one PC, which is too coarse to locate misses. So once a counter template has shown which level misses more (L1D, L2 or beyond, TLB, instruction fetch), profile that miss event itself: an async campaign of the two builds with `"profile": "async:<event>"` through the kperf helper (`"kperf": "<socket>"`, the `asprof-kperf` helper of [pmu-counters.md](pmu-counters.md)), then `perflab profdiff --event <event>` on a cell of each. The event is an alias (`cycles`, `instructions`, `cache-misses`, `branch-misses`) or a kpep name such as `L1D_TLB_MISS`; several join with `+` in one session, each with an optional sampling period (`cycles@3000000+cache-misses@100000`). Size each period from the counter run that found the miss, for about 100k samples per fork: (events per op × ops per fork) / 100k ([choosing a sampling period](pmu-counters.md#choosing-a-sampling-period)). Too short a period costs more than time: a million samples of an event per fork make a JFR of gigabytes and collapsed stacks of more. The diff gives the methods and stacks whose misses per op grew, not just the totals.
+The counts say which level misses more, not where. xctrace's per-method attribution charges each 1 ms window's counts to one PC, which is too coarse to locate misses. So once a counter template has shown which level misses more (L1D, L2 or beyond, TLB, instruction fetch), profile that miss event itself: an async campaign of the two builds with `"profile": "async:<event>"` through the kperf helper (`"kperf": "<socket>"`, the `asprof-kperf` helper of [pmu-counters.md](pmu-counters.md)), then `perflab ab diff` of the two variants (its curated diff, with an `owner` and `groups`, is usually the readable one). The event is an alias (`cycles`, `instructions`, `cache-misses`, `branch-misses`) or a kpep name such as `L1D_TLB_MISS`; several join with `+` in one session, each with an optional sampling period (`cycles@3000000+cache-misses@100000`). Size each period from the counter run that found the miss, for about 100k samples per fork: (events per op × ops per fork) / 100k ([choosing a sampling period](pmu-counters.md#choosing-a-sampling-period)). Too short a period costs more than time: a million samples of an event per fork make a JFR of gigabytes and collapsed stacks of more. The diff gives the methods and stacks whose misses per op grew, not just the totals.
 
 The M5 Pro counts cycles, instructions and eight configurable events in one recording, so one template of ten events can replace several four-event campaigns. The bundled templates use four slots, and [`make_template.py`](../perflab-jmh/src/main/resources/io/github/retronym/perflab/xctrace/make_template.py) makes others with four events of your choice from JMH's bundled template; name its path in the profile (`"profile": "xctrace:/abs/path/mem-l2.template.xml"`). For more than four, extend the `NS.objects` array of `XRCountersSetupEventOrFormula` objects in the template's inner archive, setting each copied event's `_mnemonic`, `_displayName`, `_aliasOrMnemonic` and `_explanation`: without `_aliasOrMnemonic`, xctrace silently records only the template's first event. Check a template by what it recorded: in `xctrace export --toc` of a trace, the `pmc-events` attribute of the `counters-profile` table lists the events actually counted.
 

@@ -2,7 +2,7 @@ import json, os, re, shlex, shutil, signal, socket, subprocess, sys, tempfile, t
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab server`: commands run here, not on its queue
-from perflab import ab, analyze, auditfold, compare, config, defcosts, index, inlinetree, jmh, jvmevents, kperf, launch, loadgate, metrics, profdiff, regraph, serve, specs, timeline, transcript, trees  # noqa: E402
+from perflab import ab, analyze, auditfold, compare, config, curate, defcosts, index, inlinetree, jmh, jvmevents, kperf, launch, loadgate, metrics, profdiff, regraph, serve, specs, stacks, timeline, transcript, trees  # noqa: E402
 
 
 def _ensure_then_stop(root=None, port=None, _ensure=serve.ensure):
@@ -451,6 +451,129 @@ class CollapsedTest(unittest.TestCase):
         before = set(os.listdir(d)) | {metrics.EVENTS_NAME}
         self.assertEqual(metrics.hw_events(d, "async:cycles+cache-misses", conv), {"cycles": 17 / 4, "cache-misses": 17 / 4})
         self.assertEqual(set(os.listdir(d)), before)
+
+
+class CurateTest(unittest.TestCase):
+    """Each step of a curated diff, on small synthetic collapsed stacks (root first)."""
+
+    @staticmethod
+    def st(*lines, ops=1):
+        return stacks.of_lines([l.rsplit(" ", 1)[0:1] + [int(l.rsplit(" ", 1)[1])] for l in lines], ops, 1.0)
+
+    def curated(self, a, b, **hints):
+        c = curate.Curator(curate.merge(curate.DEFAULTS, hints))
+        ba, _ = c.base(a)
+        bb, _ = c.base(b)
+        return c.aligned(c.shaped(ba), c.shaped(bb))
+
+    def test_names_lose_compilation_suffixes(self):
+        a, _ = self.curated(self.st("main;F.f_[j];G.g_[i] 2", "main;F.f_[0];G.g_[j] 3"), self.st("main;G.g 1"), align=False)
+        self.assertEqual(a, {"main;F.f;G.g": 5})
+
+    def test_meaningless_frames_are_dropped(self):
+        a, _ = self.curated(self.st("main;interpreted;F.f;interpreted 4"), self.st("main;F.f 1"), align=False)
+        self.assertEqual(a, {"main;F.f": 4})
+
+    def test_plumbing_folds_into_its_caller_but_stays_as_the_leaf(self):
+        a, _ = self.curated(self.st("main;F.f;java/lang/invoke/LambdaForm$MH.invoke;F$$Lambda.apply;G.g 2",
+                                    "main;G.g$lzyINIT1;java/lang/invoke/VarHandleGuards.guard_LL_L;java/lang/invoke/VarHandle.getAcquire 3",
+                                    "main;scala/X.y;G.g 1"),
+                            self.st("main 1"), fold=["^scala/"], align=False)
+        self.assertEqual(a, {"main;F.f;G.g": 2, "main;java/lang/invoke/VarHandle.getAcquire": 3, "main;G.g": 1})
+
+    def test_recursion_keeps_the_outermost_frame(self):
+        a, _ = self.curated(self.st("main;T.typed;T.adapt;T.typed;T.adapt;T.typed;L.leaf 1", "main;T.typed;T.adapt;T.typed 2"), self.st("main 1"), align=False)
+        self.assertEqual(a, {"main;T.typed;T.adapt;L.leaf": 1, "main;T.typed;T.adapt;T.typed": 2})
+        a, _ = self.curated(self.st("main;T.typed;T.typed;L.leaf 1"), self.st("main 1"), recursion=False, align=False)
+        self.assertEqual(a, {"main;T.typed;T.typed;L.leaf": 1})
+
+    def test_frames_one_build_lacks_are_dropped_above_the_leaf(self):
+        a, b = self.curated(self.st("main;Phase.run;Typer.typed;S.denot 5"),
+                            self.st("main;Phase.run;Phase.$anonfun$15;Typer.typed;S.infoAfterCompletion;S.denot 7",
+                                    "main;Phase.run;Phase.$anonfun$15;Typer.typed;S.infoAfterCompletion 1"))
+        self.assertEqual(a, {"main;Phase.run;Typer.typed;S.denot": 5})
+        self.assertEqual(b, {"main;Phase.run;Typer.typed;S.denot": 7, "main;Phase.run;Typer.typed;S.infoAfterCompletion": 1})
+        self.assertEqual(self.curated(self.st("main;X.x;L 1"), self.st("main;L 1"), align=False)[0], {"main;X.x;L": 1})
+
+    def test_the_anchor_cuts_stacks_above_it_and_leaves_out_the_rest(self):
+        c = curate.Curator(curate.merge(curate.DEFAULTS, {"anchor": r"Typer\.typed"}))
+        base, outside = c.base(self.st("main;Phase.run;Typer.typed;L 2", "main;GC.collect 3"))
+        self.assertEqual(([[c.names[x] for x in g] for g, _ in base], outside), ([["Typer.typed", "L"]], 3))
+
+    def test_owners_groups_and_growth_beyond_the_ratio(self):
+        rules = curate.merge(curate.DEFAULTS, {"owner": "dc/", "ownerSkip": ["dc/Ctx."],
+                                               "groups": {"denot": r"\.(denot|symbol)$", "caches": r"Cache"}})
+        # a: the miss is inlined into widen; b: the same load is a VarHandle getAcquire under denot, through a context accessor
+        a = self.st("main;dc/T.typed;dc/F.findRef;dc/N.widen;jdk/Unsafe.get 10", "main;dc/T.typed;dc/O.other 90", ops=2)
+        b = self.st("main;dc/T.typed;dc/F.findRef;dc/N.denot;dc/Ctx.period;java/lang/invoke/VarHandle.getAcquire 14",
+                    "main;dc/T.typed;dc/F.findRef;dc/M.memberCache 6", "main;dc/T.typed;dc/O.other 90", ops=2)
+        c = curate.Curator(rules)
+        ba, _ = c.base(a)
+        bb, _ = c.base(b)
+        (oa, ia), (ob, ib) = c.tables(ba), c.tables(bb)
+        self.assertEqual(oa, {"dc/N.widen": 10, "dc/O.other": 90})  # the leaf is no owner, its nearest owner frame is
+        self.assertEqual(ob, {"dc/N.denot": 14, "dc/M.memberCache": 6, "dc/O.other": 90})  # dc/Ctx. skipped
+        t = curate.summarize(rules, oa, ob, ia, ib, 100, 110, 2, 2)
+        self.assertEqual(t["total"], {"a": 50.0, "b": 55.0, "ratio": 1.1})
+        g = {r["name"]: (r["delta"], r["members"]) for r in t["groups"]}
+        self.assertEqual(g, {"denot": (7.0, 1), "caches": (3.0, 1), "(ungrouped)": (-5.0, 2)})
+        top = t["excess"][0]
+        self.assertEqual((top["name"], top["a"], top["b"]), ("dc/F.findRef", 5.0, 10.0))
+        self.assertAlmostEqual(top["excess"], 10.0 - 5.0 * 1.1)
+        self.assertNotIn("dc/N.denot", [r["name"] for r in t["excess"]])  # in one build only: not a growth
+        md = curate.table_md("cache-misses", t, "a", "b", rules, 5)
+        self.assertIn("| denot | +7 | 0 | 7 | +14.00% | 1 |", md)
+        self.assertIn("| +7 | 0 | 7 | +14.00% | `dc/N.denot` |", md)
+
+    def test_rules_merge_from_the_lab_the_spec_a_preset_and_json(self):
+        Project('[build]\njmh = "x"\n[diff]\nowner = "dc/"\nfold = ["^scala/"]\n[diff.groups]\nd = "denot"\n')
+        spec = {"diff": {"fold": ["^x/"], "groups": {"c": "Cache"}, "presets": {"typer": {"anchor": "Typer"}}}}
+        r, name = curate.rules_for(spec, "typer")
+        self.assertEqual((name, r["owner"], r["fold"], r["groups"], r["anchor"]), ("typer", "dc/", ["^scala/", "^x/"], {"d": "denot", "c": "Cache"}, "Typer"))
+        r, name = curate.rules_for(spec, '{"owner": "x/"}')
+        self.assertEqual((r["owner"], name[:8]), ("x/", "curated-"))
+        self.assertEqual(curate.rules_for(spec)[1], "curated")
+        with self.assertRaises(SystemExit):
+            curate.rules_for(spec, "nope")
+
+    def test_the_stack_cache_round_trips(self):
+        st = self.st("main;F.f_[j] 3", "main;G.g 2", "main;F.f_[j] 1", ops=4)
+        f = os.path.join(tempfile.mkdtemp(), "stacks-cycles.gz")
+        stacks.write(f, st)
+        back = stacks.read(f)
+        self.assertEqual(sorted(back.named()), [(["main", "F.f_[j]"], 4), (["main", "G.g"], 2)])
+        self.assertEqual((back.ops, back.total), (4, 6))
+
+    def test_ab_diff_writes_the_raw_and_the_curated_diff(self):
+        """End to end, with a stand-in jfrconv that writes the stacks it is given as the 'graph'."""
+        Project('[build]\njmh = "x"\n')
+        camp = config.get().campaigns
+        d, conv = CollapsedTest().run_dir()
+        conv_graph = os.path.join(d, "jfrconv-graph")
+        # converting a recording prints LINES; rendering copies its (last) collapsed input to the output
+        open(conv_graph, "w").write("#!/bin/sh\nfor last; do :; done\ncase \"$*\" in *.jfr*) exec " + conv + " \"$@\";; esac\n"
+                                     "prev=; for x; do [ \"$x\" = \"$last\" ] || prev=$x; done\ncp \"$prev\" \"$last\"\n")
+        os.chmod(conv_graph, 0o755)
+        for v in ("base", "tip"):
+            shutil.copytree(d, os.path.join(camp, "c", "k", v, "1"))
+        json.dump({"name": "c", "corpora": {"k": ""}, "variants": {"base": "", "tip": ""}, "benchmark": "B", "rounds": 1,
+                   "diff": {"owner": "a"}}, open(os.path.join(camp, "c", "spec.json"), "w"))
+        os.environ["JFRCONV"] = conv_graph
+        self.addCleanup(os.environ.pop, "JFRCONV", None)
+        import contextlib, io
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(curate.main(["c", "base", "tip", "--event", "cache-misses", "--by-leaf"]), 0)
+        raw, cur = os.path.join(camp, "c", "diff-base-tip"), os.path.join(camp, "c", "diff-base-tip-curated")
+        self.assertTrue(os.path.exists(os.path.join(camp, "c", "k", "base", "1", "stacks-cache-misses.gz")))
+        self.assertIn("main-jmh-worker-1", open(os.path.join(raw, "diff-cache-misses.html")).read())
+        self.assertEqual(open(os.path.join(cur, "diff-cache-misses.html")).read(), "a;b;c 10\n[main-jmh-worker-1];F$$Lambda;a;d 5\nx;y;z 2\n")
+        self.assertTrue(os.path.exists(os.path.join(cur, "diff-cache-misses-byleaf.html")))
+        pair = json.load(open(os.path.join(cur, "pair.json")))
+        self.assertEqual((pair["curated"], pair["rules"]["owner"], pair["cells"]), ("curated", "a", ["k/base/1", "k/tip/1"]))
+        page = open(os.path.join(cur, "compare.html")).read()
+        self.assertIn("<p class=note>Curated: names without compilation suffixes", page)
+        self.assertIn('data-view="byleaf"', page)
+        self.assertEqual(json.load(open(os.path.join(cur, "tables-cache-misses.json")))["total"]["ratio"], 1.0)
 
 
 class MetricsTest(unittest.TestCase):

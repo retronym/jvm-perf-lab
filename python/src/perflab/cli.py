@@ -41,7 +41,7 @@ COMMANDS = {"run": "jmh", "ab": "ab", "trees": "trees", "index": "index", "timel
             "server": "server", "submit": "server:submit_main", "jobs": "server:jobs_main",
             "branch": "branchprofile", "api": "api", "mcp": "mcp"}
 # the commands that become a job of a running `perflab server`: command -> the subcommands that do (None: all)
-SUBMITS = {"run": None, "ab": {"run"}, "branch": {"profile", "diff"}}
+SUBMITS = {"run": None, "ab": {"run", "diff"}, "branch": {"profile", "diff"}}
 LOCAL_ENV = "PERFLAB_LOCAL"  # server.LOCAL_ENV
 
 

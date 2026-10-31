@@ -63,9 +63,9 @@ ACTIVE = ("running", "paused")
 
 
 def concurrent(argv):
-    """A job that only renders recordings already made (`branch diff`, `profdiff`): it starts as soon as it is queued,
-    beside the job that measures, which a diff would neither disturb much nor need to wait for."""
-    return argv[:1] == ["profdiff"] or argv[:2] == ["branch", "diff"]
+    """A job that only renders recordings already made (`branch diff`, `ab diff`, `profdiff`): it starts as soon as it
+    is queued, beside the job that measures, which a diff would neither disturb much nor need to wait for."""
+    return argv[:1] == ["profdiff"] or argv[:2] in (["branch", "diff"], ["ab", "diff"])
 FINAL = ("done", "failed", "cancelled")
 TRANSITIONS = {"queued": {"running", "cancelled"},
                "running": {"paused", "done", "failed", "cancelled"},

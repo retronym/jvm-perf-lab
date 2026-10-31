@@ -7,6 +7,8 @@ interleaved, each run checked against the spec.
                                               did not build are built again (else their cells are skipped)
   perflab ab report <spec.json> [--per-op]    markdown summary, per "perUnit" if the spec has one (--per-op: per op);
                                               for async profiles, an index of flame graphs
+  perflab ab diff   <spec.json | campaign> <a> <b> [--curate <preset | json>] [--raw] [--round <n>] [--event <e>]...
+                                              two variants' profile diff, raw and curated (perflab.curate; `--help`)
 
 A spec:
 
@@ -696,8 +698,11 @@ bench: benchmark threads · reverse: by leaf · *-classify: benchmark threads, j
 
 
 def main(argv):
-    if len(argv) < 2 or argv[0] not in ("run", "report"):
+    if len(argv) < 2 or argv[0] not in ("run", "report", "diff"):
         sys.exit(__doc__)
+    if argv[0] == "diff":
+        from . import curate
+        return curate.main(argv[1:])
     spec = Spec(argv[1])
     if argv[0] == "run":
         run(spec, "--dry-run" in argv, retry_unbuildable="--retry-unbuildable" in argv)

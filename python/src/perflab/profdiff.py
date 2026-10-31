@@ -46,10 +46,11 @@ def stacks(lines):
     return (p for p in map(parse, lines) if p)
 
 
-def load(run, event, jfrconv, out_dir, name, keep=True):
+def load(run, event, jfrconv, out_dir, name, keep=True, sink=None):
     """A run's `event` on the benchmark threads, per method and in total, with its ops. jfrconv's collapsed stacks are
     read as they come, so a large recording is never held in memory; with `keep`, they are also written to
-    `<out_dir>/<name>-<event>.collapsed` (its "collapsed"), else nothing is written."""
+    `<out_dir>/<name>-<event>.collapsed` (its "collapsed"), else nothing is written. `sink(stack, count)` sees each
+    stack as normalized."""
     if not jfrconv:
         from . import jmh
         jfrconv = jmh.jfrconv(jmh.async_lib())
@@ -78,6 +79,8 @@ def load(run, event, jfrconv, out_dir, name, keep=True):
             stack, n = THREAD_ID.sub("]", HIDDEN_ADDRESS.sub("", s[0])), s[1]
             if out:
                 out.write(f"{stack} {n}\n")
+            if sink:
+                sink(stack, n)
             total += n
             # by method, however it was compiled (jfrconv's _[j] JIT, _[i] inlined, _[1] C1, ...)
             self_[FRAME_KIND.sub("", stack.rsplit(";", 1)[-1])] += n

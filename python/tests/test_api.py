@@ -463,6 +463,19 @@ class HttpTest(Fixture, unittest.TestCase):
         self.assertEqual(self.http("POST", "/api/v1/forget", {"project": other["id"]})[0], 404)
         self.assertIn('id="projects"', self.http("GET", "/admin")[1])
 
+    def test_make_diff_queues_an_ab_diff_beside_the_measuring_job(self):
+        code, err, _ = self.http("GET", f"/api/v1/diff?campaign=plain&a=base&b=base")
+        self.assertEqual((code, err["error"]["details"]["action"]), (404, "make_diff"))
+        self.assertEqual(err["error"]["details"]["submit"], ["ab", "diff", "plain", "base", "base"])
+        body = {"project": self.pid, "campaign": "plain", "a": "base", "b": "x", "round": 2, "event": ["cache-misses"],
+                "curate": '{"owner": "a/"}', "byLeaf": True}
+        self.assertEqual(self.http("POST", "/api/v1/make_diff", body, token=False)[0], 403)
+        code, r, _ = self.http("POST", "/api/v1/make_diff", body)
+        self.assertEqual(code, 200, r)
+        self.assertEqual(r["job"]["argv"], ["ab", "diff", "plain", "base", "x", "--round", "2", "--curate", '{"owner": "a/"}',
+                                            "--event", "cache-misses", "--by-leaf"])
+        self.assertTrue(server.concurrent(r["job"]["argv"]))
+
     def test_void_unvoid_and_rerun_once(self):
         body = {"project": self.pid, "campaign": "br", "corpus": "a", "variant": V[4], "round": 2, "reason": "load over 2 cores"}
         self.assertEqual(self.http("POST", "/api/v1/void", body, token=False)[0], 403)
