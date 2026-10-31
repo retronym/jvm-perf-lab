@@ -148,7 +148,7 @@ class FailedCellTest(unittest.TestCase):
         d = tempfile.mkdtemp()
         with open(os.path.join(d, "result.json"), "w") as f:
             f.write("[]")  # JMH's file when the benchmark threw
-        self.assertEqual(branchview.load_cell(d), "running")
+        self.assertIsNone(branchview.load_cell(d))  # not the cell being run (running.json): an interrupted run's
         with open(os.path.join(d, ab.FAILED), "w") as f:
             f.write("empty result.json\n")
         self.assertEqual(branchview.load_cell(d), "failed")

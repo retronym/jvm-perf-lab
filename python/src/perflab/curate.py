@@ -11,10 +11,13 @@ other lacks (so a whole tower shows as new), and deep recursion that splits ever
 
 1. names: hidden-class addresses and thread ids stripped (as profdiff does), and jfrconv's compilation suffixes
    (`_[j]`, `_[i]`, ...), so inlined and compiled copies of a method are one frame;
-2. drop: frames that mean nothing to the comparison (`interpreted`), wherever they are;
+2. drop: frames that mean nothing to the comparison (`interpreted`), wherever they are; and transparent: frames one
+   build has where the other does the same work inline (a `VarHandle` access where the other loads the field; a
+   lab's shared-state helpers and accessors), removed wherever they are, the leaf included, so their events are its
+   nearest remaining caller's;
 3. anchor (a hint): each stack cut above its first frame matching it, so one subsystem is compared; stacks without
    it are left out;
-4. fold: plumbing frames folded into their caller, except as the leaf, where the event landed (`VarHandle...getAcquire`);
+4. fold: plumbing frames folded into their caller, except as the leaf, where the event landed (`Unsafe.getReference`);
 5. recursion: each method's outermost occurrence in a stack kept, the deeper ones dropped (the leaf stays);
 6. alignment: a frame that appears above the leaf in only one build's stacks is dropped there (it stays as a leaf),
    so the towers of both builds merge.
@@ -37,6 +40,7 @@ from either one's `presets`, then `--curate '<json>'`:
   anchor = "Typer\\.typed"                   "groups": {"denot/symbol": "Types\\$NamedType\\.(denot|symbol)"},
   fold = ["scala/runtime/"]                  "presets": {"typer": {"anchor": "Typer\\.typed"}}}
   drop = []
+  transparent = ["dotty/tools/sharing/"]
   byLeaf = false
   [diff.groups]
   "denot/symbol" = "Types\\$NamedType\\.(denot|symbol)"
@@ -44,7 +48,7 @@ from either one's `presets`, then `--curate '<json>'`:
 The built-in preset `light` (`--curate light`, and written by default as `<campaign>/diff-<a>-<b>-light/`) keeps what
 the curated diff erases on purpose: names keep their compilation suffixes (a method inlined and the same method
 compiled are different frames, coloured by kind), no frame is aligned away and recursion stays; only steps 1 (hidden
-classes, thread ids), 2 and 4 apply. Beside its graphs, `toggle-a-<event>.html` and `toggle-b-<event>.html` (and
+classes, thread ids), 2 (without transparent frames: it is for seeing them) and 4 apply. Beside its graphs, `toggle-a-<event>.html` and `toggle-b-<event>.html` (and
 `-byleaf`) are the two builds in jfrconv's viewer with one layout, per op on one scale (perflab.kinds), which its
 compare page flips between in place (t).
 
@@ -52,7 +56,7 @@ Every diff, raw and light, has the frame-kind flips table (perflab.kinds): per m
 its own frame in each build, ranked by the self events that changed kind, with C2's reasons when the cells have a
 "jitRecording".
 
-`fold` and `drop` add to the defaults, `groups` and `presets` merge by name, anything else replaces. Each cell's
+`fold`, `drop` and `transparent` add to the defaults (`"transparent": null` clears them), `groups` and `presets` merge by name, anything else replaces. Each cell's
 stacks are cached (perflab.stacks), so curating a pair again with other hints takes seconds. The rules applied are in
 the diff's pair.json and on its page.
 """
@@ -64,16 +68,17 @@ SUFFIX = re.compile(r"_\[[a-z0-9]+\]$")
 DROP = [r"^interpreted$"]
 FOLD = [r"^java/lang/invoke/", r"^jdk/internal/reflect/", r"^java/lang/reflect/Method\.invoke", r"\$\$Lambda\.",
         r"\$lzyINIT\d*(\$|$)"]
-DEFAULTS = {"drop": [], "fold": [], "anchor": None, "owner": None, "ownerSkip": [], "groups": {}, "byLeaf": False,
+TRANSPARENT = [r"^java/lang/invoke/VarHandle"]  # VarHandle..., VarHandleGuards, VarHandleInts$FieldInstanceReadOnly, ...
+DEFAULTS = {"drop": [], "fold": [], "transparent": TRANSPARENT, "anchor": None, "owner": None, "ownerSkip": [], "groups": {}, "byLeaf": False,
             "align": True, "recursion": True, "excessMin": 0.002, "top": 25}
 NO_OWNER = "(no owner frame)"
-LIGHT = {"kinds": True, "align": False, "recursion": False}  # the built-in preset `light`
+LIGHT = {"kinds": True, "align": False, "recursion": False, "transparent": None}  # the built-in preset `light`
 
 
 def merge(base, extra):
     out = dict(base)
     for k, v in (extra or {}).items():
-        if k in ("fold", "drop", "ownerSkip"):
+        if k in ("fold", "drop", "ownerSkip", "transparent") and v is not None:
             out[k] = list(out.get(k) or []) + list(v)
         elif k in ("groups", "presets"):
             out[k] = {**(out.get(k) or {}), **v}
@@ -111,7 +116,7 @@ class Curator:
     def __init__(self, rules):
         self.r = rules
         any_of = lambda pats: re.compile("|".join(f"(?:{p})" for p in pats)) if pats else None
-        self.drop_re = any_of(DROP + as_list(rules.get("drop")))
+        self.drop_re = any_of(DROP + as_list(rules.get("drop")) + as_list(rules.get("transparent")))
         self.fold_re = any_of(FOLD + as_list(rules.get("fold")))
         self.anchor_re = re.compile(rules["anchor"]) if rules.get("anchor") else None
         self.owners = tuple(as_list(rules.get("owner")))
@@ -368,6 +373,8 @@ def banner(rules):
     parts = ["names keep their compilation suffixes (frames by kind)" if rules.get("kinds") else "names without compilation suffixes", "dropped: " + ", ".join(DROP + as_list(rules.get("drop")))]
     if rules.get("anchor"):
         parts.append(f"stacks cut above {rules['anchor']}")
+    if rules.get("transparent"):
+        parts.append("transparent (their events their caller's, as the leaf too): " + ", ".join(as_list(rules["transparent"])))
     parts.append("folded into their caller (not as the leaf): " + ", ".join(FOLD + as_list(rules.get("fold"))))
     if rules.get("recursion", True):
         parts.append("recursion collapsed to each method's outermost frame")

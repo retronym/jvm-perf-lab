@@ -809,10 +809,20 @@ class CurateTest(unittest.TestCase):
 
     def test_plumbing_folds_into_its_caller_but_stays_as_the_leaf(self):
         a, _ = self.curated(self.st("main;F.f;java/lang/invoke/LambdaForm$MH.invoke;F$$Lambda.apply;G.g 2",
-                                    "main;G.g$lzyINIT1;java/lang/invoke/VarHandleGuards.guard_LL_L;java/lang/invoke/VarHandle.getAcquire 3",
+                                    "main;G.g$lzyINIT1;java/lang/invoke/LambdaForm$MH.invoke;java/lang/invoke/Invokers$Holder.linkToTarget 3",
                                     "main;scala/X.y;G.g 1"),
                             self.st("main 1"), fold=["^scala/"], align=False)
-        self.assertEqual(a, {"main;F.f;G.g": 2, "main;java/lang/invoke/VarHandle.getAcquire": 3, "main;G.g": 1})
+        self.assertEqual(a, {"main;F.f;G.g": 2, "main;java/lang/invoke/Invokers$Holder.linkToTarget": 3, "main;G.g": 1})
+
+    def test_transparent_frames_go_wherever_they_are_and_their_caller_takes_their_events(self):
+        a = self.st("main;N.denot;java/lang/invoke/VarHandleGuards.guard_L_I;java/lang/invoke/VarHandleInts$FieldInstanceReadOnly.getAcquire 3",
+                    "main;N.denot;s/Once.get;s/Stamped.read 2", "main;N.denot;R.f$$inline$x;L.leaf 1")
+        a, _ = self.curated(a, self.st("main;N.denot 1"), transparent=["^s/", r"\$\$inline\$"], align=False)
+        self.assertEqual(a, {"main;N.denot": 5, "main;N.denot;L.leaf": 1})
+        light = curate.merge(curate.merge(curate.DEFAULTS, {"transparent": ["^s/"]}), curate.LIGHT)
+        self.assertEqual(curate.as_list(light["transparent"]), [])  # light shows them
+        self.assertIn("transparent", curate.banner(curate.DEFAULTS))
+        self.assertNotIn("transparent", curate.banner(light))
 
     def test_recursion_keeps_the_outermost_frame(self):
         a, _ = self.curated(self.st("main;T.typed;T.adapt;T.typed;T.adapt;T.typed;L.leaf 1", "main;T.typed;T.adapt;T.typed 2"), self.st("main 1"), align=False)

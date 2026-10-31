@@ -34,6 +34,7 @@ Its tables say where the event moved, given hints about the program:
 - `groups`: named regexes over the owners, one net row each;
 - `anchor`: compare one subsystem, cutting each stack above its first frame matching it;
 - `fold` and `drop`: more frames to fold into their caller or drop.
+- `transparent`: frames one build has where the other does the same work inline, removed even as the leaf, so their events are their caller's. `java/lang/invoke/VarHandle` is transparent by default: in scala3's #84 tip, a field read became `VarHandleGuards.guard_L_I` → `getAcquire` under `NamedType.denot`, a big new leaf that made `denot` look cheaper; the lab adds its `dotty/tools/sharing/` helpers, its `inline$` accessors and the `Reader`'s field accessors. The `light` diff keeps them, to see exactly those frames.
 
 The table of inclusive growth beyond the overall ratio (b − a × (b's total / a's)) picks out subtrees that grew more than the whole: in scala3, `Typer.findRef`'s grew 10% in L1D misses against 4.4% overall. Put the hints in perflab.toml for the lab and in the spec for a campaign, named presets in either:
 
