@@ -558,6 +558,63 @@ class StorageTest(unittest.TestCase):
         self.assertEqual(storage.cleanup(es, "delete", target={"project": "p", "kind": "run", "name": "r1"})["skipped"][0]["why"], "active")
 
 
+class ReloadTest(unittest.TestCase):
+    """A server run in the foreground restarts itself, in its own pid, when its code changes, unless the new code does
+    not import; `perflab server reload` asks it to."""
+
+    def setUp(self):
+        self.home, src = tempfile.mkdtemp(), tempfile.mkdtemp()
+        self.pkg = os.path.join(src, "perflab")
+        shutil.copytree(os.path.join(SRC, "perflab"), self.pkg, ignore=shutil.ignore_patterns("__pycache__"))
+        self.env = {**os.environ, "PYTHONPATH": src, server.HOME_ENV: self.home, server.PORT_ENV: str(free_port())}
+        self.proc = subprocess.Popen([sys.executable, "-m", "perflab", "server", "run"], env=self.env, cwd=self.home,
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        self.state = os.path.join(self.home, "server.json")
+        self.first = wait_for(lambda: self.status(), what="the server to serve")
+
+    def tearDown(self):
+        self.proc.terminate()
+        self.proc.wait(10)
+        self.proc.stdout.close()
+
+    def status(self):
+        st = server._read_json(self.state)
+        if not st:
+            return None
+        try:
+            with urllib.request.urlopen(st["url"] + "api/status", timeout=2) as r:
+                return {**json.load(r), "started": st["started"]}
+        except OSError:
+            return None
+
+    def edit(self, text):
+        with open(os.path.join(self.pkg, "reloadmark.py"), "w") as f:
+            f.write(text)
+
+    def reloaded(self, since):
+        st = self.status()
+        return st if st and st["started"] > since["started"] else None
+
+    def test_reloads_on_change_and_not_on_code_that_does_not_import(self):
+        self.edit("X = 1\n")
+        second = wait_for(lambda: self.reloaded(self.first), what="a reload")
+        self.assertEqual(second["pid"], self.first["pid"])  # exec'd in place
+        self.assertEqual(second["pid"], self.proc.pid)
+        self.edit("X = (\n")  # a syntax error
+        st = wait_for(lambda: (self.status() or {}).get("reloadError"), timeout=20, what="a refused reload")
+        self.assertIn("SyntaxError", st["error"])
+        self.assertEqual(self.status()["started"], second["started"])  # still the old code
+        self.assertIn("Not reloaded", urllib.request.urlopen(server._read_json(self.state)["url"]).read().decode())
+        self.edit("X = 2\n")
+        third = wait_for(lambda: self.reloaded(second), what="a reload of the fixed code")
+        self.assertIsNone(third["reloadError"])
+        r = subprocess.run([sys.executable, "-m", "perflab", "server", "reload"], env=self.env, cwd=self.home,
+                           capture_output=True, text=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("reloaded", r.stdout)
+        self.assertGreater(self.status()["started"], third["started"])
+
+
 class CliTest(unittest.TestCase):
     """`perflab server start|status|stop`, `submit` and `jobs`, as a shell runs them."""
 

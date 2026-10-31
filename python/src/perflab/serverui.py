@@ -1,7 +1,7 @@
 """The pages of `perflab server`: the queue (/) and storage (/admin), in the look of the index (ui.py). Each page polls
 the server's JSON API, and carries the server's token for its POSTs: it is served only to 127.0.0.1, with our own Host.
 """
-import html, json, os
+import html, json, os, time
 
 from . import timeline, ui
 
@@ -303,6 +303,17 @@ load();
 """
 
 
+def reload_banner(server):
+    """Why the server is still on its old code, when the new code on disk did not import (perflab.server's hot reload)."""
+    e = getattr(server, "reload_error", None)
+    if not e:
+        return ""
+    return ('<section class="card" style="border-color:var(--bad,#c92a2a)"><div class="card-h"><h2>Not reloaded</h2>'
+            f'<span class="k">{time.strftime("%H:%M:%S", time.localtime(e["at"]))}</span></div><p>The code on disk changed but does '
+            'not import, so this server still runs the code it started on. It tries again on the next change.</p>'
+            f'<pre>{html.escape(e["error"])}</pre></section>')
+
+
 def _page(server, title, tab, body, script, css="", head_script="", keys=()):
     projects = server.q.projects()
     tabs = ui.nav_tabs(projects, tab)
@@ -310,7 +321,7 @@ def _page(server, title, tab, body, script, css="", head_script="", keys=()):
 {ui.style(ui.BASE, ui.NAV_CSS, CSS, css)}
 {ui.masthead("server", home="/")}
 <div class="nav"><div class="tabsrow"><div class="in"><nav class="tabs">{tabs}</nav></div></div></div>
-<main>{body}</main>{ui.footer()}<div id="toast" hidden></div>
+<main>{reload_banner(server)}{body}</main>{ui.footer()}<div id="toast" hidden></div>
 {f"<script>{head_script}</script>" if head_script else ""}<script>const TOKEN = {json.dumps(server.token)}, HOME = {json.dumps(os.path.expanduser("~"))};
 {COMMON_JS}
 {script}</script>{ui.shortcuts(*keys)}"""

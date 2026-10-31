@@ -100,7 +100,7 @@ PYTHONPATH="{{config_root}}/python/src" "$python" -m perflab server status
 """
 
 [tasks."server:restart"]
-description = "Restart the launchd perflab server (on this code); running jobs carry on and are adopted"
+description = "Restart the launchd perflab server (on this code); running jobs carry on and are adopted. A code change reloads it anyway"
 run = """
 set -euo pipefail
 launchctl kickstart -k "gui/$(id -u)/io.github.retronym.perflab.server"

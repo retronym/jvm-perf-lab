@@ -5,6 +5,7 @@ time, and serves a UI (the queue, storage admin) and every registered project's 
   perflab server stop                    stop it; a running job runs on, and the next server adopts it
   perflab server status                  its URL and the queue
   perflab server run [--port <port>]     run it in the foreground
+  perflab server reload                  restart it on the code now on disk (it does so itself when that changes)
   perflab submit [--detach] [--priority <n>] [--env NAME[=VALUE]]... -- <perflab arguments>
                                          queue `perflab <arguments>` for this project (starting the server if need be),
                                          and follow its transcript until it ends; Ctrl-C detaches, the job runs on
@@ -25,8 +26,17 @@ time.
 State is in ~/.perflab/server (PERFLAB_SERVER_HOME): jobs.sqlite, token (POSTs carry it as X-Perflab-Token), server.json
 (pid, port), server.lock (flock-ed by the running server: one per home), jobs/<id>/. The port is 8690 unless --port or PERFLAB_SERVER_PORT says otherwise.
 
+Hot reload: a server run in the foreground (`run`, as launchd does) polls its own package's files, and when they change
+and then stay put (a checkout or a fast-forward has finished writing them), it restarts itself on them: it checks that
+the new code compiles and that the server's modules import, in a subprocess, then stops serving, leaves its jobs to run on
+(as `stop` does), and execs its own command line in its own pid, which takes the lock and the port again and adopts the
+jobs. New code that does not import is not loaded: the server keeps serving on the old, says why on the queue page and in
+/api/status, and tries again on the next change. PERFLAB_SERVER_RELOAD=0 turns the polling off; POST /api/reload (`perflab
+server reload`) reloads at once.
+
 HTTP (JSON unless noted):
   GET  /api/status                       the server
+  POST /api/reload                       restart the server on the code on disk (409, and why, if it does not import)
   GET  /api/jobs[?all=1]                 jobs, queue order first
   GET  /api/jobs/<id>                    one job
   GET  /api/jobs/<id>/transcript[?tail=<lines>|offset=<bytes>][&file=output]   its transcript (text), or its output
@@ -74,6 +84,10 @@ TRANSITIONS = {"queued": {"running", "cancelled"},
 ENV_KEEP = re.compile(r"^(PATH|HOME|USER|LOGNAME|SHELL|LANG|LC_\w+|TMPDIR|TZ|JAVA_HOME|JAVA_\w+|JDK_\w+|SBT_\w+|SCALA\w*|"
                       r"MAVEN_\w+|M2_HOME|COURSIER_\w+|MISE_\w+|ASYNC_PROFILER\w*|JFRCONV|PYTHONPATH|PERFLAB_\w+)$")
 ENV_DROP = {"PERFLAB_TRANSCRIPT", control.ENV, control.POLL_ENV, HOME_ENV, PORT_ENV, GRACE_ENV, JOB_ENV, LOCAL_ENV}
+RELOAD_ENV = "PERFLAB_SERVER_RELOAD"
+RELOAD_POLL = 2.0  # seconds between looks at the code
+# what the server needs to start and serve its pages; every module is compiled as well
+RELOAD_IMPORTS = "import perflab.server, perflab.serverui, perflab.api, perflab.docs, perflab.ui, perflab.index, perflab.mcp"
 PKG = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # what `import perflab` needs on the path
 
 
@@ -648,6 +662,7 @@ class Server:
         self.port = self.httpd.server_address[1]
         self.url = f"http://127.0.0.1:{self.port}/"
         self.indexing = set()
+        self.reexec, self.reload_error = False, None
 
     def start(self):
         self.worker.start()
@@ -675,14 +690,52 @@ class Server:
             json.dump({"pid": os.getpid(), "port": self.port, "url": self.url, "started": time.time(), "python": sys.executable}, f)
         os.replace(state + ".tmp", state)
         signal.signal(signal.SIGTERM, lambda *_: threading.Thread(target=self.httpd.shutdown).start())
+        if os.environ.get(RELOAD_ENV, "1") != "0":
+            threading.Thread(target=self.watch_code, daemon=True, name="perflab-reload").start()
         try:
             self.httpd.serve_forever()
         except KeyboardInterrupt:
             pass
         finally:
             st = _read_json(state)
-            if st and st.get("pid") == os.getpid():
+            if st and st.get("pid") == os.getpid() and not self.reexec:
                 os.unlink(state)
+        if self.reexec:
+            self._exec()
+
+    def watch_code(self):
+        """Reloads when the package's files have changed and then stayed put for a poll."""
+        seen = code_stamp()
+        while True:
+            time.sleep(RELOAD_POLL)
+            now = code_stamp()
+            if now == seen:
+                continue
+            time.sleep(RELOAD_POLL)
+            if code_stamp() != now:  # still being written
+                continue
+            seen = code_stamp()
+            self.reload("its code changed")
+
+    def reload(self, why):
+        """Restarts on the code on disk, once it is known to import; else keeps serving and returns why not."""
+        err = check_code()
+        if err:
+            self.reload_error = {"at": time.time(), "error": err}
+            print(f"perflab server: not reloading ({why}): the new code does not import:\n{err}", flush=True)
+            return err
+        print(f"perflab server: reloading: {why}", flush=True)
+        self.reload_error, self.reexec = None, True
+        threading.Thread(target=self.httpd.shutdown).start()
+        return None
+
+    def _exec(self):
+        self.worker.stopping.set()  # the jobs run on; the next image adopts them
+        self.worker.wake.set()
+        self.worker.join(5)
+        self.httpd.server_close()
+        sys.stdout.flush(), sys.stderr.flush()
+        os.execv(sys.executable, sys.orig_argv)
 
     def build_index(self, project):
         """The project's index, built in the background (by the project's own perflab, as `perflab index` would) if it
@@ -882,6 +935,9 @@ class Server:
                 try:
                     if p == "/api/jobs":  # always `perflab`, by the server's Python: what to run is not the request's to say
                         return self._send(201, public(submit_local(server, body)))
+                    if p == "/api/reload":
+                        err = server.reload("asked to")
+                        return self._error(409, f"the code on disk does not import: {err}") if err else self._send(202, {"reloading": True})
                     if p == "/api/projects":
                         project = server.q.register(body.get("root") or "")
                         server.build_index(project)
@@ -953,11 +1009,39 @@ def submit_local(server, body, python=None, module=None):
     return j
 
 
+def code_stamp():
+    """The package's files, as (path, mtime, size): what a reload watches."""
+    out = []
+    for d, dirs, files in os.walk(os.path.join(PKG, "perflab")):
+        dirs[:] = [x for x in dirs if x != "__pycache__"]
+        for f in files:
+            try:
+                st = os.stat(os.path.join(d, f))
+            except OSError:
+                continue
+            out.append((os.path.join(d, f), st.st_mtime_ns, st.st_size))
+    return sorted(out)
+
+
+def check_code():
+    """None if the package's code on disk compiles and the server's modules import (in a fresh Python), else why not."""
+    src = ("import compileall, sys\n"
+           f"ok = compileall.compile_dir({os.path.join(PKG, 'perflab')!r}, quiet=1, force=False)\n"
+           f"{RELOAD_IMPORTS}\n"
+           "sys.exit(0 if ok else 1)")
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join(p for p in (PKG, os.environ.get("PYTHONPATH")) if p))
+    try:
+        r = subprocess.run([sys.executable, "-c", src], capture_output=True, text=True, timeout=60, env=env, cwd=PKG)
+    except subprocess.TimeoutExpired:
+        return "importing the new code took over 60 s"
+    return None if r.returncode == 0 else (r.stderr or r.stdout or f"exit {r.returncode}").strip()[-2000:]
+
+
 def status(server):
     jobs = server.q.jobs(include_final=False)
     return {"pid": os.getpid(), "url": server.url, "publicUrl": public_url(server.url), "home": server.home, "port": server.port,
             "running": next((public(j) for j in jobs if j["state"] in ACTIVE), None),
-            "queued": sum(j["state"] == "queued" for j in jobs)}
+            "queued": sum(j["state"] == "queued" for j in jobs), "reloadError": server.reload_error}
 
 
 def local_host(host, port):
@@ -1199,7 +1283,7 @@ def print_jobs(jobs, out=None):
 
 def main(argv):
     ap = argparse.ArgumentParser(prog="perflab server", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("action", choices=["start", "stop", "status", "run"])
+    ap.add_argument("action", choices=["start", "stop", "status", "run", "reload"])
     ap.add_argument("--port", type=int)
     ap.add_argument("--grace", type=float, help="seconds between asking a job to cancel and SIGTERM (default 10)")
     x = ap.parse_args(argv)
@@ -1224,6 +1308,20 @@ def main(argv):
         return 0
     st = _read_json(os.path.join(home(), "server.json"))
     url = running()
+    if x.action == "reload":
+        if not url:
+            print("not running")
+            return 1
+        pid = st and st.get("pid")
+        api("POST", "/api/reload", {}, url)
+        for _ in range(100):  # the same pid, a new server.json once it serves again
+            time.sleep(0.1)
+            st2 = _read_json(os.path.join(home(), "server.json")) or {}
+            if st2.get("pid") == pid and st2.get("started", 0) > (st or {}).get("started", 0) and running():
+                print(f"reloaded: {public_url(url)}")
+                return 0
+        print("reload asked; the server has not come back yet (see ~/.perflab/server/server.log)")
+        return 1
     if x.action == "stop":
         if url and st:
             active = [j for j in api("GET", "/api/jobs?all=0", url=url) if j["state"] in ACTIVE]
