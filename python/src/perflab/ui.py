@@ -321,6 +321,8 @@ SHORTCUTS = {  # section: (heading, [(keys, what)]); keys as a tuple are keys, a
                                     (("t", "Space"), "flip between them, keeping the zoom, scroll, search, filters and name mode"),
                                     (("1", "–", "9"), "the graph's first to ninth view"),
                                     (("[", "]"), "its previous or next view (of the graph under the pointer)")]),
+    "card": ("A campaign's summary", [(("+",), "show every row's cells (of the card under the pointer, else of every card)"),
+                                      (("−",), "hide them"), ("hover a value", "its distribution: run order, against the baseline, the numbers")]),
     "void": ("A branch campaign's cell popover", [(("Enter",), "in the reason, void the round"), (("Esc",), "close the popover")]),
     "timeline": ("Timelines, by mouse", [("wheel or pinch", "zoom"), ("drag", "pan"), ("double-click", "reset")]),
 }

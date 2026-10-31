@@ -693,6 +693,43 @@ class PerOpGraphsTest(unittest.TestCase):
         self.assertEqual(open(f).read(), "main;f 8\nmain;g 2\n")  # rounded, a sample never to 0
 
 
+class CampaignCardTest(unittest.TestCase):
+    """A campaign's summary and cells as one table (index.card_summary): a row per corpus and variant, its cells beneath,
+    each value as mean, median and min, and the iterations for the page's hover panel and chart."""
+
+    def rec(self, v, rnd, forks):
+        flat = [x for f in forks for x in f]
+        r = {"benchmark": "B", "mode": "ss", "primaryMetric": {"score": sum(flat) / len(flat), "scoreError": 1.0, "scoreUnit": "ms/op", "rawData": forks},
+             "secondaryMetrics": {}, "jvmArgs": []}
+        cell = os.path.join(tempfile.mkdtemp(), v, str(rnd))
+        return {"c": "k", "v": v, "round": rnd, "state": "done", "cell": cell, "name": f"#{rnd}", "detail": "", "flags": "",
+                "data": (v, r["primaryMetric"]["score"], None, None, None, None, {}, "ms/op", r, cell)}
+
+    def test_one_table_three_statistics_and_the_iterations(self):
+        recs = [self.rec("base", 1, [[10.0, 11.0, 12.0, 30.0]]), self.rec("tip", 1, [[9.0, 9.5, 10.0, 10.5]])]
+        html = index.card_summary(recs, ["base", "tip"], [("k", v, r) for v in ("base", "tip") for r in (1, 2)])
+        self.assertEqual(html.count('<tr class="sr"'), 2)
+        self.assertEqual(html.count('<tr class="sub" data-of="0"'), 2)  # base's round 1, and round 2 pending
+        self.assertIn('<span class="badge pending">pending</span>', html)
+        self.assertIn('hidden><td></td><td>#1', html)  # the cells hidden until their row is expanded
+        for stat in ("mean", "median", "min"):
+            self.assertIn(f'class="st st-{stat}"', html)
+        data = json.loads(re.search(r'<script type="application/json">(.*?)</script>', html).group(1))
+        base, tip = data["rows"]
+        self.assertEqual(base["m"]["median"][0][1], 11.5)  # pooled iterations: (11 + 12) / 2
+        self.assertEqual(tip["m"]["min"][0][1], 9.0)
+        self.assertAlmostEqual(tip["m"]["median"][0][3], 100 * (9.75 / 11.5 - 1))
+        self.assertEqual(data["cells"][tip["cells"][0]]["raw"]["score"], [[9.0, 9.5, 10.0, 10.5]])
+
+    def test_a_pooled_statistic_and_its_bootstrap_spread(self):
+        base, tip = [[10.0, 11.0, 12.0]] * 3, [[9.0, 10.0, 11.0]] * 3
+        x, d, spread, ok = metrics.pooled_delta(base, tip, "median")
+        self.assertEqual((x, round(d, 2), ok), (10.0, -9.09, True))
+        self.assertGreater(spread, 0)
+        self.assertEqual(metrics.pooled_delta(base, tip, "median"), (x, d, spread, ok))  # seeded: the page doesn't flicker
+        self.assertEqual(metrics.describe([3, 1, 2])["median"], 2)
+
+
 class FlameGraphTest(unittest.TestCase):
     """perflab's own flame graphs are jfrconv's viewer with other frames (perflab.flamegraph), never a viewer of their own."""
 
@@ -929,13 +966,13 @@ class MetricsTest(unittest.TestCase):
                   open(spec, "w"))
         page = open(index.build(camp)).read()
         self.assertIn('<button data-sn="unit" title="divided by the files counter per op" aria-pressed="false">per file</button>', page)
-        unit, op = re.findall(r'<div class="summ" data-norm="(\w+)">.*?<script type="application/json">(.*?)</script>', page)
+        unit, op = re.findall(r'<div class="summ card-s" data-stat="mean" data-norm="(\w+)">.*?<script type="application/json">(.*?)</script>', page)
         self.assertEqual(unit[0], "unit")
         data = json.loads(re.search(r'data-norm="unit">.*?<script type="application/json">(.*?)</script>', page).group(1))
-        self.assertIn({"k": "ev:LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS/cycles", "h": "LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS % of cycles"}, data["metrics"])
+        self.assertIn({"k": "ev:LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS/cycles", "h": "LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS % of cycles", "kind": "pct"}, data["metrics"])
         cycles = [m["k"] for m in data["metrics"]].index("cycles")
-        self.assertEqual(data["rows"][1]["m"][cycles][0], "41.1M")  # 80G / 1948: per file, the same cycles at 1.03x
-        self.assertAlmostEqual(data["rows"][1]["m"][cycles][3], 100 * (80e9 / 1948 / (20e9 / 487) - 1))
+        self.assertEqual(data["rows"][1]["m"]["mean"][cycles][0], "41.1M")  # 80G / 1948: per file, the same cycles at 1.03x
+        self.assertAlmostEqual(data["rows"][1]["m"]["mean"][cycles][3], 100 * (80e9 / 1948 / (20e9 / 487) - 1))
         import contextlib, io
         out = io.StringIO()
         with contextlib.redirect_stdout(out):

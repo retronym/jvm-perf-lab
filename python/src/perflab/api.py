@@ -183,9 +183,11 @@ define("Stat", "One metric of one variant (or commit) on one corpus, over its fo
     "n": I("Forks"), "df": null(N("Degrees of freedom of sd (n − 1, or the pool's)")),
     "pooled": B("One fork: sd is the fork-to-fork relative sd pooled over the corpus's variants with two or more"),
     "shown": S("The mean as the index shows it, with its unit (e.g. 5.25 s, 1.2 GB)"),
+    "median": null(N("The median of every measurement iteration of the forks, pooled; null without per-iteration samples")),
+    "min": null(N("The least measurement iteration of the forks, pooled; null without per-iteration samples")),
     "ciShown": S("The CI half-width as the index shows it ('' without one)"),
     "delta": null({**ref("Delta"), "description": "Δ against the baseline (campaign, compare) or the previous measured commit (branch)"})},
-    optional=("delta",))
+    optional=("delta", "median", "min"))
 define("MetricInfo", "A metric the cells recorded (perflab.metrics.of)", {
     "key": METRIC_KEY, "label": S("Its label, with its unit: e.g. ms/op, cycles/op, alloc/op (bytes), IPC, JIT % of cycles"),
     "kind": S("score: the benchmark's primary score (its unit in the label); count: events per op; alloc: bytes per op; "
@@ -867,25 +869,27 @@ def _results(d, corpus, variant):
 
 
 def _forks(rs, per_unit):
-    """Per metric, the forks' means (a metric without rawData: each round's value), and the metrics' (label, kind, main)."""
+    """Per metric, the forks' means (a metric without rawData: each round's value), the metrics' (label, kind, main),
+    and per metric the forks' measurement iterations (none without rawData)."""
     of = [metrics.of(r, per_unit, metrics.cached_hw_events(c)) for r, c in rs]
-    cols, us = {}, {}
+    cols, us, raw = {}, {}, {}
     for ms in of:
         for k, label, kind, main, _ in ms:
             cols.setdefault(k, (k, label, kind, main))
     for k in cols:
         forks = [f for (r, _) in rs for f in branchview.raw_of(r, k, metrics.units_per_op(r, per_unit) if per_unit else 1.0) if f]
         us[k] = [sum(f) / len(f) for f in forks] or [x for ms in of for kk, _, _, _, x in ms if kk == k and branchview.fin(x) is not None]
-    return us, cols
+        raw[k] = forks
+    return us, cols, raw
 
 
 def _stats(per_v, per_unit):
     """{variant: (forks' means by metric, cols)} -> {variant: {metric: Stat}}, the pooled sd for one of few forks (metrics.fork_spread)."""
-    stat = {v: {k: (*metrics.stats(xs), len(xs)) for k, xs in us.items() if xs} for v, (us, _) in per_v.items()}
+    stat = {v: {k: (*metrics.stats(xs), len(xs)) for k, xs in us.items() if xs} for v, (us, *_) in per_v.items()}
     keys = {k for st in stat.values() for k in st}
     pool = {k: metrics.pooled_rel_sd([(st[k][0], st[k][1], st[k][2] - 1) for st in stat.values() if k in st]) for k in keys}
     out = {}
-    for v, (us, cols) in per_v.items():
+    for v, (us, cols, raw) in per_v.items():
         out[v] = {}
         for k, (mean, sd, n) in stat[v].items():
             kind = cols[k][2]
@@ -895,6 +899,7 @@ def _stats(per_v, per_unit):
             out[v][k] = {"mean": f(mean), "sd": f(sd), "ci": f(ci), "n": n, "df": f(df),
                          "pooled": pooled, "shown": metrics.fmt(kind, mean),
                          "ciShown": "" if ci is None else branchview.ci_shown(kind, ci, mean),
+                         "median": f(metrics.pooled(raw.get(k, []), "median")), "min": f(metrics.pooled(raw.get(k, []), "min")),
                          "_ok": metrics.delta_ok(mean, kind, per_unit)}
     return out
 

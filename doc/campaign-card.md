@@ -1,6 +1,6 @@
 # The campaign card, rethought
 
-Status: proposal, for review.
+Status: built (index.card_summary, metrics.pooled_delta, the index's SUMMARY_JS).
 
 ## The problem
 
@@ -43,8 +43,9 @@ The chart view becomes a box-and-strip plot per variant (per corpus) instead of 
 - `metrics.summarise` grows the median and min statistics with their bootstrap interval. The API's Stat gains `median` and `min` beside `mean`, so `compare` can answer with any of them.
 - The branch view's commit popover already shows fork means. It moves to the same panel, so the A/B card, the branch history and paired campaigns share one distribution component.
 
-## Open questions
+## Decisions
 
-1. Median and min over **pooled iterations** (proposed), or over **fork medians** and **fork minima**? Pooled uses every sample; per-fork keeps the fork as the unit. The bootstrap's resampling of forks gives pooled statistics a per-fork interval anyway.
-2. Which statistic is the default? I'd keep mean, so verdicts don't change under anyone's feet.
-3. Keep the pivot view? With expandable rows and a better chart, I'd drop it unless you use it.
+1. Median and min are over pooled iterations. The bootstrap resamples forks, then iterations within each fork, so their spread still treats the fork as the unit of variation. It is the bootstrap's sd of Δ, like the mean's spread over rounds, so the better/worse/flat verdict reads the same for every statistic. The bootstrap is seeded, so a refresh doesn't change it.
+2. The default statistic is the mean, so no verdict changes under anyone's feet.
+3. The pivot view is gone. The chart's second scale is the distribution (box p25–p75, whiskers min–max, median line, mean dot, every iteration beneath). A paired campaign, whose cells are forks shared by every variant, keeps its own summary and cells table and the chart's absolute scale.
+4. The API's Stat has `median` and `min` (pooled, as on the card) beside `mean`, in `campaign` and `compare`. Their Δ stays on the card for now.

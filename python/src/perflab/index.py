@@ -7,7 +7,7 @@ each cell, `perflab run` at its start and end, and the page refreshes itself.
 
   perflab index [<campaigns-dir> [<runs-dir>]]
 """
-import glob, html, json, math, os, re, sys, time
+import collections, glob, html, json, math, os, re, sys, time
 
 from . import ab, branchview, config, jmh, kperf, loadgate, metrics, regraph, runinfo, specs, timeline, ui
 
@@ -127,6 +127,19 @@ def cell_row(spec, corpus, variant, cell):
             (variant, p["score"], cyc, ins, version, alloc, m, p.get("scoreUnit", ""), r, cell))
 
 
+def cell_rec(row, corpus, variant, cell):
+    """`cell_row`'s cell as `card_summary` takes it."""
+    (attrs, tds, detail), when, _, data = row
+    ver = specs.of_cell(cell)
+    n = int(os.path.basename(cell))
+    state = "done" if data else "running" if 'class="badge running"' in tds[2] else "interrupted"
+    return {"c": corpus, "v": variant, "round": n, "state": state, "data": data, "cell": cell, "when": when,
+            "attrs": attrs.replace(' data-running="1"', ""), "detail": detail,
+            "name": f'#{n}' + (f' <span class="when ver" title="spec version">spec {esc(ver)}</span>' if ver else "")
+                    + f' <span class="when">{stamp(when)}</span>',
+            "flags": (tds[6] if len(tds) > 6 else "")}
+
+
 def score_head(units, suffix=""):
     """The score column's name: its unit (µs/op), else "score"."""
     return (esc(unit(next(iter(units)))) if len(units) == 1 and next(iter(units)) else "score") + suffix
@@ -185,6 +198,152 @@ def metric_summary(cells, order, per_unit, norm=None):
     return views(heads, out, [(k, head(k, label)) for k, label, _, _ in cols], data, norm)
 
 
+def iteration_log(cell, u=1.0):
+    """The cell's warmup scores and which measured iterations other load disturbed, per fork, from iterations.tsv and
+    the load gate's load.json: ([[warmup score, ...] per fork], [[measured iteration disturbed?, ...] per fork])."""
+    tsv = os.path.join(cell, "iterations.tsv")
+    try:
+        rows = open(tsv).read().splitlines()
+    except OSError:
+        return [], []
+    try:
+        disturbed = set(json.load(open(os.path.join(cell, ab.LOAD_CHECK))).get("disturbed") or [])
+    except (OSError, ValueError):
+        disturbed = set()
+    head = rows[0].split("\t") if rows else []
+    if not {"kind", "pid", "score", "index"} <= set(head):
+        return [], []
+    col = {h: i for i, h in enumerate(head)}
+    warm, dist = {}, {}
+    for row in rows[1:]:
+        x = row.split("\t")
+        if len(x) < len(head):
+            continue
+        pid = x[col["pid"]]
+        if x[col["kind"]] == "warmup":
+            try:
+                warm.setdefault(pid, []).append(float(x[col["score"]]) / u)
+            except ValueError:
+                pass
+        elif x[col["kind"]] == "measure":
+            try:
+                dist.setdefault(pid, []).append(int(x[col["index"]]) in disturbed)
+            except ValueError:
+                pass
+    pids = list(dict.fromkeys(list(warm) + list(dist)))
+    return [warm.get(p, []) for p in pids], [dist.get(p, []) for p in pids]
+
+
+STAT_TITLE = {"mean": "the mean over rounds of each round's mean, ± the sd over rounds; Δ ± its spread over rounds",
+              "median": "the median of every measured iteration, the forks pooled; Δ ± the sd of a bootstrap over forks and iterations",
+              "min": "the fastest measured iteration, the forks pooled; Δ ± the sd of a bootstrap over forks and iterations"}
+
+
+def card_summary(recs, order, planned, per_unit=None, norm=None):
+    """A campaign's summary and cells as one table: a row per corpus and variant, its cells as rows beneath (hidden
+    until it is expanded), every value as mean, median and min (the card's statistic switch picks one). `recs` are
+    the cells (dicts from `cell_rec`), `planned` the (corpus, variant, round)s of the spec. The page's data: per row
+    its values per statistic, per cell its iterations per fork per metric, for the hover panel and the chart."""
+    by = {}
+    for r in recs:
+        by.setdefault(r["c"], {}).setdefault(r["v"], []).append(r)
+    for c, v, rnd in planned:
+        if not any(r["round"] == rnd for r in by.get(c, {}).get(v, [])):
+            by.setdefault(c, {}).setdefault(v, []).append({"c": c, "v": v, "round": rnd, "state": "pending", "data": None})
+    cols = {}
+    for c in by:
+        for v in by[c]:
+            for r in by[c][v]:
+                if r["data"]:
+                    hw = metrics.cached_hw_events(r["cell"])
+                    r["of"] = metrics.of(r["data"][8], per_unit, hw)
+                    u = metrics.units_per_op(r["data"][8], per_unit) if per_unit else 1.0
+                    r["raw"] = {k: f for k, *_ in r["of"] if (f := [x for x in branchview.raw_of(r["data"][8], k, u) if x])}
+                    r["warm"], r["dist"] = iteration_log(r["cell"], u or 1.0)
+                    for k, label, kind, main, _ in r["of"]:
+                        cols.setdefault(k, (k, label, kind, main))
+    cols = list(cols.values())
+    main = [x for x in cols if x[3]]
+    rows, data_rows, data_cells = [], [], []
+    for corpus in sorted(by):
+        vs = by[corpus]
+        names = [v for v in order if v in vs] + sorted(v for v in vs if v not in order)
+        done = {v: sorted((r for r in vs[v] if r["data"]), key=lambda r: r["round"]) for v in names}
+        _, st = metrics.summarise({v: [r["of"] for r in done[v]] for v in names if done[v]}, per_unit)
+        base = next((v for v in names if done[v]), None)
+        forks = lambda v, k: [f for r in done.get(v, []) for f in r["raw"].get(k, [])]
+        for v in names:
+            i = len(data_rows)
+            vals, ms = [], {s: [] for s in metrics.STATS}
+            for k, label, kind, is_main in cols:
+                cell_html = {}
+                for stat in metrics.STATS:
+                    if stat == "mean":
+                        if k not in st.get(v, {}):
+                            ms[stat].append(None); cell_html[stat] = ""; continue
+                        mean, sd, d, spread, ok = st[v][k]
+                        shown = metrics.fmt(kind, mean)
+                        rel_sd = f' <span class="pm">± {100 * sd / mean:.1f}%</span>' if sd is not None and mean else ""
+                        ms[stat].append(view_metric(shown, mean, sd, d, spread, ok))
+                        cell_html[stat] = with_delta(f"{shown}{rel_sd}", "" if d is None else delta(d, spread, ok))
+                    else:
+                        x, d, spread, ok = metrics.pooled_delta(forks(base, k) if v != base else None, forks(v, k), stat, kind, per_unit)
+                        if x is None:
+                            ms[stat].append(None); cell_html[stat] = '<span class="k" title="no per-iteration samples">–</span>' if k in st.get(v, {}) else ""; continue
+                        shown = metrics.fmt(kind, x)
+                        ms[stat].append(view_metric(shown, x, None, d, spread, ok))
+                        cell_html[stat] = with_delta(shown, "" if d is None else delta(d, spread, ok))
+                if is_main:
+                    vals.append(f'<td class="n" data-k="{esc(k)}" data-row="{i}">' + "".join(
+                        f'<span class="st st-{stat}">{cell_html[stat]}</span>' for stat in metrics.STATS) + "</td>")
+            cells = sorted(vs[v], key=lambda r: r["round"])
+            n = len(done[v])
+            states = collections.Counter(r["state"] for r in cells if r["state"] != "done")
+            pend = " ".join(f'<span class="badge {s}">{m} {s}</span>' for s, m in states.items())
+            rows.append(f'<tr class="sr" data-row="{i}" data-key="{esc(corpus)}|{esc(v)}" data-corpus="{esc(corpus)}"><td><button class="exp" aria-expanded="false" title="Its cells (+ / − expand or collapse all)">▸</button>'
+                        f'{esc(corpus)}{mixed({w: [r["data"] for r in rs if r["data"]] for w, rs in vs.items()}) if v == names[0] else ""}</td><td>{esc(v)}</td><td class="n">{n}{" " + pend if pend else ""}</td>{"".join(vals)}</tr>')
+            cell_ids = []
+            for r in cells:
+                j = len(data_cells)
+                cell_ids.append(j)
+                data_cells.append({"c": corpus, "v": v, "r": r["round"], "state": r["state"], "raw": r.get("raw", {}),
+                                   "warm": r.get("warm", []), "dist": r.get("dist", [])})
+                tds = []
+                for k, label, kind, is_main in main:
+                    if not r["data"]:
+                        tds.append("<td></td>"); continue
+                    own = dict((kk, x) for kk, _, _, _, x in r["of"])
+                    if k not in own:
+                        tds.append("<td></td>"); continue
+                    p = r["data"][8]["primaryMetric"]
+                    mean_html = metrics.fmt(kind, own[k]) + (f' <span class="pm">± {num(p["scoreError"], p["score"])}</span>'
+                                                              if k == "score" and not per_unit and isinstance(p.get("scoreError"), (int, float)) and math.isfinite(p["scoreError"]) else "")
+                    parts = {"mean": mean_html}
+                    for stat in ("median", "min"):
+                        x = metrics.pooled(r["raw"].get(k, []), stat)
+                        parts[stat] = metrics.fmt(kind, x) if x is not None else '<span class="k">–</span>'
+                    tds.append(f'<td class="n" data-k="{esc(k)}" data-cell="{j}">' + "".join(f'<span class="st st-{s}">{parts[s]}</span>' for s in metrics.STATS) + "</td>")
+                badge = "" if r["state"] == "done" else f' <span class="badge {r["state"]}">{r["state"]}</span>'
+                name = r.get("name") or f"#{r['round']}"
+                attrs = r.get("attrs") or f' data-corpus="{esc(corpus)}"'
+                rows.append(f'<tr class="sub" data-of="{i}"{attrs} hidden><td></td><td>{name}{badge}</td><td></td>{"".join(tds)}</tr>')
+                extra = r.get("detail") or ""
+                if r.get("flags"):
+                    extra += f'<details class="flags"><summary>flags</summary>{r["flags"]}</details>'
+                if extra:
+                    rows.append(f'<tr class="sub sd" data-of="{i}" data-corpus="{esc(corpus)}" hidden><td></td><td colspan="{2 + len(main)}">{extra}</td></tr>')
+            data_rows.append({"c": corpus, "v": v, "n": n, "base": base, "cells": cell_ids, "m": ms})
+    units = {r["data"][7] for c in by.values() for rs in c.values() for r in rs if r["data"]}
+    head = lambda k, label: (esc(unit(label)) if per_unit else score_head(units)) if k == "score" else esc(label)
+    heads = ([f"<th>{esc(config.get().corpus_param)}</th>", "<th>variant</th>", "<th class=n>rounds</th>"]
+             + [f'<th class="n">{head(k, label)}</th>' for k, label, _, _ in main])
+    table = f'<div class="scroll"><table class="t summary card-t"><tr>{"".join(heads)}</tr>{"".join(rows)}</table></div>'
+    blob = json.dumps({"metrics": [{"k": k, "h": head(k, label), "kind": kind} for k, label, kind, _ in cols],
+                       "rows": data_rows, "cells": data_cells}, separators=(",", ":")).replace("</", "<\\/")
+    return (f'<div class="summ card-s" data-stat="mean"{f" data-norm={chr(34)}{norm}{chr(34)}" if norm else ""}><div class="sv-table">{table}</div><div class="sv-alt"></div>'
+            f'<script type="application/json">{blob}</script></div>')
+
+
 def verdict(d, spread=None, ok=True):
     """A percent change's class: better or worse when the spread over rounds or forks doesn't cross zero (lower is
     better for every metric here), flat when it does or is unknown, na when the base is about zero."""
@@ -221,11 +380,9 @@ def view_metric(text, mean, sd, d, spread, ok):
 HISTORY_VIEW = ("history", "History: a row per commit, newest first, a column per corpus",
                 '<path d="M4.5 2v12"/><circle cx="4.5" cy="4.5" r="1.6" fill="currentColor"/><circle cx="4.5" cy="11.5" r="1.6" fill="currentColor"/>'
                 '<path d="M8 4.5h5.5M8 11.5h5.5M8 8h3.5"/>')
-VIEWS = (("table", "Table: a row per corpus and variant",
+VIEWS = (("table", "Table: a row per corpus and variant, its cells beneath (▸)",
           '<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M2.5 9.75h11"/>'),
-         ("pivot", "Pivot: corpora as columns, a row per variant and metric",
-          '<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M2.5 9.75h11M6.2 3v10M9.85 3v10"/>'),
-         ("chart", "Chart: Δ against the first variant with its spread, or the values themselves",
+         ("chart", "Chart: Δ against the first variant with its spread, or each variant's distribution",
           '<path d="M8 2v12"/><rect x="8" y="3.5" width="5.5" height="2.4" fill="currentColor" stroke="none"/>'
           '<rect x="3" y="6.8" width="5" height="2.4" fill="currentColor" stroke="none"/><rect x="8" y="10.1" width="3" height="2.4" fill="currentColor" stroke="none"/>'))
 def view_toggle(views):
@@ -248,6 +405,11 @@ def views(heads, rows, metrics, data, norm=None):
     blob = json.dumps({"metrics": [{"k": k, "h": h} for k, h in metrics], "rows": data}).replace("</", "<\\/")
     return (f'<div class="summ"{f" data-norm={chr(34)}{norm}{chr(34)}" if norm else ""}><div class="sv-table">{table(heads, rows, "t summary")}</div><div class="sv-alt"></div>'
             f'<script type="application/json">{blob}</script></div>')
+
+
+STAT_TOGGLE = ('<span class="sv-tg sv-stat" role="group" aria-label="statistic">'
+               + "".join(f'<button data-ss="{x}" title="{STAT_TITLE[x]}" aria-pressed="{str(x == "mean").lower()}">{x}</button>' for x in metrics.STATS)
+               + "</span>")
 
 
 def norm_toggle(per_unit):
@@ -408,9 +570,10 @@ def short_jvm(jvm):
     return "~" + jvm[len(home):] if jvm.startswith(home + "/") else jvm
 
 
-def summary_block(about, summ, history, norm=""):
+def summary_block(about, summ, history, norm="", stat=False):
     """A campaign's Summary: its views (table, pivot, chart), and for a branch campaign its history (perflab.branchview)
     as the first of them; each view's note in the heading."""
+    norm = (STAT_TOGGLE if stat else "") + norm
     if not history:
         return sub("Summary", about, VIEW_TOGGLE + norm) + summ if summ else ""
     note, help_, body = history
@@ -637,8 +800,22 @@ footer{max-width:1400px;margin:0 auto;padding:0 20px 30px;color:var(--muted);fon
 .sv-tg button[aria-pressed=true]{background:var(--link-bg);color:var(--link)}
 .sv-tg svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.3} .sv-norm button{font:12px/16px inherit}
 .sv-ctl{display:flex;flex-wrap:wrap;gap:4px 18px;margin:8px 0 4px}
-table.pivot td{border-bottom:0} table.pivot tr.g0 td{border-top:1px solid var(--line2)} table.pivot tr:nth-child(2) td{border-top:0}
-table.pivot td.mk{color:var(--muted);font-size:12px} table.pivot td.dd{padding-left:2px;text-align:left} table.pivot td.gm{border-left:1px solid var(--line2)}
+.card-s .st{display:none} .card-s[data-stat=mean] .st-mean,.card-s[data-stat=median] .st-median,.card-s[data-stat=min] .st-min{display:inline}
+.sv-stat button{font:12px/16px inherit}
+table.card-t tr.sr td{border-top:1px solid var(--line2)} table.card-t .exp{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 4px 0 0;font-size:11px;width:14px}
+table.card-t .exp:hover{color:var(--fg)} table.card-t tr.sub td{border-bottom:0;background:var(--panel2,transparent);font-size:12.5px}
+table.card-t tr.sub td:nth-child(2){padding-left:18px;white-space:nowrap} table.card-t tr.sd td{padding-top:0;text-align:left!important}
+table.card-t tr.sd .flags{display:inline-block;vertical-align:top;margin-left:8px;font-size:12px} table.card-t tr.sd .flags summary{cursor:pointer;color:var(--muted)}
+table.card-t tr.sd .flags code{display:block;font-size:11px;color:var(--muted);white-space:normal;overflow-wrap:anywhere;max-width:900px} table.card-t tr.sd .cellg{display:inline}
+table.card-t td[data-k]{cursor:default} table.card-t td[data-k]:hover{background:var(--link-bg)} table.card-t td .badge{margin-left:4px}
+.sv-dist{display:grid;grid-template-columns:1fr;gap:6px}
+svg.sv-c .med{stroke:var(--fg);stroke-width:1.6} svg.sv-c .mean{fill:var(--link)} svg.sv-c .it{fill:var(--muted);opacity:.6}
+.sv-tip{position:fixed;z-index:50;width:380px;max-width:calc(100vw - 16px);background:var(--panel);border:1px solid var(--line);border-radius:8px;
+  box-shadow:0 6px 24px rgba(0,0,0,.25);padding:8px 10px;font-size:12px;pointer-events:none}
+.sv-tip svg{width:100%;height:auto;display:block;margin:4px 0;overflow:visible} .sv-tip svg text{font-size:10px;fill:var(--muted)}
+.sv-tip .tmed{stroke:var(--fg);stroke-width:.8;opacity:.5} .sv-tip .tbase{stroke:var(--muted);stroke-width:.8;stroke-dasharray:3 3}
+.sv-tip .box{fill:var(--muted);opacity:.4} .sv-tip .med{stroke:var(--fg);stroke-width:1.6} .sv-tip .mean{fill:var(--link)} .sv-tip .wh{stroke:var(--fg);opacity:.6}
+.sv-tip .it{fill:var(--muted);opacity:.7} .sv-tip .nums{font:11px ui-monospace,monospace;margin-top:2px;overflow-wrap:anywhere}
 .sv-charts{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:10px 28px;margin:6px 0 8px}
 .sv-charts figure{margin:0} .sv-charts figcaption{font-size:12px;font-weight:600;margin:0 0 2px} .sv-charts figcaption .k{font-weight:normal}
 .sv-abs{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px 16px}
@@ -656,7 +833,9 @@ svg.sv-c .wh{stroke:var(--fg);stroke-width:1.2;opacity:.7}
 # (or of the values, a panel per corpus). The view, metrics and scale are remembered in this browser; `apply` redraws.
 SUMMARY_JS = r"""
 const SV = (() => { try { return JSON.parse(localStorage.getItem('perflab.summary')) || {}; } catch (e) { return {}; } })();
-SV.view = SV.view || 'table'; SV.bview = SV.bview || 'history'; SV.metrics = SV.metrics || ['score']; SV.scale = SV.scale || 'delta'; SV.norm = SV.norm || 'unit';
+SV.view = SV.view === 'pivot' ? 'table' : SV.view || 'table'; SV.bview = SV.bview === 'pivot' ? 'table' : SV.bview || 'history';
+SV.metrics = SV.metrics || ['score']; SV.scale = SV.scale || 'delta'; SV.norm = SV.norm || 'unit'; SV.stat = SV.stat || 'mean';
+const svOpen = new Set();  // the card rows expanded to their cells: section id|corpus|variant
 const svOff = {};  // per campaign: the variants switched off
 let svCorpora = new Set();
 const svEsc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
@@ -680,17 +859,31 @@ function drawSummaries(corpora) {
   // a campaign with a "perUnit" has its summary per unit and per op: the one picked shows
   document.querySelectorAll('.sv-tg button[data-sn]').forEach(b => b.setAttribute('aria-pressed', b.dataset.sn === SV.norm));
   for (const el of document.querySelectorAll('.summ[data-norm]')) el.hidden = el.dataset.norm !== SV.norm;
+  document.querySelectorAll('.sv-tg button[data-ss]').forEach(b => b.setAttribute('aria-pressed', b.dataset.ss === SV.stat));
+  for (const el of document.querySelectorAll('.card-s')) el.dataset.stat = SV.stat;
+  for (const tr of document.querySelectorAll('.card-t tr.sr')) svExpand(tr, svOpen.has(svKey(tr)));
   for (const el of document.querySelectorAll('.summ:not([hidden])')) drawSummary(el);
+}
+const svKey = tr => tr.closest('section').id + '|' + tr.dataset.key;
+function svExpand(tr, on) {
+  const b = tr.querySelector('.exp');
+  if (b) { b.setAttribute('aria-expanded', on); b.textContent = on ? '▾' : '▸'; }
+  for (const sub of tr.closest('table').querySelectorAll(`tr.sub[data-of="${tr.dataset.row}"]`)) sub.hidden = !on;
+  if (on) svOpen.add(svKey(tr)); else svOpen.delete(svKey(tr));
 }
 function svModel(el) {
   const data = el._d || (el._d = JSON.parse(el.querySelector('script').textContent));
   const off = svOff[el.closest('section').id] = svOff[el.closest('section').id] || new Set();
-  const ms = data.metrics.map((m, i) => ({...m, i})).filter(m => data.rows.some(r => r.m[m.i]));
+  const statOf = r => Array.isArray(r.m) ? r.m : r.m[SV.stat] || r.m.mean || [];
+  const ms = data.metrics.map((m, i) => ({...m, i})).filter(m => data.rows.some(r => statOf(r)[m.i] || (r.m.mean || [])[m.i]));
   let sel = ms.filter(m => SV.metrics.includes(m.k)); if (!sel.length) sel = ms.slice(0, 1);
   const variants = [...new Set(data.rows.map(r => r.v))];
   const corpora = [...new Set(data.rows.map(r => r.c))].filter(c => !svCorpora.size || svCorpora.has(c));
-  const cell = (c, v) => (data.rows.find(r => r.c === c && r.v === v) || {m: []}).m;
-  return {ms, sel, variants, base: variants[0], vs: variants.filter(v => !off.has(v)), off, corpora, cell};
+  const rowOf = (c, v) => data.rows.find(r => r.c === c && r.v === v);
+  const cell = (c, v) => { const r = rowOf(c, v); return r ? statOf(r) : []; };
+  // a row's iterations of a metric, per fork, its cells' together
+  const forks = (c, v, k) => { const r = rowOf(c, v); return !r || !data.cells ? [] : r.cells.flatMap(j => (data.cells[j].raw || {})[k] || []); };
+  return {ms, sel, variants, base: variants[0], vs: variants.filter(v => !off.has(v)), off, corpora, cell, forks, raw: !!data.cells};
 }
 function drawSummary(el) {
   const view = svView(el);
@@ -701,29 +894,13 @@ function drawSummary(el) {
   let ctl = `<span class="fg"><span class="fl">metric</span>${m.ms.map(x => chip('data-sm', x.k, m.sel.includes(x), x.h)).join('')}</span>`;
   if (m.variants.length > 2)
     ctl += `<span class="fg"><span class="fl">variant</span>${m.variants.map(v => chip('data-svv', v, !m.off.has(v), svEsc(v))).join('')}</span>`;
+  const other = m.raw ? ['dist', 'distribution', "each variant's iterations: box from p25 to p75, whiskers min to max, the median a line, the mean a dot"]
+                      : ['abs', 'abs', 'the values, from zero'];
+  const scale = SV.scale === 'delta' ? 'delta' : other[0];
   if (view === 'chart')
-    ctl += `<span class="fg"><span class="fl">scale</span>${chip('data-sc', 'delta', SV.scale === 'delta', 'Δ %', 'against ' + svEsc(m.base))}${chip('data-sc', 'abs', SV.scale === 'abs', 'abs', 'the values, from zero')}</span>`;
+    ctl += `<span class="fg"><span class="fl">scale</span>${chip('data-sc', 'delta', scale === 'delta', 'Δ %', 'against ' + svEsc(m.base) + ', the ' + SV.stat + "'s")}${chip('data-sc', other[0], scale !== 'delta', other[1], other[2])}</span>`;
   alt.innerHTML = `<div class="sv-ctl">${ctl}</div>` + (!m.corpora.length ? '<p class="k">No corpus matches the filter.</p>'
-    : view === 'pivot' ? svPivot(m) : `<div class="sv-charts">${m.sel.map(x => SV.scale === 'abs' ? svAbs(m, x) : svBars(m, x)).join('')}</div>`);
-}
-// a row per variant and metric, the metrics of a variant aligned beneath each other; per corpus its value and Δ
-function svPivot({sel, vs, base, corpora, cell}) {
-  const multi = sel.length > 1, geo = corpora.length >= 3;
-  let h = '<div class="scroll"><table class="t pivot"><tr><th>variant</th>' + (multi ? '<th>metric</th>' : '')
-    + corpora.map(c => `<th class="n">${svEsc(c)}</th><th></th>`).join('')
-    + (geo ? `<th class="n" title="the geometric mean over the corpora shown of each corpus's ratio to ${svEsc(base)}">geomean Δ</th>` : '') + '</tr>';
-  for (const v of vs) sel.forEach((m, j) => {
-    h += `<tr class="${j ? '' : 'g0'}">` + (j ? '' : `<td rowspan="${sel.length}">${svEsc(v)}</td>`) + (multi ? `<td class="mk">${m.h}</td>` : '');
-    const logs = [];
-    for (const c of corpora) {
-      const x = cell(c, v)[m.i], b = cell(c, base)[m.i];
-      h += `<td class="n">${x ? x[0] + svPm(x) : ''}</td><td class="dd">${x && x[3] != null ? svDelta(x) : ''}</td>`;
-      if (x && b && x[1] > 0 && b[1] > 0) logs.push(Math.log(x[1] / b[1]));
-    }
-    if (geo) h += `<td class="n gm">${v !== base && logs.length ? svPct(100 * (Math.exp(logs.reduce((a, y) => a + y, 0) / logs.length) - 1)) : ''}</td>`;
-    h += '</tr>';
-  });
-  return h + '</table></div>';
+    : `<div class="sv-charts">${m.sel.map(x => scale === 'dist' ? svDist(m, x) : scale === 'abs' ? svAbs(m, x) : svBars(m, x)).join('')}</div>`);
 }
 const svStep = span => { const p = Math.pow(10, Math.floor(Math.log10(span / 4))), r = span / 4 / p; return p * (r >= 5 ? 5 : r >= 2 ? 2 : 1); };
 // Δ% against the first variant per corpus and variant, whiskers the spread; coloured only when the spread doesn't cross zero
@@ -784,13 +961,121 @@ function svAbs({vs, base, corpora, cell}, m) {
   });
   return `<figure><figcaption>${m.h} <span class="k">from zero; coloured by Δ against ${svEsc(base)}</span></figcaption><div class="sv-abs">${panels.join('')}</div></figure>`;
 }
+// each variant's iterations of metric `m`, a panel per corpus (their scales differ): box p25-p75, whiskers min-max,
+// the median a line, the mean a dot, every iteration a faint dot beneath
+function svDist({vs, base, corpora, forks}, m) {
+  const W = 440, L = 90, R = 16, RH = 22;
+  const panels = corpora.map(c => {
+    const xs = vs.map(v => forks(c, v, m.k).flat()), all = xs.flat();
+    if (!all.length) return `<p class="k">${svEsc(c)}: no per-iteration samples</p>`;
+    let lo = Math.min(...all), hi = Math.max(...all); if (hi === lo) { lo *= 0.99; hi *= 1.01; }
+    const X = x => L + (x - lo) / (hi - lo) * (W - L - R);
+    let s = `<text class="grp" x="0" y="11">${svEsc(c)}</text>`, y = 16;
+    vs.forEach((v, i) => {
+      const d = svDescribe(xs[i]);
+      s += `<text class="lab" x="${L - 6}" y="${y + 12}" text-anchor="end">${svEsc(v)}</text>`;
+      if (d) {
+        const cls = v === base ? 'base' : 'flat';
+        s += `<path class="wh" d="M${X(d.min)} ${y + 9}H${X(d.max)}"/>`
+          + `<rect class="${cls}" x="${X(d.p25)}" y="${y + 3}" width="${Math.max(1, X(d.p75) - X(d.p25))}" height="12" rx="1.5" opacity="0.55"><title>${svEsc(c)} · ${svEsc(v)}: ${svStats(d, m.kind)}</title></rect>`
+          + `<path class="med" d="M${X(d.median)} ${y + 1}v16"/><circle class="mean" cx="${X(d.mean)}" cy="${y + 9}" r="2.4"/>`
+          + xs[i].map((x, j) => `<circle class="it" cx="${X(x).toFixed(1)}" cy="${y + 18 + (j % 3)}" r="0.9"/>`).join('');
+      }
+      y += RH;
+    });
+    const ticks = [lo, (lo + hi) / 2, hi].map(t => `<text x="${X(t)}" y="${y + 10}" text-anchor="middle">${svFmt(t, m.kind)}</text>`).join('');
+    return `<svg class="sv-c" viewBox="0 0 ${W} ${y + 14}">${s}${ticks}</svg>`;
+  });
+  return `<figure><figcaption>${m.h} <span class="k">every measured iteration; box p25–p75, whiskers min–max, line the median, dot the mean</span></figcaption><div class="sv-dist">${panels.join('')}</div></figure>`;
+}
+function svDescribe(xs) {
+  if (!xs || !xs.length) return null;
+  const a = [...xs].sort((x, y) => x - y), q = p => a[Math.min(a.length - 1, Math.max(0, Math.round(p * (a.length - 1))))];
+  const mean = a.reduce((s, x) => s + x, 0) / a.length;
+  const sd = a.length > 1 ? Math.sqrt(a.reduce((s, x) => s + (x - mean) ** 2, 0) / (a.length - 1)) : 0;
+  const median = a.length % 2 ? a[(a.length - 1) / 2] : (a[a.length / 2 - 1] + a[a.length / 2]) / 2;
+  return {n: a.length, min: a[0], p25: q(0.25), median, mean, p75: q(0.75), max: a[a.length - 1], cv: mean ? sd / mean : null};
+}
+function svFmt(x, kind) {
+  const a = Math.abs(x);
+  if (kind === 'alloc') return a >= 1e9 ? (x / 1e9).toFixed(2) + 'GB' : a >= 1e6 ? (x / 1e6).toFixed(1) + 'MB' : a >= 1e3 ? (x / 1e3).toFixed(1) + 'kB' : x.toFixed(0) + 'B';
+  if (kind === 'count' || kind === 'total') return a >= 1e9 ? (x / 1e9).toPrecision(3) + 'G' : a >= 1e6 ? (x / 1e6).toPrecision(3) + 'M' : a >= 1e3 ? (x / 1e3).toPrecision(3) + 'k' : x.toPrecision(3);
+  if (kind === 'pct') return x.toFixed(1) + '%';
+  return a >= 100 ? Math.round(x).toLocaleString() : x.toPrecision(4);
+}
+const svStats = (d, kind) => `n ${d.n} · min ${svFmt(d.min, kind)} · p25 ${svFmt(d.p25, kind)} · median ${svFmt(d.median, kind)} · mean ${svFmt(d.mean, kind)} · p75 ${svFmt(d.p75, kind)} · max ${svFmt(d.max, kind)}` + (d.cv != null ? ` · cv ${(100 * d.cv).toFixed(1)}%` : '');
+// the hover panel of a value in a card's table: its iterations in run order (a segment per fork, warmup faint,
+// iterations other load disturbed marked), against the baseline's on one axis, and their numbers
+const svTip = document.createElement('div'); svTip.className = 'sv-tip'; svTip.hidden = true;
+if (document.body) document.body.appendChild(svTip); else document.addEventListener('DOMContentLoaded', () => document.body.appendChild(svTip));
+function svPanel(td) {
+  const el = td.closest('.card-s'), data = el._d || (el._d = JSON.parse(el.querySelector('script').textContent));
+  const k = td.dataset.k, mi = data.metrics.findIndex(x => x.k === k), metric = data.metrics[mi] || {h: k, kind: 'score'};
+  let cells, title, row;
+  if (td.dataset.cell != null) { const c = data.cells[+td.dataset.cell]; cells = [c]; row = data.rows.find(r => r.cells.includes(+td.dataset.cell)); title = `${c.c} · ${c.v} #${c.r}`; }
+  else { row = data.rows[+td.dataset.row]; cells = row.cells.map(j => data.cells[j]); title = `${row.c} · ${row.v}`; }
+  const forks = cells.flatMap(c => (c.raw[k] || []).map((f, i) => ({xs: f, warm: k === 'score' ? (c.warm[i] || []) : [], dist: c.dist[i] || []})));
+  if (!forks.length) return null;
+  const baseRow = row && row.base !== row.v ? data.rows.find(r => r.c === row.c && r.v === row.base) : null;
+  const baseXs = baseRow ? baseRow.cells.flatMap(j => (data.cells[j].raw[k] || []).flat()) : [];
+  const xs = forks.flatMap(f => f.xs), d = svDescribe(xs), bd = svDescribe(baseXs);
+  const W = 360, H = 70, all = forks.flatMap(f => [...f.warm, ...f.xs]), n = all.length;
+  // the scale spans the measured iterations, this row's and the baseline's: warmup beyond them is drawn at the edge
+  let lo = Math.min(...xs, ...baseXs), hi = Math.max(...xs, ...baseXs); if (hi === lo) { lo *= 0.99; hi *= 1.01; }
+  const Y = x => 6 + (1 - (Math.min(hi, Math.max(lo, x)) - lo) / (hi - lo)) * (H - 12), X = i => 4 + i / Math.max(1, n - 1) * (W - 8);
+  const COL = ['#4f8ef7', '#e8590c', '#2f9e44', '#ae3ec9', '#f08c00', '#1098ad'];
+  let i = 0, run = '';
+  forks.forEach((f, fi) => {
+    const col = COL[fi % COL.length], pts = [];
+    f.warm.forEach(x => { run += `<circle cx="${X(i).toFixed(1)}" cy="${Y(x).toFixed(1)}" r="1.3" fill="${col}" opacity="0.25"/>`; i++; });
+    f.xs.forEach((x, j) => { pts.push(`${X(i).toFixed(1)},${Y(x).toFixed(1)}`);
+      if (f.dist[j]) run += `<circle cx="${X(i).toFixed(1)}" cy="${Y(x).toFixed(1)}" r="3.2" fill="none" stroke="#e03131"><title>disturbed by other load</title></circle>`; i++; });
+    run += `<polyline points="${pts.join(' ')}" fill="none" stroke="${col}" stroke-width="1.4"/>`;
+  });
+  const hl = (x, cls) => `<line class="${cls}" x1="0" x2="${W}" y1="${Y(x).toFixed(1)}" y2="${Y(x).toFixed(1)}"/>`;
+  run = hl(d.median, 'tmed') + (bd ? hl(bd.median, 'tbase') : '') + run;
+  // against the baseline, on one axis
+  const SX = x => 60 + (x - lo) / (hi - lo) * (W - 70);
+  const strip = (ds, xs, y, label) => !ds ? '' : `<text x="56" y="${y + 4}" text-anchor="end">${svEsc(label)}</text>`
+    + `<path class="wh" d="M${SX(ds.min)} ${y}H${SX(ds.max)}"/><rect x="${SX(ds.p25)}" y="${y - 5}" width="${Math.max(1, SX(ds.p75) - SX(ds.p25))}" height="10" class="box"/>`
+    + `<path class="med" d="M${SX(ds.median)} ${y - 7}v14"/><circle class="mean" cx="${SX(ds.mean)}" cy="${y}" r="2.4"/>`
+    + xs.map((x, j) => `<circle class="it" cx="${SX(x).toFixed(1)}" cy="${y + 9 + (j % 3)}" r="0.9"/>`).join('');
+  const cmp = `<svg viewBox="0 0 ${W} ${bd ? 58 : 30}">${strip(d, xs, 10, row ? row.v : '')}${bd ? strip(bd, baseXs, 38, row.base) : ''}</svg>`;
+  return `<b>${svEsc(title)}</b> <span class="k">${metric.h}</span>`
+    + `<svg viewBox="0 0 ${W} ${H}" class="run">${run}</svg><div class="k">run order: a line per fork${forks.some(f => f.warm.length) ? ', warmup faint' : ''}; `
+    + `line: its median${bd ? ', dashed: ' + svEsc(row.base) + "'s" : ''}</div>${cmp}<div class="nums">${svStats(d, metric.kind)}</div>`
+    + (bd ? `<div class="nums k">${svEsc(row.base)}: ${svStats(bd, metric.kind)}</div>` : '');
+}
+document.addEventListener('mouseover', e => {
+  const td = e.target.closest && e.target.closest('.card-s td[data-k]');
+  if (!td) { if (!e.target.closest || !e.target.closest('.sv-tip')) svTip.hidden = true; return; }
+  if (svTip._td === td && !svTip.hidden) return;
+  const h = svPanel(td);
+  if (!h) { svTip.hidden = true; return; }
+  svTip.innerHTML = h; svTip._td = td; svTip.hidden = false;
+  const r = td.getBoundingClientRect(), w = svTip.offsetWidth, ht = svTip.offsetHeight;
+  svTip.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + 'px';
+  svTip.style.top = (r.bottom + ht + 8 > innerHeight ? r.top - ht - 6 : r.bottom + 6) + 'px';
+});
+addEventListener('scroll', () => { svTip.hidden = true; }, {passive: true});
+// + and − expand or collapse every row of the card under the pointer (else every card)
+let svHover = null;
+document.addEventListener('mouseover', e => { svHover = e.target.closest && e.target.closest('section.card'); });
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (e.key !== '+' && e.key !== '=' && e.key !== '-') return;
+  for (const tr of (svHover || document).querySelectorAll('.card-t tr.sr')) svExpand(tr, e.key !== '-');
+});
 document.addEventListener('click', e => {
-  const b = e.target.closest('[data-sv],[data-sm],[data-svv],[data-sc],[data-sn]');
+  const x = e.target.closest('.card-t .exp');
+  if (x) { const tr = x.closest('tr'); svExpand(tr, x.getAttribute('aria-expanded') !== 'true'); return; }
+  const b = e.target.closest('[data-sv],[data-sm],[data-svv],[data-sc],[data-sn],[data-ss]');
   if (!b) return;
   const el = b.closest('section') && b.closest('section').querySelector('.summ:not([hidden])');
   if (b.dataset.sv && svBranch(b)) SV.bview = b.dataset.sv;
   else if (b.dataset.sv) SV.view = b.dataset.sv;
   else if (b.dataset.sn) SV.norm = b.dataset.sn;
+  else if (b.dataset.ss) SV.stat = b.dataset.ss;
   else if (b.dataset.sc) SV.scale = b.dataset.sc;
   else if (b.dataset.sm) {
     // this campaign's metrics after the click (never none), kept beside those of campaigns with other metrics
@@ -847,7 +1132,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   timeline_cells = []  # (mtime, value, label, group) of cells with an iterations.tsv, for the timeline panel
   for spec_dir in glob.glob(os.path.join(campaigns, "*/")):
       name = os.path.basename(spec_dir.rstrip("/"))
-      rows, whens, corpora, cells, counts, benches, tools = [], [], set(), {}, {}, set(), set()
+      rows, whens, corpora, cells, counts, benches, tools, recs = [], [], set(), {}, {}, set(), set(), []
       for corpus_dir in sorted(glob.glob(os.path.join(spec_dir, "*/"))):
           corpus = os.path.basename(corpus_dir.rstrip("/"))
           if corpus.startswith("diff-"):
@@ -866,6 +1151,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
                       row = cell_row(name, corpus, variant, cell)
                       if row:
                           rows.append(row[0]); whens.append(row[1]); corpora.add(row[2])
+                          recs.append(cell_rec(row, corpus, variant, cell))
                           if row[3]:
                               cells.setdefault(corpus, {}).setdefault(row[3][0], []).append(row[3])
       # a profdiff output directory: its compare page (each event's graphs as tabs), else its graphs
@@ -900,14 +1186,23 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       except (OSError, ValueError):
           spec_json = {}
       paired, per_unit = list(spec_json.get("paired") or []), spec_json.get("perUnit")
-      summ = summary(name, cells)
+      if paired:
+          summ = summary(name, cells)
+      else:
+          order = list(spec_json.get("variants") or {})
+          try:
+              planned = [(c, v, r) for c in spec_json["corpora"] for v in order for r in range(1, spec_json.get("rounds", 2) + 1)]
+          except (KeyError, TypeError):
+              planned = []
+          summ = (card_summary(recs, order, planned, per_unit, "unit") + card_summary(recs, order, planned, None, "op") if per_unit
+                  else card_summary(recs, order, planned)) if recs or planned else ""
       about = (f"means over forks, each alternating {esc(', '.join(paired))}; Δ against {esc(paired[0])} within each fork" if paired
-               else "means over rounds; Δ against the first variant; counters of the benchmark threads"
+               else "Δ against the first variant; counters of the benchmark threads; ▸ shows a row's cells, a value's hover its distribution"
                + (f"; per {esc(metrics.unit_name(per_unit))}: counts, allocation and the score divided by the <code>{esc(per_unit)}</code> counter per op"
                   if per_unit and not paired else ""))
       # the cells: open while they are what there is to see (no summary yet, a cell running) or carry flame graphs
       cells_open = not summ or any(' data-running="1"' in r[0] or ' data-profiled="1"' in r[0] for r in rows)
-      cells_html = (f'<details class="cells" id="{sid}-cells"{" open" if cells_open else ""}><summary><b>Cells</b> <span class="k">{len(rows)}: '
+      cells_html = "" if not paired else (f'<details class="cells" id="{sid}-cells"{" open" if cells_open else ""}><summary><b>Cells</b> <span class="k">{len(rows)}: '
                     f'{"forks of the paired run" if paired else "one per variant and round"}; timelines and flame graphs</span></summary>'
                     f'{table(heads, rows)}</details>') if rows else ""
       single = " single-ver" if len(counts) <= 1 else ""
@@ -918,7 +1213,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
                                   f'data-corpus="{esc(" ".join(sorted(corpora)))}" data-profiled="{1 if profiled else 0}">'
                                   f'{card_head("campaign", name, progress_badge(prog, name), when, buttons)}'
                                   f'{variants_panel(spec_dir)}{notes(os.path.join(spec_dir, "NOTES.md"))}{kperf_note(spec_dir)}{diff_html}{spec_history(spec_dir, counts, sid)}'
-                                  f'{summary_block(about, summ, history, norm_toggle(per_unit) if per_unit and not paired else "")}{cells_html}</section>'))
+                                  f'{summary_block(about, summ, history, norm_toggle(per_unit) if per_unit and not paired else "", not paired)}{cells_html}</section>'))
   run_dirs = sorted(glob.glob(os.path.join(runs, "*/"))) if runs and os.path.isdir(runs) else []
   RUN_NAMES.clear(); RUN_NAMES.update(os.path.basename(r.rstrip("/")) for r in run_dirs)
   for run in run_dirs:
@@ -995,7 +1290,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   <h2 class="sec" id="runs">Runs <span class="k">one benchmark under one profile, newest first</span></h2>
   {newest(run_sections) or '<p class="k">No runs yet: <code>perflab run</code>.</p>'}
   </div></main>{f'<footer>{footer}</footer>' if footer else ''}<div id="srv-foot" hidden>{ui.footer()}</div>
-  <script>{timeline.script()}</script>{ui.lightbox_script()}{ui.shortcuts('lightbox', 'void', 'timeline')}
+  <script>{timeline.script()}</script>{ui.lightbox_script()}{ui.shortcuts('card', 'lightbox', 'void', 'timeline')}
   <script>{SUMMARY_JS}</script>
   <script>{branchview.JS}</script>
   <script>

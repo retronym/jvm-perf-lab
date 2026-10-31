@@ -513,7 +513,7 @@ class BranchIndexTest(unittest.TestCase):
         # the history is the first of the summary's views, and the one shown first
         card = page[page.index('id="c-br"'):]
         self.assertLess(card.index('data-sv="history"'), card.index('data-sv="table"'))
-        self.assertLess(card.index('class="sv-hist"'), card.index('class="summ"'))
+        self.assertLess(card.index('class="sv-hist"'), card.index('class="summ'))
 
     def test_a_branch_campaign_shows_before_any_cell(self):
         shutil.rmtree(os.path.join(self.camps, "br", "a"))

@@ -11,7 +11,7 @@ With a spec's "perUnit" (an aux counter of the benchmark, e.g. "files"), counts,
 by that counter's units per op (its sum over the measurement iterations over their ops), so variants that do different
 amounts of work per op compare: cycles/file, not cycles/op. Ratios (IPC, /kinst, % of cycles) stay as they are.
 """
-import functools, glob, json, math, os, plistlib, re
+import functools, glob, json, math, os, plistlib, random, re, statistics
 
 # events counting cycles are shown as % of cycles, the others per 1,000 instructions: by the event's description in
 # macOS's PMU event database (kpep), else by its name, as XctraceProfiler does
@@ -275,3 +275,55 @@ def summarise(variants, per_unit=None):
             d = None if v == names[0] or not b else 100 * (mean / b - 1)
             out[v][k] = (mean, sd if n > 1 else None, d, spread, delta_ok(b, kind, per_unit))
     return list(cols.values()), out
+
+
+# ---- distributions: statistics of every measured iteration, pooled over a variant's forks
+
+STATS = ("mean", "median", "min")  # what a summary can show; mean is `summarise`'s (over rounds), the rest `pooled`'s
+BOOT = 200  # bootstrap resamples for the spread of a pooled statistic's Δ
+
+
+def pooled(forks, stat):
+    """`stat` (median, min) of every iteration of `forks` ([[x, ...] per fork]), pooled; None without any."""
+    xs = [x for f in forks for x in f]
+    if not xs:
+        return None
+    return statistics.median(xs) if stat == "median" else min(xs)
+
+
+def resample(forks, rng):
+    """A bootstrap sample of `forks`: forks drawn with replacement, then each fork's iterations, so that the fork stays
+    the unit of variation as it is for the mean."""
+    return [rng.choices(f, k=len(f)) for f in rng.choices(forks, k=len(forks))]
+
+
+def pooled_delta(base, forks, stat, kind="score", per_unit=None, seed=0):
+    """(value, Δ% against `base`'s, spread of Δ (the bootstrap's sd, in percentage points, as `summarise`'s), Δ ok) of
+    the pooled `stat` of `forks` against `base` (both [[x, ...] per fork]); Δ and spread None without a base."""
+    x = pooled(forks, stat)
+    b = pooled(base, stat) if base else None
+    if x is None or not b:
+        return x, None, None, x is not None and delta_ok(x, kind, per_unit)
+    d = 100 * (x / b - 1)
+    if base is forks:
+        return x, 0.0, 0.0, delta_ok(b, kind, per_unit)
+    rng = random.Random(seed)
+    ds = []
+    for _ in range(BOOT):
+        bb = pooled(resample(base, rng), stat)
+        if bb:
+            ds.append(100 * (pooled(resample(forks, rng), stat) / bb - 1))
+    spread = statistics.stdev(ds) if len(ds) > 1 else None
+    return x, d, spread, delta_ok(b, kind, per_unit)
+
+
+def describe(xs):
+    """n, min, p25, median, mean, p75, max and the coefficient of variation of `xs`."""
+    xs = sorted(xs)
+    if not xs:
+        return None
+    q = lambda p: xs[min(len(xs) - 1, max(0, round(p * (len(xs) - 1))))]
+    mean = sum(xs) / len(xs)
+    sd = statistics.stdev(xs) if len(xs) > 1 else 0.0
+    return {"n": len(xs), "min": xs[0], "p25": q(0.25), "median": statistics.median(xs), "mean": mean, "p75": q(0.75),
+            "max": xs[-1], "cv": sd / mean if mean else None}
