@@ -137,7 +137,15 @@ class BranchViewTest(unittest.TestCase):
         self.assertEqual(len(c0["raw"]["alloc"]), 4)
         self.assertEqual(c0["s"]["score"][0], "10.15")
         b = branchview.branch_view(self.camp)["cells"]["b"]
-        self.assertEqual(b[self.v[2]], {"state": "running", "rd": [{"round": 1, "state": "running", "links": {}}]})
+        # an empty result.json is an interrupted run's, unless running.json names the cell
+        self.assertEqual(b[self.v[2]], {"state": "interrupted", "rd": [{"round": 1, "state": "interrupted", "links": {}}]})
+        running = os.path.join(os.path.dirname(self.camp), "running.json")
+        json.dump({"campaign": "br", "cell": f"br/b/{self.v[2]}/1", "started": 0}, open(running, "w"))
+        try:
+            b = branchview.branch_view(self.camp)["cells"]["b"]
+            self.assertEqual(b[self.v[2]], {"state": "running", "rd": [{"round": 1, "state": "running", "links": {}}]})
+        finally:
+            os.unlink(running)
 
     def test_one_fork_takes_the_pooled_spread(self):
         a = branchview.branch_view(self.camp)["cells"]["a"]

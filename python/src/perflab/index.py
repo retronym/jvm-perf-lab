@@ -94,10 +94,15 @@ def cell_row(spec, corpus, variant, cell):
         r = json.load(open(res_f))[0]
         p = r["primaryMetric"]
     except (OSError, ValueError, IndexError, KeyError):
-        # JMH writes result.json when the fork ends, so an empty or partial one is a cell still running
-        return ((f' data-running="1"{attrs} data-profiled="0"', [esc(corpus), name, '<span class="badge running">running</span>']
+        # JMH writes result.json when the fork ends, so an empty or partial one is the running cell's, or an interrupted run's
+        running = ab.is_running(cell)
+        badge = ('<span class="badge running">running</span>' if running else
+                 '<span class="badge interrupted" title="Its run stopped before JMH wrote a result: `perflab ab run` runs it again">interrupted</span>')
+        when = time.time() if running else max(os.path.getmtime(os.path.join(cell, f)) for f in os.listdir(cell))
+        mark = ' data-running="1"' if running else ""
+        return ((f'{mark}{attrs} data-profiled="0"', [esc(corpus), name, badge]
                  + [""] * 5, f'<div class="cellg"><span class="btns">{timeline_link(cell)}</span></div>' if os.path.exists(os.path.join(cell, "timeline.html")) else ""),
-                time.time(), corpus, None)
+                when, corpus, None)
     m = r.get("secondaryMetrics", {})
     cyc = m.get("xctrace.CORE_ACTIVE_CYCLE", {}).get("score")
     ins = m.get("xctrace.INST_ALL", {}).get("score")

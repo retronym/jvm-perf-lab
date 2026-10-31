@@ -74,7 +74,7 @@ def sig(x, n=5):
 
 def load_cell(cell):
     """A cell's JMH result, "failed" when its run did (a branch campaign records why), "running" while its result.json
-    is empty or partial, None before it has one."""
+    is empty or partial and it is the cell being run, None before it has one or after its run was interrupted."""
     f = os.path.join(cell, "result.json")
     try:
         r = json.load(open(f))[0]
@@ -84,7 +84,8 @@ def load_cell(cell):
         pass
     if os.path.exists(os.path.join(cell, "failed.txt")):  # ab.FAILED: its run failed
         return "failed"
-    return "running" if os.path.exists(f) else None
+    from . import ab
+    return "running" if os.path.exists(f) and ab.is_running(cell) else None
 
 
 def results(d):
@@ -221,7 +222,7 @@ def cell_links(cell, rel_to):
 def rounds_of(d, rel_to, per_unit=None, max_cores=MAX_CORES):
     """A commit's rounds on a corpus (d is <campaign>/<corpus>/<variant>), as the cell's popover lists them, and where
     other load disturbed their measurement iterations in the cell's rawData, for the chart: ([{"round", "state" (done,
-    failed with "why", running, pending), "forks": [{"mean", "ci" (within the fork, over its iterations), "n"}] of the
+    failed with "why", running, interrupted (a result.json without a result, and not the cell being run), pending), "forks": [{"mean", "ci" (within the fork, over its iterations), "n"}] of the
     score, "load" (the most of any measurement iteration, cores) and "maxCores", "disturbed": [{"i" (its index in
     iterations.tsv), "fork", "j" (from 1, when known), "cores", "top"}], "links", "graphs"}], [[fork, j] from 0, the
     forks of every done round in turn, as `fork_units` has them])."""
@@ -230,7 +231,8 @@ def rounds_of(d, rel_to, per_unit=None, max_cores=MAX_CORES):
         if not (os.path.isdir(cell) and os.path.basename(cell).isdigit()):
             continue
         r = load_cell(cell)
-        state = r if isinstance(r, str) else "done" if r else "pending"
+        # no result, but a result.json: JMH's, of a run that stopped before the fork ended
+        state = r if isinstance(r, str) else "done" if r else "interrupted" if os.path.exists(os.path.join(cell, "result.json")) else "pending"
         x = {"round": int(os.path.basename(cell)), "state": state}
         forks = []
         if state == "done":
@@ -360,6 +362,8 @@ def branch_view(campaign_dir, rel_to=None):
                     per_v[v] = {"state": "running", **extra}
                 elif failed:
                     per_v[v] = {"state": "failed", **failed_cell(failed, rel_to), **extra}
+                elif any(x["state"] == "interrupted" for x in rd):
+                    per_v[v] = {"state": "interrupted", **extra}
                 elif extra:  # only voided rounds: nothing to show but them
                     per_v[v] = {"state": "none", **extra}
                 continue
@@ -876,6 +880,7 @@ const BH = (() => {
     const nv = (x.void || []).length, vd = nv ? ` <span class="bh-pend">· ${nv} voided</span>` : '';
     if (x.state === 'running') return cellBtn(c, v, '', '', 'running: its rounds', '<span class="badge running">running</span>' + vd);
     if (x.state === 'failed') return cellBtn(c, v, '', '', esc(x.why) + ' (its rounds and logs)', '<span class="bh-fail">run failed</span>' + vd);
+    if (x.state === 'interrupted') return k === 'score' ? cellBtn(c, v, '', '', 'its run stopped before JMH wrote a result: a resume runs it again', '<span class="bh-fail">interrupted</span>' + vd) : '';
     if (x.state === 'none') return k === 'score' ? cellBtn(c, v, '', '', 'its voided rounds', '<span class="bh-pend">pending</span>' + vd) : '';
     const m = x.m[k];
     if (!m) return k === 'score' ? unmeasured(x, v, d) : '';
@@ -1039,7 +1044,7 @@ const BH = (() => {
     if (!cm) return '';
     const val = k => { const m = x && x.state === 'done' && x.m[k]; if (!m) return ''; const s = shown(d, k, m, x.s[k]); return `${esc(s[0])}${s[1] ? ' ± ' + esc(s[1]) + (m[6] ? '†' : '') : ''}`; };
     const m2 = st.m2 !== 'none' ? metric(d, st.m2) : null;
-    const nums = !x ? 'pending' : x.state === 'running' ? 'running' : x.state === 'failed' ? 'run failed: ' + esc(x.why)
+    const nums = !x ? 'pending' : x.state === 'running' ? 'running' : x.state === 'interrupted' ? 'interrupted' : x.state === 'failed' ? 'run failed: ' + esc(x.why)
       : (val('score') ? `${val('score')} ${esc(heading(d, 'score'))} ${delta(x.d.score)}` : 'score pending')
         + (m2 && val(m2.k) ? ` · ${val(m2.k)} ${esc(heading(d, m2.k))} ${delta(x.d[m2.k])}` : '');
     return `${sha(cm)} ${esc(cm.subject)} · <b>${esc(st.c)}</b>: ${nums}`;
@@ -1146,7 +1151,7 @@ const BH = (() => {
   // flame graphs, and on the server Void & rerun), then its voided cells, which count for nothing
   function popover(d, name, c, v, server) {
     const cm = d.commits.find(k => k.v === v) || {sha: v, short: v, subject: ''}, x = cellOf(d, c, v) || {};
-    const BADGE = {done: 'done', failed: 'failed', running: 'running'};
+    const BADGE = {done: 'done', failed: 'failed', running: 'running', interrupted: 'interrupted'};
     let h = `<div class="ph"><h4 id="bh-pop-t">${sha(cm, 7)} on ${esc(c)} <span class="k">${esc(cm.subject)}</span></h4>`
       + '<button type="button" class="x" data-bpclose="1" aria-label="Close" title="Close (Esc)">✕</button></div>'
       + `<div class="k">Each fork’s mean ${esc(heading(d, 'score'))} ± its 99.9% CI ${WITHIN}.</div><ul>`;

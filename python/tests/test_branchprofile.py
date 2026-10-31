@@ -176,7 +176,7 @@ class ProfileViewTest(unittest.TestCase):
         fake_profile_cell(os.path.join(self.prof, "a", self.v[3], "1"))
         fake_profile_cell(os.path.join(self.prof, "a", self.v[4], "1"))
         os.makedirs(os.path.join(self.prof, "a", self.v[1], "1"))
-        open(os.path.join(self.prof, "a", self.v[1], "1", "result.json"), "w").close()  # running
+        open(os.path.join(self.prof, "a", self.v[1], "1", "result.json"), "w").close()  # interrupted
         d = os.path.join(self.prof, f"diff-a-{self.v[3]}-{self.v[4]}")
         os.makedirs(d)
         stub_profdiff([])(["--event", "cpu", "x", "y", d])
@@ -186,7 +186,7 @@ class ProfileViewTest(unittest.TestCase):
         p = branchview.branch_view(self.camp, self.camps)["profile"]
         self.assertEqual((p["campaign"], p["corpora"]), ("br.profile", ["a"]))
         cells = p["cells"]["a"]
-        self.assertEqual(cells[self.v[1]], {"state": "running", "graphs": []})
+        self.assertNotIn(self.v[1], cells)  # an empty result.json and no running.json: an interrupted run's
         self.assertEqual(cells[self.v[3]]["graphs"], [["cpu", "bench", f"br.profile/a/{self.v[3]}/1/rec-cpu.html"],
                                                       ["alloc", "bench", f"br.profile/a/{self.v[3]}/1/rec-alloc.html"]])
         [d] = p["diffs"]

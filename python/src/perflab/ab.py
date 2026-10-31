@@ -204,6 +204,17 @@ def jmh_lock_held():
 RUNNING_NAME = "running.json"
 
 
+def is_running(cell):
+    """Whether `cell` (<campaigns>/<campaign>/<corpus>/<variant>/<round>) is the one being run (running.json). JMH writes
+    result.json when the fork ends, so an empty or partial one is the running cell's, or else an interrupted run's."""
+    campaigns = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(cell)))))
+    try:
+        r = json.load(open(os.path.join(campaigns, RUNNING_NAME)))
+    except (OSError, ValueError):
+        return False
+    return bool(r.get("cell")) and os.path.realpath(os.path.join(campaigns, r["cell"])) == os.path.realpath(cell)
+
+
 def set_running(spec, dest):
     """<campaigns>/running.json names the cell being run (the index's timeline follows it); the index is rebuilt, so
     the page picks up new cells and results."""
