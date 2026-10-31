@@ -317,7 +317,9 @@ def help_popover(html_body, right=False):
 
 SHORTCUTS = {  # section: (heading, [(keys, what)]); keys as a tuple are keys, as a string a gesture
     "lightbox": ("A graph in the overlay", [(("[", "]"), "the previous or next graph"), (("Esc",), "close the overlay")]),
-    "compare": ("A diff's graphs", [(("1", "–", "9"), "the graph's first to ninth view"),
+    "compare": ("A diff's graphs", [(("a",), "the first run's graph (of the graph under the pointer)"), (("b",), "the second run's"),
+                                    (("t", "Space"), "flip between them, keeping the zoom, scroll, search, filters and name mode"),
+                                    (("1", "–", "9"), "the graph's first to ninth view"),
                                     (("[", "]"), "its previous or next view (of the graph under the pointer)")]),
     "void": ("A branch campaign's cell popover", [(("Enter",), "in the reason, void the round"), (("Esc",), "close the popover")]),
     "timeline": ("Timelines, by mouse", [("wheel or pinch", "zoom"), ("drag", "pan"), ("double-click", "reset")]),

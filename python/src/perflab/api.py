@@ -431,7 +431,8 @@ define("Diff", "The profdiff outputs of a pair: per event its pages and the tabl
     "diffs": A(O("One profdiff output directory", {**SCHEMAS["DiffRef"]["properties"], "events": A(O("One event", {
         "event": S("cpu, alloc, cycles, ..."),
         "pages": M(URL, "a: a's graph, diff: the differential graph a → b, inverse: b → a, b: b's graph; a light diff's "
-                        "toggle and toggleByLeaf: one graph flipping between a and b in place (key t)"),
+                        "toggleA and toggleB (and toggleByLeafA, toggleByLeafB): a's and b's graphs with one layout, per op on one scale, "
+                        "flipped in place on its compare page (key t)"),
         "summary": null(S("The table's first line: the event per op of a and b and Δ")),
         "rows": A(O("A method", {"delta": null(N("Δ of self events per op, b − a")), "a": null(N("a's self events per op")),
                                  "b": null(N("b's")), "pctOfTotal": null(N("Δ as % of a's total")), "method": S("The method"),
@@ -447,15 +448,27 @@ define("Diff", "The profdiff outputs of a pair: per event its pages and the tabl
             "outsideAnchor": null(O("Events left out for want of the anchor", {"a": N("a"), "b": N("b")})),
             "oneSidedFrames": I("Frames dropped above the leaf for being in one build only")})),
         "flips": O("Frame-kind flips (flips-<event>.json): methods whose self events moved between running inlined (_[i]) and "
-                   "in their own frame (_[j] C2, _[1] C1, _[0] interpreted), per op, most moved first", {
+                   "in their own frame (_[j] C2, _[1] C1, _[0] interpreted), per op, most moved into their own frames first", {
             "total": O("The event per op", {"a": N("a"), "b": N("b")}),
             "rows": A(O("A method", {
-                "method": S("The method, as jfrconv names it"), "moved": N("|b's real share − a's| × its mean self events per op"),
+                "method": S("The method, as jfrconv names it"),
+                "selfToReal": N("Its self events per op in its own frames, b's − a's: the sort key"),
+                "inclusiveMoved": N("Its inclusive events per op whose kind changed: |b's real share − a's| × their mean"),
+                "reshuffle": B("Most of the flip is inclusive: a caller's compile reshaped, rather than this method inlined differently"),
+                "sitesFlipped": I("Its call sites not inlined in b − in a (C2, with a jitRecording): the second sort key"),
                 "a": ref("FlipSide"), "b": ref("FlipSide"),
                 "jit": O("C2's decisions with it as the callee, over every method's last C2 compile (the cells' jitRecording)",
                          {"a": {**null(ref("FlipJit")), "description": "In a; null: not a callee there"},
-                          "b": {**null(ref("FlipJit")), "description": "In b"}})}, optional=("jit",)), "Most moved first"),
-            "jit": B("Whether the rows have C2's decisions")}, optional=("jit",))},
+                          "b": {**null(ref("FlipJit")), "description": "In b"}})}, optional=("jit", "sitesFlipped")),
+                      "By selfToReal, then sitesFlipped, largest first"),
+            "jit": B("Whether the rows have C2's decisions"),
+            "bySites": A(O("A callee C2 stopped inlining at more call sites in b", {
+                "method": S("The callee, dotted"), "sitesFlipped": I("Call sites not inlined, b − a"),
+                "selfToReal": null(N("Its self events per op in its own frames, b − a; null: not in the profile as a Java frame")),
+                "jit": O("C2's decisions with it as the callee", {"a": {**null(ref("FlipJit")), "description": "In a"},
+                                                                    "b": {**null(ref("FlipJit")), "description": "In b"}})}),
+                         "With the cells' jitRecording: callees by call sites C2 no longer inlined them at, most first, whatever the profile says")},
+            optional=("jit", "bySites"))},
         optional=("curated", "flips")), "Events diffed")}, optional=("curated", "note")), "One per corpus diffed")}, top=True)
 
 define("Void", "A voided cell", {"id": S("Its id for unvoid: <corpus>/<variant>/<round>-<timestamp>"), "corpus": S("corpus"),
@@ -1674,7 +1687,8 @@ def diff(campaign, a, b, project=None, corpus=None):
                 pages = {view: _url(p, os.path.join(x["path"], name.format(event=ev)))
                          for view, name in (("a", "a-{event}.html"), ("diff", "diff-{event}.html"), ("inverse", "diff-{event}-inverse.html"),
                                             ("b", "b-{event}.html"), ("byleaf", "diff-{event}-byleaf.html"),
-                                            ("toggle", "toggle-{event}.html"), ("toggleByLeaf", "toggle-{event}-byleaf.html"))
+                                            ("toggleA", "toggle-a-{event}.html"), ("toggleB", "toggle-b-{event}.html"),
+                                            ("toggleByLeafA", "toggle-a-{event}-byleaf.html"), ("toggleByLeafB", "toggle-b-{event}-byleaf.html"))
                          if os.path.exists(os.path.join(x["path"], name.format(event=ev)))}
                 e = {"event": ev, "pages": pages, "summary": summary, "rows": rows, "table": text}
                 t = _json(os.path.join(x["path"], f"tables-{ev}.json"), None)

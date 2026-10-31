@@ -1,8 +1,11 @@
 import collections, json, os, re, shlex, shutil, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+SRC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src")
+sys.path.insert(0, SRC)
+# the lab's jfrconv (retronym/async-profiler's integration branch: `mise run tools:async-profiler`)
+LAB_JFRCONV = os.environ.get("JFRCONV") or os.path.join(SRC, "..", "..", "tools", "build", "async-profiler", "build", "bin", "jfrconv")
 os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab server`: commands run here, not on its queue
-from perflab import ab, analyze, jfrevents, auditfold, compare, config, curate, defcosts, index, inlinetree, jmh, kinds, jvmevents, kperf, launch, loadgate, metrics, profdiff, regraph, serve, specs, stacks, timeline, transcript, trees  # noqa: E402
+from perflab import ab, analyze, jfrevents, auditfold, compare, config, curate, defcosts, index, flamegraph, inlinetree, jmh, kinds, jvmevents, kperf, launch, loadgate, metrics, profdiff, regraph, serve, specs, stacks, timeline, transcript, trees  # noqa: E402
 
 
 def _ensure_then_stop(root=None, port=None, _ensure=serve.ensure):
@@ -584,10 +587,19 @@ class KindsTest(unittest.TestCase):
         self.assertEqual(r["method"], "S.denot")
         self.assertEqual((r["a"]["inlined"], r["a"]["real"], r["b"]["inlined"], r["b"]["real"]), (4.0, 0.0, 0.0, 4.5))  # self
         self.assertEqual((r["a"]["inclusiveInlined"], r["b"]["inclusiveReal"]), (4.0, 4.5))
-        self.assertEqual(r["moved"], 4.25)
+        self.assertEqual((r["selfToReal"], r["inclusiveMoved"], r["reshuffle"]), (4.5, 4.25, False))
         jit = {"methods": [{"c2": {"inlining": [{"caller": "T.find()V", "callee": "S.denot()V", "inlined": 0, "notInlined": 2, "messages": {"too big": 2}}]}}]}
         r = kinds.with_jit(t, {"methods": []}, jit)["rows"][0]
         self.assertEqual(r["jit"], {"a": None, "b": {"inlined": 0, "notInlined": 2, "messages": {"too big": 2}}})
+        self.assertEqual(r["sitesFlipped"], 2)
+        jit_a = {"methods": [{"c2": {"inlining": [{"caller": "T.find()V", "callee": "S.denot()V", "inlined": 2, "notInlined": 0, "messages": {"inline (hot)": 2}}]}}]}
+        jit_b = {"methods": [{"c2": {"inlining": [{"caller": "T.find()V", "callee": "S.denot()V", "inlined": 0, "notInlined": 2, "messages": {"too big": 2}},
+                                                  {"caller": "T.find()V", "callee": "S.cheap()V", "inlined": 0, "notInlined": 5, "messages": {"too big": 5}}]}}]}
+        t = kinds.with_jit(kinds.flips(*self.pair()), jit_a, jit_b)
+        self.assertNotIn("_all", t)
+        # by call sites: a callee too cheap to show in the profile still ranks, with no profile figure
+        self.assertEqual([(r["method"], r["sitesFlipped"], r["selfToReal"]) for r in t["bySites"]], [("S.cheap", 5, None), ("S.denot", 2, 4.5)])
+        self.assertIn("## C2: callees no longer inlined", kinds.table_md("cpu", t, "base", "tip"))
         self.assertIn("too big 2", kinds.table_md("cpu", t, "base", "tip"))
 
     def test_light_keeps_kinds_and_one_sided_frames(self):
@@ -615,9 +627,73 @@ class KindsTest(unittest.TestCase):
                 self.assertGreaterEqual(t["slot"][i], max(t["a"][i], t["b"][i]))
         roots = [t["table"][t["names"][i]] for i in range(len(t["depth"])) if t["depth"][i] == 1]
         self.assertEqual(roots, ["S.denot_[i]", "S.denot_[j]", "T.find_[j]"])  # by leaf: a method's kinds side by side
-        f = os.path.join(tempfile.mkdtemp(), "toggle.html")
-        kinds.toggle_page(f, "cpu", "base", "tip", t, True)
-        self.assertIn("S.denot_[j]", open(f).read())
+        out = tempfile.mkdtemp()
+        kinds.toggle_graphs(MINI_TEMPLATE, os.path.join(out, "a.html"), os.path.join(out, "b.html"), "cpu", "base", "tip", t, True)
+        a, b = (open(os.path.join(out, n)).read() for n in ("a.html", "b.html"))
+        calls = lambda page: re.findall(r"\nf\([0-9,]+\)", page)
+        self.assertEqual(calls(a), calls(b))  # one layout: the same frames at the same places
+        self.assertNotEqual(a, b)  # each drawn to its own build's weight (W)
+        self.assertIn('" S.denot"', a)  # unpack()'s prefix char, then the name
+
+
+# the shape of a jfrconv page: its viewer, the frames, its tail
+MINI_TEMPLATE = """<!DOCTYPE html><html><head><title>t</title><style>canvas {width: 100%; height: 160px; display: block}</style></head>
+<body><h1>t</h1><script>
+const levels = Array(10);
+function f(key, level, left, width) {}
+function unpack(cpool) {}
+const cpool = [
+'all',
+' x'
+];
+unpack(cpool);
+
+f(3,0,0,10)
+u(9,8)
+
+render(levels[0][0]);
+</script></body></html>"""
+
+
+class FlameGraphTest(unittest.TestCase):
+    """perflab's own flame graphs are jfrconv's viewer with other frames (perflab.flamegraph), never a viewer of their own."""
+
+    def test_a_page_keeps_the_viewer_and_replaces_the_frames(self):
+        p = flamegraph.page(MINI_TEMPLATE, "a <b>", [("all", 0, 0, 100), ("A.f_[j]", 1, 0, 60), ("B.g_[i]", 2, 10, 50)], "/* overlay */")
+        head, tail = flamegraph.split(MINI_TEMPLATE)
+        self.assertIn(tail[:tail.rindex("</script>")], p)  # the viewer's tail, then the link to the compare page
+        self.assertIn(flamegraph.LINK_MARK, p)
+        self.assertEqual(flamegraph.link(p), p)  # once
+        self.assertIn("const levels = Array(3)", p)
+        self.assertIn("height: 48px", p)
+        self.assertIn("<h1>a &lt;b&gt;</h1>", p)
+        self.assertIn('const cpool = [\n"all",\n" A.f",\n" B.g"\n];', p)
+        self.assertIn("/* overlay */\nf(3,0,0,100)\nf(9,1,0,60)\nf(18,2,10,50)", p)  # name << 3 | type; left from the previous frame's
+        with self.assertRaises(flamegraph.TemplateError):
+            flamegraph.page("<html></html>", "t", [("all", 0, 0, 1)])
+
+    def test_no_page_draws_its_own_canvas(self):
+        """A flame graph drawn by perflab's own code would drift from the viewer's controls (zoom, search, filters, short
+        names, help, the compare page's link): pages draw through flamegraph.page."""
+        src = os.path.join(SRC, "perflab")
+        own = [f for f in sorted(os.listdir(src)) if f.endswith((".py", ".js")) and "getContext(" in open(os.path.join(src, f)).read()]
+        self.assertEqual(own, [])
+
+    @unittest.skipUnless(os.path.exists(LAB_JFRCONV), "no retronym/async-profiler jfrconv (mise run tools:async-profiler)")
+    def test_the_toggle_graphs_have_the_standard_controls(self):
+        d = tempfile.mkdtemp()
+        col = os.path.join(d, "a.collapsed")
+        open(col, "w").write("main_[j];T.find_[j];S.denot_[i] 6\nmain_[j];T.find_[j] 4\n")
+        template = os.path.join(d, "a.html")
+        subprocess.run([LAB_JFRCONV, col, template], check=True, capture_output=True, timeout=120)
+        t = kinds.tree(collections.Counter({"main_[j];T.find_[j];S.denot_[i]": 6}), collections.Counter({"main_[j];T.find_[j];S.denot_[j]": 7}), 1, 1)
+        kinds.toggle_graphs(open(template).read(), os.path.join(d, "ta.html"), os.path.join(d, "tb.html"), "cpu", "base", "tip", t)
+        page = open(os.path.join(d, "ta.html")).read()
+        head, _ = flamegraph.split(open(template).read())
+        for control in ("id='search'", "id='shortn'", "id='info'", "id='zoomin'", "'wheel'", "function applyFlameState"):
+            self.assertIn(control, head)
+        code = head[head.index("const levels"):]
+        self.assertIn(code[code.index("\n"):], page)  # the viewer's code, unchanged after the frame count
 
 
 class CurateTest(unittest.TestCase):

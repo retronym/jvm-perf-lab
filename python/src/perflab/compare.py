@@ -1,6 +1,8 @@
 """compare.html in a `perflab profdiff` output directory: for each event diffed there, the two runs' flame graphs and the
 differential ones in both directions, as tabs over the same frame (after branch-bench's diff view), so that flipping
-between them shows what changed. Keys: 1-4 pick a tab of the widget under the pointer (else the first), [ and ] step.
+between them shows what changed. Keys (ui.SHORTCUTS["compare"]): a and b show that run's graph, t or space flips
+between them, 1-9 pick a tab of the widget under the pointer (else the first), [ and ] step; a flip keeps the scroll,
+and the link keeps the rest of the graph's state.
 
 The graphs' controls are linked: async-profiler's flame graph (retronym/async-profiler's integration branch) posts the
 state of its toolbar (view toggles, search, highlights, filters, zoom) after each change, and the page relays it to the
@@ -8,13 +10,14 @@ other graphs of the same event, or of every event, or to none (the header's "lin
 """
 import glob, html, os
 
-from . import ui
+from . import flamegraph, ui
 
 # what profdiff writes per event, in tab order
 SLOTS = [("a", "{a}", "a-{event}.html", "side"), ("diff", "DIFF", "diff-{event}.html", "diff"),
          ("inverse", "DIFF⁻¹", "diff-{event}-inverse.html", "diff"), ("b", "{b}", "b-{event}.html", "side"),
-         ("byleaf", "by leaf", "diff-{event}-byleaf.html", "diff"),
-         ("toggle", "{a} ⇄ {b}", "toggle-{event}.html", "side"), ("toggleleaf", "⇄ by leaf", "toggle-{event}-byleaf.html", "side")]
+         ("byleaf", "by leaf", "diff-{event}-byleaf.html", "diff")]
+# a light diff's pairs of graphs with one layout (perflab.kinds): a widget each, flipped in place with t
+PAIRS = [("⇄", "toggle-{side}-{event}.html"), ("⇄ by leaf", "toggle-{side}-{event}-byleaf.html")]
 
 CSS = """
 :root{--accent:var(--link);--diff:#b4560b;--diffbg:#fdf0e3}
@@ -47,17 +50,25 @@ for (const w of document.querySelectorAll('.w')) {
   w.querySelector('.tabs').addEventListener('click', e => { const t = e.target.closest('.tab'); if (t) show(w, t.dataset.view); });
 }
 function show(w, v) {
+  const to = w.querySelector(`iframe[data-view="${v}"]`);
+  if (!to) return;
+  // the zoom, search, filters and name mode follow through the link ({flameState}), the scroll as {flameScroll}
   w.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
-  w.querySelectorAll('iframe').forEach(f => f.classList.toggle('hidden', f.dataset.view !== v));
+  w.querySelectorAll('iframe').forEach(f => f.classList.toggle('hidden', f !== to));
 }
-function onKey(e) {
-  if (e.target.tagName === 'INPUT') return;
-  const w = hovered || document.querySelector('.w'); if (!w) return;
+function onKey(e, from) {
+  if (e.target && e.target.tagName === 'INPUT') return;
+  const w = from || hovered || document.querySelector('.w'); if (!w) return;
   const tabs = [...w.querySelectorAll('.tab')], cur = tabs.findIndex(t => t.classList.contains('active'));
+  // a and b: that run's graph; t or space: flip between them (from any other view, to a), in every widget
+  if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === 'a' || e.key === 'b' || e.key === 't' || e.key === ' ')) {
+    const at = cur >= 0 ? tabs[cur].dataset.view : null;
+    show(w, e.key === 'a' || e.key === 'b' ? e.key : at === 'a' ? 'b' : 'a'); if (e.preventDefault) e.preventDefault(); return;
+  }
   const n = parseInt(e.key);
   const t = n >= 1 && n <= tabs.length ? tabs[n - 1] : e.key === '[' ? tabs[(cur - 1 + tabs.length) % tabs.length]
           : e.key === ']' ? tabs[(cur + 1) % tabs.length] : null;
-  if (t) { show(w, t.dataset.view); e.preventDefault(); }
+  if (t) { show(w, t.dataset.view); if (e.preventDefault) e.preventDefault(); }
 }
 document.addEventListener('keydown', onKey);
 // ↗ opens the widget's current graph in a new tab; ⤢ opens the widget's graphs in the lightbox (not when this page is
@@ -83,6 +94,23 @@ document.querySelectorAll('iframe').forEach(f => f.addEventListener('load', () =
 let linkMode = 'event';
 const lastState = new Map();  // widget (or 'all') -> the last state posted in it
 function scopeOf(f) { return linkMode === 'all' ? 'all' : f.closest('.w'); }
+// a graph's scroll goes to the other graphs of its widget, its keys (flamegraph.LINK_JS: its origin is opaque, so the
+// page cannot listen in it) to the widget it is in
+const lastScroll = new Map();  // widget -> the last {flameScroll} posted in it
+addEventListener('message', e => {
+  const from = [...document.querySelectorAll('iframe')].find(f => f.contentWindow === e.source);
+  if (!from || !e.data) return;
+  if (e.data.flameKey) { onKey({key: e.data.flameKey}, from.closest('.w')); return; }
+  if (e.data.flameScroll) {
+    const w = from.closest('.w');
+    lastScroll.set(w, e.data.flameScroll);
+    for (const f of w.querySelectorAll('iframe')) if (f !== from) f.contentWindow.postMessage(e.data, '*');
+  }
+});
+document.querySelectorAll('iframe').forEach(f => f.addEventListener('load', () => {
+  const s = lastScroll.get(f.closest('.w'));
+  if (s) f.contentWindow.postMessage({flameScroll: s}, '*');
+}));
 addEventListener('message', e => {
   if (!e.data || !e.data.flameState || linkMode === 'off') return;
   const from = [...document.querySelectorAll('iframe')].find(f => f.contentWindow === e.source);
@@ -123,12 +151,29 @@ def write(out, a, b, note=None):
         links = f'<a class="btn" href="{esc(table)}" title="The differences as a table">table</a>' if os.path.exists(os.path.join(out, table)) else ""
         links += ('<a class="btn open" href="#" target="_blank" rel="noopener" title="Open this graph in a new tab">↗</a>'
                   '<button class="btn big" title="Enlarge, over this page (Esc closes)">⤢</button>')
+        for _, _, name, _ in slots:
+            flamegraph.link_file(os.path.join(out, name))
         widgets.append(f'<div class="w" data-event="{esc(event)}"><div class="tabs"><span class="ev">{esc(event)}</span>{tabs}<span class="act">{links}</span></div>'
                        f'<div class="body">{frames}</div></div>')
+        for label, pattern in PAIRS:
+            names = [pattern.format(side=side, event=event) for side in ("a", "b")]
+            if not all(os.path.exists(os.path.join(out, n)) for n in names):
+                continue
+            for n in names:
+                flamegraph.link_file(os.path.join(out, n))
+            tabs = "".join(f'<button class="tab{" active" if side == "a" else ""}" data-view="{side}" title="{esc(n)} (t flips)">{esc(run)}</button>'
+                           for side, run, n in zip("ab", (a, b), names))
+            frames = "".join(f'<iframe src="{esc(n)}" data-view="{side}"{"" if side == "a" else " class=hidden"}></iframe>' for side, n in zip("ab", names))
+            act = ('<a class="btn open" href="#" target="_blank" rel="noopener" title="Open this graph in a new tab">↗</a>'
+                   '<button class="btn big" title="Enlarge, over this page (Esc closes)">⤢</button>')
+            widgets.append(f'<div class="w pair" data-event="{esc(event)} {esc(label)}"><div class="tabs"><span class="ev">{esc(event)} {esc(label)}</span>'
+                           f'{tabs}<span class="act">{act}</span></div><div class="body">{frames}</div></div>')
     help_html = ui.help_popover(
         f"The flame graphs of <b>{esc(a)}</b> and <b>{esc(b)}</b> per op on the benchmark threads, and the differential graphs "
         "between them in both directions (DIFF: a → b; DIFF⁻¹: b → a), as tabs over one frame, so flipping between them shows what "
-        "changed. Keys: 1–4 pick a tab of the graph under the pointer, [ and ] step. <i>link</i>: a graph's controls (search, zoom, "
+        "changed; for a light diff, ⇄ pairs: both runs with one layout, per op on one scale, so that a flip changes only the "
+        "widths. Keys (? lists them): a and b show that run's graph, t or space flips between them keeping the zoom, scroll, "
+        "search, filters and name mode; 1–9 pick a tab of the graph under the pointer, [ and ] step. <i>link</i>: a graph's controls (search, zoom, "
         "toggles) drive the other graphs of its event, of every event, or none.")
     page = (f'{ui.HEAD}<title>{esc(a)} vs {esc(b)}</title>{ui.style(ui.BASE, ui.LIGHTBOX_CSS, CSS)}'
             f'{ui.masthead(home=ui.home_from(out), slim=True)}<header><span class="kind">profdiff</span><h1>{esc(a)} → {esc(b)}</h1>{help_html}<span class="sep"></span>'

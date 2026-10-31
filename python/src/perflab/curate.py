@@ -44,8 +44,9 @@ from either one's `presets`, then `--curate '<json>'`:
 The built-in preset `light` (`--curate light`, and written by default as `<campaign>/diff-<a>-<b>-light/`) keeps what
 the curated diff erases on purpose: names keep their compilation suffixes (a method inlined and the same method
 compiled are different frames, coloured by kind), no frame is aligned away and recursion stays; only steps 1 (hidden
-classes, thread ids), 2 and 4 apply. Beside its graphs, `toggle-<event>.html` (and `-byleaf`) flips one flame graph
-between the builds in place, per op on one scale (perflab.kinds).
+classes, thread ids), 2 and 4 apply. Beside its graphs, `toggle-a-<event>.html` and `toggle-b-<event>.html` (and
+`-byleaf`) are the two builds in jfrconv's viewer with one layout, per op on one scale (perflab.kinds), which its
+compare page flips between in place (t).
 
 Every diff, raw and light, has the frame-kind flips table (perflab.kinds): per method, its self events per op inlined and in
 its own frame in each build, ranked by the self events that changed kind, with C2's reasons when the cells have a
@@ -55,9 +56,9 @@ its own frame in each build, ranked by the self events that changed kind, with C
 stacks are cached (perflab.stacks), so curating a pair again with other hints takes seconds. The rules applied are in
 the diff's pair.json and on its page.
 """
-import argparse, collections, glob, hashlib, json, os, re, subprocess, sys
+import argparse, collections, glob, hashlib, json, os, re, subprocess, sys, tempfile
 
-from . import compare, config, jmh, kinds, profdiff, regraph, stacks
+from . import compare, config, flamegraph, jmh, kinds, profdiff, regraph, stacks
 
 SUFFIX = re.compile(r"_\[[a-z0-9]+\]$")
 DROP = [r"^interpreted$"]
@@ -273,6 +274,7 @@ def write_flips(out, event, A, B, la, lb, jits=None):
     t = kinds.flips(A, B)
     if jits:
         t = kinds.with_jit(t, *jits)
+    t.pop("_all", None)
     json.dump(t, open(os.path.join(out, f"flips-{event}.json"), "w"), indent=1)
     md = os.path.join(out, f"table-{event}.md")
     text = open(md).read().split("\n## frame-kind flips")[0] if os.path.exists(md) else ""  # this table again: replaced
@@ -281,11 +283,18 @@ def write_flips(out, event, A, B, la, lb, jits=None):
     return t
 
 
+def scratch(out, name, event):
+    """A collapsed file of its own for jfrconv's input: two diffs of one pair may run at once."""
+    fd, f = tempfile.mkstemp(dir=out, prefix=f".{name}-{event}-", suffix=".collapsed")
+    os.close(fd)
+    return f
+
+
 def raw_diff(out, event, A, B, la, lb, jfrconv, top, jits=None):
     """profdiff's output for two cells' cached stacks."""
     tmp = []
     for st, name in ((A, "a"), (B, "b")):
-        f = os.path.join(out, f".{name}-{event}.collapsed")
+        f = scratch(out, name, event)
         with open(f, "w") as w:
             for s, n in st.stacks:
                 w.write(";".join(st.frames[i] for i in s) + f" {n}\n")
@@ -304,7 +313,8 @@ def raw_diff(out, event, A, B, la, lb, jfrconv, top, jits=None):
         write_flips(out, event, A, B, la, lb, jits)
     finally:
         for f in tmp:
-            os.unlink(f)
+            if os.path.exists(f):
+                os.unlink(f)
 
 
 def curated_diff(out, event, A, B, la, lb, jfrconv, rules, jits=None):
@@ -313,14 +323,15 @@ def curated_diff(out, event, A, B, la, lb, jfrconv, rules, jits=None):
     ba, outside_a = c.base(A)
     bb, outside_b = c.base(B)
     ca, cb = c.aligned(c.shaped(ba), c.shaped(bb))
-    tmp = [os.path.join(out, f".{n}-{event}.collapsed") for n in ("a", "b")]
+    tmp = [scratch(out, n, event) for n in ("a", "b")]
     write_collapsed(tmp[0], ca)
     write_collapsed(tmp[1], cb)
     try:
         render(jfrconv, out, event, *tmp, la, lb, rules.get("byLeaf"), " (curated)")
     finally:
         for f in tmp:
-            os.unlink(f)
+            if os.path.exists(f):
+                os.unlink(f)
     own_a, incl_a = c.tables(ba)
     own_b, incl_b = c.tables(bb)
     t = summarize(rules, own_a, own_b, incl_a, incl_b, sum(n for _, n in ba), sum(n for _, n in bb), A.ops, B.ops)
@@ -330,9 +341,22 @@ def curated_diff(out, event, A, B, la, lb, jfrconv, rules, jits=None):
     json.dump(t, open(os.path.join(out, f"tables-{event}.json"), "w"), indent=1)
     if c.kinds:
         write_flips(out, event, A, B, la, lb, jits)
-        for by_leaf in (False, True):
-            kinds.toggle_page(os.path.join(out, f"toggle-{event}{'-byleaf' if by_leaf else ''}.html"), event, la, lb,
-                              kinds.tree(ca, cb, A.ops, B.ops, by_leaf), by_leaf)
+        template = os.path.join(out, f"a-{event}.html")  # jfrconv's, just rendered: the viewer of the graphs beside them
+        try:
+            viewer = open(template).read()
+            flamegraph.split(viewer)
+        except (OSError, flamegraph.TemplateError) as e:
+            print(f"{event}: no toggle graphs ({template}: {e})", file=sys.stderr)
+            viewer = None
+        if viewer:
+            for by_leaf in (False, True):
+                sfx = "-byleaf" if by_leaf else ""
+                kinds.toggle_graphs(viewer, os.path.join(out, f"toggle-a-{event}{sfx}.html"),
+                                    os.path.join(out, f"toggle-b-{event}{sfx}.html"), event, la, lb,
+                                    kinds.tree(ca, cb, A.ops, B.ops, by_leaf), by_leaf)
+                stale = os.path.join(out, f"toggle-{event}{sfx}.html")  # the first toggle page, its own viewer
+                if os.path.exists(stale):
+                    os.unlink(stale)
     return t
 
 
@@ -417,11 +441,11 @@ def main(argv):
         for e in events:
             raw_diff(raw_out, e, *loaded[e], la, lb, jfrconv, rules.get("top", 25), jits)
         json.dump(pair, open(os.path.join(raw_out, "pair.json"), "w"), indent=2)
-        compare.write(raw_out, la, lb)
     else:
         for e in events:  # a raw diff from before the flips table
             if not os.path.exists(os.path.join(raw_out, f"flips-{e}.json")):
                 write_flips(raw_out, e, *loaded[e], la, lb, jits)
+    compare.write(raw_out, la, lb)  # again for a diff already there: the page's keys and links are its own
     print(f"raw: {os.path.join(raw_out, 'compare.html')}{' (there already)' if raw_done else ''}")
     curations = [] if x.raw else [(rules, name)]
     if not x.raw and not x.no_light and name != "light":

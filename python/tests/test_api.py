@@ -93,10 +93,14 @@ def plain_fixture(campaigns, name="plain"):
     stub_profdiff([])(["--event", "cpu", "x", "y", dd])
     open(os.path.join(dd, "table-cpu.md"), "w").write(TABLE)
     json.dump({"total": {"a": 1200.0, "b": 1000.0}, "jit": True, "rows": [
-        {"method": "a/S.denot", "moved": 30.0, "a": {"inlined": 30.0, "real": 0.0, "realShare": 0.0, "inclusiveInlined": 40.0, "inclusiveReal": 0.0},
+        {"method": "a/S.denot", "selfToReal": 30.0, "inclusiveMoved": 40.0, "reshuffle": False, "sitesFlipped": 5, "a": {"inlined": 30.0, "real": 0.0, "realShare": 0.0, "inclusiveInlined": 40.0, "inclusiveReal": 0.0},
          "b": {"inlined": 0.0, "real": 30.0, "realShare": 1.0, "inclusiveInlined": 0.0, "inclusiveReal": 40.0},
          "jit": {"a": {"inlined": 5, "notInlined": 0, "messages": {"inline (hot)": 5}},
-                 "b": {"inlined": 0, "notInlined": 5, "messages": {"too big": 5}}}}]}, open(os.path.join(dd, "flips-cpu.json"), "w"))
+                 "b": {"inlined": 0, "notInlined": 5, "messages": {"too big": 5}}}}],
+        "bySites": [{"method": "a.S.denot", "sitesFlipped": 5, "selfToReal": 30.0,
+                     "jit": {"a": {"inlined": 5, "notInlined": 0, "messages": {"inline (hot)": 5}}, "b": {"inlined": 0, "notInlined": 5, "messages": {"too big": 5}}}},
+                    {"method": "a.S.cheap", "sitesFlipped": 3, "selfToReal": None,
+                     "jit": {"a": None, "b": {"inlined": 0, "notInlined": 3, "messages": {"too big": 3}}}}]}, open(os.path.join(dd, "flips-cpu.json"), "w"))
     os.makedirs(os.path.join(camp, "b", "base", "2"))
     open(os.path.join(camp, "b", "base", "2", "result.json"), "w").close()
     return camp
