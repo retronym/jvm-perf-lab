@@ -13,7 +13,8 @@ from . import ui
 # what profdiff writes per event, in tab order
 SLOTS = [("a", "{a}", "a-{event}.html", "side"), ("diff", "DIFF", "diff-{event}.html", "diff"),
          ("inverse", "DIFF⁻¹", "diff-{event}-inverse.html", "diff"), ("b", "{b}", "b-{event}.html", "side"),
-         ("byleaf", "by leaf", "diff-{event}-byleaf.html", "diff")]
+         ("byleaf", "by leaf", "diff-{event}-byleaf.html", "diff"),
+         ("toggle", "{a} ⇄ {b}", "toggle-{event}.html", "side"), ("toggleleaf", "⇄ by leaf", "toggle-{event}-byleaf.html", "side")]
 
 CSS = """
 :root{--accent:var(--link);--diff:#b4560b;--diffbg:#fdf0e3}

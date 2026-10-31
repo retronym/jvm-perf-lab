@@ -420,11 +420,17 @@ define("DiffRef", "A profdiff output: differential flame graphs of two cells", {
 define("Profiles", "A campaign's profiled cells and their diffs (for a branch campaign: those of its profile campaign too)", {
     "campaign": S("The campaign"), "graphs": A(ref("Graph"), "Flame graphs of every profiled cell"),
     "diffs": A(ref("DiffRef"), "Diffs")}, top=True)
+define("FlipSide", "A method's events per op in one build, by frame kind", {
+    "inlined": N("Inclusive events per op as an inlined frame"), "real": N("As a frame of its own"),
+    "realShare": N("real / (inlined + real)"), "self": N("Self events per op, any kind")})
+define("FlipJit", "C2's decisions about a callee in one build", {
+    "inlined": I("Call sites inlined"), "notInlined": I("Call sites not inlined"), "messages": M(I("call sites"), "By C2's reason")})
 define("Diff", "The profdiff outputs of a pair: per event its pages and the table of methods whose self time per op changed most", {
     "campaign": S("The campaign"), "a": S("a"), "b": S("b"),
     "diffs": A(O("One profdiff output directory", {**SCHEMAS["DiffRef"]["properties"], "events": A(O("One event", {
         "event": S("cpu, alloc, cycles, ..."),
-        "pages": M(URL, "a: a's graph, diff: the differential graph a → b, inverse: b → a, b: b's graph"),
+        "pages": M(URL, "a: a's graph, diff: the differential graph a → b, inverse: b → a, b: b's graph; a light diff's "
+                        "toggle and toggleByLeaf: one graph flipping between a and b in place (key t)"),
         "summary": null(S("The table's first line: the event per op of a and b and Δ")),
         "rows": A(O("A method", {"delta": null(N("Δ of self events per op, b − a")), "a": null(N("a's self events per op")),
                                  "b": null(N("b's")), "pctOfTotal": null(N("Δ as % of a's total")), "method": S("The method"),
@@ -438,8 +444,18 @@ define("Diff", "The profdiff outputs of a pair: per event its pages and the tabl
             "excess": A(O("A frame's inclusive growth beyond the overall ratio", {**DIFF_ROW, "excess": N("b − a × ratio")},
                           optional=("delta",)), "Frames of both builds, biggest excess first"),
             "outsideAnchor": null(O("Events left out for want of the anchor", {"a": N("a"), "b": N("b")})),
-            "oneSidedFrames": I("Frames dropped above the leaf for being in one build only")}))},
-        optional=("curated",)), "Events diffed")}, optional=("curated", "note")), "One per corpus diffed")}, top=True)
+            "oneSidedFrames": I("Frames dropped above the leaf for being in one build only")})),
+        "flips": O("Frame-kind flips (flips-<event>.json): methods whose events moved between running inlined (_[i]) and as "
+                   "their own frame (_[j] C2, _[1] C1, _[0] interpreted), per op, most moved first", {
+            "total": O("The event per op", {"a": N("a"), "b": N("b")}),
+            "rows": A(O("A method", {
+                "method": S("The method, as jfrconv names it"), "moved": N("|b's real share − a's| × its mean inclusive events per op"),
+                "a": ref("FlipSide"), "b": ref("FlipSide"),
+                "jit": O("C2's decisions with it as the callee, over every method's last C2 compile (the cells' jitRecording)",
+                         {"a": {**null(ref("FlipJit")), "description": "In a; null: not a callee there"},
+                          "b": {**null(ref("FlipJit")), "description": "In b"}})}, optional=("jit",)), "Most moved first"),
+            "jit": B("Whether the rows have C2's decisions")}, optional=("jit",))},
+        optional=("curated", "flips")), "Events diffed")}, optional=("curated", "note")), "One per corpus diffed")}, top=True)
 
 define("Void", "A voided cell", {"id": S("Its id for unvoid: <corpus>/<variant>/<round>-<timestamp>"), "corpus": S("corpus"),
                                  "variant": S("variant"), "round": I("round"), "reason": S("Why it was voided"), "voided": WHEN,
@@ -1656,7 +1672,8 @@ def diff(campaign, a, b, project=None, corpus=None):
                 summary, rows, text = _table(os.path.join(x["path"], f"table-{ev}.md"))
                 pages = {view: _url(p, os.path.join(x["path"], name.format(event=ev)))
                          for view, name in (("a", "a-{event}.html"), ("diff", "diff-{event}.html"), ("inverse", "diff-{event}-inverse.html"),
-                                            ("b", "b-{event}.html"), ("byleaf", "diff-{event}-byleaf.html"))
+                                            ("b", "b-{event}.html"), ("byleaf", "diff-{event}-byleaf.html"),
+                                            ("toggle", "toggle-{event}.html"), ("toggleByLeaf", "toggle-{event}-byleaf.html"))
                          if os.path.exists(os.path.join(x["path"], name.format(event=ev)))}
                 e = {"event": ev, "pages": pages, "summary": summary, "rows": rows, "table": text}
                 t = _json(os.path.join(x["path"], f"tables-{ev}.json"), None)
@@ -1665,6 +1682,9 @@ def diff(campaign, a, b, project=None, corpus=None):
                     e["curated"] = {"total": t["total"], "owners": top(t["owners"][::-1][:25] + t["owners"][:25][::-1]),
                                     "groups": t["groups"], "excess": t["excess"][:25], "outsideAnchor": t.get("outsideAnchor"),
                                     "oneSidedFrames": t.get("oneSidedFrames", 0)}
+                fl = _json(os.path.join(x["path"], f"flips-{ev}.json"), None)
+                if fl:
+                    e["flips"] = fl
                 evs.append(e)
             out.append({**x, "events": evs})
     if not out:

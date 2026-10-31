@@ -92,6 +92,11 @@ def plain_fixture(campaigns, name="plain"):
     os.makedirs(dd)
     stub_profdiff([])(["--event", "cpu", "x", "y", dd])
     open(os.path.join(dd, "table-cpu.md"), "w").write(TABLE)
+    json.dump({"total": {"a": 1200.0, "b": 1000.0}, "jit": True, "rows": [
+        {"method": "a/S.denot", "moved": 40.0, "a": {"inlined": 40.0, "real": 0.0, "realShare": 0.0, "self": 30.0},
+         "b": {"inlined": 0.0, "real": 40.0, "realShare": 1.0, "self": 30.0},
+         "jit": {"a": {"inlined": 5, "notInlined": 0, "messages": {"inline (hot)": 5}},
+                 "b": {"inlined": 0, "notInlined": 5, "messages": {"too big": 5}}}}]}, open(os.path.join(dd, "flips-cpu.json"), "w"))
     os.makedirs(os.path.join(camp, "b", "base", "2"))
     open(os.path.join(camp, "b", "base", "2", "result.json"), "w").close()
     return camp
@@ -198,6 +203,11 @@ class ReadTest(Fixture, unittest.TestCase):
         self.assertEqual(j["churn"][0]["compilations"], 6)
         self.assertEqual(j["inlining"]["failures"], {"hot method too big": 1, "too big": 1})
         self.assertEqual(len(j["methods"][0]["c2"]["inlining"]), 2)
+
+    def test_diff_has_the_frame_kind_flips(self):
+        [x] = [x for x in api.diff("plain", "base", "tip")["diffs"] if x["path"].endswith("diff-base-tip")]
+        r = x["events"][0]["flips"]["rows"][0]
+        self.assertEqual((r["method"], r["jit"]["b"]["messages"]), ("a/S.denot", {"too big": 5}))
 
     def test_jit_diff(self):
         jd = api.jit_diff("plain", "base", "tip", "a", 1)

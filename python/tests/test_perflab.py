@@ -1,8 +1,8 @@
-import json, os, re, shlex, shutil, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
+import collections, json, os, re, shlex, shutil, signal, socket, subprocess, sys, tempfile, time, unittest, urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab server`: commands run here, not on its queue
-from perflab import ab, analyze, jfrevents, auditfold, compare, config, curate, defcosts, index, inlinetree, jmh, jvmevents, kperf, launch, loadgate, metrics, profdiff, regraph, serve, specs, stacks, timeline, transcript, trees  # noqa: E402
+from perflab import ab, analyze, jfrevents, auditfold, compare, config, curate, defcosts, index, inlinetree, jmh, kinds, jvmevents, kperf, launch, loadgate, metrics, profdiff, regraph, serve, specs, stacks, timeline, transcript, trees  # noqa: E402
 
 
 def _ensure_then_stop(root=None, port=None, _ensure=serve.ensure):
@@ -566,6 +566,57 @@ class JitRecordingTest(unittest.TestCase):
         self.assertEqual(decisions["Hot.small(I)I"]["inlined"], 1)
         self.assertEqual(decisions["Hot.big(I)I"]["messages"], {"too big": 1})  # beyond FreqInlineSize
         self.assertEqual(jfrevents.jit(cell), j)  # from the cache
+
+
+class KindsTest(unittest.TestCase):
+    """Frame kinds: the flips table, the light curation, the toggle page's tree."""
+
+    st = staticmethod(lambda *lines, ops=1: stacks.of_lines([[l.rsplit(" ", 1)[0], int(l.rsplit(" ", 1)[1])] for l in lines], ops, 1.0))
+
+    def pair(self):
+        a = self.st("main_[j];T.find_[j];S.denot_[i] 6", "main_[j];T.find_[j] 4", "main_[j];U.f_[j];S.denot_[i] 2", ops=2)
+        b = self.st("main_[j];T.find_[j];S.denot_[j] 7", "main_[j];T.find_[j] 4", "main_[j];U.f_[j];S.denot_[j] 2", ops=2)
+        return a, b
+
+    def test_a_method_no_longer_inlined_tops_the_flips(self):
+        t = kinds.flips(*self.pair())
+        [r] = t["rows"]  # nothing else changed kind
+        self.assertEqual(r["method"], "S.denot")
+        self.assertEqual((r["a"]["inlined"], r["a"]["real"], r["b"]["inlined"], r["b"]["real"]), (4.0, 0.0, 0.0, 4.5))
+        self.assertEqual(r["moved"], 4.25)
+        jit = {"methods": [{"c2": {"inlining": [{"caller": "T.find()V", "callee": "S.denot()V", "inlined": 0, "notInlined": 2, "messages": {"too big": 2}}]}}]}
+        r = kinds.with_jit(t, {"methods": []}, jit)["rows"][0]
+        self.assertEqual(r["jit"], {"a": None, "b": {"inlined": 0, "notInlined": 2, "messages": {"too big": 2}}})
+        self.assertIn("too big 2", kinds.table_md("cpu", t, "base", "tip"))
+
+    def test_light_keeps_kinds_and_one_sided_frames(self):
+        rules, name = curate.rules_for({}, "light")
+        self.assertEqual(name, "light")
+        c = curate.Curator(rules)
+        a, b = self.pair()
+        ba, _ = c.base(a)
+        bb, _ = c.base(b)
+        ca, cb = c.aligned(c.shaped(ba), c.shaped(bb))
+        self.assertEqual(ca["main_[j];T.find_[j];S.denot_[i]"], 6)
+        self.assertEqual(cb["main_[j];U.f_[j];S.denot_[j]"], 2)
+        own, incl = c.tables(ba)
+        self.assertEqual(own["S.denot"], 8)  # the tables are by method, whatever its kind
+        self.assertIn("keep their compilation suffixes", curate.banner(rules))
+
+    def test_the_toggle_tree_lays_out_both_builds_once(self):
+        a, b = self.pair()
+        ca = collections.Counter({";".join(a.frames[i] for i in s): n for s, n in a.stacks})
+        cb = collections.Counter({";".join(b.frames[i] for i in s): n for s, n in b.stacks})
+        for by_leaf in (False, True):
+            t = kinds.tree(ca, cb, a.ops, b.ops, by_leaf)
+            self.assertEqual((t["a"][0], t["b"][0]), (6.0, 6.5))
+            for i in range(len(t["depth"])):
+                self.assertGreaterEqual(t["slot"][i], max(t["a"][i], t["b"][i]))
+        roots = [t["table"][t["names"][i]] for i in range(len(t["depth"])) if t["depth"][i] == 1]
+        self.assertEqual(roots, ["S.denot_[i]", "S.denot_[j]", "T.find_[j]"])  # by leaf: a method's kinds side by side
+        f = os.path.join(tempfile.mkdtemp(), "toggle.html")
+        kinds.toggle_page(f, "cpu", "base", "tip", t, True)
+        self.assertIn("S.denot_[j]", open(f).read())
 
 
 class CurateTest(unittest.TestCase):

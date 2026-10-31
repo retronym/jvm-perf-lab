@@ -41,13 +41,23 @@ from either one's `presets`, then `--curate '<json>'`:
   [diff.groups]
   "denot/symbol" = "Types\\$NamedType\\.(denot|symbol)"
 
+The built-in preset `light` (`--curate light`, and written by default as `<campaign>/diff-<a>-<b>-light/`) keeps what
+the curated diff erases on purpose: names keep their compilation suffixes (a method inlined and the same method
+compiled are different frames, coloured by kind), no frame is aligned away and recursion stays; only steps 1 (hidden
+classes, thread ids), 2 and 4 apply. Beside its graphs, `toggle-<event>.html` (and `-byleaf`) flips one flame graph
+between the builds in place, per op on one scale (perflab.kinds).
+
+Every diff, raw and light, has the frame-kind flips table (perflab.kinds): per method, its events per op inlined and as
+its own frame in each build, ranked by the weight that changed kind, with C2's reasons when the cells have a
+"jitRecording".
+
 `fold` and `drop` add to the defaults, `groups` and `presets` merge by name, anything else replaces. Each cell's
 stacks are cached (perflab.stacks), so curating a pair again with other hints takes seconds. The rules applied are in
 the diff's pair.json and on its page.
 """
 import argparse, collections, glob, hashlib, json, os, re, subprocess, sys
 
-from . import compare, config, jmh, profdiff, regraph, stacks
+from . import compare, config, jmh, kinds, profdiff, regraph, stacks
 
 SUFFIX = re.compile(r"_\[[a-z0-9]+\]$")
 DROP = [r"^interpreted$"]
@@ -56,6 +66,7 @@ FOLD = [r"^java/lang/invoke/", r"^jdk/internal/reflect/", r"^java/lang/reflect/M
 DEFAULTS = {"drop": [], "fold": [], "anchor": None, "owner": None, "ownerSkip": [], "groups": {}, "byLeaf": False,
             "align": True, "recursion": True, "excessMin": 0.002, "top": 25}
 NO_OWNER = "(no owner frame)"
+LIGHT = {"kinds": True, "align": False, "recursion": False}  # the built-in preset `light`
 
 
 def merge(base, extra):
@@ -80,6 +91,8 @@ def rules_for(spec, curate=None):
             name = "curated-" + hashlib.sha1(json.dumps(extra, sort_keys=True).encode()).hexdigest()[:6]
         elif curate in (r.get("presets") or {}):
             extra, name = r["presets"][curate], curate
+        elif curate == "light":
+            extra, name = LIGHT, "light"
         else:
             sys.exit(f"--curate {curate}: neither JSON hints nor a preset ({', '.join(r.get('presets') or {}) or 'none defined'})")
         r = merge(r, extra)
@@ -102,15 +115,22 @@ class Curator:
         self.anchor_re = re.compile(rules["anchor"]) if rules.get("anchor") else None
         self.owners = tuple(as_list(rules.get("owner")))
         self.skip = tuple(as_list(rules.get("ownerSkip")))
-        self.names, self.ids = [], {}
+        self.names, self.plain, self.ids = [], [], {}
+        self.kinds = bool(rules.get("kinds"))
         self.drop, self.fold, self.anchor, self.owner, self.skipped = [], [], [], [], []
 
-    def gid(self, name):
-        name = profdiff.HIDDEN_ADDRESS.sub("", SUFFIX.sub("", name))
-        i = self.ids.get(name)
+    def gid(self, frame):
+        name = profdiff.HIDDEN_ADDRESS.sub("", SUFFIX.sub("", frame))
+        if self.kinds:
+            k = SUFFIX.search(frame)
+            frame, name = name + (k.group(0) if k else ""), name
+        else:
+            frame = name
+        i = self.ids.get(frame)
         if i is None:
-            i = self.ids[name] = len(self.names)
-            self.names.append(name)
+            i = self.ids[frame] = len(self.names)
+            self.names.append(frame)
+            self.plain.append(name)
             self.drop.append(bool(self.drop_re and self.drop_re.search(name)))
             self.fold.append(bool(self.fold_re and self.fold_re.search(name)))
             self.anchor.append(bool(self.anchor_re and self.anchor_re.search(name)))
@@ -174,14 +194,14 @@ class Curator:
         return first
 
     def tables(self, base):
-        """{owner name: events}, {frame name: inclusive events} of base stacks (owner frames only, with an owner)."""
+        """{owner name: events}, {frame name: inclusive events} of base stacks (owner frames only, with an owner), by
+        method, whatever its kinds."""
         own, incl = collections.Counter(), collections.Counter()
         for g, n in base:
             o = self.owner_of(g)
-            own[NO_OWNER if o is None else self.names[o]] += n
-            for x in set(g):
-                if (self.owner[x] if self.owners else not self.fold[x]):
-                    incl[self.names[x]] += n
+            own[NO_OWNER if o is None else self.plain[o]] += n
+            for name in {self.plain[x] for x in g if (self.owner[x] if self.owners else not self.fold[x])}:
+                incl[name] += n
         return own, incl
 
 
@@ -248,7 +268,18 @@ def render(jfrconv, out, event, fa, fb, la, lb, by_leaf=False, note=""):
                         "--diff", fa, fb, os.path.join(out, f"diff-{event}-byleaf.html")], capture_output=True)
 
 
-def raw_diff(out, event, A, B, la, lb, jfrconv, top):
+def write_flips(out, event, A, B, la, lb, jits=None):
+    """flips-<event>.json and its table appended to table-<event>.md (perflab.kinds)."""
+    t = kinds.flips(A, B)
+    if jits:
+        t = kinds.with_jit(t, *jits)
+    json.dump(t, open(os.path.join(out, f"flips-{event}.json"), "w"), indent=1)
+    with open(os.path.join(out, f"table-{event}.md"), "a") as f:
+        f.write("\n" + kinds.table_md(event, t, la, lb))
+    return t
+
+
+def raw_diff(out, event, A, B, la, lb, jfrconv, top, jits=None):
     """profdiff's output for two cells' cached stacks."""
     tmp = []
     for st, name in ((A, "a"), (B, "b")):
@@ -268,12 +299,13 @@ def raw_diff(out, event, A, B, la, lb, jfrconv, top):
         t = summarize({}, selfs[0], selfs[1], {}, {}, A.total, B.total, A.ops, B.ops)
         md = table_md(event, t, la, lb, {}, top).replace(" (benchmark threads, curated)", " (benchmark threads)")
         open(os.path.join(out, f"table-{event}.md"), "w").write(md.split("\ninclusive ")[0])
+        write_flips(out, event, A, B, la, lb, jits)
     finally:
         for f in tmp:
             os.unlink(f)
 
 
-def curated_diff(out, event, A, B, la, lb, jfrconv, rules):
+def curated_diff(out, event, A, B, la, lb, jfrconv, rules, jits=None):
     """The curated graphs, table-<event>.md and tables-<event>.json of two cells' cached stacks; the tables."""
     c = Curator(rules)
     ba, outside_a = c.base(A)
@@ -294,12 +326,17 @@ def curated_diff(out, event, A, B, la, lb, jfrconv, rules):
     t["oneSidedFrames"] = c.one_sided
     open(os.path.join(out, f"table-{event}.md"), "w").write(table_md(event, t, la, lb, rules, rules.get("top", 25)))
     json.dump(t, open(os.path.join(out, f"tables-{event}.json"), "w"), indent=1)
+    if c.kinds:
+        write_flips(out, event, A, B, la, lb, jits)
+        for by_leaf in (False, True):
+            kinds.toggle_page(os.path.join(out, f"toggle-{event}{'-byleaf' if by_leaf else ''}.html"), event, la, lb,
+                              kinds.tree(ca, cb, A.ops, B.ops, by_leaf), by_leaf)
     return t
 
 
 def banner(rules):
     """The rules, in a sentence, for the page."""
-    parts = ["names without compilation suffixes", "dropped: " + ", ".join(DROP + as_list(rules.get("drop")))]
+    parts = ["names keep their compilation suffixes (frames by kind)" if rules.get("kinds") else "names without compilation suffixes", "dropped: " + ", ".join(DROP + as_list(rules.get("drop")))]
     if rules.get("anchor"):
         parts.append(f"stacks cut above {rules['anchor']}")
     parts.append("folded into their caller (not as the leaf): " + ", ".join(FOLD + as_list(rules.get("fold"))))
@@ -334,6 +371,7 @@ def main(argv):
     ap.add_argument("--event", action="append", help="default: every event of the recording")
     ap.add_argument("--curate", help="a preset of [diff] presets, or JSON hints")
     ap.add_argument("--raw", action="store_true", help="the raw diff only")
+    ap.add_argument("--no-light", action="store_true", help="without the light diff (the `light` preset) beside the curated one")
     ap.add_argument("--by-leaf", action="store_true", help="also the leaf-rooted differential graph")
     ap.add_argument("--force", action="store_true", help="render the raw diff again even when it is there")
     x = ap.parse_args(argv)
@@ -357,7 +395,14 @@ def main(argv):
     if x.by_leaf:
         rules["byLeaf"] = True
     pair = {"a": x.a, "b": x.b, "corpus": corpus, "cells": [os.path.relpath(c, d) for c in (ca, cb)]}
-    raw_out, cur_out = os.path.join(d, stem), os.path.join(d, f"{stem}-{name}")
+    raw_out = os.path.join(d, stem)
+    jits = None
+    from . import jfrevents
+    if all(jfrevents.jit_recordings(c) for c in (ca, cb)):
+        try:
+            jits = (jfrevents.jit(ca), jfrevents.jit(cb))
+        except (RuntimeError, OSError, ValueError) as e:
+            print(f"JIT recordings not read: {e}", file=sys.stderr)
     loaded = {}
     for e in events:
         loaded[e] = (stacks.load(ca, e, jfrconv), stacks.load(cb, e, jfrconv))
@@ -368,22 +413,30 @@ def main(argv):
     if not raw_done:
         os.makedirs(raw_out, exist_ok=True)
         for e in events:
-            raw_diff(raw_out, e, *loaded[e], la, lb, jfrconv, rules.get("top", 25))
+            raw_diff(raw_out, e, *loaded[e], la, lb, jfrconv, rules.get("top", 25), jits)
         json.dump(pair, open(os.path.join(raw_out, "pair.json"), "w"), indent=2)
         compare.write(raw_out, la, lb)
+    else:
+        for e in events:  # a raw diff from before the flips table
+            if not os.path.exists(os.path.join(raw_out, f"flips-{e}.json")):
+                write_flips(raw_out, e, *loaded[e], la, lb, jits)
     print(f"raw: {os.path.join(raw_out, 'compare.html')}{' (there already)' if raw_done else ''}")
-    if not x.raw:
+    curations = [] if x.raw else [(rules, name)]
+    if not x.raw and not x.no_light and name != "light":
+        curations.append(rules_for(spec, "light"))
+    for rules, name in curations:
+        cur_out = os.path.join(d, f"{stem}-{name}")
         os.makedirs(cur_out, exist_ok=True)
         for e in events:
-            t = curated_diff(cur_out, e, *loaded[e], la, lb, jfrconv, rules)
+            t = curated_diff(cur_out, e, *loaded[e], la, lb, jfrconv, rules, jits)
             tot = t["total"]
-            print(f"{e}: {profdiff.si(tot['a'])} → {profdiff.si(tot['b'])} per op ({100 * (tot['ratio'] - 1):+.1f}%)")
+            print(f"{e} ({name}): {profdiff.si(tot['a'])} → {profdiff.si(tot['b'])} per op ({100 * (tot['ratio'] - 1):+.1f}%)")
             for g in t["groups"]:
                 print(f"  {g['name']}: {'+' if g['delta'] > 0 else ''}{profdiff.si(g['delta'])}")
         json.dump({**pair, "curated": name, "rules": rules, "raw": os.path.basename(raw_out), "note": banner(rules)},
                   open(os.path.join(cur_out, "pair.json"), "w"), indent=2)
         compare.write(cur_out, la, lb, note=banner(rules))
-        print(f"curated: {os.path.join(cur_out, 'compare.html')}")
+        print(f"{name}: {os.path.join(cur_out, 'compare.html')}")
     from . import index
     try:
         index.rebuild(config.get().campaigns)

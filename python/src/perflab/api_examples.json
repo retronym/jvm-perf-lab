@@ -487,8 +487,8 @@
     "planned": 8
    },
    "status": "partial",
-   "updated": 1793442348.5259752,
-   "updatedIso": "2026-10-31T20:25:48",
+   "updated": 1793445475.6283677,
+   "updatedIso": "2026-10-31T21:17:55",
    "bytes": null,
    "profileOf": null,
    "profiles": null,
@@ -833,8 +833,8 @@
      "planned": 8
     },
     "status": "partial",
-    "updated": 1793442348.5259752,
-    "updatedIso": "2026-10-31T20:25:48",
+    "updated": 1793445475.6283677,
+    "updatedIso": "2026-10-31T21:17:55",
     "bytes": null,
     "profileOf": null,
     "profiles": null,
@@ -865,8 +865,8 @@
      "planned": 2
     },
     "status": "finished",
-    "updated": 1793442348.5202925,
-    "updatedIso": "2026-10-31T20:25:48",
+    "updated": 1793445475.621966,
+    "updatedIso": "2026-10-31T21:17:55",
     "bytes": null,
     "profileOf": "br",
     "profiles": null,
@@ -886,7 +886,7 @@
    "score": 10.15,
    "error": 0.1,
    "unit": "ms/op",
-   "finished": 1793442348.522455,
+   "finished": 1793445475.6244948,
    "why": null,
    "voidId": null,
    "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1",
@@ -1087,7 +1087,7 @@
     "score": 10.1,
     "error": 0.1,
     "unit": "ms/op",
-    "finished": 1793442348.5164332,
+    "finished": 1793445475.6179726,
     "why": null,
     "voidId": null,
     "path": "/Users/me/lab/out/perflab/ab/br/a/aaaaaaaaaa/1",
@@ -1102,7 +1102,7 @@
     "score": 10.0,
     "error": 0.1,
     "unit": "ms/op",
-    "finished": 1793442348.5169902,
+    "finished": 1793445475.6185346,
     "why": null,
     "voidId": null,
     "path": "/Users/me/lab/out/perflab/ab/br/a/bbbbbbbbbb/1",
@@ -1262,7 +1262,48 @@
         "shown": "| +10 | 5 | 15 | +0.83% | `a.B.fast` |"
        }
       ],
-      "table": "cpu per op (benchmark threads): a 1.2k, b 1.0k, -16.7%  (ms/op a 10, b 8; ops a 3, b 3; a = base/1, b = tip/1)\n\nself cpu per op, biggest decreases then increases (b − a):\n\n| Δ | a | b | Δ of a's total | method |\n|---|---|---|---|---|\n| -150 | 300 | 150 | -12.50% | `a.B.slow` |\n| … | | | | |\n| +10 | 5 | 15 | +0.83% | `a.B.fast` |\n"
+      "table": "cpu per op (benchmark threads): a 1.2k, b 1.0k, -16.7%  (ms/op a 10, b 8; ops a 3, b 3; a = base/1, b = tip/1)\n\nself cpu per op, biggest decreases then increases (b − a):\n\n| Δ | a | b | Δ of a's total | method |\n|---|---|---|---|---|\n| -150 | 300 | 150 | -12.50% | `a.B.slow` |\n| … | | | | |\n| +10 | 5 | 15 | +0.83% | `a.B.fast` |\n",
+      "flips": {
+       "total": {
+        "a": 1200.0,
+        "b": 1000.0
+       },
+       "jit": true,
+       "rows": [
+        {
+         "method": "a/S.denot",
+         "moved": 40.0,
+         "a": {
+          "inlined": 40.0,
+          "real": 0.0,
+          "realShare": 0.0,
+          "self": 30.0
+         },
+         "b": {
+          "inlined": 0.0,
+          "real": 40.0,
+          "realShare": 1.0,
+          "self": 30.0
+         },
+         "jit": {
+          "a": {
+           "inlined": 5,
+           "notInlined": 0,
+           "messages": {
+            "inline (hot)": 5
+           }
+          },
+          "b": {
+           "inlined": 0,
+           "notInlined": 5,
+           "messages": {
+            "too big": 5
+           }
+          }
+         }
+        }
+       ]
+      }
      }
     ]
    }
@@ -1272,13 +1313,13 @@
   "schema": "Forgotten",
   "version": 1,
   "project": {
-   "id": "tmpdc155exr-40f81b",
-   "name": "tmpdc155exr",
+   "id": "tmpdnsiej41-0c0d66",
+   "name": "tmpdnsiej41",
    "root": "/tmp/perflab-server",
    "campaigns": "/tmp/perflab-server/out/perflab/ab",
    "runs": "/tmp/perflab-server/out/perflab/runs",
    "registered": true,
-   "index": "/p/tmpdc155exr-40f81b/ab/index.html"
+   "index": "/p/tmpdnsiej41-0c0d66/ab/index.html"
   }
  },
  "Jit": {
@@ -1572,8 +1613,8 @@
    "module": "perflab_fakejob",
    "state": "queued",
    "priority": 0,
-   "seq": 1793442348.603413,
-   "created": 1793442348.603413,
+   "seq": 1793445475.7165911,
+   "created": 1793445475.7165911,
    "started": null,
    "ended": null,
    "rc": null,
@@ -1608,8 +1649,8 @@
     "module": "perflab_fakejob",
     "state": "queued",
     "priority": 0,
-    "seq": 1793442348.603413,
-    "created": 1793442348.603413,
+    "seq": 1793445475.7165911,
+    "created": 1793445475.7165911,
     "started": null,
     "ended": null,
     "rc": null,
@@ -1743,8 +1784,8 @@
    "module": "perflab_fakejob",
    "state": "queued",
    "priority": 0,
-   "seq": 1793442348.603413,
-   "created": 1793442348.603413,
+   "seq": 1793445475.7165911,
+   "created": 1793445475.7165911,
    "started": null,
    "ended": null,
    "rc": null,
@@ -1786,27 +1827,27 @@
    "score": 8.2,
    "error": 0.1,
    "unit": "ms/op",
-   "finished": 1793442348.5179682,
+   "finished": 1793445475.6195693,
    "why": null,
    "voidId": null,
    "path": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2",
    "url": "/p/lab-3f2a1c/ab/br/a/eeeeeeeeee/2",
    "timeline": null
   },
-  "from": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-202548"
+  "from": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-211755"
  },
  "Voided": {
   "schema": "Voided",
   "version": 1,
   "campaign": "br",
   "void": {
-   "id": "a/eeeeeeeeee/2-20261031-202548",
+   "id": "a/eeeeeeeeee/2-20261031-211755",
    "corpus": "a",
    "variant": "eeeeeeeeee",
    "round": 2,
    "reason": "other load up to 2.1 cores over iterations 3, 4",
-   "voided": 1793442348.600054,
-   "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-202548",
+   "voided": 1793445475.712963,
+   "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-211755",
    "restorable": true
   },
   "from": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2"
@@ -1817,13 +1858,13 @@
   "campaign": "br",
   "voids": [
    {
-    "id": "a/eeeeeeeeee/2-20261031-202548",
+    "id": "a/eeeeeeeeee/2-20261031-211755",
     "corpus": "a",
     "variant": "eeeeeeeeee",
     "round": 2,
     "reason": "other load up to 2.1 cores over iterations 3, 4",
-    "voided": 1793442348.600054,
-    "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-202548",
+    "voided": 1793445475.712963,
+    "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-211755",
     "restorable": true
    }
   ]
