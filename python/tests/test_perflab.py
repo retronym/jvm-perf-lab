@@ -2,7 +2,7 @@ import json, os, re, shlex, shutil, signal, socket, subprocess, sys, tempfile, t
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab server`: commands run here, not on its queue
-from perflab import ab, analyze, auditfold, compare, config, curate, defcosts, index, inlinetree, jmh, jvmevents, kperf, launch, loadgate, metrics, profdiff, regraph, serve, specs, stacks, timeline, transcript, trees  # noqa: E402
+from perflab import ab, analyze, jfrevents, auditfold, compare, config, curate, defcosts, index, inlinetree, jmh, jvmevents, kperf, launch, loadgate, metrics, profdiff, regraph, serve, specs, stacks, timeline, transcript, trees  # noqa: E402
 
 
 def _ensure_then_stop(root=None, port=None, _ensure=serve.ensure):
@@ -451,6 +451,83 @@ class CollapsedTest(unittest.TestCase):
         before = set(os.listdir(d)) | {metrics.EVENTS_NAME}
         self.assertEqual(metrics.hw_events(d, "async:cycles+cache-misses", conv), {"cycles": 17 / 4, "cache-misses": 17 / 4})
         self.assertEqual(set(os.listdir(d)), before)
+
+
+PROMOTE = "+jdk.PromoteObjectInNewPLAB+jdk.PromoteObjectOutsidePLAB+jdk.TenuringDistribution"
+
+
+class JfrsyncTest(unittest.TestCase):
+    """A campaign's "jfrsync" instead of the lab's [async] jfrsync; `+event` added to the lab's .jfc."""
+
+    def setUp(self):
+        self.p = Project('[build]\njmh = "x {args}"\n')
+
+    def raw(self, out):
+        line = next(a for a in open(os.path.join(out, "jmh.args")).read().splitlines() if a.startswith("async:"))
+        return dict(kv.split("=", 1) for kv in line.split("rawCommand=", 1)[1].split(";", 1)[0].split(","))
+
+    def test_settings(self):
+        self.assertEqual(jmh.jfrsync(), jmh.PERFLAB_JFC)  # the lab's default
+        self.assertIsNone(jmh.jfrsync(False))
+        self.assertEqual(jmh.jfrsync("my.jfc"), os.path.join(self.p.dir, "my.jfc"))
+        self.assertEqual(jmh.jfrsync("profile"), "profile")
+        self.assertEqual(jmh.added_events("+jdk.A, +jdk.B#threshold=0 ms"),
+                         [("jdk.A", {"enabled": "true"}), ("jdk.B", {"enabled": "true", "threshold": "0 ms"})])
+
+    def test_added_to_perflab_jfc(self):
+        out = tempfile.mkdtemp()
+        f = jmh.jfrsync(PROMOTE + "+jdk.GarbageCollection#enabled=false", out)
+        self.assertEqual(f, os.path.join(out, "jfrsync.jfc"))
+        import xml.etree.ElementTree as ET
+        ev = {e.get("name"): {st.get("name"): st.text for st in e.iter("setting")} for e in ET.parse(f).getroot().iter("event")}
+        base = {e.get("name") for e in ET.parse(jmh.PERFLAB_JFC).getroot().iter("event")}
+        self.assertLessEqual(base, set(ev))  # perflab.jfc's events stay
+        self.assertEqual(ev["jdk.PromoteObjectInNewPLAB"]["enabled"], "true")
+        self.assertEqual(ev["jdk.GarbageCollection"]["enabled"], "false")  # an existing event's setting replaced
+        t = os.path.getmtime(f)
+        time.sleep(0.01)
+        jmh.jfrsync(PROMOTE + "+jdk.GarbageCollection#enabled=false", out)
+        self.assertEqual(os.path.getmtime(f), t)  # unchanged: not rewritten under a running campaign
+
+    def test_a_campaign_overrides_the_lab(self):
+        spec = os.path.join(self.p.dir, "s.json")
+        json.dump({"name": "s", "benchmark": "B", "profile": "async:alloc", "jfrsync": PROMOTE, "corpora": {"c": ""},
+                   "variants": {"a": ""}}, open(spec, "w"))
+        sp = ab.Spec(spec)
+        dest = sp.cell_dir("c", "a", 1)
+        sp.command("c", "", "a", "", dest)
+        self.assertEqual(self.raw(dest)["jfrsync"], os.path.join(sp.out, "jfrsync.jfc"))
+        self.assertEqual(json.load(open(os.path.join(dest, jmh.JFRSYNC))), {"jfrsync": os.path.join(sp.out, "jfrsync.jfc")})
+        json.dump({**json.load(open(spec)), "jfrsync": False}, open(spec, "w"))
+        ab.Spec(spec).command("c", "", "a", "", dest)
+        self.assertNotIn("jfrsync", self.raw(dest))
+        json.dump({k: v for k, v in json.load(open(spec)).items() if k != "jfrsync"}, open(spec, "w"))
+        ab.Spec(spec).command("c", "", "a", "", dest)
+        self.assertEqual(self.raw(dest)["jfrsync"], jmh.PERFLAB_JFC)
+
+    @unittest.skipUnless(shutil.which("java"), "no java")
+    def test_a_jvm_records_the_merged_jfc_and_the_census_reads_it(self):
+        """The merged .jfc is one JFR takes, and G1's promotion events land in the recording."""
+        d = tempfile.mkdtemp()
+        jfc = jmh.jfrsync(PROMOTE, d)
+        src = os.path.join(d, "Promote.java")
+        open(src, "w").write("public class Promote { public static void main(String[] a) {\n"
+                             "  java.util.ArrayDeque<Object[]> keep = new java.util.ArrayDeque<>();\n"
+                             "  for (int i = 0; i < 3_000_000; i++) { keep.add(new Object[8]); if (keep.size() > 200_000) keep.poll(); }\n"
+                             "  System.out.println(keep.size()); } }\n")
+        cell = os.path.join(d, "cell")
+        os.makedirs(cell)
+        jfr = os.path.join(cell, "rec.jfr")
+        r = subprocess.run(["java", "-XX:+UseG1GC", "-Xmx256m", "-Xmn32m", f"-XX:StartFlightRecording:settings={jfc},filename={jfr}", src],
+                           capture_output=True, text=True, timeout=120)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        counts = jfrevents.count(cell, ["jdk.PromoteObjectInNewPLAB", "jdk.TenuringDistribution", "jdk.GarbageCollection"])
+        self.assertGreater(counts["jdk.PromoteObjectInNewPLAB"], 0)
+        self.assertGreater(counts["jdk.GarbageCollection"], 0)  # perflab.jfc's own events too
+        c = jfrevents.promotion(cell)
+        self.assertIn("java.lang.Object[]", [k["class"] for k in c["classes"]])
+        self.assertTrue(os.path.exists(os.path.join(cell, jfrevents.CENSUS)))
+        self.assertEqual(jfrevents.promotion(cell), c)  # from the cache
 
 
 class CurateTest(unittest.TestCase):

@@ -56,16 +56,71 @@ def jfrconv(lib=None):
 PERFLAB_JFC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "perflab.jfc")
 
 
-def jfrsync():
-    """async-profiler's jfrsync setting: the JDK events to record with its own, in the same .jfr; None for none."""
+LAB = object()  # jfrsync's setting: the lab's ([async] jfrsync)
+
+
+def jfrsync(setting=LAB, out_dir=None):
+    """async-profiler's jfrsync setting: the JDK events to record with its own, in the same .jfr; None for none.
+    `setting` is a campaign's (its spec's "jfrsync"), else the lab's `[async] jfrsync`: true for perflab.jfc, false
+    for none, a .jfc (relative to the project root), a predefined JFR profile (default, profile), or events to add,
+    `+jdk.A+jdk.B#threshold=0 ms` (`,` also separates them): the lab's .jfc (perflab.jfc unless it names one) with
+    those enabled too, written to <out_dir>/jfrsync.jfc. async-profiler's own `+` list would record those events
+    alone, without perflab.jfc's (the timeline's lanes)."""
     cfg = config.get()
-    v = cfg.get("async", "jfrsync")
+    v = cfg.get("async", "jfrsync") if setting is LAB else setting
     if v is True:
         return PERFLAB_JFC
     if not v:
         return None
-    # a .jfc relative to the project root, else a predefined JFR profile (default, profile) or a +event list
-    return cfg.path("async", "jfrsync") if v.endswith(".jfc") else v
+    v = str(v).strip()
+    if v.startswith("+"):
+        base = jfrsync() if setting is not LAB else PERFLAB_JFC
+        return merge_jfc(base if base and base.endswith(".jfc") else PERFLAB_JFC, added_events(v),
+                         os.path.join(out_dir or ".", "jfrsync.jfc"))
+    if v.endswith(".jfc"):
+        return os.path.join(cfg.root, os.path.expanduser(v))
+    return v
+
+
+def added_events(v):
+    """`+jdk.A+jdk.B#threshold=0 ms` (or with `,`) -> [(event, {setting: value})], each enabled."""
+    out = []
+    for item in [x.strip() for x in v.replace(",", "+").split("+") if x.strip()]:
+        name, *settings = item.split("#")
+        kv = {"enabled": "true"}
+        for st in settings:
+            k, _, val = st.partition("=")
+            kv[k.strip()] = val.strip()
+        out.append((name.strip(), kv))
+    return out
+
+
+def merge_jfc(base, events, dest):
+    """`base` with `events` ([(name, {setting: value})]) enabled, as `dest`; written only when it changes, so that a
+    running campaign's cells all see the same file."""
+    import xml.etree.ElementTree as ET
+    tree = ET.parse(base)
+    root = tree.getroot()
+    byname = {e.get("name"): e for e in root.iter("event")}
+    for name, settings in events:
+        e = byname.get(name)
+        if e is None:
+            e = ET.SubElement(root, "event", name=name)
+            byname[name] = e
+        for k, val in settings.items():
+            st = next((x for x in e.iter("setting") if x.get("name") == k), None)
+            if st is None:
+                st = ET.SubElement(e, "setting", name=k)
+            st.text = val
+    text = ET.tostring(root, encoding="unicode")
+    head = f'<?xml version="1.0" encoding="UTF-8"?>\n<!-- {os.path.basename(base)} with {", ".join(n for n, _ in events)} (perflab: jfrsync) -->\n'
+    text = head + text + "\n"
+    os.makedirs(os.path.dirname(os.path.abspath(dest)), exist_ok=True)
+    if not os.path.exists(dest) or open(dest).read() != text:
+        with open(dest + ".tmp", "w") as f:
+            f.write(text)
+        os.replace(dest + ".tmp", dest)
+    return os.path.abspath(dest)
 
 
 def async_events(spec, kperf=False):
@@ -92,8 +147,9 @@ def async_events(spec, kperf=False):
     return opts
 
 
-def profile_args(profile, out, kperf=None, lib=None):
-    """(JMH arguments, JVM arguments to prepend) for a profile, writing into `out`."""
+def profile_args(profile, out, kperf=None, lib=None, sync=LAB):
+    """(JMH arguments, JVM arguments to prepend) for a profile, writing into `out`; `sync`: the resolved jfrsync
+    (jfrsync()), else the lab's."""
     kind, _, arg = profile.partition(":")
     if kind == "none":
         return [], []
@@ -115,7 +171,8 @@ def profile_args(profile, out, kperf=None, lib=None):
         depth = config.get().get("async", "stackdepth")
         if depth:
             raw.append(f"jstackdepth={depth}")
-        sync = jfrsync()
+        if sync is LAB:
+            sync = jfrsync(LAB, out)
         if sync:
             raw.append(f"jfrsync={sync}")
         opts.append("rawCommand=" + ",".join(raw))
@@ -152,18 +209,21 @@ def write_args(path, args):
 
 
 # what a run writes into its directory: cleared before the next run there, so nothing stale is merged into its results
-OUTPUTS = ["jmh.log", "result.json", "report.md", "audit-*.json", "**/*.jfr", "**/*.html", "**/*.regraph", "*.trace", "*.trace.*",
+JFRSYNC = "jfrsync.json"  # <cell>/jfrsync.json: the jfrsync the run was given, and what its recording has of what it added
+OUTPUTS = ["jmh.log", JFRSYNC, "result.json", "report.md", "audit-*.json", "**/*.jfr", "**/*.html", "**/*.regraph", "*.trace", "*.trace.*",
            "iterations.tsv", "timeline.tsv", "gc.log", "gc-*.log", "run.json"]
 
 
-def prepare(out, profile, jmh_args, kperf=None, lib=None, jvm_append=None, built=None):
+def prepare(out, profile, jmh_args, kperf=None, lib=None, jvm_append=None, built=None, sync=LAB):
     """Writes <out>/jmh.args for this run and returns the build command that runs it."""
     os.makedirs(out, exist_ok=True)
     import shutil
     for pattern in OUTPUTS:
         for f in glob.glob(os.path.join(out, pattern), recursive=True):
             shutil.rmtree(f) if os.path.isdir(f) else os.unlink(f)
-    prof, prepend = profile_args(profile, out, kperf, lib)
+    if profile.startswith("async") and sync is LAB:
+        sync = jfrsync(LAB, out)
+    prof, prepend = profile_args(profile, out, kperf, lib, sync)
     args = ["-o", os.path.join(out, "jmh.log"), "-rf", "json", "-rff", os.path.join(out, "result.json"), *prof]
     if prepend:
         args += ["-jvmArgsPrepend", " ".join(prepend)]
@@ -174,6 +234,10 @@ def prepare(out, profile, jmh_args, kperf=None, lib=None, jvm_append=None, built
     write_args(path, args)
     with open(os.path.join(out, "profile.txt"), "w") as f:
         f.write(profile + "\n")
+    if profile.startswith("async"):
+        with open(os.path.join(out, JFRSYNC), "w") as f:
+            json.dump({"jfrsync": sync}, f)
+            f.write("\n")
     return jmh_command(path, built)
 
 

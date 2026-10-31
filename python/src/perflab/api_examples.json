@@ -10,7 +10,7 @@
    "reads": "GET /api/v1/<function>?<param>=<value>: no token; numbers and booleans as text (true/false), arrays as JSON.",
    "actions": "POST /api/v1/<function> with a JSON object of the parameters, header X-Perflab-Token (the server's token, in ~/.perflab/server/token), from the server's own origin only.",
    "project": "Every function on a project takes `project`: a project id (see projects) or its root directory; over HTTP only registered projects, and omitted only when there is one.",
-   "urls": "Fields named url are paths on the server (http://127.0.0.1:8690 by default): the index, timelines, flame graphs.",
+   "urls": "Fields named url are paths on the server (http://127.0.0.1:8690 by default, or the name a local proxy gives it, such as https://perflab.localhost): the index, timelines, flame graphs.",
    "units": "A metric's unit is in its label (MetricInfo.label): the score in the benchmark's unit (e.g. ms/op), alloc in bytes per op, counts in events per op (per unit of perUnit when the spec has one), ratios and percents as such.",
    "statistics": "The unit of variation is the fork: a variant's mean, sd and 99.9% CI are over its forks' means; Δ is by Welch's t, significant (better or worse) when |pct| > halfWidth."
   },
@@ -46,6 +46,129 @@
      }
     ],
     "result": "Campaigns"
+   }
+  ]
+ },
+ "Audit": {
+  "schema": "Audit",
+  "version": 1,
+  "campaign": "plain",
+  "corpus": null,
+  "round": null,
+  "variants": [
+   {
+    "variant": "base",
+    "forks": [
+     {
+      "cell": "a/base/2",
+      "file": "audit-7.json",
+      "pid": 7,
+      "ops": 2.0
+     }
+    ],
+    "counters": {
+     "lookups": {
+      "mean": 100.0,
+      "min": 100,
+      "max": 100,
+      "perOp": 50.0
+     },
+     "misses": {
+      "mean": 10.0,
+      "min": 10,
+      "max": 10,
+      "perOp": 5.0
+     }
+    },
+    "probes": {
+     "denot": {
+      "kind": "callers",
+      "hits": 40.0,
+      "sites": [
+       {
+        "site": "A.f:1 <- B.g:2",
+        "count": 30.0
+       },
+       {
+        "site": "C.h:3",
+        "count": 10.0
+       }
+      ]
+     }
+    }
+   },
+   {
+    "variant": "tip",
+    "forks": [
+     {
+      "cell": "a/tip/2",
+      "file": "audit-7.json",
+      "pid": 7,
+      "ops": 2.0
+     }
+    ],
+    "counters": {
+     "lookups": {
+      "mean": 150.0,
+      "min": 150,
+      "max": 150,
+      "perOp": 75.0
+     },
+     "misses": {
+      "mean": 10.0,
+      "min": 10,
+      "max": 10,
+      "perOp": 5.0
+     }
+    },
+    "probes": {
+     "denot": {
+      "kind": "callers",
+      "hits": 40.0,
+      "sites": [
+       {
+        "site": "A.f:1 <- B.g:2",
+        "count": 30.0
+       },
+       {
+        "site": "C.h:3",
+        "count": 10.0
+       }
+      ]
+     }
+    }
+   }
+  ],
+  "counters": [
+   {
+    "counter": "lookups",
+    "mean": {
+     "base": 100.0,
+     "tip": 150.0
+    },
+    "perOp": {
+     "base": 50.0,
+     "tip": 75.0
+    },
+    "ratio": {
+     "base": 1.0,
+     "tip": 1.5
+    }
+   },
+   {
+    "counter": "misses",
+    "mean": {
+     "base": 10.0,
+     "tip": 10.0
+    },
+    "perOp": {
+     "base": 5.0,
+     "tip": 5.0
+    },
+    "ratio": {
+     "base": 1.0,
+     "tip": 1.0
+    }
    }
   ]
  },
@@ -364,8 +487,8 @@
     "planned": 8
    },
    "status": "partial",
-   "updated": 1793233249.696012,
-   "updatedIso": "2026-10-29T10:20:49",
+   "updated": 1793426746.9876065,
+   "updatedIso": "2026-10-31T16:05:46",
    "bytes": null,
    "profileOf": null,
    "profiles": null,
@@ -628,8 +751,8 @@
      "planned": 8
     },
     "status": "partial",
-    "updated": 1793233249.696012,
-    "updatedIso": "2026-10-29T10:20:49",
+    "updated": 1793426746.9876065,
+    "updatedIso": "2026-10-31T16:05:46",
     "bytes": null,
     "profileOf": null,
     "profiles": null,
@@ -660,8 +783,8 @@
      "planned": 2
     },
     "status": "finished",
-    "updated": 1793233249.6645012,
-    "updatedIso": "2026-10-29T10:20:49",
+    "updated": 1793426746.9802802,
+    "updatedIso": "2026-10-31T16:05:46",
     "bytes": null,
     "profileOf": "br",
     "profiles": null,
@@ -681,7 +804,7 @@
    "score": 10.15,
    "error": 0.1,
    "unit": "ms/op",
-   "finished": 1793233249.6696844,
+   "finished": 1793426746.9837258,
    "why": null,
    "voidId": null,
    "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1",
@@ -816,7 +939,16 @@
      "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1/rec-alloc.html"
     }
    ],
-   "hwEvents": {}
+   "hwEvents": {},
+   "jfrsync": {
+    "jfrsync": "/Users/me/lab/out/perflab/ab/plain/jfrsync.jfc",
+    "added": [
+     "jdk.PromoteObjectInNewPLAB"
+    ],
+    "counts": {
+     "jdk.PromoteObjectInNewPLAB": 3
+    }
+   }
   },
   "logs": {
    "jmh.log": {
@@ -835,10 +967,10 @@
     "url": "/p/lab-3f2a1c/ab/plain/a/base/1/iterations.tsv"
    },
    {
-    "name": "jmh.log",
-    "bytes": 14,
-    "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1/jmh.log",
-    "url": "/p/lab-3f2a1c/ab/plain/a/base/1/jmh.log"
+    "name": "jfrsync.json",
+    "bytes": 147,
+    "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1/jfrsync.json",
+    "url": "/p/lab-3f2a1c/ab/plain/a/base/1/jfrsync.json"
    }
   ],
   "specVersion": null,
@@ -857,7 +989,7 @@
     "score": 10.1,
     "error": 0.1,
     "unit": "ms/op",
-    "finished": 1793233249.641082,
+    "finished": 1793426746.9756398,
     "why": null,
     "voidId": null,
     "path": "/Users/me/lab/out/perflab/ab/br/a/aaaaaaaaaa/1",
@@ -872,7 +1004,7 @@
     "score": 10.0,
     "error": 0.1,
     "unit": "ms/op",
-    "finished": 1793233249.6455116,
+    "finished": 1793426746.9761302,
     "why": null,
     "voidId": null,
     "path": "/Users/me/lab/out/perflab/ab/br/a/bbbbbbbbbb/1",
@@ -1042,13 +1174,13 @@
   "schema": "Forgotten",
   "version": 1,
   "project": {
-   "id": "lab-3f2a1c",
-   "name": "lab",
-   "root": "/Users/me/lab",
-   "campaigns": "/Users/me/lab/out/perflab/ab",
-   "runs": "/Users/me/lab/out/perflab/runs",
+   "id": "tmp0tili6k5-5b42bf",
+   "name": "tmp0tili6k5",
+   "root": "/tmp/perflab-server",
+   "campaigns": "/tmp/perflab-server/out/perflab/ab",
+   "runs": "/tmp/perflab-server/out/perflab/runs",
    "registered": true,
-   "index": "/p/lab-3f2a1c/ab/index.html"
+   "index": "/p/tmp0tili6k5-5b42bf/ab/index.html"
   }
  },
  "JobResult": {
@@ -1064,11 +1196,11 @@
    "cwd": "/Users/me/lab",
    "python": null,
    "module": "perflab_fakejob",
-   "state": "running",
+   "state": "queued",
    "priority": 0,
-   "seq": 1793233249.827444,
-   "created": 1793233249.827444,
-   "started": 1793233249.833496,
+   "seq": 1793426747.073854,
+   "created": 1793426747.073854,
+   "started": null,
    "ended": null,
    "rc": null,
    "pid": null,
@@ -1082,7 +1214,8 @@
    "envKeys": [
     "ASYNC_PROFILER_DIR",
     "HOME"
-   ]
+   ],
+   "campaign": "br"
   }
  },
  "Jobs": {
@@ -1099,25 +1232,27 @@
     "cwd": "/Users/me/lab",
     "python": null,
     "module": "perflab_fakejob",
-    "state": "running",
+    "state": "queued",
     "priority": 0,
-    "seq": 1793233249.827444,
-    "created": 1793233249.827444,
-    "started": 1793233249.833496,
+    "seq": 1793426747.073854,
+    "created": 1793426747.073854,
+    "started": null,
     "ended": null,
     "rc": null,
-    "pid": 49537,
+    "pid": null,
     "cancel_requested": null,
     "dir": "/Users/me/.perflab/server/jobs/1",
     "transcript": "/Users/me/.perflab/server/jobs/1/transcript.txt",
     "note": null,
-    "pid_start": "Thu Oct 29 10:20:49 2026",
+    "pid_start": null,
     "control": null,
     "acked": false,
+    "position": 1,
     "envKeys": [
      "ASYNC_PROFILER_DIR",
      "HOME"
-    ]
+    ],
+    "campaign": "br"
    }
   ]
  },
@@ -1172,6 +1307,48 @@
    }
   ]
  },
+ "Promotion": {
+  "schema": "Promotion",
+  "version": 1,
+  "cell": "a/base/1",
+  "recording": "/Users/me/lab/out/perflab/ab/plain/a/base/1/rec.jfr",
+  "events": {
+   "jdk.PromoteObjectInNewPLAB": 3,
+   "jdk.PromoteObjectOutsidePLAB": 0,
+   "jdk.TenuringDistribution": 2
+  },
+  "gcs": 2,
+  "ops": 1.0,
+  "total": {
+   "survivorBytes": 3000,
+   "tenuredBytes": 1000,
+   "survivorPerOp": 3000.0,
+   "tenuredPerOp": 1000.0
+  },
+  "classes": [
+   {
+    "class": "a.Tree",
+    "survivorBytes": 3000,
+    "tenuredBytes": 1000,
+    "events": 3,
+    "share": 1.0,
+    "perOp": 4000.0
+   },
+   {
+    "class": "a.Name",
+    "survivorBytes": 0,
+    "tenuredBytes": 0,
+    "events": 0,
+    "share": 0.0,
+    "perOp": 0.0
+   }
+  ],
+  "tenuringDistribution": {
+   "1": 4096,
+   "2": 512
+  },
+  "note": null
+ },
  "Rerun": {
   "schema": "Rerun",
   "version": 1,
@@ -1192,8 +1369,8 @@
    "module": "perflab_fakejob",
    "state": "queued",
    "priority": 0,
-   "seq": 1793233249.827444,
-   "created": 1793233249.827444,
+   "seq": 1793426747.073854,
+   "created": 1793426747.073854,
    "started": null,
    "ended": null,
    "rc": null,
@@ -1211,6 +1388,7 @@
     "ASYNC_PROFILER_DIR",
     "HOME"
    ],
+   "campaign": "br",
    "url": "/#job-1"
   },
   "deduped": false,
@@ -1234,27 +1412,27 @@
    "score": 8.2,
    "error": 0.1,
    "unit": "ms/op",
-   "finished": 1793233249.6518488,
+   "finished": 1793426746.9773767,
    "why": null,
    "voidId": null,
    "path": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2",
    "url": "/p/lab-3f2a1c/ab/br/a/eeeeeeeeee/2",
    "timeline": null
   },
-  "from": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261029-102049"
+  "from": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-160547"
  },
  "Voided": {
   "schema": "Voided",
   "version": 1,
   "campaign": "br",
   "void": {
-   "id": "a/eeeeeeeeee/2-20261029-102049",
+   "id": "a/eeeeeeeeee/2-20261031-160547",
    "corpus": "a",
    "variant": "eeeeeeeeee",
    "round": 2,
    "reason": "other load up to 2.1 cores over iterations 3, 4",
-   "voided": 1793233249.821394,
-   "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261029-102049",
+   "voided": 1793426747.070148,
+   "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-160547",
    "restorable": true
   },
   "from": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2"
@@ -1265,13 +1443,13 @@
   "campaign": "br",
   "voids": [
    {
-    "id": "a/eeeeeeeeee/2-20261029-102049",
+    "id": "a/eeeeeeeeee/2-20261031-160547",
     "corpus": "a",
     "variant": "eeeeeeeeee",
     "round": 2,
     "reason": "other load up to 2.1 cores over iterations 3, 4",
-    "voided": 1793233249.821394,
-    "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261029-102049",
+    "voided": 1793426747.070148,
+    "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261031-160547",
     "restorable": true
    }
   ]

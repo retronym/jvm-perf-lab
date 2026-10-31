@@ -18,7 +18,7 @@ the CLI, they are POSTed to it, and with no server running they fail with code "
 """
 import contextlib, datetime, glob, inspect, json, math, os, re, shutil, sqlite3, threading, time, urllib.error, urllib.parse, urllib.request
 
-from . import ab, branchview, config, index, loadgate, metrics, server as srv, storage
+from . import ab, branchview, config, index, jmh, loadgate, metrics, server as srv, storage
 
 API_VERSION = 1
 VOID_DIR = ".void"
@@ -239,6 +239,39 @@ define("Graph", "A rendered flame graph", {"corpus": null(S("corpus")), "variant
                                            "event": S("The event: cpu, alloc, wall, lock, cycles, ..."),
                                            "kind": S("The graph kind: bench, reverse, classify, threads, ..."), "url": URL,
                                            "path": PATH}, optional=("corpus", "variant", "round"))
+define("Audit", "A campaign's caller-audit reports (audit-<pid>.json, one per fork) per variant: counters and probes", {
+    "campaign": S("The campaign"), "corpus": null(S("The corpus the reports are of; null for every corpus")),
+    "round": null(I("The round; null for every round")),
+    "variants": A(O("A variant's reports", {
+        "variant": S("The variant"),
+        "forks": A(O("A report", {"cell": S("corpus/variant/round"), "file": S("Its file, in the cell"), "pid": null(I("The fork's pid")),
+                                  "ops": null(N("The fork's ops (warmup and measurement, from iterations.tsv), which its counts cover"))}),
+                   "Its reports, one per fork"),
+        "counters": M(O("A counter", {"mean": N("Mean count per fork"), "min": N("Lowest count of a fork"), "max": N("Highest"),
+                                      "perOp": null(N("Count per op, over the forks whose ops are known"))}), "By counter name"),
+        "probes": M(O("A probe", {"kind": null(S("The probe's kind")), "hits": N("Mean hits per fork"),
+                                  "sites": A(O("A site", {"site": S("Its callers, `Class.method:line <- …` [qualifiers]"),
+                                                           "count": N("Mean count per fork")}), "The commonest sites, most first")}),
+                    "By probe name")}), "Each variant with reports, in the spec's order"),
+    "counters": A(O("A counter across the variants", {"counter": S("Its name"), "mean": M(null(N("mean")), "Mean per fork, by variant"),
+                                                      "perOp": M(null(N("per op")), "Per op, by variant"),
+                                                      "ratio": M(null(N("ratio")), "Per op (else per fork) over the first variant's, by variant")}),
+                  "Every counter, to compare variants")}, top=True)
+
+define("Promotion", "G1's promotion census of an async cell's recording: bytes promoted per class, to a survivor space or tenured", {
+    "cell": S("corpus/variant/round"), "recording": PATH,
+    "events": M(I("events"), "jdk.PromoteObjectInNewPLAB, jdk.PromoteObjectOutsidePLAB and jdk.TenuringDistribution events in it"),
+    "gcs": I("GCs with a promotion event"), "ops": null(N("The measured ops the recording covers (iterations.tsv)")),
+    "total": O("Over every class", {"survivorBytes": I("Bytes promoted to a survivor space"), "tenuredBytes": I("Bytes promoted to the old generation"),
+                                   "survivorPerOp": null(N("Per op")), "tenuredPerOp": null(N("Per op"))}),
+    "classes": A(O("A class", {"class": S("The class"), "survivorBytes": I("Bytes promoted to a survivor space"),
+                               "tenuredBytes": I("Bytes promoted to the old generation"), "events": I("Its events"),
+                               "share": N("Its share of all bytes promoted (0..1)"), "perOp": null(N("Its bytes per op"))}),
+                 "The classes that promoted most, most first. A new PLAB's event stands for the plabSize bytes promoted into it, so a class's bytes are an estimate"),
+    "tenuringDistribution": M(I("bytes"), "Survivor-space bytes per age, summed over GCs"),
+    "note": null(S("Why the census is empty, when it is"))}, top=True)
+
+
 define("Cell", "One cell in full: its result, every metric and sample, its iterations, load, GC, profile and logs", {
     "cell": ref("CellSummary"),
     "result": null(O("The essentials of JMH's result.json", {
@@ -268,7 +301,12 @@ define("Cell", "One cell in full: its result, every metric and sample, its itera
     "profile": O("The cell's profile", {"profiler": S("profile.txt: none, xctrace:<template>, async:<events>"),
                                         "recordings": A(FILE, "Recordings: .jfr, .trace"),
                                         "graphs": A(ref("Graph"), "Rendered flame graphs"),
-                                        "hwEvents": M(N("events per op"), "An async kperf profile's events per op on the benchmark threads")}),
+                                        "hwEvents": M(N("events per op"), "An async kperf profile's events per op on the benchmark threads"),
+                                        "jfrsync": null(O("The JDK events an async run recorded with its own (jfrsync.json)", {
+                                            "jfrsync": null(S("What async-profiler was given: a .jfc, a JFR profile; null for none")),
+                                            "added": A(S("event"), "Events the campaign's jfrsync added to the lab's .jfc"),
+                                            "counts": M(I("events"), "How many of each added event the recording has")},
+                                            optional=("added", "counts")))}),
     "logs": M(O("A log", {**FILE["properties"], "tail": null(S("Its last `tail` lines (with tail > 0)"))}),
               "build.log (the build tool's output), jmh.log (JMH's), gc.log"),
     "files": A(FILE, "Every file of the cell"),
@@ -1110,12 +1148,136 @@ def cell(campaign, corpus, variant, round, project=None, tail=0):
         void = None
         prof = {"profiler": profiler, "recordings": [_file(p, f, c) for f in files if f.endswith((".jfr", ".trace"))],
                 "graphs": [{"event": ev, "kind": k, "url": _url(p, path), "path": path} for ev, k, path in _cell_graphs(c)] if _async(c) else [],
-                "hwEvents": hw}
+                "hwEvents": hw, "jfrsync": _json(os.path.join(c, jmh.JFRSYNC))}
     return envelope("Cell", cell=summ, result=res, metrics=ms, raw=raw, iterations=its, load=load,
                     gc={"metrics": gcm, "log": _file(p, os.path.join(c, "gc.log"), c) if os.path.exists(os.path.join(c, "gc.log")) else None},
                     profile=prof, logs=logs, files=[_file(p, f, c) for f in files],
                     specVersion=(open(os.path.join(c, "spec.version")).read().strip() or None) if os.path.exists(os.path.join(c, "spec.version")) else None,
                     void=void)
+
+
+@endpoint("read", "Audit", "A campaign's caller-audit counters and probes per variant (perflab-agent's audit-<pid>.json), to compare variants",
+          project=PROJECT_P, campaign=CAMPAIGN_P, corpus=S("Only this corpus"), round=I("Only this round", minimum=1),
+          top=I("Sites per probe (default 10)", minimum=0))
+def audit(campaign, project=None, corpus=None, round=None, top=10):
+    """The audit reports of an `audit:` campaign's cells: per variant, each counter's mean per fork and per op (the
+    report's pid joined to iterations.tsv's ops of that fork: an audit counts the whole fork, warmup included), each
+    probe's hits and commonest sites; and every counter across the variants, with its ratio to the first variant's.
+    A cell rerun (the load gate) leaves the earlier fork's report beside the new one, so forks are averaged, not summed."""
+    p = resolve(project)
+    with _config(p):
+        d = _camp_dir(p, campaign)
+        spec = _json(os.path.join(d, "spec.json"), {}) or {}
+        if corpus is not None:
+            _segment("corpus", corpus)
+        reports = {}
+        for f in sorted(glob.glob(os.path.join(d, "*", "*", "*", "audit-*.json"))):
+            cell = os.path.dirname(f)
+            c, v, r = os.path.relpath(cell, d).split(os.sep)
+            if (corpus is not None and c != corpus) or (round is not None and r != str(int(round))) or not r.isdigit():
+                continue
+            reports.setdefault(v, []).append((cell, f))
+        if not reports:
+            raise ApiError("not_found", f"{campaign}: no audit reports (audit-<pid>.json)" + (f" for corpus {corpus}" if corpus else "")
+                           + (f" in round {round}" if round else ""), {"profile": spec.get("profile")})
+        order = [v for v in (spec.get("variants") or {}) if v in reports] + sorted(v for v in reports if v not in (spec.get("variants") or {}))
+        out = []
+        for v in order:
+            forks, counters, probes = [], {}, {}
+            for cell, f in reports[v]:
+                rep_ = _json(f, {}) or {}
+                m = re.fullmatch(r"audit-(\d+)\.json", os.path.basename(f))
+                pid = int(m.group(1)) if m else None
+                forks.append({"cell": os.path.relpath(cell, d), "file": os.path.basename(f), "pid": pid, "ops": _fork_ops(cell, pid)})
+                for k, n in (rep_.get("counters") or {}).items():
+                    counters.setdefault(k, []).append((n, forks[-1]["ops"]))
+                for k, pr in (rep_.get("probes") or {}).items():
+                    q = probes.setdefault(k, {"kind": pr.get("kind"), "hits": [], "sites": {}})
+                    q["hits"].append(pr.get("hits") or 0)
+                    for site, n in (pr.get("sites") or {}).items():
+                        q["sites"][site] = q["sites"].get(site, 0) + n
+            nf = len(forks)
+            cs = {}
+            for k, xs in counters.items():
+                ns = [n for n, _ in xs]
+                known = [(n, o) for n, o in xs if o]
+                cs[k] = {"mean": sum(ns) / nf, "min": min(ns) if len(ns) == nf else 0, "max": max(ns),
+                         "perOp": sum(n for n, _ in known) / sum(o for _, o in known) if known else None}
+            ps = {k: {"kind": q["kind"], "hits": sum(q["hits"]) / nf,
+                      "sites": [{"site": s_, "count": n / nf} for s_, n in sorted(q["sites"].items(), key=lambda kv: -kv[1])[:int(top)]]}
+                  for k, q in probes.items()}
+            out.append({"variant": v, "forks": forks, "counters": cs, "probes": ps})
+        names = sorted({k for x in out for k in x["counters"]})
+        first = out[0]["counters"]
+        table = []
+        for k in names:
+            mean = {x["variant"]: (x["counters"].get(k) or {}).get("mean") for x in out}
+            per_op = {x["variant"]: (x["counters"].get(k) or {}).get("perOp") for x in out}
+            base = first.get(k) or {}
+            def ratio(x):
+                c = x["counters"].get(k) or {}
+                if c.get("perOp") is not None and base.get("perOp"):
+                    return c["perOp"] / base["perOp"]
+                return c["mean"] / base["mean"] if c.get("mean") is not None and base.get("mean") else None
+            table.append({"counter": k, "mean": mean, "perOp": per_op, "ratio": {x["variant"]: ratio(x) for x in out}})
+    return envelope("Audit", campaign=campaign, corpus=corpus, round=int(round) if round is not None else None, variants=out, counters=table)
+
+
+def _fork_ops(cell, pid):
+    """The ops of the fork with `pid`, warmup and measurement (iterations.tsv); None if unknown."""
+    tsv = os.path.join(cell, "iterations.tsv")
+    if pid is None or not os.path.exists(tsv):
+        return None
+    rows = open(tsv).read().splitlines()
+    head = rows[0].split("\t") if rows else []
+    if "pid" not in head or "ops" not in head:
+        return None
+    ip, io = head.index("pid"), head.index("ops")
+    n = 0.0
+    for row in rows[1:]:
+        cols = row.split("\t")
+        if len(cols) > max(ip, io) and cols[ip] == str(pid):
+            x = _num(cols[io])
+            n += x if isinstance(x, (int, float)) else 0
+    return n or None
+
+
+@endpoint("read", "Promotion", "G1's promotion census of an async cell: bytes promoted per class, survivor vs tenured, from its .jfr",
+          project=PROJECT_P, campaign=CAMPAIGN_P, corpus=S("The corpus"), variant=S("The variant (or a commit's sha prefix)"),
+          round=I("The round", minimum=1), top=I("Classes (default 30)", minimum=0))
+def promotion(campaign, corpus, variant, round, project=None, top=30):
+    """From jdk.PromoteObjectInNewPLAB, jdk.PromoteObjectOutsidePLAB and jdk.TenuringDistribution in the cell's
+    recording, which a campaign records with `"jfrsync": "+jdk.PromoteObjectInNewPLAB+jdk.PromoteObjectOutsidePLAB+jdk.TenuringDistribution"`.
+    Read by the JDK that recorded it (perflab.jfrevents), the first time in seconds, then cached in the cell."""
+    from . import jfrevents
+    p = resolve(project)
+    with _config(p):
+        d = _camp_dir(p, campaign)
+        spec = _json(os.path.join(d, "spec.json"), {}) or {}
+        variant = _variant_ref(d, spec, _segment("variant", variant))
+        _segment("corpus", corpus)
+        c = os.path.join(d, corpus, variant, str(int(round)))
+        jfr = jfrevents.recording(c) if os.path.isdir(c) else None
+        if not jfr:
+            raise ApiError("not_found", f"{campaign}: no recording in cell {corpus}/{variant}/{round} (an async profile's .jfr)")
+        try:
+            census = jfrevents.promotion(c)
+        except (RuntimeError, OSError, ValueError) as e:
+            raise ApiError("internal", f"reading {jfr}: {e}")
+        ops = jfrevents.measured_ops(c)
+        per = lambda x: x / ops if ops else None
+        sb = sum(k["survivorBytes"] for k in census["classes"])
+        tb = sum(k["tenuredBytes"] for k in census["classes"])
+        classes = [{"class": k["class"], "survivorBytes": k["survivorBytes"], "tenuredBytes": k["tenuredBytes"],
+                    "events": k["survivorEvents"] + k["tenuredEvents"],
+                    "share": (k["survivorBytes"] + k["tenuredBytes"]) / (sb + tb) if sb + tb else 0.0,
+                    "perOp": per(k["survivorBytes"] + k["tenuredBytes"])} for k in census["classes"][:int(top)]]
+        events = {n: census["events"].get(n, 0) for n in ("jdk.PromoteObjectInNewPLAB", "jdk.PromoteObjectOutsidePLAB", "jdk.TenuringDistribution")}
+        note = None if any(events.values()) else ("the recording has no promotion events: record them with the campaign's "
+                                                  '"jfrsync": "+jdk.PromoteObjectInNewPLAB+jdk.PromoteObjectOutsidePLAB+jdk.TenuringDistribution"')
+    return envelope("Promotion", cell=f"{corpus}/{variant}/{int(round)}", recording=jfr, events=events, gcs=census.get("gcs", 0), ops=ops,
+                    total={"survivorBytes": sb, "tenuredBytes": tb, "survivorPerOp": per(sb), "tenuredPerOp": per(tb)},
+                    classes=classes, tenuringDistribution={str(k): v for k, v in (census.get("tenuringDistribution") or {}).items()}, note=note)
 
 
 # ---- branch campaigns

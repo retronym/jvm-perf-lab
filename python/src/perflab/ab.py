@@ -17,6 +17,9 @@ A spec:
     "benchmark": "CompileBenchmark",          # default: [benchmark] default in perflab.toml
     "profile": "xctrace:ipc",                 # as `perflab run --profile`: none, xctrace:<template>, async:<events>
     "kperf": "/tmp/asprof-kperf.sock",        # optional, for async: macOS PMU events through the kperf helper
+    "jfrsync": "+jdk.PromoteObjectInNewPLAB",  # optional, for async: the JDK events in its .jfr, instead of the lab's
+                                              # [async] jfrsync: a .jfc, false, or `+event...` added to the lab's .jfc
+                                              # (written to <campaign>/jfrsync.jfc); recorded in <cell>/jfrsync.json
     "lib": "<libasyncProfiler>",              # optional, for async
     "jvm": "<java>",                          # optional: JMH -jvm for every run (checked against result.json)
     "jvmArgs": "-Xms4G -Xmx4G -Xss2M",        # given to every variant; default: [benchmark] jvmArgs
@@ -107,6 +110,7 @@ class Spec:
             p = f"xctrace:{p['xctrace']}" if "xctrace" in p else f"async:{p['async']}" if "async" in p else "none"
         self.profile = p
         self.kperf, self.lib = s.get("kperf"), s.get("lib")
+        self.jfrsync = s.get("jfrsync", jmh.LAB)  # the campaign's, else the lab's [async] jfrsync
         self.jvm_args = s.get("jvmArgs", cfg.get("benchmark", "jvmArgs") or "")
         self.jvm = s.get("jvm")
         self.rounds = s.get("rounds", 2)
@@ -183,7 +187,8 @@ class Spec:
         jvm_args = " ".join(x for x in [self.jvm_args, flags, *extra] if x)
         args = (["-jvm", self.jvm] if self.jvm else []) + ["-p", f"{self.corpus_param}={corpus}"]
         args += shlex.split(iters) + shlex.split(self.variant_jmh_args.get(variant, "")) + [self.benchmark]
-        return jmh.prepare(dest, self.profile, args, self.kperf, self.lib, jvm_args, built)
+        sync = jmh.jfrsync(self.jfrsync, self.out) if self.profile.startswith("async") else jmh.LAB
+        return jmh.prepare(dest, self.profile, args, self.kperf, self.lib, jvm_args, built, sync)
 
 
 def jmh_lock_held():
@@ -289,6 +294,25 @@ def check(spec, dest, started, flags, variant, built=None):
         if ours and last != ours[-1:]:
             return f"{opt}: the run used {last}, not {ours[-1]}"
     return None
+
+
+def record_jfrsync(spec, dest):
+    """How many of each event the campaign's jfrsync added the cell's recording has, in <cell>/jfrsync.json; a warning
+    for one it lacks (the JDK has no such event, or it never fired)."""
+    from . import jfrevents
+    f = os.path.join(dest, jmh.JFRSYNC)
+    try:
+        rec = json.load(open(f))
+        added = [n for n, _ in jmh.added_events(spec.jfrsync)]
+        rec.update(added=added, counts=jfrevents.count(dest, added))
+        with open(f, "w") as out:
+            json.dump(rec, out)
+            out.write("\n")
+        missing = [n for n in added if not rec["counts"].get(n)]
+        if missing:
+            log(f"  warning: the recording has no {', '.join(missing)} (jfrsync)")
+    except Exception as e:  # a check that cannot read the recording is no reason to stop the campaign
+        log(f"  warning: counting the jfrsync events failed: {e}")
 
 
 def check_samples(spec, dest):
@@ -429,6 +453,8 @@ def run(spec, dry, retry_unbuildable=False):
             from . import timeline
             timeline.write(dest)
         jmh.finish(dest, spec.profile, spec.lib)
+        if spec.profile.startswith("async") and isinstance(spec.jfrsync, str) and spec.jfrsync.strip().startswith("+"):
+            record_jfrsync(spec, dest)
         if spec.kperf:
             try:
                 metrics.hw_events(dest, spec.profile, jmh.jfrconv(jmh.async_lib(spec.lib)))  # for the index's summary

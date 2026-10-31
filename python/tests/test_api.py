@@ -52,6 +52,17 @@ def plain_fixture(campaigns, name="plain"):
             open(os.path.join(d, "load.tsv"), "w").write("2.5\t2.0\tjava 2.0\t2\n")
             open(os.path.join(d, "jmh.log"), "w").write("one\ntwo\nthree\n")
             open(os.path.join(d, "timeline.html"), "w").write("<html>")
+            if r == 1:  # the promotion census of its recording, as jfrevents caches it, and the jfrsync it was given
+                json.dump({"events": {"jdk.PromoteObjectInNewPLAB": 3, "jdk.TenuringDistribution": 2}, "gcs": 2,
+                           "classes": [{"class": "a.Tree", "survivorBytes": 3000, "tenuredBytes": 1000, "survivorEvents": 2, "tenuredEvents": 1},
+                                       {"class": "a.Name", "survivorBytes": 0, "tenuredBytes": 0, "survivorEvents": 0, "tenuredEvents": 0}],
+                           "tenuringDistribution": {"1": 4096, "2": 512}}, open(os.path.join(d, "promotion.json"), "w"))
+                json.dump({"jfrsync": "/Users/me/lab/out/perflab/ab/plain/jfrsync.jfc", "added": ["jdk.PromoteObjectInNewPLAB"],
+                           "counts": {"jdk.PromoteObjectInNewPLAB": 3}}, open(os.path.join(d, "jfrsync.json"), "w"))
+            else:  # a caller audit of its fork (pid 7: 2 ops)
+                json.dump({"counters": {"lookups": 100 if v == "base" else 150, "misses": 10},
+                           "probes": {"denot": {"kind": "callers", "hits": 40, "sample": 1, "sites": {"A.f:1 <- B.g:2": 30, "C.h:3": 10}}}},
+                          open(os.path.join(d, "audit-7.json"), "w"))
     dd = os.path.join(camp, "diff-base-tip")
     os.makedirs(dd)
     stub_profdiff([])(["--event", "cpu", "x", "y", dd])
@@ -106,7 +117,8 @@ def every_read(t):
             ("compare", {"campaign": "plain", "a": "base", "b": "tip"}), ("compare", {"campaign": "br", "a": V[3], "b": "eeee"}),
             ("profiles", {"campaign": "plain"}), ("profiles", {"campaign": "br"}),
             ("diff", {"campaign": "plain", "a": "base", "b": "tip"}), ("diff", {"campaign": "br", "a": V[4], "b": V[3]}),
-            ("voids", {"campaign": "br"}), ("jobs", {})]
+            ("voids", {"campaign": "br"}), ("jobs", {}), ("audit", {"campaign": "plain"}),
+            ("promotion", {"campaign": "plain", "corpus": "a", "variant": "base", "round": 1})]
 
 
 class ReadTest(Fixture, unittest.TestCase):
@@ -116,6 +128,27 @@ class ReadTest(Fixture, unittest.TestCase):
                 self.valid(api.call(name, args))
         self.assertEqual({n for n, _ in every_read(self)} | {"job", "transcript"},
                          {f.name for f in api.FUNCTIONS.values() if f.kind == "read"})
+
+    def test_audit_per_variant(self):
+        a = api.audit("plain")
+        self.assertEqual([v["variant"] for v in a["variants"]], ["base", "tip"])
+        base = a["variants"][0]
+        self.assertEqual(base["forks"], [{"cell": "a/base/2", "file": "audit-7.json", "pid": 7, "ops": 2.0}])
+        self.assertEqual(base["counters"]["lookups"], {"mean": 100, "min": 100, "max": 100, "perOp": 50.0})
+        self.assertEqual(base["probes"]["denot"]["sites"][0], {"site": "A.f:1 <- B.g:2", "count": 30})
+        row = next(r for r in a["counters"] if r["counter"] == "lookups")
+        self.assertEqual(row["ratio"], {"base": 1.0, "tip": 1.5})
+        with self.assertRaises(api.ApiError):
+            api.audit("plain", round=1)  # round 1 has none
+
+    def test_promotion_census(self):
+        pr = api.promotion("plain", "a", "base", 1)
+        self.assertEqual(pr["total"]["survivorBytes"], 3000)
+        self.assertEqual(pr["ops"], 1.0)  # the measured iteration's
+        self.assertEqual(pr["classes"][0]["share"], 1.0)
+        self.assertIsNone(pr["note"])
+        self.assertEqual(api.cell("plain", "a", "base", 1)["profile"]["jfrsync"]["counts"], {"jdk.PromoteObjectInNewPLAB": 3})
+        self.assertIsNone(api.cell("plain", "a", "base", 2)["profile"]["jfrsync"])
 
     def test_campaigns(self):
         cs = {c["name"]: c for c in api.campaigns()["campaigns"]}

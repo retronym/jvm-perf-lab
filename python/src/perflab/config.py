@@ -33,7 +33,9 @@
     stackdepth = 8192                        # frames per stack; default: async-profiler's 2048
     spans = true                             # the span panel on `bench` graphs (jfrconv --spans)
     span_config = "span-config.json"         # the span panel's groupings (implies spans)
-    jfrsync = true                           # JDK events in the same .jfr (perflab.jfc); or a .jfc, a JFR profile, false
+    jfrsync = true                           # JDK events in the same .jfr (perflab.jfc); or a .jfc, a JFR profile, false,
+                                             # or `+jdk.A+jdk.B#threshold=0 ms`: perflab.jfc with those too. A campaign's
+                                             # spec "jfrsync" (the same values) replaces it for that campaign
 
     [analyze]
     phases = "perflab-phases.toml"    # phase table for `perflab analyze`
