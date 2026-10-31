@@ -4,9 +4,10 @@ inlining (a caller grew past `FreqInlineSize`, or the method past `MaxInlineSize
 spread over every call site, hundreds of slivers in a flame graph, and the curated diff merges the kinds on purpose; here
 it is one row.
 
-- `flips(A, B)`: per method, its inclusive events per op as inlined and as a real frame in each build, ranked by the
-  weight that moved between the two (|b's real share − a's| × its mean weight), with its self events per op; with the
-  cells' JIT recordings (a spec's "jitRecording"), C2's decisions about it as a callee in each (`jit_reasons`).
+- `flips(A, B)`: per method, its self events per op as an inlined frame and as one of its own in each build, ranked
+  by the self weight that changed kind (|b's real share − a's| × its mean self events), with its inclusive events
+  by kind; with the cells' JIT recordings (a spec's "jitRecording"), C2's decisions about it as a callee in each
+  (`jit_reasons`).
 - `toggle_page`: one flame graph that flips between the two builds in place (key t): both per op on one scale, laid
   out once over both, so the zoom, the scroll and every frame's place stay put and only the widths change; frames
   coloured by kind, as async-profiler's. Top-down, or by leaf (all of a method's self events in one root bar, split by
@@ -29,7 +30,8 @@ def plain(frame):
 
 
 def weights(st):
-    """{method: [inlined, real]} inclusive events (a stack counts once per method and kind), {method: self events}."""
+    """{method: [inlined, real]} of its inclusive events (a stack counts once per method and kind), and of its self
+    events (the leaf's kind)."""
     ids, code = {}, []
     for f in st.frames:
         m = KIND.search(f)
@@ -39,40 +41,39 @@ def weights(st):
             code.append(2 * i + (k != "i"))
         else:
             code.append(-1)
-    incl = [0] * (2 * len(ids))
-    own = collections.Counter()
-    names = list(ids)
+    incl, own = [0] * (2 * len(ids)), [0] * (2 * len(ids))
     for s, n in st.stacks:
         for c in set(map(code.__getitem__, s)):
             if c >= 0:
                 incl[c] += n
         c = code[s[-1]]
         if c >= 0:
-            own[names[c >> 1]] += n
-    return {m: [incl[2 * i], incl[2 * i + 1]] for m, i in ids.items()}, own
+            own[c] += n
+    return ({m: [incl[2 * i], incl[2 * i + 1]] for m, i in ids.items()},
+            {m: [own[2 * i], own[2 * i + 1]] for m, i in ids.items()})
 
 
-def flips(A, B, top=50, min_frac=0.0005):
-    """The methods whose events moved most between inlined and real frames, a -> b, per op."""
-    wa, sa = weights(A)
-    wb, sb = weights(B)
+def flips(A, B, top=50, min_frac=0.0002):
+    """The methods whose self events moved most between inlined and real frames, a -> b, per op: the call overhead of
+    a lost inlining lands in the callee's own frames. Inclusive weight would rank the methods high in the tree, whose
+    whole subtree changes kind when a caller's compile is reshaped, above the callee that C2 stopped inlining."""
+    ia, wa = weights(A)
+    ib, wb = weights(B)
     ta, tb = A.total / A.ops, B.total / B.ops
     rows = []
     for m in wa.keys() | wb.keys():
         ai, ar = (x / A.ops for x in wa.get(m, (0, 0)))
         bi, br = (x / B.ops for x in wb.get(m, (0, 0)))
-        if ai + ar + bi + br < min_frac * (ta + tb):
-            continue
-        share_a = ar / (ai + ar) if ai + ar else None
-        share_b = br / (bi + br) if bi + br else None
-        if share_a is None or share_b is None:
-            continue  # in one build only: not a change of kind
+        if ai + ar + bi + br < min_frac * (ta + tb) or not ai + ar or not bi + br:
+            continue  # small, or in one build only: not a change of kind
+        share_a, share_b = ar / (ai + ar), br / (bi + br)
         moved = abs(share_b - share_a) * (ai + ar + bi + br) / 2
         if moved <= 0:
             continue
-        rows.append({"method": m, "moved": moved,
-                     "a": {"inlined": ai, "real": ar, "realShare": share_a, "self": sa.get(m, 0) / A.ops},
-                     "b": {"inlined": bi, "real": br, "realShare": share_b, "self": sb.get(m, 0) / B.ops}})
+        side = lambda i, r, share, incl, ops: {"inlined": i, "real": r, "realShare": share,
+                                               "inclusiveInlined": incl[0] / ops, "inclusiveReal": incl[1] / ops}
+        rows.append({"method": m, "moved": moved, "a": side(ai, ar, share_a, ia.get(m, (0, 0)), A.ops),
+                     "b": side(bi, br, share_b, ib.get(m, (0, 0)), B.ops)})
     rows.sort(key=lambda r: -r["moved"])
     return {"total": {"a": ta, "b": tb}, "rows": rows[:top]}
 
@@ -104,16 +105,19 @@ def with_jit(t, jit_a, jit_b):
 def table_md(event, t, la, lb, top=25):
     from .profdiff import si
     pct = lambda x: "" if x is None else f"{100 * x:.0f}%"
-    out = [f"## frame-kind flips: {event} per op where a method ran inlined (`_[i]`) vs as its own frame (`_[j]`, `_[1]`, `_[0]`)", "",
-           f"a = {la}, b = {lb}. moved: the weight whose kind changed, |b's real share − a's| × its mean inclusive events per op."
-           + (" C2: its decisions as a callee in the last C2 compiles (inlined/not inlined call sites; b's reasons)." if t.get("jit") else ""), "",
-           "| moved | a inlined | a real | a real % | b inlined | b real | b real % | a self | b self |" + (" C2 a | C2 b |" if t.get("jit") else "") + " method |",
-           "|---|---|---|---|---|---|---|---|---|" + ("---|---|" if t.get("jit") else "") + "---|"]
+    jit = t.get("jit")
+    out = [f"## frame-kind flips: self {event} per op of a method inlined (`_[i]`) vs in its own frame (`_[j]`, `_[1]`, `_[0]`)", "",
+           f"a = {la}, b = {lb}. moved: the self events whose kind changed, |b's real share − a's| × the mean self events per op; "
+           "incl real %: its inclusive events' share in its own frames."
+           + (" C2: its decisions as a callee in the last C2 compiles (inlined/not inlined call sites; b's reasons)." if jit else ""), "",
+           "| moved | a inlined | a real | a real % | b inlined | b real | b real % | incl real % a → b |" + (" C2 a | C2 b |" if jit else "") + " method |",
+           "|---|---|---|---|---|---|---|---|" + ("---|---|" if jit else "") + "---|"]
     for r in t["rows"][:top]:
         a, b = r["a"], r["b"]
+        inc = lambda x: pct(x["inclusiveReal"] / (x["inclusiveInlined"] + x["inclusiveReal"])) if x["inclusiveInlined"] + x["inclusiveReal"] else ""
         cells = [si(r["moved"]), si(a["inlined"]), si(a["real"]), pct(a["realShare"]), si(b["inlined"]), si(b["real"]), pct(b["realShare"]),
-                 si(a["self"]), si(b["self"])]
-        if t.get("jit"):
+                 f"{inc(a)} → {inc(b)}"]
+        if jit:
             j = r.get("jit") or {}
             c2 = lambda x, why=False: "" if not x else f"{x['inlined']}/{x['notInlined']}" + (
                 " " + ", ".join(f"{m} {n}" for m, n in x["messages"].items() if not m.startswith("inline")) if why else "")

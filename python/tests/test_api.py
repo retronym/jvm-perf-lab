@@ -93,8 +93,8 @@ def plain_fixture(campaigns, name="plain"):
     stub_profdiff([])(["--event", "cpu", "x", "y", dd])
     open(os.path.join(dd, "table-cpu.md"), "w").write(TABLE)
     json.dump({"total": {"a": 1200.0, "b": 1000.0}, "jit": True, "rows": [
-        {"method": "a/S.denot", "moved": 40.0, "a": {"inlined": 40.0, "real": 0.0, "realShare": 0.0, "self": 30.0},
-         "b": {"inlined": 0.0, "real": 40.0, "realShare": 1.0, "self": 30.0},
+        {"method": "a/S.denot", "moved": 30.0, "a": {"inlined": 30.0, "real": 0.0, "realShare": 0.0, "inclusiveInlined": 40.0, "inclusiveReal": 0.0},
+         "b": {"inlined": 0.0, "real": 30.0, "realShare": 1.0, "inclusiveInlined": 0.0, "inclusiveReal": 40.0},
          "jit": {"a": {"inlined": 5, "notInlined": 0, "messages": {"inline (hot)": 5}},
                  "b": {"inlined": 0, "notInlined": 5, "messages": {"too big": 5}}}}]}, open(os.path.join(dd, "flips-cpu.json"), "w"))
     os.makedirs(os.path.join(camp, "b", "base", "2"))

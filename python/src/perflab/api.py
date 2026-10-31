@@ -421,8 +421,9 @@ define("Profiles", "A campaign's profiled cells and their diffs (for a branch ca
     "campaign": S("The campaign"), "graphs": A(ref("Graph"), "Flame graphs of every profiled cell"),
     "diffs": A(ref("DiffRef"), "Diffs")}, top=True)
 define("FlipSide", "A method's events per op in one build, by frame kind", {
-    "inlined": N("Inclusive events per op as an inlined frame"), "real": N("As a frame of its own"),
-    "realShare": N("real / (inlined + real)"), "self": N("Self events per op, any kind")})
+    "inlined": N("Self events per op in an inlined frame"), "real": N("Self events per op in its own frame"),
+    "realShare": N("real / (inlined + real)"), "inclusiveInlined": N("Inclusive events per op through an inlined frame"),
+    "inclusiveReal": N("Inclusive events per op through its own frame")})
 define("FlipJit", "C2's decisions about a callee in one build", {
     "inlined": I("Call sites inlined"), "notInlined": I("Call sites not inlined"), "messages": M(I("call sites"), "By C2's reason")})
 define("Diff", "The profdiff outputs of a pair: per event its pages and the table of methods whose self time per op changed most", {
@@ -445,11 +446,11 @@ define("Diff", "The profdiff outputs of a pair: per event its pages and the tabl
                           optional=("delta",)), "Frames of both builds, biggest excess first"),
             "outsideAnchor": null(O("Events left out for want of the anchor", {"a": N("a"), "b": N("b")})),
             "oneSidedFrames": I("Frames dropped above the leaf for being in one build only")})),
-        "flips": O("Frame-kind flips (flips-<event>.json): methods whose events moved between running inlined (_[i]) and as "
-                   "their own frame (_[j] C2, _[1] C1, _[0] interpreted), per op, most moved first", {
+        "flips": O("Frame-kind flips (flips-<event>.json): methods whose self events moved between running inlined (_[i]) and "
+                   "in their own frame (_[j] C2, _[1] C1, _[0] interpreted), per op, most moved first", {
             "total": O("The event per op", {"a": N("a"), "b": N("b")}),
             "rows": A(O("A method", {
-                "method": S("The method, as jfrconv names it"), "moved": N("|b's real share − a's| × its mean inclusive events per op"),
+                "method": S("The method, as jfrconv names it"), "moved": N("|b's real share − a's| × its mean self events per op"),
                 "a": ref("FlipSide"), "b": ref("FlipSide"),
                 "jit": O("C2's decisions with it as the callee, over every method's last C2 compile (the cells' jitRecording)",
                          {"a": {**null(ref("FlipJit")), "description": "In a; null: not a callee there"},

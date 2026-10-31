@@ -582,7 +582,8 @@ class KindsTest(unittest.TestCase):
         t = kinds.flips(*self.pair())
         [r] = t["rows"]  # nothing else changed kind
         self.assertEqual(r["method"], "S.denot")
-        self.assertEqual((r["a"]["inlined"], r["a"]["real"], r["b"]["inlined"], r["b"]["real"]), (4.0, 0.0, 0.0, 4.5))
+        self.assertEqual((r["a"]["inlined"], r["a"]["real"], r["b"]["inlined"], r["b"]["real"]), (4.0, 0.0, 0.0, 4.5))  # self
+        self.assertEqual((r["a"]["inclusiveInlined"], r["b"]["inclusiveReal"]), (4.0, 4.5))
         self.assertEqual(r["moved"], 4.25)
         jit = {"methods": [{"c2": {"inlining": [{"caller": "T.find()V", "callee": "S.denot()V", "inlined": 0, "notInlined": 2, "messages": {"too big": 2}}]}}]}
         r = kinds.with_jit(t, {"methods": []}, jit)["rows"][0]

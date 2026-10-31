@@ -47,8 +47,8 @@ compiled are different frames, coloured by kind), no frame is aligned away and r
 classes, thread ids), 2 and 4 apply. Beside its graphs, `toggle-<event>.html` (and `-byleaf`) flips one flame graph
 between the builds in place, per op on one scale (perflab.kinds).
 
-Every diff, raw and light, has the frame-kind flips table (perflab.kinds): per method, its events per op inlined and as
-its own frame in each build, ranked by the weight that changed kind, with C2's reasons when the cells have a
+Every diff, raw and light, has the frame-kind flips table (perflab.kinds): per method, its self events per op inlined and in
+its own frame in each build, ranked by the self events that changed kind, with C2's reasons when the cells have a
 "jitRecording".
 
 `fold` and `drop` add to the defaults, `groups` and `presets` merge by name, anything else replaces. Each cell's
@@ -274,8 +274,10 @@ def write_flips(out, event, A, B, la, lb, jits=None):
     if jits:
         t = kinds.with_jit(t, *jits)
     json.dump(t, open(os.path.join(out, f"flips-{event}.json"), "w"), indent=1)
-    with open(os.path.join(out, f"table-{event}.md"), "a") as f:
-        f.write("\n" + kinds.table_md(event, t, la, lb))
+    md = os.path.join(out, f"table-{event}.md")
+    text = open(md).read().split("\n## frame-kind flips")[0] if os.path.exists(md) else ""  # this table again: replaced
+    with open(md, "w") as f:
+        f.write(text.rstrip("\n") + "\n\n" + kinds.table_md(event, t, la, lb))
     return t
 
 
