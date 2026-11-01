@@ -154,7 +154,7 @@ def main(argv):
     A = load(x.a, x.event, x.jfrconv, x.out, "a")
     B = load(x.b, x.event, x.jfrconv, x.out, "b")
     # collapsed hardware-event stacks count events (samples × period), not samples
-    per_op = lambda r, n: n / r["ops"]
+    of_op = lambda r, n: n / r["ops"]  # not per_op, which this would hide
     la, lb = label(x.a), label(x.b)
     graph = lambda title, *args: subprocess.run([x.jfrconv, "-J-Xmx8g", "--minwidth", "0.2", "--title", title, *args],
                                                 capture_output=True)
@@ -167,14 +167,14 @@ def main(argv):
     graph(f"{ev}: {lb} → {la}", "--diff", B["collapsed"], A["collapsed"], os.path.join(x.out, f"diff-{x.event}-inverse.html"))
     graph(f"{ev}: {la}", A["collapsed"], os.path.join(x.out, f"a-{x.event}.html"))
     graph(f"{ev}: {lb}", B["collapsed"], os.path.join(x.out, f"b-{x.event}.html"))
-    ta, tb = per_op(A, A["total"]), per_op(B, B["total"])
+    ta, tb = of_op(A, A["total"]), of_op(B, B["total"])
     table = io.StringIO()
     out = lambda s="": (print(s), table.write(s + "\n"))
     out(f"{x.event} per op (benchmark threads): a {si(ta)}, b {si(tb)}, {100 * (tb / ta - 1):+.1f}%  "
         f"(ms/op a {A['score']:.0f}, b {B['score']:.0f}; ops a {A['ops']}, b {B['ops']}; a = {la}, b = {lb})")
-    delta = {m: per_op(B, B["self"][m]) - per_op(A, A["self"][m]) for m in set(A["self"]) | set(B["self"])}
+    delta = {m: of_op(B, B["self"][m]) - of_op(A, A["self"][m]) for m in set(A["self"]) | set(B["self"])}
     rows = sorted(delta.items(), key=lambda kv: kv[1])
-    fmt = lambda m, d: (f"| {'+' if d > 0 else ''}{si(d)} | {si(per_op(A, A['self'][m]))} | {si(per_op(B, B['self'][m]))} | "
+    fmt = lambda m, d: (f"| {'+' if d > 0 else ''}{si(d)} | {si(of_op(A, A['self'][m]))} | {si(of_op(B, B['self'][m]))} | "
                        f"{100 * d / ta:+.2f}% | `{m}` |")
     out(f"\nself {x.event} per op, biggest decreases then increases (b − a):\n")
     out("| Δ | a | b | Δ of a's total | method |\n|---|---|---|---|---|")

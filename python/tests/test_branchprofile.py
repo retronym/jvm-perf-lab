@@ -11,7 +11,8 @@ from test_perflab import Project  # noqa: E402
 def fake_profile_cell(d, corpus="a", scores=((10.0, 10.1),), allocs=((1e6, 1e6),), hw=None):
     """A profile cell: its result, its profile, a recording and its bench graphs; with `hw`, its kperf events per op."""
     os.makedirs(d, exist_ok=True)
-    json.dump([result(corpus, [list(f) for f in scores], [list(f) for f in allocs])], open(os.path.join(d, "result.json"), "w"))
+    json.dump([{**result(corpus, [list(f) for f in scores], [list(f) for f in allocs]), "measurementTime": "1 s"}],
+              open(os.path.join(d, "result.json"), "w"))
     if hw:  # as totals over one measured op
         json.dump({"format": 2, "totals": hw}, open(os.path.join(d, "hw-events.json"), "w"))
         open(os.path.join(d, "iterations.tsv"), "w").write("index\tkind\tops\n0\tmeasure\t1\n")
@@ -29,6 +30,9 @@ def stub_profdiff(calls):
         for f in (f"a-{ev}.html", f"diff-{ev}.html", f"diff-{ev}-inverse.html", f"b-{ev}.html", "compare.html"):
             open(os.path.join(out, f), "w").write("<html>")
     return run
+
+
+BRANCH_RUN_PROFDIFF = branchprofile.run_profdiff
 
 
 class ProfileCampaignTest(unittest.TestCase):
@@ -131,6 +135,23 @@ class ProfileCampaignTest(unittest.TestCase):
         # an unprofiled commit: nothing to diff
         mid = b["commits"][1]["variant"]
         self.assertEqual(branchprofile.main(["diff", "br", base, mid]), 1)
+
+    def test_diff_runs_profdiff(self):
+        # the real profdiff, over a jfrconv that writes the same stacks for every recording and an empty page per graph
+        branchprofile.main(["profile", self.spec_f, self.base, self.tip])
+        conv = os.path.join(tempfile.mkdtemp(), "jfrconv")
+        open(conv, "w").write("#!/bin/sh\nfor last; do :; done\n"
+                              "case \"$last\" in *.html) echo '<html>' > \"$last\";; *) printf 'a;b 10\\na;c 5\\n' > \"$last\";; esac\n")
+        os.chmod(conv, 0o755)
+        for mod, name, value in [(branchprofile, "run_profdiff", BRANCH_RUN_PROFDIFF), (jmh, "jfrconv", lambda lib: conv)]:
+            self.addCleanup(setattr, mod, name, getattr(mod, name))
+            setattr(mod, name, value)
+        b = json.load(open(os.path.join(config.get().campaigns, "br", branch.BRANCH)))
+        base, tip = b["commits"][0]["variant"], b["commits"][-1]["variant"]
+        self.assertEqual(branchprofile.main(["diff", "br", base, tip, "--force"]), 0)
+        d = os.path.join(config.get().campaigns, "br.profile", f"diff-x-{base}-{tip}")
+        for f in ("compare.html", "diff-cpu.html", "a-alloc.html", "pair.json"):
+            self.assertTrue(os.path.exists(os.path.join(d, f)), f)
 
     def test_commits_by_prefix_or_ref(self):
         b = branch.resolve(self.repo, f"{self.base}..main")
