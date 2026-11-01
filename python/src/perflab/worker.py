@@ -137,6 +137,8 @@ class Job:
             control.write(f, None)
         open(self.transcript, "w").close()
         self.sent, self.word, self.lost, self.proc = 0, None, None, None
+        self.hold = False  # the worker's own pause at a cell boundary, to upload while nothing is measured
+        self.ctl_lock = threading.Lock()
         self.stop = threading.Event()
 
     def say(self, msg):
@@ -154,7 +156,7 @@ class Job:
 
     def beat(self, final_rc=None):
         data = self.chunk()
-        body = {"transcript": data.decode(errors="replace"), "paused": control.acked(self.ctl)}
+        body = {"transcript": data.decode(errors="replace"), "paused": control.acked(self.ctl) and self.word == control.PAUSE}
         if final_rc is not None:
             self.w.client.post(f"/api/workers/jobs/{self.id}/finish", {**body, "rc": final_rc})
             self.sent += len(data)
@@ -163,7 +165,12 @@ class Job:
         self.sent += len(data)
         if r.get("control") != self.word:
             self.word = r.get("control")
-            control.write(self.ctl, self.word)
+            self.apply()
+
+    def apply(self):
+        """The control file: the coordinator's word, else the worker's own pause while it uploads."""
+        with self.ctl_lock:
+            control.write(self.ctl, self.word or (control.PAUSE if self.hold else None))
 
     def beats(self):
         while not self.stop.wait(BEAT):
@@ -501,7 +508,7 @@ class Job:
             self.proc = subprocess.Popen(cmd, cwd=project, env=env, stdin=subprocess.DEVNULL, stdout=out,
                                          stderr=subprocess.STDOUT, start_new_session=True)
         running_f = os.path.join(os.path.dirname(camp), ab.RUNNING_NAME)
-        term_at, cancel_at, last_sync = None, None, 0.0
+        term_at, cancel_at, seen, pending = None, None, None, False
         while self.proc.poll() is None:
             time.sleep(1)
             if self.lost:
@@ -515,14 +522,24 @@ class Job:
                 elif term_at and now - term_at >= KILL_AFTER:
                     self.kill(signal.SIGKILL)
                     term_at = float("inf")
-            if now - last_sync >= BEAT:
-                last_sync = now
-                r = _read_json(running_f) or {}
-                cell = os.path.relpath(os.path.join(os.path.dirname(running_f), r["cell"]), camp) if r.get("cell") else None
+            # a cell ended: its upload waits for the next cell boundary, where the job pauses (its checkpoint) while it
+            # goes, so that nothing is measured meanwhile; the load gate's quiet period then follows it
+            r = _read_json(running_f) or {}
+            now_running = (r.get("cell"), r.get("started")) if r.get("campaign") == self.p["campaign"] else None
+            if now_running != seen:
+                pending = pending or seen is not None
+                seen = now_running
+            if pending and not self.hold and self.word is None:
+                self.hold = True
+                self.apply()
+            elif self.hold and control.acked(self.ctl):
                 try:
-                    self.sync(camp, cell)
+                    self.sync(camp)
+                    pending = False
                 except (OSError, RuntimeError) as e:
-                    print(f"[worker] upload failed ({e}); next time", flush=True)
+                    print(f"[worker] upload failed ({e}); at the next cell boundary", flush=True)
+                self.hold = False
+                self.apply()
         rc = self.proc.wait()
         return control.CANCELLED if self.word == control.CANCEL and rc else rc
 

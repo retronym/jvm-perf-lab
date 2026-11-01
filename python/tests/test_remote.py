@@ -144,7 +144,8 @@ class EndToEndTest(unittest.TestCase):
         files["lab/campaigns/rw.json"] = json.dumps({
             "name": "rw", "testbed": "sim", "rounds": 1, "corpora": {"c": ""},
             "jvmArgs": f"-Dfake.data={lab}/data.txt",
-            "builds": {"base": {"checkout": "../../../base", "env": env}, "tip": {"checkout": "../../../src", "env": env}}})
+            "builds": {"base": {"checkout": "../../../base", "env": env}, "tip": {"checkout": "../../../src", "env": env},
+                       "tip2": {"checkout": "../../../src", "env": env}}})
         commit(h, "lab", **files)
         open(os.path.join(lab, "data.txt"), "w").write("2")
         self.lab = lab
@@ -159,7 +160,7 @@ class EndToEndTest(unittest.TestCase):
 
     def work(self):
         env = {**os.environ, "PERFLAB_WORKER_HOME": self.whome, "PERFLAB_WORKER_TOKEN": self.srv.token,
-               "PYTHONPATH": SRC, "PERFLAB_WORKER_BEAT": "0.5", "TMPDIR": os.path.join(self.t, "tmp")}  # its own jmh.lock
+               "PYTHONPATH": SRC, "PERFLAB_WORKER_BEAT": "0.5", "PERFLAB_CONTROL_POLL": "0.2", "TMPDIR": os.path.join(self.t, "tmp")}  # its own jmh.lock
         env.pop("PERFLAB_SERVER_HOME", None)
         return subprocess.run([sys.executable, "-m", "perflab", "worker", "--server", self.srv.url, "--testbed", "sim",
                                "--name", "w1", "--once", "--poll", "0.2"], env=env, capture_output=True, text=True, timeout=180)
@@ -176,7 +177,7 @@ class EndToEndTest(unittest.TestCase):
         camp = os.path.join(self.lab, "out", "ab", "rw")
         version = open(os.path.join(camp, "c", "base", "1", "spec.version")).read()
         self.assertEqual(version, remote.payload(j)["specVersion"])
-        for v, want in (("base", 5 + 2), ("tip", 7 + 2)):  # VERSION of its commit + the harness's uncommitted data.txt
+        for v, want in (("base", 5 + 2), ("tip", 7 + 2), ("tip2", 7 + 2)):  # VERSION of its commit + the harness's uncommitted data.txt
             cell = os.path.join(camp, "c", v, "1")
             res = json.load(open(os.path.join(cell, "result.json")))[0]
             self.assertEqual(res["primaryMetric"]["score"], want, v)
@@ -184,13 +185,15 @@ class EndToEndTest(unittest.TestCase):
             self.assertTrue(ab.done(cell))
         self.assertIn("from the coordinator's bundle", log)  # the unpushed commit
         self.assertIn("uploaded c/tip/1", log)
+        # a cell is uploaded at a cell boundary, the job paused meanwhile: never while a later cell measures
+        self.assertLess(log.index("uploaded c/base/1"), log.index("round 1 c tip2"))
         self.assertNotIn(self.whome, json.load(open(os.path.join(camp, "spec.json")))["jvmArgs"])  # the coordinator's own spec
         # again: the worker resumes from the coordinator's cells, and has nothing to run
         j2 = server.submit_local(self.srv, {"argv": ["ab", "run", "campaigns/rw.json"], "cwd": self.lab})
         r = self.work()
         j2 = self.srv.q.get(j2["id"])
         self.assertEqual(j2["state"], "done", r.stdout + r.stderr)
-        self.assertIn("2 cells, 0 to run", open(j2["transcript"]).read())
+        self.assertIn("3 cells, 0 to run", open(j2["transcript"]).read())
 
 
 def glob_campaigns(whome):
