@@ -290,6 +290,9 @@ def run_build(cmd, log_path, every=None, tick=None, env=None, label=None):
     transcript.say(f"[perflab] command: {brief(cmd)}\n[perflab] its log: {log_path}")
     state = label and {"pid": os.getpid(), "label": label, "cmd": brief(cmd), "log": os.path.relpath(os.path.abspath(log_path), os.path.dirname(loadgate.state_path(BUILD_STATE))),
                        "started": time.time(), "updated": time.time(), "lines": 0, "tail": []}
+    if state:  # a campaign's build (<campaigns>/<campaign>/.build/...): its card on the index shows it building
+        rel = os.path.relpath(os.path.abspath(log_path), os.path.abspath(config.get().campaigns))
+        state["campaign"] = None if rel.startswith("..") else rel.split(os.sep)[0]
 
     def show():
         state["updated"] = time.time()

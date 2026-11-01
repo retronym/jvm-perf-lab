@@ -239,17 +239,19 @@ STAT_TITLE = {"mean": "the mean over rounds of each round's mean, ± the sd over
               "min": "the fastest measured iteration, the forks pooled; Δ ± the sd of a bootstrap over forks and iterations"}
 
 
-def card_summary(recs, order, planned, per_unit=None, norm=None):
+def card_summary(recs, order, planned, per_unit=None, norm=None, running=None):
     """A campaign's summary and cells as one table: a row per corpus and variant, its cells as rows beneath (hidden
     until it is expanded), every value as mean, median and min (the card's statistic switch picks one). `recs` are
-    the cells (dicts from `cell_rec`), `planned` the (corpus, variant, round)s of the spec. The page's data: per row
+    the cells (dicts from `cell_rec`), `planned` the (corpus, variant, round)s of the spec, `running` the one being run
+    (running.json), shown so before it has a result. The page's data: per row
     its values per statistic, per cell its iterations per fork per metric, for the hover panel and the chart."""
     by = {}
     for r in recs:
         by.setdefault(r["c"], {}).setdefault(r["v"], []).append(r)
     for c, v, rnd in planned:
         if not any(r["round"] == rnd for r in by.get(c, {}).get(v, [])):
-            by.setdefault(c, {}).setdefault(v, []).append({"c": c, "v": v, "round": rnd, "state": "pending", "data": None})
+            by.setdefault(c, {}).setdefault(v, []).append({"c": c, "v": v, "round": rnd, "data": None,
+                                                           "state": "running" if (c, v, rnd) == running else "pending"})
     cols = {}
     for c in by:
         for v in by[c]:
@@ -748,6 +750,16 @@ def progress(spec_dir):
   return done, planned
 
 
+def running_cell(name):
+  """(corpus, variant, round) of campaign `name`'s cell being run (running.json), or None."""
+  try:
+    r = json.load(open(os.path.join(CAMPAIGNS, ab.RUNNING_NAME)))
+    camp, corpus, variant, rnd = (r.get("cell") or "").split("/")[-4:]
+    return (corpus, variant, int(rnd)) if camp == name and r.get("campaign") == name else None
+  except (OSError, ValueError, TypeError):
+    return None
+
+
 def progress_badge(prog, name):
   if not prog:
     return ""
@@ -1196,8 +1208,9 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
               planned = [(c, v, r) for c in spec_json["corpora"] for v in order for r in range(1, spec_json.get("rounds", 2) + 1)]
           except (KeyError, TypeError):
               planned = []
-          summ = (card_summary(recs, order, planned, per_unit, "unit") + card_summary(recs, order, planned, None, "op") if per_unit
-                  else card_summary(recs, order, planned)) if recs or planned else ""
+          run_at = running_cell(name)
+          summ = (card_summary(recs, order, planned, per_unit, "unit", run_at) + card_summary(recs, order, planned, None, "op", run_at) if per_unit
+                  else card_summary(recs, order, planned, running=run_at)) if recs or planned else ""
       about = (f"means over forks, each alternating {esc(', '.join(paired))}; Δ against {esc(paired[0])} within each fork" if paired
                else "Δ against the first variant; counters of the benchmark threads; ▸ shows a row's cells, a value's hover its distribution"
                + (f"; per {esc(metrics.unit_name(per_unit))}: counts, allocation and the score divided by the <code>{esc(per_unit)}</code> counter per op"
@@ -1376,6 +1389,10 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
     let b = null;
     try {{ const r = await fetch(BUILD, {{cache: 'no-store'}}); b = r.ok ? await r.json() : null; }} catch (e) {{}}
     bd.hidden = !b || Date.now() / 1000 - b.updated > 30;
+    // the campaign's card says it is building, before it has a cell running
+    document.querySelectorAll('.card-h .bld').forEach(e => e.remove());
+    const card = !bd.hidden && b.campaign && document.getElementById('c-' + b.campaign);
+    if (card) card.querySelector('.card-h h2').insertAdjacentHTML('afterend', `<a class="badge running bld" href="#bd" title="${{String(b.label).replace(/[&<>"]/g, '')}}">building ${{String(b.label.split(': ').slice(1).join(': ') || 'its build').replace(/[&<>]/g, '').replace(/ \\(.*\\)$/, '')}}</a>`);
     if (bd.hidden) return;
     const esc = s => String(s).replace(/[&<>]/g, c => ({{'&': '&amp;', '<': '&lt;', '>': '&gt;'}})[c]), s = b.updated - b.started;
     const log = BUILD.replace(/[^/]*$/, '') + b.log;

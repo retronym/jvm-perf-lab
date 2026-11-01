@@ -712,6 +712,9 @@ class CampaignCardTest(unittest.TestCase):
         self.assertEqual(html.count('<tr class="sub" data-of="0"'), 2)  # base's round 1, and round 2 pending
         self.assertIn('<span class="badge pending">pending</span>', html)
         self.assertIn('hidden><td></td><td>#1', html)  # the cells hidden until their row is expanded
+        running = index.card_summary(recs, ["base", "tip"], [("k", v, r) for v in ("base", "tip") for r in (1, 2)], running=("k", "base", 2))
+        self.assertIn('<span class="badge running">running</span>', running)  # running.json's cell, before it has a result
+        self.assertEqual(running.count('<span class="badge pending">pending</span>'), html.count('<span class="badge pending">pending</span>') - 1)
         recs[0]["attrs"], recs[0]["detail"] = ' data-lb-group="c · k · base #1"', '<a data-lb href="t.html">timeline</a>'
         html = index.card_summary(recs, ["base", "tip"], [])
         self.assertIn('<tr class="sub sd" data-of="0" data-corpus="k" data-lb-group="c · k · base #1" hidden>', html)  # its links' lightbox: this cell's
