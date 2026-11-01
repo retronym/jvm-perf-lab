@@ -25,7 +25,8 @@ TOP_DOWN = ("useful", "processing", "delivery", "discarded")  # Instruments' "CP
 JIT = (("compilations", "JIT compilations while measuring"), ("compileTime", "JIT compile ms while measuring"),
        ("deopts", "deopts while measuring"), ("lastWarmup.compilations", "JIT compilations, last warmup"),
        ("lastWarmup.deopts", "deopts, last warmup"))
-EVENTS_NAME = "hw-events.json"  # per cell: an async kperf profile's events per op on the benchmark threads
+EVENTS_NAME = "hw-events.json"  # per cell: an async kperf profile's events on the benchmark threads
+EVENTS_FORMAT = 2  # {"format", "totals": {event: n}}; the first was {event: n per op}
 
 
 def ops(r):
@@ -76,29 +77,55 @@ def units_per_op(r, per_unit):
 
 def hw_events(cell, profile, jfrconv=None):
     """An async kperf profile's events (`async:cycles+instructions`) per op on the benchmark threads, from the cell's
-    recording through jfrconv, kept in the cell's hw-events.json; {} for other profiles."""
+    recording through jfrconv; the totals are kept in the cell's hw-events.json. {} for other profiles."""
     from . import regraph
     events = [label.removeprefix("hw-") for label, _ in regraph.events_of(profile) if label.startswith("hw-")]
     f = os.path.join(cell, EVENTS_NAME)
     if not events or not glob.glob(os.path.join(cell, "**", "*.jfr"), recursive=True):
         return {}
     if os.path.exists(f) and os.path.getmtime(f) >= os.path.getmtime(os.path.join(cell, "result.json")):
-        return json.load(open(f))
+        return cached_hw_events(cell)
     from . import profdiff
-    out = {}
+    totals = {}
     for e in events:  # streamed: a recording's collapsed stacks can run to gigabytes
-        r = profdiff.load(cell, e, jfrconv, None, "events", keep=False)
-        out[e] = r["total"] / r["ops"]
-    json.dump(out, open(f, "w"), indent=1)
-    return out
+        totals[e] = profdiff.load(cell, e, jfrconv, None, "events", keep=False)["total"]
+    json.dump({"format": EVENTS_FORMAT, "totals": totals}, open(f, "w"), indent=1)
+    return per_op_events(cell, totals)
+
+
+def per_op_events(cell, totals):
+    from . import profdiff
+    try:
+        ops = profdiff.ops_of(cell)
+    except (OSError, ValueError, KeyError, IndexError):
+        return {}
+    return {e: n / ops for e, n in totals.items()} if ops else {}
+
+
+def old_ops(r):
+    """The op count of an hw-events.json before EVENTS_FORMAT 2: ceil(time / t) per iteration, whatever the mode."""
+    n, unit = r["measurementTime"].split()
+    return sum(math.ceil(float(n) * JMH_TIME_MS[unit] / t) for t in r["primaryMetric"]["rawData"][0])
 
 
 def cached_hw_events(cell):
-    """What `hw_events` kept for the cell, without running jfrconv (the index is rebuilt every few seconds)."""
+    """What `hw_events` kept for the cell, without running jfrconv (the index is rebuilt every few seconds). A file of
+    the first format (events per op, by an op count that was wrong in SingleShotTime) is rewritten as totals."""
+    f = os.path.join(cell, EVENTS_NAME)
     try:
-        return json.load(open(os.path.join(cell, EVENTS_NAME)))
+        c = json.load(open(f))
     except (OSError, ValueError):
         return {}
+    if c.get("format") != EVENTS_FORMAT:
+        try:
+            ops = old_ops(json.load(open(os.path.join(cell, "result.json")))[0])
+        except (OSError, ValueError, KeyError, IndexError):
+            return {}
+        c = {"format": EVENTS_FORMAT, "totals": {e: x * ops for e, x in c.items()}}
+        t = os.stat(f)
+        json.dump(c, open(f, "w"), indent=1)
+        os.utime(f, (t.st_atime, t.st_mtime))  # still as fresh as it was against result.json
+    return per_op_events(cell, c["totals"])
 
 
 def of(r, per_unit=None, hw=None):

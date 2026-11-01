@@ -406,6 +406,18 @@ Iteration  16: [INFO] kperf: cycles: 350472 samples, 0 with precise PC, 0 used a
         self.assertEqual(kperf.check(self.cell(d, "tip", self.LOG.replace("968341", "90000"))), [])
         self.assertEqual(kperf.campaign_warnings(d), kperf.check(cell))  # the worst cell's
 
+    def test_benchmark_threads_must_have_most_of_the_helpers_samples(self):
+        cell = self.cell(tempfile.mkdtemp())
+        kperf.check(cell)
+        json.dump([{"mode": "ss", "measurementIterations": 16, "measurementBatchSize": 1, "primaryMetric": {"score": 1, "rawData": [[1] * 16]}}],
+                  open(os.path.join(cell, "result.json"), "w"))
+        json.dump({"format": 2, "totals": {"cycles": 0.9 * 350472 * 1000000, "cache-misses": 0.4 * 968341 * 10000}},
+                  open(os.path.join(cell, metrics.EVENTS_NAME), "w"))
+        self.assertEqual(kperf.coverage_warnings(cell), ["cache-misses: the benchmark threads have 40% of the 968,341 samples the helper took"])
+        rows = ["index\tkind\tops"] + [f"{i}\tmeasure\t2" for i in range(16)]
+        open(os.path.join(cell, "iterations.tsv"), "w").write("\n".join(rows) + "\n")
+        self.assertIn("32 ops measured (iterations.tsv) but 16 by the result: the per-op figures divide by 32", kperf.coverage_warnings(cell))
+
     def test_the_index_shows_the_warning(self):
         Project('[build]\njmh = "x"\n')
         camp = config.get().campaigns
@@ -432,7 +444,7 @@ class CollapsedTest(unittest.TestCase):
         open(os.path.join(d, "x.jfr"), "w").close()
         open(os.path.join(d, "profile.txt"), "w").write("async:cycles+cache-misses\n")
         open(os.path.join(d, "jmh.args"), "w").write("rawCommand=kperf=/tmp/k.sock\n")
-        json.dump([{"measurementTime": "10 s", "primaryMetric": {"score": 5000.0, "rawData": [[5000.0, 5000.0]]}}],
+        json.dump([{"mode": "avgt", "measurementTime": "10 s", "primaryMetric": {"score": 5000.0, "rawData": [[5000.0, 5000.0]]}}],
                   open(os.path.join(d, "result.json"), "w"))
         conv = os.path.join(d, "jfrconv")
         lines = "".join(self.LINES).replace("a;d 5", "[main-jmh-worker-1 tid=37123];F$$Lambda.0x0000f80140b6b0;a;d 5")
@@ -454,6 +466,34 @@ class CollapsedTest(unittest.TestCase):
         before = set(os.listdir(d)) | {metrics.EVENTS_NAME}
         self.assertEqual(metrics.hw_events(d, "async:cycles+cache-misses", conv), {"cycles": 17 / 4, "cache-misses": 17 / 4})
         self.assertEqual(set(os.listdir(d)), before)
+
+    def single_shot(self, d, score=2990.0):
+        """`d`'s result as a SingleShotTime run of 16 ops, each a little shorter than the 3 s iteration time."""
+        json.dump([{"mode": "ss", "measurementIterations": 16, "measurementBatchSize": 1, "measurementTime": "3 s",
+                    "primaryMetric": {"score": score, "rawData": [[score] * 16]}}], open(os.path.join(d, "result.json"), "w"))
+
+    def test_a_single_shot_op_is_one_op_whatever_its_time(self):
+        # not ceil(3 s / 2.99 s) = 2 per iteration: that halved every per-op figure of a cell whose ops ran under 3 s
+        d, conv = self.run_dir()
+        self.single_shot(d)
+        self.assertEqual(profdiff.load(d, "cycles", conv, d, "a", keep=False)["ops"], 16)
+        rows = ["index\tkind\tops"] + [f"{i}\tmeasure\t2" for i in range(4)] + ["-1\texit\t"]
+        open(os.path.join(d, "iterations.tsv"), "w").write("\n".join(rows) + "\n")
+        self.assertEqual(profdiff.ops_of(d), 8)  # JMH's own count first
+
+    def test_hw_events_of_the_first_format_are_recounted(self):
+        d, conv = self.run_dir()
+        self.single_shot(d)
+        json.dump({"cycles": 17 / 32}, open(os.path.join(d, metrics.EVENTS_NAME), "w"))  # by 32 ops, ceil(3000 / 2990) each
+        self.assertEqual(metrics.cached_hw_events(d), {"cycles": 17 / 16})
+        self.assertEqual(json.load(open(os.path.join(d, metrics.EVENTS_NAME))), {"format": 2, "totals": {"cycles": 17}})
+        self.assertEqual(metrics.cached_hw_events(d), {"cycles": 17 / 16})
+
+    def test_cached_stacks_take_the_ops_afresh(self):
+        d, conv = self.run_dir()
+        self.single_shot(d)
+        stacks.write(stacks.path(d, "cycles"), stacks.of_lines([("a;b", 3)], 32, 2990.0))
+        self.assertEqual(stacks.load(d, "cycles", conv).ops, 16)
 
 
 PROMOTE = "+jdk.PromoteObjectInNewPLAB+jdk.PromoteObjectOutsidePLAB+jdk.TenuringDistribution"

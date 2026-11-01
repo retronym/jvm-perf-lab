@@ -475,6 +475,8 @@ def run(spec, dry, retry_unbuildable=False):
         if spec.kperf:
             try:
                 metrics.hw_events(dest, spec.profile, jmh.jfrconv(jmh.async_lib(spec.lib)))  # for the index's summary
+                for w in kperf.coverage_warnings(dest):
+                    log(f"  warning: {w}")
             except Exception as e:  # the summary lacks the cell's events; its result stands
                 log(f"  warning: counting the cell's kperf events failed: {e}")
         set_running(spec, None)

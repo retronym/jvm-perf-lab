@@ -122,7 +122,9 @@ def load(cell, event, jfrconv=None, leaf=None):
         raise FileNotFoundError(f"{cell}: no recording")
     if os.path.exists(f) and os.path.getmtime(f) >= os.path.getmtime(jfrs[0]):
         try:
-            return read(f)
+            st = read(f)
+            st.ops = profdiff.ops_of(cell)  # not the cached one: it was miscounted for SingleShotTime before
+            return st
         except (OSError, ValueError, EOFError):
             pass
     b = Builder()

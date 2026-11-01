@@ -12,8 +12,9 @@ def fake_profile_cell(d, corpus="a", scores=((10.0, 10.1),), allocs=((1e6, 1e6),
     """A profile cell: its result, its profile, a recording and its bench graphs; with `hw`, its kperf events per op."""
     os.makedirs(d, exist_ok=True)
     json.dump([result(corpus, [list(f) for f in scores], [list(f) for f in allocs])], open(os.path.join(d, "result.json"), "w"))
-    if hw:
-        json.dump(hw, open(os.path.join(d, "hw-events.json"), "w"))
+    if hw:  # as totals over one measured op
+        json.dump({"format": 2, "totals": hw}, open(os.path.join(d, "hw-events.json"), "w"))
+        open(os.path.join(d, "iterations.tsv"), "w").write("index\tkind\tops\n0\tmeasure\t1\n")
     open(os.path.join(d, "profile.txt"), "w").write("async:cpu,alloc\n")
     open(os.path.join(d, "rec.jfr"), "w").write("jfr")
     for ev in ("cpu", "alloc"):

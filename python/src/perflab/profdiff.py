@@ -6,10 +6,10 @@ over one frame, to flip between them (`compare.write`).
   perflab profdiff [--event cycles] [--jfrconv <jfrconv>] [--top 25] <run-a> <run-b> <out-dir>
 
 A run is a directory written by `perflab run` or a campaign cell, with an async profile. Samples are
-normalized per op (each iteration has ceil(iteration time / its mean op time) ops), so runs of different lengths or speeds compare;
-with hardware events the table is in events per op.
+normalized per op (`ops_of`), so runs of different lengths or speeds compare; with hardware events the table is in events
+per op.
 """
-import argparse, collections, glob, io, json, math, os, re, subprocess, sys, tempfile
+import argparse, collections, glob, io, json, os, re, subprocess, sys, tempfile
 
 from . import compare, regraph
 
@@ -32,6 +32,13 @@ def si(x):
 def profile_dir(run):
     p = os.path.join(run, "profile-dir")
     return open(p).read().strip() if os.path.exists(p) else run
+
+
+def ops_of(run):
+    """The run's measured ops, which its recording covers: JMH's own count (iterations.tsv), else what its result
+    implies (`metrics.ops`: one per iteration and batch in SingleShotTime, ceil(time / t) per iteration in avgt)."""
+    from . import jfrevents, metrics
+    return jfrevents.measured_ops(run) or metrics.ops(json.load(open(os.path.join(profile_dir(run), "result.json")))[0])
 
 
 def parse(line):
@@ -57,9 +64,7 @@ def load(run, event, jfrconv, out_dir, name, keep=True, sink=None, extra=()):
     d = profile_dir(run)
     jfr = glob.glob(os.path.join(d, "**", "*.jfr"), recursive=True)[0]
     res = json.load(open(os.path.join(d, "result.json")))[0]
-    # JMH runs whole ops until the iteration time is up, so an iteration with mean op time t has ceil(time / t) ops
-    iteration_ms = float(res["measurementTime"].split()[0]) * 1000
-    ops = sum(math.ceil(iteration_ms / t) for t in res["primaryMetric"]["rawData"][0])
+    ops = ops_of(run)
     collapsed = os.path.join(out_dir, f"{name}-{event}.collapsed") if keep else None
     select = [s for label, s in regraph.events_of(d) if label.removeprefix("hw-") == event][0]
     err = tempfile.TemporaryFile("w+")  # not a pipe: unread, a full one would stop jfrconv

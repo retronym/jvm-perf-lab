@@ -79,6 +79,37 @@ def check(cell):
     return warnings_of(counts)
 
 
+MIN_SHARE, MAX_SHARE = 0.5, 1.02  # of the helper's count that the benchmark threads take
+
+
+def coverage_warnings(cell):
+    """A warning for each event whose total on the benchmark threads (hw-events.json, per op x ops) is not a plausible
+    share of what the helper counted in the measurement (kperf-samples.json: samples x period): more is impossible, much
+    less is samples lost to the thread filter or the recording. And one if the op count from JMH's iterations disagrees
+    with the one its result implies, which per-op figures divide by."""
+    from . import metrics, profdiff
+    out = []
+    try:
+        counts = json.load(open(os.path.join(cell, SAMPLES_NAME)))
+    except (OSError, ValueError):
+        counts = {}
+    ops = profdiff.ops_of(cell)
+    try:
+        implied = metrics.ops(json.load(open(os.path.join(profdiff.profile_dir(cell), "result.json")))[0])
+    except (OSError, ValueError, KeyError, IndexError):
+        implied = None
+    if implied and ops and abs(ops / implied - 1) > 0.01:
+        out.append(f"{ops:g} ops measured (iterations.tsv) but {implied:g} by the result: the per-op figures divide by {ops:g}")
+    for e, x in metrics.cached_hw_events(cell).items():
+        c = counts.get(e)
+        if not c or not c.get("period") or not c["samples"]:
+            continue
+        share = x * ops / (c["samples"] * c["period"])
+        if not MIN_SHARE <= share <= MAX_SHARE:
+            out.append(f"{e}: the benchmark threads have {100 * share:.0f}% of the {c['samples']:,} samples the helper took")
+    return out
+
+
 def campaign_warnings(spec_dir):
     """A warning for each event over a campaign's cells, from the cell that took the most samples of it."""
     worst = {}
