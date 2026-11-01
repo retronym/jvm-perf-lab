@@ -99,6 +99,7 @@ function jobHtml(j, tail) {
   const body = tail ? `<pre class="tail" id="tail-${j.id}">…</pre>` : j.state === 'queued' ? ''
     : `<details class="more" data-id="${j.id}"${open.has(j.id) ? ' open' : ''}><summary>transcript ▾</summary><pre class="tail" id="tail-${j.id}">…</pre></details>`;
   return `<div class="job${location.hash === '#job-' + j.id ? ' hit' : ''}" id="job-${j.id}"><div class="jh"><a class="id" href="#job-${j.id}" title="a link to this job">#${j.id}</a><span class="badge ${cls}">${esc(text)}</span>${proj(j.project)}${camp(j)}`
+    + (j.testbed ? `<span class="badge" title="it runs on a remote worker of this testbed (perflab worker)">${j.worker ? esc(j.worker) + ' · ' : ''}testbed ${esc(j.testbed)}</span>` : '')
     + `<span class="when">${when}</span><span class="btns">${buttons(j)}</span></div>`
     + `<code class="argv">perflab ${esc(j.argv.join(' '))}<span class="cwd"> · in ${esc(j.cwd.startsWith(HOME + '/') ? '~' + j.cwd.slice(HOME.length) : j.cwd)}</span></code>`
     + (j.note ? `<p class="k">${esc(j.note)}</p>` : '') + body + `</div>`;

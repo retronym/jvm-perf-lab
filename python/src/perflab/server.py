@@ -80,6 +80,7 @@ FINAL = ("done", "failed", "cancelled")
 TRANSITIONS = {"queued": {"running", "cancelled"},
                "running": {"paused", "done", "failed", "cancelled"},
                "paused": {"running", "done", "failed", "cancelled"}}
+LEASE = 90.0  # seconds a remote worker's claim lasts without a heartbeat (perflab.worker beats every 10)
 # the submitting shell's variables a job keeps: the toolchain, perflab's own settings, the locale
 ENV_KEEP = re.compile(r"^(PATH|HOME|USER|LOGNAME|SHELL|LANG|LC_\w+|TMPDIR|TZ|JAVA_HOME|JAVA_\w+|JDK_\w+|SBT_\w+|SCALA\w*|"
                       r"MAVEN_\w+|M2_HOME|COURSIER_\w+|MISE_\w+|ASYNC_PROFILER\w*|JFRCONV|PYTHONPATH|PERFLAB_\w+)$")
@@ -176,11 +177,13 @@ class Queue:
               CREATE TABLE IF NOT EXISTS jobs(id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, argv TEXT, cwd TEXT,
                 env TEXT, python TEXT, module TEXT, state TEXT, priority INTEGER DEFAULT 0, seq REAL, created REAL,
                 started REAL, ended REAL, rc INTEGER, pid INTEGER, cancel_requested REAL, dir TEXT, transcript TEXT, note TEXT,
-                pid_start TEXT);
+                pid_start TEXT, testbed TEXT, worker TEXT, lease REAL);
               CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY, root TEXT UNIQUE, name TEXT, campaigns TEXT, runs TEXT,
                 registered REAL);""")
-            if "pid_start" not in {r[1] for r in db.execute("PRAGMA table_info(jobs)")}:  # a queue from before it
-                db.execute("ALTER TABLE jobs ADD COLUMN pid_start TEXT")
+            have = {r[1] for r in db.execute("PRAGMA table_info(jobs)")}
+            for col, typ in (("pid_start", "TEXT"), ("testbed", "TEXT"), ("worker", "TEXT"), ("lease", "REAL")):
+                if col not in have:  # a queue from before it
+                    db.execute(f"ALTER TABLE jobs ADD COLUMN {col} {typ}")
 
     def _db(self):
         db = sqlite3.connect(self.path, timeout=30)
@@ -229,15 +232,16 @@ class Queue:
 
     # jobs
 
-    def submit(self, project, argv, cwd, env=None, priority=0, python=None, module="perflab", jobs_dir=None):
+    def submit(self, project, argv, cwd, env=None, priority=0, python=None, module="perflab", jobs_dir=None, testbed_=None):
+        """A new job; `testbed_` names the testbed whose worker runs it (None: this machine's)."""
         if not isinstance(argv, list) or not all(isinstance(a, str) for a in argv) or not argv:
             raise ValueError("argv must be a non-empty list of strings")
         now = time.time()
         with self.lock, self._db() as db:
-            cur = db.execute("INSERT INTO jobs(project, argv, cwd, env, python, module, state, priority, seq, created) "
-                             "VALUES(?,?,?,?,?,?,?,?,?,?)",
+            cur = db.execute("INSERT INTO jobs(project, argv, cwd, env, python, module, state, priority, seq, created, testbed) "
+                             "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                              (project, json.dumps(argv), cwd, json.dumps(env or {}), python, module or "perflab", "queued",
-                              int(priority or 0), now, now))
+                              int(priority or 0), now, now, testbed_))
             jid = cur.lastrowid
             d = os.path.join(jobs_dir or os.path.join(os.path.dirname(self.path), "jobs"), str(jid))
             db.execute("UPDATE jobs SET dir=?, transcript=? WHERE id=?", (d, os.path.join(d, "transcript.txt"), jid))
@@ -285,18 +289,73 @@ class Queue:
             return self.update(jid, state=state, **kw)
 
     def claim(self):
-        """The next queued job, now running; None if there is none or a job is already running."""
+        """The next queued job of this machine's testbed, now running; None if there is none or one is already running."""
         with self.lock:
             if self.active():
                 return None
-            q = self.queued()
+            q = [j for j in self.queued() if local_job(j)]
             if not q:
                 return None
             return self.transition(q[0]["id"], "running", started=time.time())
 
     def active(self):
-        """The job measuring now, if any."""
-        return next((j for j in self.running() if not concurrent(j["argv"])), None)
+        """The job measuring on this machine now, if any."""
+        return next((j for j in self.running() if not concurrent(j["argv"]) and not j.get("worker")), None)
+
+    # remote workers (perflab.worker): a job of their testbed, held by a lease that their heartbeat renews
+
+    def claim_remote(self, worker, testbed_):
+        """The job for the worker `worker` of testbed `testbed_`: the one it holds already (a worker that restarted runs
+        it again, resuming it), else the next queued one of its testbed, now running and leased to it; None if none."""
+        now = time.time()
+        with self.lock:
+            mine = [j for j in self.running() if j.get("worker") == worker]
+            if mine:
+                return self.update(mine[0]["id"], lease=now + LEASE)
+            q = [j for j in self.queued() if j.get("testbed") == testbed_ and testbed_ != _local_testbed()]
+            if not q:
+                return None
+            return self.transition(q[0]["id"], "running", started=now, worker=worker, lease=now + LEASE, pid=None, rc=None)
+
+    def held(self, jid, worker):
+        """The job, if `worker` holds its lease; Conflict otherwise (it was given back, or to another worker)."""
+        j = self.get(jid)
+        if j is None:
+            raise KeyError(jid)
+        if j.get("worker") != worker or j["state"] not in ACTIVE:
+            raise Conflict(f"job {jid} is not {worker}'s any more ({j['state']}" + (f", {j['worker']}'s" if j.get("worker") else "") + ")")
+        return j
+
+    def heartbeat(self, jid, worker, paused=False):
+        """Renews the worker's lease, and records whether its job says it is paused; the job."""
+        with self.lock:
+            j = self.held(jid, worker)
+            want = "paused" if paused else "running"
+            if j["state"] != want:
+                self.transition(jid, want)
+            return self.update(jid, lease=time.time() + LEASE)
+
+    def finish(self, jid, worker, rc):
+        """The worker's job ended with exit status `rc`."""
+        with self.lock:
+            j = self.held(jid, worker)
+            state = "cancelled" if j["cancel_requested"] else "done" if rc == 0 else "failed"
+            return self.transition(jid, state, rc=rc, lease=None)
+
+    def expire(self, now=None):
+        """Jobs whose worker's lease ran out: queued again (cancelled, if a cancel was asked); the ones it changed."""
+        now = now or time.time()
+        out = []
+        with self.lock:
+            for j in self.running():
+                if j.get("worker") and (j.get("lease") or 0) < now:
+                    if j["cancel_requested"]:
+                        out.append(self.transition(j["id"], "cancelled", lease=None))
+                        continue
+                    note = f"{j['worker']} stopped answering at {time.strftime('%H:%M:%S', time.localtime(j.get('lease') or now))}; queued again"
+                    # queued again, which only a lease that ran out does to a job that has run (not a transition)
+                    out.append(self.update(j["id"], state="queued", worker=None, lease=None, started=None, note=note))
+        return out
 
     def running(self):
         return [_job(r) for r in self._q("SELECT * FROM jobs WHERE state IN ('running','paused') ORDER BY started")]
@@ -336,6 +395,35 @@ class Queue:
             else:
                 self.update(me["id"], priority=other["priority"], seq=other["seq"] + (-1e-6 if by < 0 else 1e-6))
             return self.get(jid)
+
+
+def _local_testbed():
+    from . import testbed
+    return testbed.name()
+
+
+def local_job(job):
+    """Whether the job runs on this machine: it names no testbed, or this machine's."""
+    return job.get("testbed") in (None, _local_testbed())
+
+
+def job_testbed(argv, cwd):
+    """The testbed a job runs on: the "testbed" of the campaign spec `ab run <spec>` runs, when it is not this
+    machine's; else None (this machine). Only `ab run` goes to another testbed (a remote worker): ValueError for another
+    command whose spec names one, as it would have nothing to run on here either."""
+    spec = next((a for a in argv if a.endswith(".json")), None) if argv[:2] == ["ab", "run"] else None
+    if spec is None:
+        return None
+    try:
+        with open(os.path.join(cwd, spec)) as f:
+            t = json.load(f).get("testbed")
+    except (OSError, ValueError, AttributeError):
+        return None
+    if not isinstance(t, str) or not t or t == _local_testbed():
+        return None
+    if any(a in ("--dry-run",) for a in argv):
+        raise ValueError(f"a dry run of a campaign of testbed {t} runs here: `perflab ab run --dry-run` in the foreground")
+    return t
 
 
 def project_id(root):
@@ -477,6 +565,8 @@ class Worker(threading.Thread):
         while not self.stopping.is_set():
             try:
                 self.start_concurrent()
+                for j in self.q.expire():
+                    print(f"perflab server: job {j['id']}: {j.get('note') or j['state']}", flush=True)
             except Exception:
                 traceback.print_exc()
             self.stopping.wait(0.5)
@@ -663,6 +753,8 @@ class Server:
         self.url = f"http://127.0.0.1:{self.port}/"
         self.indexing = set()
         self.reexec, self.reload_error = False, None
+        self.workers = {}  # remote workers by name: {name, testbed, seen, job}, from their claims and heartbeats
+        self.reindexing = {}  # project id -> when a reindex after a remote worker's upload is due
 
     def start(self):
         self.worker.start()
@@ -755,6 +847,24 @@ class Server:
                 self.indexing.discard(project["id"])
         threading.Thread(target=run, daemon=True).start()
 
+    def reindex_soon(self, project, delay=5.0):
+        """The project's index rebuilt in `delay` s, once for every upload that comes meanwhile."""
+        with self.q.lock:
+            if project["id"] in self.reindexing:
+                return
+            self.reindexing[project["id"]] = time.time() + delay
+
+        def run():
+            time.sleep(delay)
+            with self.q.lock:
+                self.reindexing.pop(project["id"], None)
+            _reindex(project)
+        threading.Thread(target=run, daemon=True).start()
+
+    def seen(self, worker, **kw):
+        w = self.workers.setdefault(worker, {"name": worker})
+        w.update(kw, seen=time.time())
+
     def storage_entries(self):
         projects = self.q.projects()
         jobs = {}
@@ -785,7 +895,7 @@ class Server:
                 return scheme in ("http", "https") and local_host(host, server.port)
 
             def _send(self, code, body, ctype="application/json; charset=utf-8", headers=()):
-                data = (json.dumps(body) if ctype.startswith("application/json") else body).encode()
+                data = body if isinstance(body, bytes) else (json.dumps(body) if ctype.startswith("application/json") else body).encode()
                 self.send_response(code)
                 self.send_header("Content-Type", ctype)
                 for k, v in headers:
@@ -919,9 +1029,13 @@ class Server:
                 return super().do_GET() if self.command == "GET" else super().do_HEAD()
 
             def do_POST(self):
+                token_ok = secrets.compare_digest(self.headers.get("X-Perflab-Token") or "", server.token)
+                if urllib.parse.urlsplit(self.path).path.startswith("/api/workers/") and token_ok:
+                    # a remote worker, through a tunnel to some local port, or across a network: the token is enough
+                    return self._workers()
                 if not self._host_ok() or not self._origin_ok():
                     return self._error(403, "cross-origin request")
-                if not secrets.compare_digest(self.headers.get("X-Perflab-Token") or "", server.token):
+                if not token_ok:
                     return self._error(403, "bad or missing token")
                 try:
                     n = int(self.headers.get("Content-Length") or 0)
@@ -977,7 +1091,98 @@ class Server:
                 except ValueError as e:
                     return self._error(400, str(e))
 
+            def _workers(self):
+                """/api/workers/...: perflab.worker's requests (claim, heartbeat, finish, bundle, cells, upload)."""
+                url = urllib.parse.urlsplit(self.path)
+                p, qs = url.path, dict(urllib.parse.parse_qsl(url.query))
+                n = int(self.headers.get("Content-Length") or 0)
+                try:
+                    m = re.fullmatch(r"/api/workers/jobs/(\d+)/upload", p)
+                    if m:
+                        j = server.q.held(int(m.group(1)), qs.get("worker") or "")
+                        server.q.update(j["id"], lease=time.time() + LEASE)
+                        from . import remote
+                        project = server.q.project(j["project"])
+                        remote.receive(j, project, qs.get("unit") or "", self.rfile, n)
+                        server.reindex_soon(project)
+                        return self._send(200, {"ok": True})
+                    body = json.loads(self.rfile.read(n) or b"{}") if n <= 1 << 26 else None
+                    if not isinstance(body, dict):
+                        return self._error(400, "expected a JSON object")
+                    worker = body.get("worker") or ""
+                    if not re.fullmatch(r"[A-Za-z0-9_.@-]{1,64}", worker):
+                        return self._error(400, "worker: a name of letters, digits and _.@-")
+                    if p == "/api/workers/claim":
+                        tb = (body.get("testbed") or {}).get("name") or ""
+                        server.seen(worker, testbed=body.get("testbed"), job=None)
+                        return self._send(200, claim_remote(server, worker, tb))
+                    m = re.fullmatch(r"/api/workers/jobs/(\d+)/(heartbeat|finish|bundle|cells|input)", p)
+                    if not m:
+                        return self._error(404, "not found")
+                    jid, op = int(m.group(1)), m.group(2)
+                    if op in ("heartbeat", "finish") and body.get("transcript"):
+                        j = server.q.held(jid, worker)
+                        with open(j["transcript"], "a") as f:
+                            f.write(body["transcript"])
+                    if op == "heartbeat":
+                        j = server.q.heartbeat(jid, worker, bool(body.get("paused")))
+                        server.seen(worker, job=jid)
+                        return self._send(200, {"state": j["state"], "control": j["control"]})
+                    if op == "finish":
+                        j = server.q.finish(jid, worker, int(body.get("rc", 1)))
+                        for f in ("control", "control.ack"):
+                            control.write(os.path.join(j["dir"], f), None)
+                        server.seen(worker, job=None)
+                        _reindex(server.q.project(j["project"]))
+                        return self._send(200, public(j))
+                    j = server.q.held(jid, worker)
+                    from . import remote
+                    if op == "cells":
+                        return self._send(200, remote.finished_cells(j, server.q.project(j["project"])), "application/gzip")
+                    if op == "input":
+                        return self._send(200, remote.input_tar(j, body.get("path") or ""), "application/gzip")
+                    f = remote.bundle(j, body.get("source") or "", bool(body.get("full")))
+                    try:
+                        with open(f, "rb") as fh:
+                            data = fh.read()
+                    finally:
+                        os.unlink(f)
+                    return self._send(200, data, "application/octet-stream")
+                except KeyError:
+                    return self._error(404, "no such job or source")
+                except Conflict as e:
+                    return self._error(409, str(e))
+                except ValueError as e:
+                    return self._error(400, str(e))
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
         return Handler
+
+
+def claim_remote(server, worker, tb):
+    """{"job": the payload of the job the worker is to run (perflab.remote), or None}. A job the coordinator cannot
+    prepare (a checkout that became dirty) fails here, with why in its transcript."""
+    from . import remote
+    while True:
+        j = server.q.claim_remote(worker, tb)
+        if j is None:
+            return {"job": None}
+        try:
+            payload = remote.prepare(j, server.q.project(j["project"]))
+        except (ValueError, OSError) as e:
+            transcript_note(j, f"[perflab] failed: {worker} could not be given the job: {e}")
+            server.q.transition(j["id"], "failed", note=str(e)[:500], worker=None, lease=None)
+            continue
+        transcript_note(j, f"[perflab] job {j['id']} claimed by {worker} (testbed {tb})")
+        server.seen(worker, job=j["id"])
+        return {"job": payload, "lease": LEASE}
+
+
+def transcript_note(job, line):
+    os.makedirs(os.path.dirname(job["transcript"]), exist_ok=True)
+    with open(job["transcript"], "a") as f:
+        f.write(line + "\n")
 
 
 # the policy of every page under /p/ but the project's index: scripts run (flame graphs need them) in an opaque origin,
@@ -1002,8 +1207,13 @@ def submit_local(server, body, python=None, module=None):
     env = body.get("env") or {}
     if not isinstance(env, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in env.items()):
         raise ValueError("env must map names to strings")
-    j = server.q.submit(project["id"], body.get("argv"), cwd, env, body.get("priority") or 0, python,
-                        module or "perflab", os.path.join(server.home, "jobs"))
+    argv = body.get("argv")
+    tb = job_testbed(argv, cwd) if isinstance(argv, list) else None
+    if tb:
+        from . import remote
+        remote.check(argv, cwd, project)  # what a worker could not run fails now, not when one claims it
+    j = server.q.submit(project["id"], argv, cwd, env, body.get("priority") or 0, python,
+                        module or "perflab", os.path.join(server.home, "jobs"), tb)
     server.worker.wake.set()
     j["position"] = next((i + 1 for i, q in enumerate(server.q.queued()) if q["id"] == j["id"]), None)
     j["index"] = project["index"]
@@ -1042,7 +1252,8 @@ def status(server):
     jobs = server.q.jobs(include_final=False)
     return {"pid": os.getpid(), "url": server.url, "publicUrl": public_url(server.url), "home": server.home, "port": server.port,
             "running": next((public(j) for j in jobs if j["state"] in ACTIVE), None),
-            "queued": sum(j["state"] == "queued" for j in jobs), "reloadError": server.reload_error}
+            "queued": sum(j["state"] == "queued" for j in jobs), "reloadError": server.reload_error,
+            "testbed": _local_testbed(), "workers": [{k: w.get(k) for k in ("name", "testbed", "seen", "job")} for w in getattr(server, "workers", {}).values()]}
 
 
 def local_host(host, port):

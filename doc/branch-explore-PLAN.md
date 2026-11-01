@@ -51,5 +51,5 @@ Design: [branch-explore.md](branch-explore.md). Test case: retronym/scala3 `scal
 
 - Adaptive exploration: refine where neighbours differ by more than their noise (Pinpoint).
 - E-Divisive change points and triage state.
-- Remote workers: testbeds, leases, git bundles, result upload (design §7).
+- DONE Remote workers: testbeds, leases, git bundles, result upload (design §7): [remote-workers.md](remote-workers.md), [remote-workers-PLAN.md](remote-workers-PLAN.md).
 - Drill into a merge: explore the commits a first-parent merge brought in.

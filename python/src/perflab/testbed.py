@@ -20,6 +20,7 @@ def _sysctl(name):
         return None
 
 
+@functools.lru_cache(maxsize=1)
 def _cpu():
     if platform.system() == "Darwin":
         return _sysctl("machdep.cpu.brand_string")
