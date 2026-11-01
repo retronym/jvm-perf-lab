@@ -261,12 +261,13 @@ def start_load_sampler(spec, path):
 
 def load_check(spec, dest):
     """The measurement iterations that ran while other load was over the gate's maxCores (the mean over a cell hides a
-    burst that hits two of its iterations), recorded in <cell>/load.json; [] when none did, or without a gate."""
+    burst that hits two of its iterations) or the machine's thermal state throttled the CPU, recorded in
+    <cell>/load.json; [] when none did, or without a gate."""
     if not spec.loadgate:
         return []
     its = loadgate.per_iteration(os.path.join(dest, "load.tsv"), os.path.join(dest, "iterations.tsv"))
     limit = spec.loadgate.get("maxCores", 1.5)
-    hit = [i for i in its if i["cores"] is not None and i["cores"] > limit]
+    hit = [i for i in its if loadgate.disturbed(i, limit)]
     with open(os.path.join(dest, LOAD_CHECK), "w") as f:
         json.dump({"maxCores": limit, "iterations": its, "disturbed": [i["index"] for i in hit]}, f)
     return hit
@@ -471,9 +472,9 @@ def run(spec, dry, retry_unbuildable=False):
                 continue
             hit = [] if rc else load_check(spec, dest)
             if hit:
-                worst = max(hit, key=lambda i: i["cores"])
-                why = (f"other load over {spec.loadgate.get('maxCores', 1.5)} cores during measurement iteration"
-                       f"{'s' if len(hit) > 1 else ''} {', '.join(str(i['index']) for i in hit)} (up to {worst['cores']:.1f}: {worst['top']})")
+                worst = max(hit, key=lambda i: (loadgate.THERMAL.index(i["thermal"]) if i.get("thermal") else 0, i["cores"] or 0))
+                why = (f"other load over {spec.loadgate.get('maxCores', 1.5)} cores or a throttling thermal state during measurement iteration"
+                       f"{'s' if len(hit) > 1 else ''} {', '.join(str(i['index']) for i in hit)} (worst: {loadgate.disturbance(worst)})")
                 log(f"  {why}; rerunning")
                 set_aside(spec, corpus, variant, r, f"{why} (attempt {attempt}, run again)")
                 continue

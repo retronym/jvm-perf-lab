@@ -1352,11 +1352,13 @@ class TranscriptTest(unittest.TestCase):
         loads = iter([(3.0, "javac 3.0"), (0.5, ""), (0.5, "")])
         orig, loadgate.other_load = loadgate.other_load, lambda root: next(loads)
         self.addCleanup(setattr, loadgate, "other_load", orig)
+        orig_machine, loadgate.machine = loadgate.machine, lambda: {"thermal": "fair", "power": "ac", "memfree": 80}
+        self.addCleanup(setattr, loadgate, "machine", orig_machine)
         orig_publish = loadgate.publish
         loadgate.publish = lambda st: (seen.append(json.loads(json.dumps(st))), orig_publish(st))
         self.addCleanup(setattr, loadgate, "publish", orig_publish)
         loadgate.wait(os.getpid(), limit=1.0, quiet=0)
-        self.assertEqual(seen[0]["samples"][0][1:], [3.0, "javac 3.0"])
+        self.assertEqual(seen[0]["samples"][0][1:], [3.0, "javac 3.0", "thermal=fair power=ac mem=80%"])
         self.assertIsNone(seen[-1])
         self.assertFalse(os.path.exists(loadgate.state_path()))
         with open(self.path) as f:

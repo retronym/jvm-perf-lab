@@ -2,9 +2,16 @@
 its descendants: the sbt server, JMH's launcher and forks, xctrace), measured as the change in cumulative CPU time.
 
   perflab loadgate wait   <root-pid> [max-cores=1.5] [quiet-secs=60]   blocks until other load stays under max-cores
-  perflab loadgate sample <root-pid> <out.tsv> [secs=5]                 appends "epoch<TAB>cores<TAB>top<TAB>secs" every secs until
-                                                                       killed: the load over the secs before epoch
+  perflab loadgate sample <root-pid> <out.tsv> [secs=5]                 appends "epoch<TAB>cores<TAB>top<TAB>secs<TAB>state" every secs
+                                                                       until killed: the load over the secs before epoch, and the
+                                                                       machine's state then (`machine`)
   perflab loadgate mean   <out.tsv> [since-epoch]                       mean other-load in cores over the samples
+  perflab loadgate machine                                              the machine's state now, one line
+
+Besides other processes' CPU, each sample records what the OS says about the machine (macOS, no root needed): its
+thermal state (NSProcessInfo.thermalState: nominal, fair, serious, critical; from serious the CPU is throttled), whether
+it runs on battery, Low Power Mode, and free memory. A wait holds while the thermal state is serious or critical, and a
+measurement iteration under one counts as disturbed, as one under too much other load does.
 """
 import json, os, subprocess, sys, time
 
@@ -65,8 +72,98 @@ def other_load(root, interval=5.0):
         top += f"; background daemons {bg:.1f}"
     return total, top
 
+THERMAL = ("nominal", "fair", "serious", "critical")  # NSProcessInfo.thermalState, from 0
+HOT = {"serious", "critical"}  # thermal states under which macOS throttles the CPU: a measurement under one is disturbed
+
+
+def _run(cmd, timeout=5):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout).stdout
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def machine():
+    """What the OS reports about the machine that bears on a measurement, without root: {"thermal": nominal | fair |
+    serious | critical, "power": ac | battery, "lowpower": bool, "memfree": % of memory free}, each key only where it
+    could be read (macOS; the thermal state through the ObjC bridge of osascript, 40 ms)."""
+    m = {}
+    if sys.platform != "darwin":
+        return m
+    t = _run(["osascript", "-l", "JavaScript", "-e", 'ObjC.import("Foundation"); $.NSProcessInfo.processInfo.thermalState']).strip()
+    if t.isdigit() and int(t) < len(THERMAL):
+        m["thermal"] = THERMAL[int(t)]
+    batt = _run(["pmset", "-g", "batt"])
+    if "AC Power" in batt:
+        m["power"] = "ac"
+    elif "Battery Power" in batt:
+        m["power"] = "battery"
+    for line in _run(["pmset", "-g"]).splitlines():
+        p = line.split()
+        if p[:1] == ["lowpowermode"] and len(p) > 1 and p[1].isdigit():
+            m["lowpower"] = p[1] != "0"
+    mem = _run(["sysctl", "-n", "kern.memorystatus_level"]).strip()
+    if mem.isdigit():
+        m["memfree"] = int(mem)
+    return m
+
+
+def state_str(m):
+    """`machine()` as the sample column: `thermal=fair power=battery lowpower mem=23%`, tokens for what is known."""
+    out = []
+    if "thermal" in m:
+        out.append(f"thermal={m['thermal']}")
+    if "power" in m:
+        out.append(f"power={m['power']}")
+    if m.get("lowpower"):
+        out.append("lowpower")
+    if "memfree" in m:
+        out.append(f"mem={m['memfree']}%")
+    return " ".join(out)
+
+
+def parse_state(s):
+    """`state_str` back to a dict (the sample column; "" or an old file's missing column gives {})."""
+    m = {}
+    for tok in (s or "").split():
+        k, _, v = tok.partition("=")
+        if k == "thermal" and v in THERMAL:
+            m["thermal"] = v
+        elif k == "power" and v in ("ac", "battery"):
+            m["power"] = v
+        elif k == "lowpower":
+            m["lowpower"] = True
+        elif k == "mem" and v.rstrip("%").isdigit():
+            m["memfree"] = int(v.rstrip("%"))
+    return m
+
+
+def describe(m, load=None, top=""):
+    """One line for people: `other load 0.3 cores (WindowServer 0.2); thermal nominal, AC power, 81% memory free`."""
+    parts = []
+    if load is not None:
+        parts.append(f"other load {load:.2f} cores" + (f" ({top})" if top else ""))
+    words = []
+    if "thermal" in m:
+        words.append(f"thermal {m['thermal']}")
+    if "power" in m:
+        words.append("AC power" if m["power"] == "ac" else "on battery")
+    if m.get("lowpower"):
+        words.append("Low Power Mode")
+    if "memfree" in m:
+        words.append(f"{m['memfree']}% memory free")
+    if words:
+        parts.append(", ".join(words))
+    return "; ".join(parts)
+
+
+def hot(m):
+    return m.get("thermal") in HOT
+
+
 def samples(path):
-    """A sample file's [(start, end, cores, top)], in epoch seconds; samples without a window are of 5 s."""
+    """A sample file's [(start, end, cores, top, state)], in epoch seconds, `state` as `machine()` gives it ({} for a
+    sample from before it was recorded); samples without a window are of 5 s."""
     out = []
     try:
         lines = open(path).read().splitlines()
@@ -79,13 +176,14 @@ def samples(path):
             secs = float(p[3]) if len(p) > 3 and p[3] else 5.0
         except (IndexError, ValueError):
             continue
-        out.append((end - secs, end, cores, p[2] if len(p) > 2 else ""))
+        out.append((end - secs, end, cores, p[2] if len(p) > 2 else "", parse_state(p[4] if len(p) > 4 else "")))
     return out
 
 
 def per_iteration(load_tsv, iterations_tsv):
     """Each measurement iteration's competing load: [{"index", "start", "end", "score", "cores" (the highest of the
-    samples overlapping it, None without any), "top"}], from a cell's load.tsv and iterations.tsv."""
+    samples overlapping it, None without any), "top", "thermal" (the worst over it, None where unknown), "lowpower"
+    (whether any sample over it had Low Power Mode on)}], from a cell's load.tsv and iterations.tsv."""
     ss = samples(load_tsv)
     out = []
     try:
@@ -103,9 +201,27 @@ def per_iteration(load_tsv, iterations_tsv):
             continue
         over = [s for s in ss if s[0] < b and s[1] > a]
         top = max(over, key=lambda s: s[2]) if over else None
+        therm = [s[4]["thermal"] for s in over if "thermal" in s[4]]
         out.append({"index": int(x.get("index") or 0), "start": a, "end": b, "score": float(x["score"]) if x.get("score") else None,
-                    "cores": top[2] if top else None, "top": top[3] if top else ""})
+                    "cores": top[2] if top else None, "top": top[3] if top else "",
+                    "thermal": max(therm, key=THERMAL.index) if therm else None, "lowpower": any(s[4].get("lowpower") for s in over)})
     return out
+
+
+def disturbed(it, limit):
+    """Whether a `per_iteration` record is of an iteration other load over `limit` cores, or a throttling thermal state,
+    disturbed (`limit` None: load never counts)."""
+    return (limit is not None and it.get("cores") is not None and it["cores"] > limit) or it.get("thermal") in HOT
+
+
+def disturbance(it):
+    """Why a disturbed iteration is: `1.7 cores: java 0.9`, `thermal serious`, or both."""
+    parts = []
+    if it.get("thermal") in HOT:
+        parts.append(f"thermal {it['thermal']}")
+    if it.get("cores") is not None:
+        parts.append(f"{it['cores']:.1f} cores" + (f": {it['top']}" if it.get("top") else ""))
+    return "; ".join(parts)
 
 
 STATE_NAME = "loadgate.json"
@@ -141,17 +257,18 @@ def wait(root, limit=1.5, quiet=60):
     try:
         while True:
             load, top = other_load(root)
+            m = machine()
             now = time.time()
-            if load <= limit:
+            if load <= limit and not hot(m):
                 since = since or now
                 if now - since >= quiet:
-                    transcript.say(f"idle: other load {load:.2f} cores")
+                    transcript.say(f"idle: {describe(m, load, top)}")
                     return
                 transcript.write(f"quiet: other load {load:.2f} cores for {now - since:.0f} of {quiet:.0f} s")
             else:
                 since = None
-                transcript.say(f"waiting: other load {load:.1f} cores ({top})")
-            state["samples"] = (state["samples"] + [[round(now), round(load, 2), top]])[-720:]
+                transcript.say("waiting: " + (f"thermal state {m['thermal']}, " if hot(m) else "") + f"other load {load:.1f} cores ({top})")
+            state["samples"] = (state["samples"] + [[round(now), round(load, 2), top, state_str(m)]])[-720:]
             state["quietSince"] = since
             publish(state)
     finally:
@@ -186,7 +303,9 @@ def main(argv):
         while True:
             load, top = other_load(root, secs)
             with open(path, "a") as f:
-                f.write(f"{time.time():.1f}\t{load:.2f}\t{top}\t{secs:g}\n")
+                f.write(f"{time.time():.1f}\t{load:.2f}\t{top}\t{secs:g}\t{state_str(machine())}\n")
+    elif cmd == "machine":
+        print(describe(machine()))
     elif cmd == "mean":
         path = argv[1]
         since = float(argv[2]) if len(argv) > 2 else 0
