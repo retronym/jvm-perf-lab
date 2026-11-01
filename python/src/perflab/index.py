@@ -9,7 +9,7 @@ each cell, `perflab run` at its start and end, and the page refreshes itself.
 """
 import collections, glob, html, json, math, os, re, sys, time
 
-from . import ab, branchview, config, jmh, kperf, loadgate, metrics, regraph, runinfo, specs, timeline, ui
+from . import ab, branchview, config, jmh, kperf, loadgate, metrics, regraph, runinfo, specs, testbed, timeline, ui
 
 root = None  # the directory of the page being built: its links are relative to it
 CAMPAIGNS = None
@@ -90,6 +90,12 @@ def cell_row(spec, corpus, variant, cell):
     # a paired cell is one fork alternating the variants
     name = f"fork {esc(n)}" if variant == "paired" else f"{esc(variant)} #{esc(n)}"
     attrs = f' data-corpus="{esc(corpus)}" data-lb-group="{esc(f"{spec} · {corpus} · {variant} #{n}")}"'
+    other = testbed.foreign(cell)
+    if other:  # another machine's: listed, never counted
+        badge = (f'<span class="badge interrupted" title="It ran on testbed {esc(other)}, not the campaign\'s '
+                 f'({esc(testbed.of_campaign(testbed.campaign_of_cell(cell)))}): it counts for nothing, and `perflab ab run` '
+                 f'runs it again">testbed {esc(other)}</span>')
+        return ((f'{attrs} data-profiled="0"', [esc(corpus), name, badge] + [""] * 5, ""), os.path.getmtime(res_f), corpus, None)
     try:
         r = json.load(open(res_f))[0]
         p = r["primaryMetric"]
@@ -591,6 +597,13 @@ def sub(title, note, extra=""):
     return f'<h3 class="sub">{title} <span class="k">{note}</span>{extra}</h3>'
 
 
+def testbed_badge(spec_dir):
+    """The campaign's testbed, when its spec names one (the others run on this machine)."""
+    t = testbed._spec_testbed(os.path.join(spec_dir, "spec.json"), os.stat(os.path.join(spec_dir, "spec.json")).st_mtime_ns) \
+        if os.path.exists(os.path.join(spec_dir, "spec.json")) else None
+    return f' <span class="badge" title="The machine its cells run on: only its cells count">testbed {esc(t)}</span>' if t else ""
+
+
 def card_head(kind, name, badge, when, buttons=""):
     return (f'<div class="card-h"><span class="kind">{kind}</span><h2>{esc(name)}</h2>{badge}<span class="when">{when}</span>'
             + (f'<span class="btns">{buttons}</span>' if buttons else "") + "</div>")
@@ -746,7 +759,8 @@ def progress(spec_dir):
     planned = s.get("rounds", 2) * len(s["corpora"]) * variants
   except (OSError, ValueError, KeyError, TypeError):
     return None
-  done = sum(1 for f in glob.glob(os.path.join(spec_dir, "*", "*", "*", "result.json")) if os.path.getsize(f) > 0)
+  done = sum(1 for f in glob.glob(os.path.join(spec_dir, "*", "*", "*", "result.json"))
+             if os.path.getsize(f) > 0 and not testbed.foreign(os.path.dirname(f)))
   return done, planned
 
 
@@ -1226,7 +1240,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       camp_sections.append((last, f'<section class="card campaign{single}" id="{sid}" data-last="{last:.0f}" data-notes="{1 if has_notes else 0}" '
                                   f'data-benchmark="{esc(" ".join(sorted(benches)))}" data-tool="{esc(" ".join(sorted(tools)))}" '
                                   f'data-corpus="{esc(" ".join(sorted(corpora)))}" data-profiled="{1 if profiled else 0}">'
-                                  f'{card_head("campaign", name, progress_badge(prog, name), when, buttons)}'
+                                  f'{card_head("campaign", name, progress_badge(prog, name) + testbed_badge(spec_dir), when, buttons)}'
                                   f'{variants_panel(spec_dir)}{notes(os.path.join(spec_dir, "NOTES.md"))}{kperf_note(spec_dir)}{diff_html}{spec_history(spec_dir, counts, sid)}'
                                   f'{summary_block(about, summ, history, norm_toggle(per_unit) if per_unit and not paired else "", not paired)}{cells_html}</section>'))
   run_dirs = sorted(glob.glob(os.path.join(runs, "*/"))) if runs and os.path.isdir(runs) else []

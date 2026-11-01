@@ -231,7 +231,7 @@ class ReadTest(Fixture, unittest.TestCase):
         # 2 rounds × 2 corpora × 5 commits; done: 7 on a, 2 on b; the running one on b (an empty result.json, no
         # running.json) is interrupted
         self.assertEqual(cs["br"]["progress"], {"planned": 20, "done": 9, "running": 0, "failed": 0, "interrupted": 1,
-                                                "unbuildable": 0, "void": 0})
+                                                "unbuildable": 0, "void": 0, "foreign": 0})
         self.assertEqual(cs["br"]["status"], "partial")
         self.assertEqual(cs["plain"]["progress"]["planned"], 8)
         self.assertIsNone(cs["plain"]["bytes"])
@@ -334,6 +334,28 @@ class ReadTest(Fixture, unittest.TestCase):
         self.assertEqual(len(done), 7)
         self.assertEqual([c["round"] for c in api.cells("br", variant=SHAS[0][:5], corpus="a")["cells"]], [1, 2])
         self.assertTrue(all(c["round"] == 2 for c in api.cells("plain", round=2)["cells"]))
+
+    def test_a_cell_of_another_testbed_counts_for_nothing(self):
+        from perflab import testbed
+        cell = os.path.join(self.camps, "plain", "a", "tip", "2")
+        json.dump({"name": "elsewhere"}, open(os.path.join(cell, testbed.CELL_FILE), "w"))
+        self.assertEqual(testbed.foreign(cell), "elsewhere")
+        self.assertFalse(ab.done(cell))
+        [c] = api.cells("plain", corpus="a", variant="tip", round=2)["cells"]
+        self.assertEqual(c["state"], "foreign")
+        self.assertIn("elsewhere", c["why"])
+        s = self.valid(api.campaign("plain"))
+        tip = {(r["corpus"], r["variant"]): r for r in s["summary"]}[("a", "tip")]
+        self.assertEqual((tip["rounds"], tip["forks"]), (1, 2))
+        summ = next(x for x in api.campaigns()["campaigns"] if x["name"] == "plain")
+        self.assertEqual((summ["testbed"], summ["progress"]["foreign"]), (testbed.name(), 1))
+        # the campaign's own testbed, named in its spec: the cell is its, and the others' are not
+        spec = os.path.join(self.camps, "plain", "spec.json")
+        json.dump({**json.load(open(spec)), "testbed": "elsewhere"}, open(spec, "w"))
+        os.utime(spec, (time.time() + 5, time.time() + 5))
+        self.assertIsNone(testbed.foreign(cell))
+        json.dump({"name": testbed.name()}, open(os.path.join(cell, "..", "1", testbed.CELL_FILE), "w"))
+        self.assertEqual(testbed.foreign(os.path.join(cell, "..", "1")), testbed.name())
 
     def test_cell_in_full(self):
         c = api.cell("plain", "a", "base", 1, tail=2)

@@ -41,6 +41,9 @@ A spec:
                                                          # with env set, snapshotted in <campaign>/.build/<variant>);
                                                          # "variants" defaults to their names
     "historical": "<why>",                               # optional: kept for its results; `run` refuses it
+    "testbed": "m4",                                     # optional: the machine it runs on (perflab.testbed): its
+                                                         # cells count only from there; queued, a worker of that
+                                                         # testbed runs it (doc/remote-workers.md)
     "description": "Does -Yx help? See [#123](<url>).",  # optional Markdown (a string, or a list of lines): the
     "variantDescriptions": {"U": "uncached, from **#123**"}  # campaign and each variant, in a panel atop its card
   }
@@ -67,7 +70,7 @@ compares the work, not the op. The index's summary toggles between per unit and 
 """
 import atexit, glob, json, os, re, shlex, shutil, subprocess, sys, time
 
-from . import branch, config, jmh, kperf, launch, loadgate, metrics, specs, transcript
+from . import branch, config, jmh, kperf, launch, loadgate, metrics, specs, testbed, transcript
 
 JMH_LOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "jmh.lock")
 MAX_ATTEMPTS = 10
@@ -165,6 +168,7 @@ class Spec:
         self.gc_log = s.get("gcLog", False)
         self.per_unit = s.get("perUnit")
         self.historical = s.get("historical")
+        self.testbed = s.get("testbed")  # the machine its cells run on (perflab.testbed); default this one
         self.description, self.variant_descriptions = s.get("description"), s.get("variantDescriptions") or {}
 
     def cells(self):
@@ -380,6 +384,10 @@ def run(spec, dry, retry_unbuildable=False):
     # the spec version cells are tagged with; `perflab trees` records the user's spec once and passes its id down
     version = os.environ.get(specs.ENV) or specs.record(spec.out, spec.path)
     todo = [c for c in cells if not done(spec.cell_dir(c[1], c[3], c[0]))]
+    here = testbed.name()
+    if spec.testbed and spec.testbed != here and todo and not dry:
+        sys.exit(f"{spec.name} runs on testbed {spec.testbed}, and this machine is {here}: queue it on `perflab server` "
+                 f"for a worker of {spec.testbed} to run (doc/remote-workers.md)")
     log(f"{spec.name}: {len(cells)} cells, {len(todo)} to run")
     if not dry:
         # the index first: it lists the campaign's cells before any has run, and updates itself as they finish
@@ -427,7 +435,11 @@ def run(spec, dry, retry_unbuildable=False):
                 continue
         cmd = spec.command(corpus, iters, variant, flags, dest, built.get(variant))
         if not dry:
+            other = testbed.foreign(dest)
+            if other:  # another machine's result, which counts for nothing here: kept in .void, and measured again
+                set_aside(spec, corpus, variant, r, f"ran on testbed {other}, not the campaign's {testbed.of_campaign(spec.out)}")
             specs.tag(dest, version)
+            testbed.record(dest)
             if os.path.exists(os.path.join(dest, FAILED)):
                 os.unlink(os.path.join(dest, FAILED))
         if dry:
@@ -529,7 +541,7 @@ def done(dest):
             r = json.load(f)
     except (OSError, ValueError):
         return False
-    return isinstance(r, list) and len(r) > 0
+    return isinstance(r, list) and len(r) > 0 and not testbed.foreign(dest)
 
 
 def build_commit(spec, commit):

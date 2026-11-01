@@ -76,6 +76,9 @@ def load_cell(cell):
     """A cell's JMH result, "failed" when its run did (a branch campaign records why), "running" while its result.json
     is empty or partial and it is the cell being run, None before it has one or after its run was interrupted."""
     f = os.path.join(cell, "result.json")
+    from . import testbed
+    if os.path.basename(cell).isdigit() and testbed.foreign(cell):  # another machine's: not comparable, not done
+        return "foreign"
     try:
         r = json.load(open(f))[0]
         r["primaryMetric"]["score"]
@@ -100,7 +103,7 @@ def results(d):
             running = True
         elif r == "failed":
             failed = cell
-        elif r is not None:
+        elif isinstance(r, dict):
             rs.append((r, cell))
     return rs, running, failed
 
@@ -241,6 +244,9 @@ def rounds_of(d, rel_to, per_unit=None, max_cores=MAX_CORES):
                           for f in forks for h in [within(f)[0]]]
         elif state == "failed":
             x["why"] = open(os.path.join(cell, "failed.txt")).read().strip()
+        elif state == "foreign":
+            from . import testbed
+            x["why"] = f"ran on testbed {testbed.of_cell(cell)}, not the campaign's: counts for nothing"
         mc, its, dist = cell_load(cell, max_cores)
         loads = [i["cores"] for i in its if i.get("cores") is not None]
         if loads:
@@ -495,7 +501,7 @@ def profiles(campaign_dir, variants, rel_to):
                 r = load_cell(cell)
                 if r == "running":
                     cells.setdefault(corpus, {}).setdefault(v, {"state": "running", "graphs": []})
-                elif r is not None:
+                elif isinstance(r, dict):
                     cells.setdefault(corpus, {})[v] = {"state": "done", "graphs": graph_links(cell, rel_to)}
                     break
         if corpus in cells and corpus not in corpora:

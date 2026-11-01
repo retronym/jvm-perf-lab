@@ -18,11 +18,11 @@ the CLI, they are POSTed to it, and with no server running they fail with code "
 """
 import contextlib, datetime, glob, inspect, json, math, os, re, shutil, sqlite3, threading, time, urllib.error, urllib.parse, urllib.request
 
-from . import ab, branchview, config, index, jmh, loadgate, metrics, server as srv, storage
+from . import ab, branchview, config, index, jmh, loadgate, metrics, server as srv, storage, testbed
 
 API_VERSION = 1
 VOID_DIR, VOID_NOTE, VOID_JSON = ab.VOID_DIR, ab.VOID_NOTE, ab.VOID_JSON
-STATES = ("done", "running", "failed", "interrupted", "pending", "unbuildable", "void")
+STATES = ("done", "running", "failed", "interrupted", "pending", "unbuildable", "void", "foreign")
 VERDICTS = ("better", "worse", "flat", "na")
 ERRORS = {"bad_request": 400, "forbidden": 403, "not_found": 404, "conflict": 409, "no_server": 503, "internal": 500}
 
@@ -133,7 +133,8 @@ PROGRESS = O("How many of the campaign's planned cells are where", {
     "failed": I("Cells whose run failed (failed.txt; a branch campaign records why and goes on)"),
     "interrupted": I("Cells with an empty or partial result.json and no run: `ab run` runs them again"),
     "unbuildable": I("Planned cells of commits that did not build (skipped until --retry-unbuildable)"),
-    "void": I("Cells voided (moved to <campaign>/.void/, see voids); not counted as done")})
+    "void": I("Cells voided (moved to <campaign>/.void/, see voids); not counted as done"),
+    "foreign": I("Cells that ran on another testbed than the campaign's: they count for nothing, and `ab run` runs them again")})
 BYTES = O("Storage by tier, in allocated bytes (perflab.storage)", {
     "results": I("result.json, iterations.tsv, logs, timelines: kept"), "profiles": I("Recordings and rendered graphs"),
     "builds": I("Launch-mode snapshots and the campaign's worktree: rebuildable"), "total": I("All three")})
@@ -157,6 +158,7 @@ define("CampaignSummary", "One campaign, as campaigns lists it", {
     "updated": WHEN, "updatedIso": null(S("`updated` in ISO 8601, local time")),
     "bytes": null({**BYTES, "description": "Storage by tier (only with storage=true: it walks every file)"}),
     "profileOf": null(S("For a profile campaign: the branch campaign it profiles")),
+    "testbed": S("The machine its cells run on (its spec's \"testbed\", else this machine's): only that testbed's cells count"),
     "profiles": null(S("For a branch campaign: its profile campaign, when it has one")),
     "jobs": A(JOB_REF, "Queued, running or paused jobs of the server that run this campaign"),
     "url": URL})
@@ -733,6 +735,8 @@ def _running_cell(p):
 
 
 def _cell_state(cell, running, unbuildable=False):
+    if testbed.foreign(cell) and not (running and os.path.realpath(cell) == running):
+        return "foreign"
     if ab.done(cell):
         return "done"
     if running and os.path.realpath(cell) == running:
@@ -796,7 +800,7 @@ def _summary(p, d, running, jobs, with_storage=False):
     kind = _kind(d, spec)
     variants, corpora, rounds, commits = _plan(d, spec)
     unb = branchview.unbuildable(d, d) if kind == "branch" else {}
-    prog = dict.fromkeys(("done", "running", "failed", "interrupted", "unbuildable", "void"), 0)
+    prog = dict.fromkeys(("done", "running", "failed", "interrupted", "unbuildable", "void", "foreign"), 0)
     prog["planned"] = rounds * len(corpora) * len(variants)
     newest = 0.0
     for corpus in corpora:
@@ -826,7 +830,7 @@ def _summary(p, d, running, jobs, with_storage=False):
     return {"name": name, "kind": kind, "benchmark": spec.get("benchmark"), "profile": _profile_str(spec),
             "rounds": rounds, "corpora": corpora, "variants": variants,
             "description": "\n".join(desc) if isinstance(desc, list) else desc, "progress": prog, "status": status,
-            "updated": updated, "updatedIso": _iso(updated), "bytes": by, "profileOf": spec.get("profileOf"),
+            "updated": updated, "updatedIso": _iso(updated), "bytes": by, "profileOf": spec.get("profileOf"), "testbed": testbed.of_campaign(d),
             "profiles": os.path.basename(prof) if kind == "branch" and os.path.isdir(prof) else None,
             "jobs": [{"id": j["id"], "state": j["state"], "argv": j["argv"]} for j in names],
             "url": (p["index"] + "#c-" + urllib.parse.quote(name)) if p.get("registered") else None}
@@ -1114,6 +1118,8 @@ def _cell_summary(p, d, corpus, variant, rnd, cell, running, unb):
             pass
     elif st == "unbuildable":
         out["why"] = unb[variant]["reason"]
+    elif st == "foreign":
+        out["why"] = f"ran on testbed {testbed.of_cell(cell)}, not the campaign's ({testbed.of_campaign(d)}): counts for nothing"
     return out
 
 
