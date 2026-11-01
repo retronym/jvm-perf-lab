@@ -73,7 +73,10 @@ final class InMemoryCompiler(val corpus: Corpus, options: List[String] = Nil, re
     if costs then CostHooks.arm(defsTable, defsListener)
     val reporter =
       try
-        try doCompile(compiler, corpus.files)(using root.fresh.setReporter(store))
+        val ctx0 = root.fresh.setReporter(store)
+        // `-Dcompilerlab.cores`: where the compiling thread runs, sampled as each unit starts a phase (`CoreTier`)
+        val ctx1 = if CoreTier.enabled then ctx0.setProgressCallback(CoreSampling) else ctx0
+        try doCompile(compiler, corpus.files)(using ctx1)
         finally if costs then CostHooks.disarm()
       catch case e: Exception =>
         throw new IllegalStateException(s"${corpus.name}: compiler crashed after:\n${store.removeBufferedMessages(using root).take(10).mkString("\n")}", e)
@@ -96,3 +99,7 @@ final class InMemoryCompiler(val corpus: Corpus, options: List[String] = Nil, re
   def outputCount: Int =
     def count(f: AbstractFile): Int = if f.isDirectory then f.iterator.map(count).sum else 1
     count(output)
+
+/** Samples the core the compiling thread is on as each unit starts a phase (`CoreTier`). */
+private object CoreSampling extends dotty.tools.dotc.sbt.interfaces.ProgressCallback:
+  override def informUnitStarting(phase: String, unit: dotty.tools.dotc.CompilationUnit): Unit = CoreTier.sample()

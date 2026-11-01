@@ -85,6 +85,13 @@ class CompileBenchmark:
   @TearDown(Level.Iteration)
   def endVariant(): Unit = if alternatives.nonEmpty then IterationLog.end()
 
+  /** `CoreTier`: the benchmark thread's QoS, if asked, and where it ran per iteration. */
+  @Setup(Level.Iteration)
+  def coreTierBegin(ip: IterationParams): Unit = CoreTier.begin(ip.getType == IterationType.MEASUREMENT)
+
+  @TearDown(Level.Iteration)
+  def coreTierEnd(): Unit = CoreTier.end()
+
   @Benchmark
   def compile(): Unit = current.compile()
 
