@@ -56,6 +56,8 @@ Before the job, the worker downloads the campaign's finished cells of its testbe
 
 The server listens on 127.0.0.1 only. The simplest secure link from the laptop is `ssh -R 8690:127.0.0.1:8690 <laptop>` run on the coordinator (the laptop needs no access to the coordinator, which may not accept SSH). Workers authenticate with the server's token (`--token-file`), on every request including downloads, which carry source. The worker endpoints accept any `Host` with the token, so a tunnel to another local port works too.
 
+Not HTTPS on a LAN interface: the server's reads are unauthenticated behind its loopback bind, and the project's index carries the token, so listening on a network would hand both to anyone on it, encrypted or not. A tunnel also opens no port on the coordinator, which matters on a managed machine. Should a network listener be needed, it would serve only `/api/workers/` (mutual TLS, a client certificate per worker), never the pages. portless does not help here: its `.localhost` names resolve to the machine they are typed on.
+
 ## Prior art
 
 - **rustc-perf collectors:** pull jobs per benchmark set from a queue in the database, keyed by the collector's machine.
