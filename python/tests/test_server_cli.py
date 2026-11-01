@@ -146,7 +146,9 @@ class SubmitsItselfTest(unittest.TestCase):
         self.root = project('[build]\njmh = "true {args}"\n')
         self.port = free_port()
         env = {k: v for k, v in os.environ.items() if k not in (server.JOB_ENV, server.LOCAL_ENV, "PERFLAB_TRANSCRIPT")}
-        self.env = {**env, "PYTHONPATH": os.path.abspath(SRC), server.HOME_ENV: self.home, server.PORT_ENV: str(self.port)}
+        # TMPDIR: JMH's lock (ab.JMH_LOCK) of its own, or a campaign measuring on this machine holds the test's ab run
+        self.env = {**env, "PYTHONPATH": os.path.abspath(SRC), server.HOME_ENV: self.home, server.PORT_ENV: str(self.port),
+                    "TMPDIR": self.home}
 
     def tearDown(self):
         self.perflab("server", "stop")
