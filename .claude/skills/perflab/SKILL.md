@@ -23,7 +23,7 @@ On macOS the server can run as a launchd agent, started at login and kept alive:
 
 When reporting, link the run or campaign on that page rather than only pasting numbers.
 
-Run long commands in the background with a transcript, and follow that file instead of waiting blind: `perflab --transcript <scratch>/t.txt ab run <spec>` (also `run`, `trees`). It gets perflab's progress, loadgate waits, the build's output as it comes (sbt compiling, a failing build or a server started without the lab's environment) and JMH's iterations. A loadgate wait also shows live on the index.
+Run long commands in the background with a transcript, and follow that file instead of waiting blind: `perflab --transcript <scratch>/t.txt ab run <spec>` (also `run`, `trees`). It gets perflab's progress, loadgate waits, the build's output as it comes (sbt compiling, a failing build or a server started without the lab's environment) and JMH's iterations. A loadgate wait also shows live on the index. Before a campaign on a laptop, `perflab quiet status` says what competes (Time Machine, Spotlight, heavy apps, thermal state); `perflab quiet on` turns that off (it asks for sudo and quits the user's applications, so ask first) and `perflab quiet off` restores it.
 
 In a lab with `[build] launch` (the scala3 lab), prefer launch mode for campaigns: `PERFLAB_BUILD_MODE=launch`, with the lab's environment (`SCALA3_CHECKOUT`, `SCALA3_BENCHMARKS`, `JAVA_HOME`) set on the perflab command itself. A batch sbt builds once and perflab snapshots the build into `<campaign>/.build`, so no sbt server is needed or left running, and editing the checkout mid-campaign doesn't change what is measured.
 

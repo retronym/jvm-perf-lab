@@ -1235,7 +1235,7 @@ def cell(campaign, corpus, variant, round, project=None, tail=0):
             lim = (spec.get("loadgate") or {}).get("maxCores")
             pi = loadgate.per_iteration(os.path.join(c, "load.tsv"), tsv)
             load = {"source": "load.tsv", "maxCores": lim, "iterations": pi,
-                    "disturbed": [i["index"] for i in pi if lim is not None and i["cores"] is not None and i["cores"] > lim]}
+                    "disturbed": [i["index"] for i in pi if loadgate.disturbed(i, lim)]}
         files = sorted(os.path.join(dp, f) for dp, _, fs in os.walk(c) for f in fs)
         try:
             profiler = open(os.path.join(c, "profile.txt")).read().strip()

@@ -1287,8 +1287,9 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   bd_help = ui.help_popover("A run or campaign in launch mode builds once (per build of a campaign with <code>builds</code>) before its "
                             "first cell: the build's command, how long it has run and the last lines of its log, as it writes them.", right=True)
   lg_help = ui.help_popover("A campaign with a <code>loadgate</code> waits before each cell until the load of other processes stays under "
-                            "its limit for its quiet period. Other load in cores, sampled every 5 s; the dashed line is the limit, the green "
-                            "band the quiet time so far.", right=True)
+                            "its limit, and the machine's thermal state under serious, for its quiet period. Other load in cores, sampled "
+                            "every 5 s; the dashed line is the limit, the green band the quiet time so far. Below the chart: the top processes "
+                            "of the last sample and the machine's state (thermal, power, memory).", right=True)
   counters_sec = (f'<h2 class="sec" id="counters">PMU counters <span class="k">by run, benchmark thread only (xctrace)</span></h2>'
                   f'<section class="card" id="counters-card"><p class="k">Misses per 1,000 instructions; top-down shares of issue slots when a run used the '
                   f'CPU Counters template. Each run name links to its card.</p>{counters_html}</section>') if counters_html else ""
@@ -1383,7 +1384,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
     const q = g.quietSince ? now - g.quietSince : 0;
     document.getElementById('lg-status').innerHTML = `<span class="badge ${{g.quietSince ? 'finished' : 'running'}}">${{last[1].toFixed(1)}} cores, limit ${{g.limit}}</span>`
       + ` <span class="k">waiting ${{mins(now - g.started)}}${{g.quietSince ? `, quiet for ${{mins(q)}} of ${{mins(g.quiet)}}` : ''}}</span>`;
-    document.getElementById('lg-top').textContent = last[2] ? `Other load: ${{last[2]}}` : '';
+    document.getElementById('lg-top').textContent = [last[2] ? `Other load: ${{last[2]}}` : '', last[3] || ''].filter(Boolean).join(' · ');
     document.getElementById('lg-bar').firstChild.style.width = `${{Math.min(100, 100 * q / g.quiet)}}%`;
     const svg = document.getElementById('lg-chart'), W = svg.clientWidth || 600, H = 90, pad = 18;
     const t0 = g.started, t1 = Math.max(now, t0 + 60), top = Math.max(g.limit * 1.5, ...xs.map(s => s[1]));

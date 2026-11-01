@@ -59,7 +59,8 @@ java -javaagent:perflab-agent.jar=spec=envelope.audit,out=audit-{pid}.json ...
 | `perflab inlinetree <label>=<cell>...` | JIT compilation units of async-profiler runs against a baseline: what C2 inlined where, which callees became real calls, how compile boundaries moved; one page beside the campaign, linked from its card |
 | `perflab auditfold` | merging and folding audit reports |
 | `perflab defcosts` | cost per definition from a compiler's `-Yprofile-defs` table: histograms, outliers, comparisons |
-| `perflab loadgate` | waiting for a quiet machine, shown live on the results page while it waits; sampling competing load |
+| `perflab loadgate` | waiting for a quiet machine, shown live on the results page while it waits; sampling competing load and what the OS says about the machine (thermal state, battery, Low Power Mode, free memory). A wait holds while the thermal state throttles the CPU, and a cell measured under one is rerun as one under too much other load is |
+| `perflab quiet on\|off\|status` | a quiet machine for a measurement (macOS): Time Machine, Spotlight indexing, automatic update checks and Low Power Mode off, the heavy applications that are running quit (`[quiet] apps` in `perflab.toml`), `caffeinate` for the duration; `off` restores what `on` recorded; `status` shows what is on, the performance and efficiency core counts and a sample of other load and the machine's state |
 | `[build] mode = "launch"` (or `PERFLAB_BUILD_MODE=launch`) | perflab builds once per run or campaign with `[build] launch`, snapshots the build, and starts JMH itself: no build tool server during the measurement, and a campaign measures the build it took ([doc/direct-launch.md](doc/direct-launch.md)) |
 | `perflab --transcript <file> <command>` | appends progress (cells, loadgate waits) and the build's output as it comes (the build tool compiling, JMH's log) to `<file>`, for a caller to follow with `tail -f`; `trees` passes it to each checkout |
 

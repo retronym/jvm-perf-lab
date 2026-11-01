@@ -182,7 +182,7 @@ def cell_load(cell, max_cores):
     if not os.path.exists(os.path.join(cell, "load.tsv")):
         return max_cores, [], []
     its = loadgate.per_iteration(os.path.join(cell, "load.tsv"), os.path.join(cell, "iterations.tsv"))
-    return max_cores, its, [i["index"] for i in its if i["cores"] is not None and i["cores"] > max_cores]
+    return max_cores, its, [i["index"] for i in its if loadgate.disturbed(i, max_cores)]
 
 
 def iteration_forks(cell, lengths):
@@ -255,7 +255,8 @@ def rounds_of(d, rel_to, per_unit=None, max_cores=MAX_CORES):
             where = iteration_forks(cell, [len(f) for f in forks]) if forks else {}
             by = {i.get("index"): i for i in its}
             x["disturbed"] = [{"i": i, **({"fork": where[i][0] + 1, "j": where[i][1] + 1} if i in where else {}),
-                               "cores": by.get(i, {}).get("cores"), "top": by.get(i, {}).get("top") or ""} for i in dist]
+                               "cores": by.get(i, {}).get("cores"), "top": by.get(i, {}).get("top") or "",
+                               **({"thermal": by[i]["thermal"]} if by.get(i, {}).get("thermal") in loadgate.HOT else {})} for i in dist]
             hot += [[offset + where[i][0], where[i][1]] for i in dist if i in where]
         x["links"] = cell_links(cell, rel_to)
         g = graph_links(cell, rel_to)
@@ -865,18 +866,20 @@ const BH = (() => {
       if (p && z.i === p.i1 + 1 && z.fork === p.fork) {
         Object.assign(p, {i1: z.i, j1: z.j});
         if ((z.cores || 0) > (p.cores || 0)) Object.assign(p, {cores: z.cores, top: z.top});
+        if (z.thermal) p.thermal = z.thermal;
       } else out.push({...z, i1: z.i, j1: z.j});
     }
     return out;
   }
-  const coresOf = z => z.cores == null ? '' : `${z.i1 !== z.i ? 'up to ' : ''}${(+z.cores).toFixed(1)} cores`;
+  const coresOf = z => (z.thermal ? `thermal ${z.thermal}` + (z.cores == null ? '' : ', ') : '')
+    + (z.cores == null ? '' : `${z.i1 !== z.i ? 'up to ' : ''}${(+z.cores).toFixed(1)} cores`);
   const span = (a, b) => a === b ? `${a}` : `${a}–${b}`;
   const itName = z => `iteration${z.i1 !== z.i ? 's' : ''} ${span(z.i, z.i1)}${z.fork ? ` (fork ${z.fork}, measurement${z.i1 !== z.i ? 's' : ''} ${span(z.j, z.j1)})` : ''}`;
   function hotTip(x) {
     const zs = disturbed(x);
     if (!zs.length) return '';
     const lim = zs[0][0].maxCores;
-    return `Other load over ${lim != null ? lim + ' cores' : 'the limit'} during ${zs.length} measurement iteration${zs.length > 1 ? 's' : ''}: `
+    return `Other load over ${lim != null ? lim + ' cores' : 'the limit'}${zs.some(([, z]) => z.thermal) ? ' or a throttling thermal state' : ''} during ${zs.length} measurement iteration${zs.length > 1 ? 's' : ''}: `
       + (x.rd || []).filter(r => (r.disturbed || []).length).flatMap(r => runs(r.disturbed).map(z => `#${r.round} ${itName(z)} ${coresOf(z)}${z.top ? ` (${z.top})` : ''}`)).join('; ');
   }
   function value(d, st, c, v, k, exts) {
