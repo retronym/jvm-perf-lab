@@ -2,7 +2,7 @@ import json, os, sys, tempfile, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab server`
-from perflab import ab, loadgate  # noqa: E402
+from perflab import ab, api, loadgate  # noqa: E402
 
 
 class LoadCheckTest(unittest.TestCase):
@@ -33,6 +33,25 @@ class LoadCheckTest(unittest.TestCase):
         self.assertEqual([i["index"] for i in hit], [14, 15])
         rec = json.load(open(os.path.join(self.d, ab.LOAD_CHECK)))
         self.assertEqual(rec["disturbed"], [14, 15])
+
+    def test_a_disturbed_attempt_is_voided_until_its_rerun(self):
+        # left in the cell while the campaign waited to run it again, it read as a result (harness-aa-xbatch dotc/b/1)
+        camp = tempfile.mkdtemp()
+        spec = type("S", (), {"loadgate": {"maxCores": 1.5}, "out": camp, "cell_dir": lambda s, c, v, r: os.path.join(camp, c, v, str(r))})()
+        cell = spec.cell_dir("dotc", "b", 1)
+        os.makedirs(cell)
+        for f in ("iterations.tsv", "load.tsv"):
+            os.rename(os.path.join(self.d, f), os.path.join(cell, f))
+        open(os.path.join(cell, "result.json"), "w").write("[]")
+        open(os.path.join(cell, "jmh.args"), "w").write("-i 4")
+        self.assertTrue(ab.load_check(spec, cell))
+        void = ab.set_aside(spec, "dotc", "b", 1, "other load over 1.5 cores during measurement iterations 14, 15 (attempt 1, run again)")
+        self.assertEqual(sorted(os.listdir(cell)), ["iterations.tsv", "jmh.args", "load.tsv"])  # what the rerun needs
+        self.assertTrue(os.path.exists(os.path.join(void, "result.json")))
+        self.assertEqual(json.load(open(os.path.join(void, ab.LOAD_CHECK)))["disturbed"], [14, 15])
+        info = api._void_info(camp, void)
+        self.assertEqual((info["corpus"], info["variant"], info["round"]), ("dotc", "b", 1))
+        self.assertIn("iterations 14, 15", info["reason"])
 
     def test_no_gate_no_check(self):
         self.assertEqual(ab.load_check(type("S", (), {"loadgate": None})(), self.d), [])

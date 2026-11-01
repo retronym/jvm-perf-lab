@@ -21,9 +21,7 @@ import contextlib, datetime, glob, inspect, json, math, os, re, shutil, sqlite3,
 from . import ab, branchview, config, index, jmh, loadgate, metrics, server as srv, storage
 
 API_VERSION = 1
-VOID_DIR = ".void"
-VOID_NOTE = "void.txt"  # the reason, as text
-VOID_JSON = "void.json"  # {reason, voided, from}
+VOID_DIR, VOID_NOTE, VOID_JSON = ab.VOID_DIR, ab.VOID_NOTE, ab.VOID_JSON
 STATES = ("done", "running", "failed", "interrupted", "pending", "unbuildable", "void")
 VERDICTS = ("better", "worse", "flat", "na")
 ERRORS = {"bad_request": 400, "forbidden": 403, "not_found": 404, "conflict": 409, "no_server": 503, "internal": 500}

@@ -268,6 +268,30 @@ def load_check(spec, dest):
     return hit
 
 
+VOID_DIR = ".void"  # in a campaign: voided cells, <corpus>/<variant>/<round>-<timestamp>/ (api.void, set_aside)
+VOID_NOTE = "void.txt"  # the reason, as text
+VOID_JSON = "void.json"  # {reason, voided, from}
+
+
+def set_aside(spec, corpus, variant, r, reason):
+    """A cell's attempt that will be run again (other load disturbed it), voided: a copy in the campaign's .void with
+    `reason`, as `perflab api void` makes, and its result removed, so that until the rerun finishes the cell reads as
+    not done rather than as a result that counts."""
+    dest = spec.cell_dir(corpus, variant, r)
+    void = os.path.join(spec.out, VOID_DIR, corpus, variant, f"{r}-{time.strftime('%Y%m%d-%H%M%S')}")
+    while os.path.exists(void):
+        void += "x"
+    shutil.copytree(dest, void)
+    with open(os.path.join(void, VOID_NOTE), "w") as f:
+        f.write(reason + "\n")
+    with open(os.path.join(void, VOID_JSON), "w") as f:
+        json.dump({"reason": reason, "voided": time.time(), "from": dest}, f)
+    for f in ("result.json", LOAD_CHECK):
+        if os.path.exists(os.path.join(dest, f)):
+            os.unlink(os.path.join(dest, f))
+    return void
+
+
 def mean_load(path):
     """Mean competing load in cores over a cell's samples (0 without samples)."""
     try:
@@ -429,13 +453,17 @@ def run(spec, dry, retry_unbuildable=False):
                 continue
             load = mean_load(load_tsv)
             if not rc and spec.loadgate and load > spec.loadgate.get("maxCores", 1.5):
-                log(f"  other load averaged {load:.1f} cores during the run; rerunning")
+                why = f"other load averaged {load:.1f} cores during the run"
+                log(f"  {why}; rerunning")
+                set_aside(spec, corpus, variant, r, f"{why} (attempt {attempt}, run again)")
                 continue
             hit = [] if rc else load_check(spec, dest)
             if hit:
                 worst = max(hit, key=lambda i: i["cores"])
-                log(f"  other load over {spec.loadgate.get('maxCores', 1.5)} cores during measurement iteration"
-                    f"{'s' if len(hit) > 1 else ''} {', '.join(str(i['index']) for i in hit)} (up to {worst['cores']:.1f}: {worst['top']}); rerunning")
+                why = (f"other load over {spec.loadgate.get('maxCores', 1.5)} cores during measurement iteration"
+                       f"{'s' if len(hit) > 1 else ''} {', '.join(str(i['index']) for i in hit)} (up to {worst['cores']:.1f}: {worst['top']})")
+                log(f"  {why}; rerunning")
+                set_aside(spec, corpus, variant, r, f"{why} (attempt {attempt}, run again)")
                 continue
             break
         else:
