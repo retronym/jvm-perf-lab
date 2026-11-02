@@ -53,6 +53,35 @@ const BenchTimeline = (() => {
 
   function mount(svg, legend, tip) {
     let D = {iters: [], series: [], pauses: [], load: [], jvm: [], profile: ''}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
+    // stuck to now: a zoomed view whose right edge is at the newest data moves with it as data arrives (the "now" button,
+    // or panning or zooming to the end); panning back from the end unsticks it
+    let stuck = false;
+    const wrap = document.createElement('div'), fab = document.createElement('div');
+    wrap.className = 'tl-wrap'; fab.className = 'tl-fab';
+    fab.innerHTML = '<button type="button" class="btn" data-go="start" title="Scroll to the fork\'s start">⇤ start</button>'
+      + '<button type="button" class="btn" data-go="now" title="Scroll to now, and follow what comes in">now ⇥</button>';
+    svg.parentNode.insertBefore(wrap, svg); wrap.append(svg, fab);
+    fab.addEventListener('click', e => {
+      const b = e.target.closest('button[data-go]');
+      if (!b) return;
+      const w = x1 - x0;
+      if (b.dataset.go === 'start') { x0 = t0; x1 = Math.min(t1, t0 + w); }
+      else { x1 = t1; x0 = Math.max(t0, t1 - w); }
+      moved();
+    });
+    // after the reader moved the view: zoomed unless it shows everything, stuck when its right edge is at the end
+    function moved() {
+      zoomed = x0 > t0 || x1 < t1;
+      stuck = zoomed && t1 - x1 <= 0.01 * (x1 - x0);
+      draw();
+    }
+    function fabs() {
+      fab.querySelector('[data-go=start]').hidden = !zoomed || x0 <= t0;
+      const now = fab.querySelector('[data-go=now]');
+      now.hidden = !zoomed;
+      now.classList.toggle('on', stuck);
+      now.textContent = stuck ? 'following now' : 'now ⇥';
+    }
     let L = 150, R = 16;
     // the score lane: every iteration's score at its time, and at the right, each variant's measurements as a cloud
     const scoreRow = {name: 'score', h: 96, scores: true}, CLOUD = 96;
@@ -107,6 +136,7 @@ const BenchTimeline = (() => {
     function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; }
 
     function draw() {
+      fabs();
       svg.innerHTML = '';
       const W = svg.clientWidth || 900;
       L = W < 600 ? 106 : 150;
@@ -323,8 +353,9 @@ const BenchTimeline = (() => {
       variants = [...new Set(D.iters.map(i => i.variant).filter(v => v))];
       const ts = [...D.iters.flatMap(i => [i.s, i.e]), ...D.series.map(s => s.t), ...D.series.map(s => s.t + BIN_MS)];
       const n0 = ts.length ? Math.min(...ts) : 0, n1 = ts.length ? Math.max(...ts) : 1;
-      // keep a zoomed view where it is as data arrives; otherwise follow the whole range
+      // keep a zoomed view where it is as data arrives, or at the end when stuck to now; otherwise follow the whole range
       if (!zoomed) { x0 = n0; x1 = Math.max(n1, n0 + 1); }
+      else if (stuck) { const w = x1 - x0; x1 = Math.max(n1, n0 + 1); x0 = Math.max(n0, x1 - w); }
       t0 = n0; t1 = Math.max(n1, n0 + 1);
       const sw = (bg, text, extra) => `<span><i style="background:${bg}${extra || ''}"></i>${text}</span>`;
       if (legend) legend.innerHTML = sw('var(--grey)', 'warmup')
@@ -337,7 +368,12 @@ const BenchTimeline = (() => {
     }
 
     svg.addEventListener('wheel', e => { e.preventDefault(); const W = svg.clientWidth, f = Math.exp(e.deltaY * 0.002);
-      const at = x0 + (e.offsetX - L) / (W - L - R) * (x1 - x0); x0 = Math.max(t0, at - (at - x0) * f); x1 = Math.min(t1, at + (x1 - at) * f); zoomed = true; draw(); }, {passive: false});
+      // a sideways swipe (a trackpad's two fingers, a tilted wheel) pans; vertical scrolling and pinching zoom
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+        const w = x1 - x0, dt = e.deltaX / (W - L - R) * w;
+        x0 = Math.min(Math.max(t0, x0 + dt), t1 - w); x1 = x0 + w; return moved();
+      }
+      const at = x0 + (e.offsetX - L) / (W - L - R) * (x1 - x0); x0 = Math.max(t0, at - (at - x0) * f); x1 = Math.min(t1, at + (x1 - at) * f); moved(); }, {passive: false});
     let drag = null;
     svg.addEventListener('pointerdown', e => { drag = {x: e.clientX, x0, x1}; svg.setPointerCapture(e.pointerId); });
     svg.addEventListener('pointermove', e => {
@@ -346,12 +382,12 @@ const BenchTimeline = (() => {
       else if (tip && !drag) tip.style.display = 'none';
       if (!drag) return;
       const W = svg.clientWidth, dt = (e.clientX - drag.x) / (W - L - R) * (drag.x1 - drag.x0), w = drag.x1 - drag.x0;
-      x0 = Math.min(Math.max(t0, drag.x0 - dt), t1 - w); x1 = x0 + w; zoomed = true; draw();
+      x0 = Math.min(Math.max(t0, drag.x0 - dt), t1 - w); x1 = x0 + w; moved();
     });
     svg.addEventListener('pointerup', () => drag = null);
-    svg.addEventListener('dblclick', () => { zoomed = false; x0 = t0; x1 = t1; draw(); });
+    svg.addEventListener('dblclick', () => { zoomed = stuck = false; x0 = t0; x1 = t1; draw(); });
     window.addEventListener('resize', draw);
-    return {set, reset() { zoomed = false; }};
+    return {set, reset() { zoomed = stuck = false; }};
   }
 
   // where a project's live files are, under its <campaigns> (`base`, ending in /): this machine's, and each remote

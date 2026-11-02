@@ -18,6 +18,11 @@ CSS = """
 svg.timeline { background:var(--panel); border:1px solid var(--line); border-radius:8px; width:100%; touch-action:none; cursor:grab; display:block; }
 svg.timeline text { fill:var(--fg); font-size:11px; } svg.timeline .lab { fill:var(--muted); } svg.timeline text.on { fill:var(--panel); } svg.timeline text.halo { paint-order:stroke; stroke:var(--panel); stroke-width:3px; }
 svg.timeline .grid { stroke:var(--line); } svg.timeline .axis { stroke:var(--muted); opacity:.5; }
+.tl-wrap { position:relative; }
+.tl-fab { position:absolute; right:22px; bottom:30px; display:flex; gap:6px; }
+.tl-fab .btn { box-shadow:var(--shadow, 0 2px 8px rgba(0,0,0,.18)); background:var(--panel); }
+.tl-fab .btn.on { background:var(--link); border-color:var(--link); color:var(--panel); }
+.tl-fab .btn[hidden] { display:none; }
 .tl-legend { margin:2px 0 6px; } .tl-legend span { display:inline-block; margin-right:14px; font-size:12px; color:var(--muted); }
 .tl-legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
 .tl-tip { position:fixed; pointer-events:none; background:var(--panel); border:1px solid var(--line); border-radius:6px;
@@ -58,7 +63,7 @@ def write(d, out=None):
         "and JIT compilations (C1, C2) and deoptimizations come from the JDK's events in its recording, which covers the last "
         "fork's measurement iterations; bars closer than a pixel merge. With xctrace, counter lanes cover the measurement "
         "iterations, which is what xctrace records; cycles are per second, so one busy performance core is about 4–4.5 G. "
-        "Each counter lane has its own scale. Wheel or pinch to zoom, drag to pan, double-click to reset.", right=True)
+        "Each counter lane has its own scale. Wheel or pinch to zoom, drag or swipe sideways to pan, double-click to reset; <b>now ⇥</b> scrolls to the newest data and keeps following it (as does panning to the end), <b>⇤ start</b> to the beginning.", right=True)
     page = f"""{ui.HEAD}<title>{html.escape(name)}: timeline</title>
 {ui.style(ui.BASE, CSS, "main{padding:16px;max-width:1600px;margin:0 auto} h1{font-size:17px;margin:0;overflow-wrap:anywhere}")}
 {ui.masthead(home=ui.home_from(d), slim=True)}<main><div class="card-h"><span class="kind">timeline</span><h1>{html.escape(name)}</h1></div>

@@ -1478,7 +1478,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       "<b>[</b> and <b>]</b> step, <b>↗</b> opens one in a new tab, Esc closes. Dashed buttons are not rendered yet; "
       f"they turn into links when <code>perflab regraph</code> finishes.</p><p style='margin-bottom:0'>Graph kinds:</p><ul style='margin:2px 0;padding-left:18px'>{kinds}</ul>", right=True)
   tl_help = ui.help_popover("Each fork from JVM start to exit. Iterations appear as they finish; counter lanes (xctrace) once the fork has "
-                            "finished. Wheel or pinch to zoom, drag to pan, double-click to reset.", right=True)
+                            "finished. Wheel or pinch to zoom, drag or swipe sideways to pan, double-click to reset; <b>now ⇥</b> follows the newest iterations (as does panning to the end), <b>⇤ start</b> goes to the beginning.", right=True)
   # the perflab server's tabs (queue, storage, its projects), drawn when the server serves this index (under /p/<project>/)
   tabs = ('<span id="srv-tabs" hidden></span>'
           + (f'<a href="#overview" data-sec="overview">Overview</a>' if intro else "")

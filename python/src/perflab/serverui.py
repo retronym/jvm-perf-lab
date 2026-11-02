@@ -396,7 +396,7 @@ def queue_page(server):
                             "effect at the next cell boundary, so no fork's work is lost; <b>Cancel</b> stops a job there too, "
                             "or with SIGTERM after a grace period. A job's results stay when it is cancelled.", right=True)
     tl_help = ui.help_popover("The running job's fork, as its project's index shows it: each fork from JVM start to exit, "
-                              "iterations as they finish. Wheel or pinch to zoom, drag to pan, double-click to reset.", right=True)
+                              "iterations as they finish. Wheel or pinch to zoom, drag or swipe sideways to pan, double-click to reset; <b>now ⇥</b> follows the newest iterations (as does panning to the end), <b>⇤ start</b> goes to the beginning.", right=True)
     bd_help = ui.help_popover("The running job's launch-mode build: its command, how long it has run and the last lines of "
                               "its log.", right=True)
     wk_help = ui.help_popover("The machines that run the queue's jobs: this one, and each remote worker (<code>perflab worker</code>) "
