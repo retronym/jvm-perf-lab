@@ -30,16 +30,15 @@ A method is compiled several times: C1 at tier 3, the top tier (C2, or Graal thr
 
 Each instruction gets its source position from the debug info HotSpot prints after it: an inlining path such as `SourceLanguage$::apply@12 (line 34)` ← `SymDenotation::is@5 (line 113)`, written outermost first as `apply:34 → is:113`. An instruction without annotation takes the position of the next annotated instruction in its basic block, otherwise the last one before it. The instructions before any annotation, the frame's setup, form a group of their own. The instructions of one position form a group, and two builds are aligned group by group:
 
-- **The same path and lines** pair directly.
+- **Moved source**: a patch that adds lines above a method shifts all of its lines alike, by a different amount per method. For each method, perflab takes the shift under which the most instructions line up (in the motivating case `apply` +1, `is` +28), shifts a's lines by it, and pairs groups with the same path at the same shifted lines. The label shows both lines where they differ (`apply:34/35 → is:113/141`).
 - **Lambda numbers are ignored** (`$anonfun$39` and `$anonfun$41` are the same frame), because a build that adds a lambda renumbers the rest.
-- **Moved source**: when a path of methods has no line in common between the builds (the patch moved the code), its groups pair in source order, and the label shows both lines (`apply:33/34`).
-- Code of one build only is shown on its own side.
+- Code of one build only (a rewritten callee, a different inlining) is shown on its own side.
 
 Within a pair, difflib compares the normalised instructions. Normalisation replaces addresses, branch targets (with block labels `L<n>`), and the `mov`/`movk` immediates that build an address with ADDR/IMM, keeps registers and small constants, and appends relocations (`runtime_call`, `metadata('Class')`, method names). Per group and in total it counts instructions, loads, stores, spills (stores to `[sp`), fills (loads from it), calls, branches, safepoint polls and nops. Totals are split into the main code (from the verified entry), the entry (the inline-cache check) and the out-of-line sections (stubs, exception and deopt handlers). aarch64 is classified by mnemonic; x86-64 by the side of its memory operand, which is cruder.
 
 ## Heat
 
-When the capture's parent has async profiles of the same variants, each group is shaded by its share of the compiled unit's samples. The source key is the same: async-profiler's frames of compiled code carry a line, and a unit is its `_[j]` frame and the `_[i]` frames above it. Samples at a position that no group has are reported as `hotUnplaced`. The samples come from the timed forks, so they are unperturbed, and they are matched by source position rather than by address, because addresses are per process. Instruction-level heat would need a profile of the capture's own fork (JMH's `perfasm`/`xctraceasm` approach), which is the perturbed one; that is not done.
+When the capture's parent has async profiles of the same variants, each group is shaded by its share of the compiled unit's samples. The source key is the same: async-profiler's frames of compiled code carry a line, and a unit is its `_[j]` frame and the `_[i]` frames above it. Samples at a position that no group has are reported as `hotUnplaced`. A profile's frames have no descriptors, so the overloads of one method share its heat. The samples come from the timed forks, so they are unperturbed, and they are matched by source position rather than by address, because addresses are per process. Instruction-level heat would need a profile of the capture's own fork (JMH's `perfasm`/`xctraceasm` approach), which is the perturbed one; that is not done.
 
 ## API
 

@@ -158,7 +158,7 @@ def split(cell, logs=None):
     os.makedirs(out, exist_ok=True)
     index = []
     for lp in logs:
-        pid = re.search(r"vm-(\d+)\.log", lp)
+        pid = re.search(r"vm-(?:pid)?(\d+)\.log", lp)  # %p is pid<n> in a LogFile name
         with open(lp, errors="replace") as f:
             for attrs, text in nmethods(f):
                 hdr = next((HEADER.match(t) for t in text if t.startswith("Compiled method")), None)
@@ -441,36 +441,41 @@ def groups(code):
 # compare -----------------------------------------------------------------------------------------------------------
 
 
-def _names(k):
-    return tuple(m for m, _ in k) if k and isinstance(k[0], tuple) else k
+def offsets(ka, kb, wa=None, wb=None):
+    """Per method, the shift of its source lines from build a to build b: the one under which the most code (by
+    instructions at each line) lines up. A patch that adds lines above a method moves all of its lines alike."""
+    wa, wb = wa or {}, wb or {}
+    la, lb = collections.defaultdict(collections.Counter), collections.defaultdict(collections.Counter)
+    for keys, w, acc in ((ka, wa, la), (kb, wb, lb)):
+        for k in keys:
+            if k and isinstance(k[0], tuple):
+                for m, l in k:
+                    if l is not None:
+                        acc[m][l] += w.get(k, 1)
+    out = {}
+    for m in la.keys() & lb.keys():
+        best = max({b - a for a in la[m] for b in lb[m]},
+                   key=lambda d: (sum(min(n, lb[m].get(a + d, 0)) for a, n in la[m].items()), -abs(d)))
+        out[m] = best
+    return out
 
 
-def align(ka, kb):
-    """Pairs two compilations' groups: the same inlining path of methods, and by line where both have it; where a
-    build's source moved (no line of a path is in both), the groups of one path pair by their order in the source. Returns
-    [(key a or None, key b or None)] in A's order, B's own after the A group they follow in B."""
-    pa, pb = {}, {}
-    for k in set(ka) & set(kb):
-        pa[k], pb[k] = k, k
-    ba, bb = collections.defaultdict(list), collections.defaultdict(list)
-    for k in ka:
-        if k not in pa:
-            ba[_names(k)].append(k)
-    for k in kb:
-        if k not in pb:
-            bb[_names(k)].append(k)
-    exact = {_names(k) for k in pa}
-    for n, xs in ba.items():
-        ys = bb.get(n, [])
-        if n in exact:  # the same lines exist in both: the source did not move, and the others are code of one build only
-            continue
-        for x, y in zip(sorted(xs), sorted(ys)):
-            pa[x], pb[y] = y, x
-    out, seen_b = [], set()
+def _shift(k, off):
+    if not k or not isinstance(k[0], tuple):
+        return k
+    return tuple((m, l + off.get(m, 0) if l is not None else None) for m, l in k)
+
+
+def align(ka, kb, wa=None, wb=None):
+    """Pairs two compilations' groups: the same inlining path of methods at the same lines, after shifting each
+    method's lines in a by its offset to b (where the patch moved the source). Returns [(key a or None, key b or None)]
+    in a's order, b's own after the a group they follow in b. `wa`, `wb`: instructions per group, to weigh offsets."""
+    off = offsets(ka, kb, wa, wb)
+    kb_set = set(kb)
+    pa = {k: _shift(k, off) for k in ka if _shift(k, off) in kb_set}
+    out, seen_b = [], set(pa.values())
     for k in ka:
         out.append((k, pa.get(k)))
-        if k in pa:
-            seen_b.add(pa[k])
     pos = {b: j for j, (a, b) in enumerate(out) if b is not None}
     after = -1
     for k in kb:
@@ -489,7 +494,7 @@ def compare(code_a, code_b, hot_a=None, hot_b=None):
     """Two compilations side by side per source group: counts and a diff of their normalised instructions."""
     ga, gb = groups(code_a), groups(code_b)
     rows = []
-    for ka, kb in align(list(ga), list(gb)):
+    for ka, kb in align(list(ga), list(gb), {k: len(v) for k, v in ga.items()}, {k: len(v) for k, v in gb.items()}):
         k = ka if ka is not None else kb
         ia, ib = ga.get(ka, []), gb.get(kb, [])
         sa, sb = [i["norm"] for i in ia], [i["norm"] for i in ib]
@@ -558,11 +563,15 @@ def hot(cells, method, jfrconv=None, event="cycles"):
         if not path or not _same_method(path[0][0], want):
             return
         acc[tuple(path)] += n
+    read = 0
     for c in cells:
         try:
             profdiff.load(c, event, jfrconv, None, "asm", keep=False, sink=sink, extra=("--lines",))
+            read += 1
         except Exception as e:  # no profile or a broken one: no shading, the diff stands
             print(f"[asm] no hot path from {c}: {e}", file=sys.stderr)
+    if not read:
+        return None
     total = sum(acc.values())
     return {k: v / total for k, v in acc.items()} if total else {}
 
@@ -696,8 +705,9 @@ def diff(campaign, a, b, method, corpus=None, rnd=None, compile_id_a=None, compi
             pa, pb = parent_cells(d, ca[0], a), parent_cells(d, cb[0], b)
             keys_a, keys_b = list(groups(code_a)), list(groups(code_b))
             jc = parent_jfrconv(parent_of(d)) if pa or pb else None
-            ha = shade(hot(pa, m, jc), keys_a) if pa else None
-            hb = shade(hot(pb, m, jc), keys_b) if pb else None
+            ha, hb = (hot(pa, m, jc) if pa else None), (hot(pb, m, jc) if pb else None)
+            ha = shade(ha, keys_a) if ha is not None else None
+            hb = shade(hb, keys_b) if hb is not None else None
             if pa or pb:
                 out["hotFrom"] = {"a": [os.path.relpath(c, os.path.dirname(d)) for c in pa],
                                   "b": [os.path.relpath(c, os.path.dirname(d)) for c in pb]}

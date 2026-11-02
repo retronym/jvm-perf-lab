@@ -82,12 +82,19 @@ class AsmTest(unittest.TestCase):
         self.assertTrue(os.path.exists(out["page"][:-5] + ".json"))
         self.assertIn("not a timed one", open(out["page"]).read())
 
-    def test_align_pairs_moved_lines_only_when_no_line_matches(self):
-        m = "a.B::f"
-        moved = asm.align([((m, 10),), ((m, 12),)], [((m, 11),), ((m, 13),)])
-        self.assertEqual(moved, [(((m, 10),), ((m, 11),)), (((m, 12),), ((m, 13),))])
+    def test_align_shifts_each_methods_lines(self):
+        m, c = "a.B::f", "a.C::g"
+        # the patch added a line above f (all of f's lines +1, some coincide with a's) and 28 above g
+        ka = [((m, 33),), ((m, 34), (c, 113)), ((m, 38),), ((m, 39), (c, 113))]
+        kb = [((m, 34),), ((m, 35), (c, 141)), ((m, 39),), ((m, 40), (c, 141)), ((m, 41),)]
+        self.assertEqual(asm.align(ka, kb), [(ka[0], kb[0]), (ka[1], kb[1]), (ka[2], kb[2]), (ka[3], kb[3]), (None, kb[4])])
         same = asm.align([((m, 10),), ((m, 12),)], [((m, 10),), ((m, 13),)])
-        self.assertEqual(same, [(((m, 10),), ((m, 10),)), (None, ((m, 13),)), (((m, 12),), None)])  # b's own after what it follows in b
+        self.assertEqual(same, [(((m, 10),), ((m, 10),)), (None, ((m, 13),)), (((m, 12),), None)])
+
+    def test_align_without_line_numbers(self):
+        m = "a.B::f"
+        ka, kb = [((m, 1), ("a.C::g", None)), ((m, 1), ("a.C::g", 3))], [((m, 2), ("a.C::g", None))]
+        self.assertEqual(asm.align(ka, kb), [(ka[0], kb[0]), (ka[1], None)])
 
     def test_lambda_numbers_ignored(self):
         self.assertEqual(asm.norm_scope_name("a.B$", "$anonfun$39"), asm.norm_scope_name("a.B$", "$anonfun$41"))
