@@ -225,15 +225,28 @@ const BenchTimeline = (() => {
         }
         if (r.load && D.load.length) {
           const lmax = Math.max(2, ...D.load.map(l => l.cores));
-          el('text', {x: W - R - 2, y: y + 12, 'text-anchor': 'end', class: 'lab'}).textContent = `load.tsv: other processes, cores (max ${lmax.toFixed(1)})`;
+          const LY = v => y + r.h - 4 - v / lmax * (r.h - 10);
+          // its scale in cores: beside the lane when it is the lane's only plot, else at the right (the counter's is at the left)
+          const sx = r.key ? {x: W - R - 2, 'text-anchor': 'end', class: 'lab halo'}
+                           : L < 150 ? {x: L + 3, 'text-anchor': 'start', class: 'lab halo'} : {x: L - 4, 'text-anchor': 'end', class: 'lab'};
+          if (!r.key) {
+            el('line', {x1: L, x2: W - R, y1: LY(0), y2: LY(0), class: 'axis'});
+            el('line', {x1: L, x2: W - R, y1: LY(lmax / 2), y2: LY(lmax / 2), class: 'grid', 'stroke-dasharray': '2 4'});
+          }
+          el('text', {...sx, y: LY(lmax) + 8}).textContent = `${lmax.toFixed(1)} cores`;
+          el('text', {...sx, y: LY(lmax / 2) + 4}).textContent = (lmax / 2).toFixed(1);
+          const clamp = x => Math.min(Math.max(x, L), W - R);
+          const hms = t => new Date(t).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
           let ld = '';
           for (const l of D.load) {
             if (l.t < x0 - l.w || l.t > x1 + l.w) continue;
-            const yy = y + r.h - 4 - l.cores / lmax * (r.h - 10);
-            const clamp = x => Math.min(Math.max(x, L), W - R);
-            ld += (ld ? 'L' : 'M') + clamp(X(l.t - l.w)).toFixed(1) + ',' + yy.toFixed(1) + 'L' + clamp(X(l.t)).toFixed(1) + ',' + yy.toFixed(1);
+            const a = clamp(X(l.t - l.w)), b = clamp(X(l.t)), yy = LY(l.cores);
+            ld += (ld ? 'L' : 'M') + a.toFixed(1) + ',' + yy.toFixed(1) + 'L' + b.toFixed(1) + ',' + yy.toFixed(1);
+            // the sample's window, for its tip: the load and the processes behind it
+            if (b > a) el('rect', {x: a, y, width: b - a, height: r.h, fill: 'transparent'}).dataset.tip =
+              `other processes, ${hms(l.t - l.w)}–${hms(l.t)}: ${l.cores.toFixed(2)} cores` + (l.top ? ` (${l.top})` : '');
           }
-          if (ld) el('path', {d: ld, fill: 'none', stroke: 'var(--v1)', 'stroke-width': 1.2, 'stroke-dasharray': '4 3'});
+          if (ld) el('path', {d: ld, fill: 'none', stroke: 'var(--v1)', 'stroke-width': 1.2, 'stroke-dasharray': '4 3', 'pointer-events': 'none'});
         }
         y += r.h + 8;
       }
