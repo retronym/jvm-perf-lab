@@ -812,18 +812,22 @@ def progress(spec_dir):
           if os.path.getsize(f) > 0 and not testbed.foreign(os.path.dirname(f))]
   left = None
   run = running_cell(os.path.basename(spec_dir))
-  if run is not None:
+  try:
+    building = json.load(open(os.path.join(CAMPAIGNS, ab.RUNNING_NAME))).get("campaign") == os.path.basename(spec_dir)
+  except (OSError, ValueError):
+    building = False
+  if run is not None or building:  # between cells (building the next), the cells still to run are all there is
     secs = {}
     for c in done:
       d = cell_secs(c)
       if d:
         secs.setdefault(os.path.basename(os.path.dirname(os.path.dirname(c))), []).append(d)
     every = [d for v in secs.values() for d in v]
-    cur = running_left(os.path.join(spec_dir, run[0], run[1], str(run[2])), s["corpora"].get(run[0]))
+    cur = running_left(os.path.join(spec_dir, run[0], run[1], str(run[2])), s["corpora"].get(run[0])) if run else 0.0
     if every and cur is not None:
       mean = lambda c: sum(secs.get(c) or every) / len(secs.get(c) or every)
       for c in s["corpora"]:
-        have = len(secs.get(c, [])) + (1 if c == run[0] else 0)
+        have = len(secs.get(c, [])) + (1 if run and c == run[0] else 0)
         left = (left or 0) + max(0, planned // len(s["corpora"]) - have) * mean(c)
       left = (left or 0) + cur
   return len(done), planned, left
