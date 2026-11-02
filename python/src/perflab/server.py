@@ -402,6 +402,12 @@ def _local_testbed():
     return testbed.name()
 
 
+def _machine():
+    """This machine's testbed, with what identifies its hardware (perflab.testbed.local)."""
+    from . import testbed
+    return testbed.local()
+
+
 def local_job(job):
     """Whether the job runs on this machine: it names no testbed, or this machine's."""
     return job.get("testbed") in (None, _local_testbed())
@@ -753,7 +759,7 @@ class Server:
         self.url = f"http://127.0.0.1:{self.port}/"
         self.indexing = set()
         self.reexec, self.reload_error = False, None
-        self.workers = {}  # remote workers by name: {name, testbed, seen, job}, from their claims and heartbeats
+        self.workers = {}  # remote workers by name: {name, testbed, seen, job, live, paused}, from their claims and heartbeats
         self.reindexing = {}  # project id -> when a reindex after a remote worker's upload is due
 
     def start(self):
@@ -1114,7 +1120,7 @@ class Server:
                         return self._error(400, "worker: a name of letters, digits and _.@-")
                     if p == "/api/workers/claim":
                         tb = (body.get("testbed") or {}).get("name") or ""
-                        server.seen(worker, testbed=body.get("testbed"), job=None)
+                        server.seen(worker, testbed=body.get("testbed"), job=None, live=None)
                         return self._send(200, claim_remote(server, worker, tb))
                     m = re.fullmatch(r"/api/workers/jobs/(\d+)/(heartbeat|finish|bundle|cells|input)", p)
                     if not m:
@@ -1127,14 +1133,14 @@ class Server:
                     if op == "heartbeat":
                         j = server.q.heartbeat(jid, worker, bool(body.get("paused")))
                         _live(server.q.project(j["project"]), j, body.get("live"))
-                        server.seen(worker, job=jid)
+                        server.seen(worker, job=jid, live=body.get("live"), paused=bool(body.get("paused")))
                         return self._send(200, {"state": j["state"], "control": j["control"]})
                     if op == "finish":
                         j = server.q.finish(jid, worker, int(body.get("rc", 1)))
                         _live(server.q.project(j["project"]), j, None)
                         for f in ("control", "control.ack"):
                             control.write(os.path.join(j["dir"], f), None)
-                        server.seen(worker, job=None)
+                        server.seen(worker, job=None, live=None)
                         _reindex(server.q.project(j["project"]))
                         return self._send(200, public(j))
                     j = server.q.held(jid, worker)
@@ -1203,7 +1209,7 @@ def _live(project, job, live):
         if live:
             tmp = f + ".tmp"
             with open(tmp, "w") as fh:
-                json.dump({**live, "at": time.time()}, fh)
+                json.dump({**live, "at": time.time(), "worker": job.get("worker")}, fh)
             os.replace(tmp, f)
         elif os.path.exists(f):
             os.unlink(f)
@@ -1274,7 +1280,8 @@ def status(server):
     return {"pid": os.getpid(), "url": server.url, "publicUrl": public_url(server.url), "home": server.home, "port": server.port,
             "running": next((public(j) for j in jobs if j["state"] in ACTIVE), None),
             "queued": sum(j["state"] == "queued" for j in jobs), "reloadError": server.reload_error,
-            "testbed": _local_testbed(), "workers": [{k: w.get(k) for k in ("name", "testbed", "seen", "job")} for w in getattr(server, "workers", {}).values()]}
+            "testbed": _local_testbed(), "machine": _machine(),
+            "workers": [{k: w.get(k) for k in ("name", "testbed", "seen", "job", "live", "paused")} for w in getattr(server, "workers", {}).values()]}
 
 
 def local_host(host, port):

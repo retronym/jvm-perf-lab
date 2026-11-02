@@ -36,6 +36,9 @@ table.t td.name{overflow-wrap:anywhere;min-width:140px} table.t td.acts{white-sp
 table.t tr.on td{background:var(--link-bg)}
 #tl[hidden],#bd[hidden]{display:none} #tl .card-h,#bd .card-h{gap:6px 12px} #tl .help,#bd .help{margin-left:auto}
 #bd-cmd{margin:2px 0 6px;word-break:break-all}
+.wk{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;border-top:1px solid var(--line2);padding:7px 0} .wk:first-child{border-top:0;padding-top:2px}
+.wk .nm{font-weight:700} .wk .hw{color:var(--muted);font-size:12px} .wk .doing{flex-basis:100%;font-size:13px} .wk .when{margin-left:auto}
+.badge.offline{background:var(--bad-bg);color:var(--bad)} .badge.idle{background:var(--line2);color:var(--muted)}
 #bd pre{margin:0;max-height:16em;overflow:auto;font-size:12px;line-height:1.4;background:var(--line2);padding:6px 8px;border-radius:4px;white-space:pre-wrap;word-break:break-all}
 @media (max-width:700px){main{padding:12px 12px 24px} .tabsrow .in{padding:0 12px} .jh .btns{margin-left:0;width:100%} .argv .cwd{display:none} pre.tail{max-height:240px}
   .tile{min-width:0;flex:1 1 40%} .tile .v{font-size:17px}}
@@ -62,7 +65,7 @@ async function post(path, body) {
 """
 
 QUEUE_JS = r"""
-let projects = {}, jobs = [];
+let projects = {}, jobs = [], status = null, run = null;
 const open = new Set();
 const proj = id => projects[id] ? `<a href="${esc(projects[id].index)}" title="${esc(projects[id].root)}">${esc(projects[id].name)}</a>` : esc(id);
 // the job's campaign, on its project's index (a card there shows the jobs that ran it, linking back here)
@@ -91,6 +94,11 @@ function buttons(j) {
       + b('cancel', 'Cancel', 'bad', 'take it off the queue') + idx;
   return t;
 }
+// where a job runs: a remote worker of its testbed, else this machine (whose queued jobs need no badge)
+function where(j) {
+  if (j.testbed) return `<span class="badge" title="${j.worker ? 'on the remote worker ' + esc(j.worker) : 'for a remote worker'} of testbed ${esc(j.testbed)} (perflab worker)">${j.worker ? esc(j.worker) + ' · ' : ''}testbed ${esc(j.testbed)}</span>`;
+  return j.state === 'queued' || !status ? '' : `<span class="badge" title="on this machine, the server's own worker">testbed ${esc(status.testbed)}</span>`;
+}
 function jobHtml(j, tail) {
   const [cls, text] = label(j);
   const when = j.state === 'queued' ? `#${j.position} · submitted ${ago(j.created)}`
@@ -99,7 +107,7 @@ function jobHtml(j, tail) {
   const body = tail ? `<pre class="tail" id="tail-${j.id}">…</pre>` : j.state === 'queued' ? ''
     : `<details class="more" data-id="${j.id}"${open.has(j.id) ? ' open' : ''}><summary>transcript ▾</summary><pre class="tail" id="tail-${j.id}">…</pre></details>`;
   return `<div class="job${location.hash === '#job-' + j.id ? ' hit' : ''}" id="job-${j.id}"><div class="jh"><a class="id" href="#job-${j.id}" title="a link to this job">#${j.id}</a><span class="badge ${cls}">${esc(text)}</span>${proj(j.project)}${camp(j)}`
-    + (j.testbed ? `<span class="badge" title="it runs on a remote worker of this testbed (perflab worker)">${j.worker ? esc(j.worker) + ' · ' : ''}testbed ${esc(j.testbed)}</span>` : '')
+    + where(j)
     + `<span class="when">${when}</span><span class="btns">${buttons(j)}</span></div>`
     + `<code class="argv">perflab ${esc(j.argv.join(' '))}<span class="cwd"> · in ${esc(j.cwd.startsWith(HOME + '/') ? '~' + j.cwd.slice(HOME.length) : j.cwd)}</span></code>`
     + (j.note ? `<p class="k">${esc(j.note)}</p>` : '') + body + `</div>`;
@@ -123,8 +131,8 @@ function section(id, list, tail, empty) {
 }
 async function refresh() {
   try {
-    const [js, ps] = await Promise.all([fetch('/api/jobs').then(r => r.json()), fetch('/api/projects').then(r => r.json())]);
-    jobs = js; projects = Object.fromEntries(ps.map(p => [p.id, p]));
+    const [js, ps, st] = await Promise.all(['/api/jobs', '/api/projects', '/api/status'].map(u => fetch(u).then(r => r.json())));
+    jobs = js; projects = Object.fromEntries(ps.map(p => [p.id, p])); status = st;
   } catch (e) { document.getElementById('conn').textContent = 'the server is not answering'; return; }
   document.getElementById('conn').textContent = '';
   const active = jobs.filter(j => j.state === 'running' || j.state === 'paused');
@@ -133,10 +141,40 @@ async function refresh() {
   section('active', active, true, 'Nothing is running.');
   section('queued', queued, false, 'The queue is empty. <code>perflab submit -- ab run &lt;spec&gt;</code> adds to it.');
   section('history', done, false, 'No finished jobs yet.');
+  workers();
   document.getElementById('n-queued').innerHTML = (active.length ? '<span class="run" title="a job is running">▶</span> ' : '') + queued.length;
   document.title = (active.length ? `▶ #${active[0].id} · ` : '') + 'queue · perflab server';
   active.forEach(j => fillTail(j.id, 60));
   open.forEach(id => fillTail(id, 200));
+}
+// the machines that run jobs: this one (the server's own worker) and each remote worker that has claimed, with what it
+// runs; a remote worker polls every 10 s when idle and beats every 10 s in a job, so one unseen for 45 s is offline
+const hw = m => !m ? '' : [m.cpu, m.cores && m.cores.performance ? `${m.cores.performance}P+${m.cores.efficiency || 0}E` : m.cores && m.cores.logical ? m.cores.logical + ' cores' : '',
+  m.memory ? Math.round(m.memory / 2 ** 30) + ' GB' : '', m.os, m.host].filter(Boolean).map(esc).join(' · ');
+const jobLink = j => `<a href="#job-${j.id}">#${j.id}</a>` + (j.campaign ? ' ' + camp(j) : ` <code>perflab ${esc(j.argv.join(' '))}</code>`);
+const cellText = (c, left) => `<b>${esc(c.join(' · '))}</b>` + (left != null ? ` · ${dur(left)} left` : '');
+function workers() {
+  if (!status) return;
+  const now = Date.now() / 1000, rows = [];
+  const local = jobs.find(j => (j.state === 'running' || j.state === 'paused') && !j.worker);
+  const lrun = local && run && run.campaign === local.campaign ? run.cell.replace(/\/$/, '').split('/').slice(-3) : null;
+  rows.push(`<div class="wk"><span class="nm">this machine</span><span class="badge">testbed ${esc(status.testbed)}</span>`
+    + `<span class="badge ${local ? local.state : 'idle'}">${local ? local.state : 'idle'}</span><span class="hw">${hw(status.machine)}</span>`
+    + `<span class="when">the server's own worker</span>`
+    + (local ? `<span class="doing">${jobLink(local)}${lrun ? ' · ' + cellText(lrun) : ''}</span>` : '') + '</div>');
+  for (const w of (status.workers || []).slice().sort((a, b) => a.name.localeCompare(b.name))) {
+    const j = w.job && jobs.find(x => x.id === w.job), off = now - w.seen > 45;
+    const st = off ? 'offline' : j ? (w.paused ? 'paused' : 'running') : 'idle', tb = (w.testbed || {}).name;
+    const live = w.live && w.live.cell, left = live && w.live.left != null ? Math.max(0, w.live.left - (now - w.seen)) : null;
+    rows.push(`<div class="wk"><span class="nm">${esc(w.name)}</span>${tb ? `<span class="badge">testbed ${esc(tb)}</span>` : ''}`
+      + `<span class="badge ${st}" title="${off ? 'not heard from in ' + dur(now - w.seen) + ': asleep, stopped, or its tunnel is down' : ''}">${st}</span>`
+      + `<span class="hw">${hw(w.testbed)}</span><span class="when">seen ${ago(w.seen)}</span>`
+      + (j ? `<span class="doing">${jobLink(j)} · ${live ? cellText(w.live.cell, left) : '<span class="k">between cells (building, checking or uploading)</span>'}</span>` : '')
+      + '</div>');
+  }
+  if (!(status.workers || []).length)
+    rows.push('<p class="empty">No remote worker has claimed since the server started. <code>perflab worker --server &lt;url&gt;</code> on another machine (doc/worker-setup.md).</p>');
+  document.getElementById('workers').innerHTML = rows.join('');
 }
 // the running job's project, live: its fork timeline (<campaigns>/running.json names the cell, as on the index) and
 // its launch-mode build (build.json)
@@ -145,9 +183,11 @@ let shown = null;
 const getJson = async u => { try { const r = await fetch(u, {cache: 'no-store'}); return r.ok ? await r.json() : null; } catch (e) { return null; } };
 const since = t => new Date(t * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
 async function live() {
-  const j = jobs.find(j => j.state === 'running' || j.state === 'paused'), p = j && projects[j.project];
+  const j = jobs.find(j => (j.state === 'running' || j.state === 'paused') && !j.worker), p = j && projects[j.project];
   const base = p ? p.index.replace(/[^/]*$/, '') : null;
-  const [run, b] = base ? await Promise.all([getJson(base + 'running.json'), getJson(base + 'build.json')]) : [null, null];
+  let b;
+  [run, b] = base ? await Promise.all([getJson(base + 'running.json'), getJson(base + 'build.json')]) : [null, null];
+  workers();
   const bd = document.getElementById('bd');
   bd.hidden = !b || Date.now() / 1000 - b.updated > 30;  // a killed build leaves its file: the heartbeat is every 5 s
   if (!bd.hidden) {
@@ -164,7 +204,8 @@ async function live() {
   if (!run) { shown = null; return; }
   const cell = base + run.cell.replace(/\/?$/, '/');
   const name = run.run || (q => q.length >= 4 ? `${q[0]} · ${q[1]} · ${q[2]} #${q[3]}` : run.cell)(run.cell.replace(/\/$/, '').split('/'));
-  document.getElementById('tl-name').innerHTML = `<a href="${esc(p.index)}">${esc(p.name)}</a> · ${esc(name)}`;
+  document.getElementById('tl-name').innerHTML = `<a href="${esc(p.index)}">${esc(p.name)}</a> · ${esc(name)}`
+    + ` <span class="badge" title="this machine, the server's own worker">on ${esc(status ? status.testbed : 'this machine')}</span>`;
   document.getElementById('tl-status').innerHTML = `<span class="badge running">running since ${since(run.started)}</span>`
     + ` <a class="btn" href="${esc(cell)}timeline.html" title="the cell's own timeline page">↗</a>`;
   if (cell !== shown) { tl.reset(); shown = cell; }
@@ -336,7 +377,11 @@ def queue_page(server):
                               "iterations as they finish. Wheel or pinch to zoom, drag to pan, double-click to reset.", right=True)
     bd_help = ui.help_popover("The running job's launch-mode build: its command, how long it has run and the last lines of "
                               "its log.", right=True)
-    body = (f'<h2 class="sec">Now <span class="k" id="conn"></span></h2><section class="card" id="active"></section>'
+    wk_help = ui.help_popover("The machines that run the queue's jobs: this one, and each remote worker (<code>perflab worker</code>) "
+                              "that has claimed since the server started, with its testbed, hardware and what it runs. A job runs on "
+                              "a worker of its campaign's testbed; numbers of two testbeds are never compared.", right=True)
+    body = (f'<h2 class="sec">Workers {wk_help}</h2><section class="card" id="workers"></section>'
+            f'<h2 class="sec">Now <span class="k" id="conn"></span></h2><section class="card" id="active"></section>'
             f'<section class="card" id="bd" hidden><div class="card-h"><h2>Building <span id="bd-label"></span></h2><span id="bd-status"></span>{bd_help}</div>'
             '<p class="k" id="bd-cmd"></p><pre id="bd-tail"></pre></section>'
             f'<section class="card" id="tl" hidden><div class="card-h"><h2>Fork timeline</h2><span class="k" id="tl-name"></span>'

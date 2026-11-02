@@ -935,7 +935,9 @@ def progress_badge(prog, name):
   if not prog:
     return ""
   done, planned, left = prog
-  running = " · running" if campaign_active(name) else ""
+  live = campaign_active(name) and remote_live(name)
+  on = f" on {live['worker']}" if live and live.get("worker") else ""
+  running = f" · running{on}" if campaign_active(name) else ""
   if running and left is not None:
     running += f" · {eta_text(left)} left"
   cls = "done" if done >= planned else "running" if running else "partial"
@@ -1489,7 +1491,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   <script>{SUMMARY_JS}</script>
   <script>{branchview.JS}</script>
   <script>
-  const RUNNING = {json.dumps(running_json)}, LOADGATE = {json.dumps(loadgate_json)}, BUILD = {json.dumps(build_json)};
+  const TESTBED = {json.dumps(testbed.name())}, RUNNING = {json.dumps(running_json)}, LOADGATE = {json.dumps(loadgate_json)}, BUILD = {json.dumps(build_json)};
   const chips = [...document.querySelectorAll('.filterbar .chip')];
   chips.forEach(c => c.onclick = () => {{ c.classList.toggle('on'); apply(); }});
   document.getElementById('q').oninput = apply;
@@ -1596,7 +1598,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
     }}
     const since = running ? new Date(running.started * 1000).toLocaleTimeString([], {{hour: '2-digit', minute: '2-digit', second: '2-digit'}}) : '';
     status.innerHTML = !running ? '<span class="k">nothing running</span>'
-      : dir(running.cell) === sel.value ? `<span class="badge running">running since ${{since}}</span>`
+      : dir(running.cell) === sel.value ? `<span class="badge running" title="on this machine">running on ${{TESTBED}} since ${{since}}</span>`
       : `<a href="#" class="badge running" title="Show it">${{nameOf(running).replace(/[&<>]/g, c => ({{'&': '&amp;', '<': '&lt;', '>': '&gt;'}})[c])}} running</a>`;
     if (!sel.value) return;
     if (sel.value !== shown) {{ tl.reset(); shown = sel.value; }}

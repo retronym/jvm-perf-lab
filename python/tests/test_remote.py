@@ -207,6 +207,11 @@ class EndToEndTest(unittest.TestCase):
         # a cell is uploaded at a cell boundary, the job paused meanwhile: never while a later cell measures
         self.assertLess(log.index("uploaded c/base/1"), log.index("round 1 c tip2"))
         self.assertNotIn(self.whome, json.load(open(os.path.join(camp, "spec.json")))["jvmArgs"])  # the coordinator's own spec
+        # the queue page's Workers card: the worker, idle again, and this machine
+        st = server.status(self.srv)
+        w = next(w for w in st["workers"] if w["name"] == "w1")
+        self.assertEqual((w["testbed"]["name"], w["job"], w["live"]), ("sim", None, None))
+        self.assertEqual(st["machine"]["name"], st["testbed"])
         # again: the worker resumes from the coordinator's cells, and has nothing to run
         j2 = server.submit_local(self.srv, {"argv": ["ab", "run", "campaigns/rw.json"], "cwd": self.lab})
         r = self.work()
