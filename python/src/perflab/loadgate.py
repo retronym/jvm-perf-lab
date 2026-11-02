@@ -1,5 +1,6 @@
 """Competing load on the machine: CPU used by processes other than the benchmark's own (a given root process and
-its descendants: the sbt server, JMH's launcher and forks, xctrace), measured as the change in cumulative CPU time.
+its descendants: the sbt server, JMH's launcher and forks; and the profilers working for it, xctrace and the kperf
+helper, which are not its descendants), measured as the change in cumulative CPU time.
 
   perflab loadgate wait   <root-pid> [max-cores=1.5] [quiet-secs=60]   blocks until other load stays under max-cores
   perflab loadgate sample <root-pid> <out.tsv> [secs=5]                 appends "epoch<TAB>cores<TAB>top<TAB>secs<TAB>state" every secs
@@ -40,6 +41,11 @@ def cputimes():
         procs[pid] = (ppid, secs, comm.rsplit("/", 1)[-1])
     return procs
 
+# profilers that serve the benchmark but are not its descendants: their CPU is the profile's, alike for every variant,
+# not competing load (the kperf helper, run by root or launchd, takes about 2 cores while a session starts)
+PROFILERS = {"xctrace", "asprof-kperf"}
+
+
 def ours(procs, root):
     # the parent is launchd (pid 1) once a detaching shell has exited: everything would count as ours
     keep = {root, *(p for p in (subprocess.os.getpid(), subprocess.os.getppid()) if p > 1)}
@@ -47,7 +53,7 @@ def ours(procs, root):
     while changed:
         changed = False
         for pid, (ppid, _, comm) in procs.items():
-            if pid not in keep and (ppid in keep or comm == "xctrace"):
+            if pid not in keep and (ppid in keep or comm in PROFILERS):
                 keep.add(pid)
                 changed = True
     return keep

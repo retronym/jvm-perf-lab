@@ -5,6 +5,15 @@ os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab 
 from perflab import ab, api, loadgate  # noqa: E402
 
 
+class OursTest(unittest.TestCase):
+    def test_the_profilers_serving_the_benchmark_are_not_other_load(self):
+        procs = {1: (0, 0, "launchd"), 10: (1, 5, "sbt"), 11: (10, 9, "java"), 20: (1, 2, "asprof-kperf"),
+                 30: (1, 1, "xctrace"), 40: (1, 3, "WindowServer")}
+        mine = loadgate.ours(procs, 10)
+        self.assertTrue({10, 11, 20, 30} <= mine)
+        self.assertNotIn(40, mine)
+
+
 class LoadCheckTest(unittest.TestCase):
     """The case that motivated it (perfint-branch, tastyQuery/708df2535c): a burst of 1.6 cores in a cell whose mean was
     0.9, over the two measurement iterations that came out 9% slow."""
