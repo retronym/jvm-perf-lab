@@ -481,6 +481,12 @@ def public(job):
     return {k: v for k, v in job.items() if k != "env"} | {"envKeys": sorted(job.get("env") or {}), "campaign": campaign_of(job)}
 
 
+def spec_of(job):
+    """The spec file a job's command names (its first .json argument, in its directory); None if none."""
+    a = next((a for a in job.get("argv") or () if a.endswith(".json")), None)
+    return os.path.join(job.get("cwd") or "", a) if a else None
+
+
 def campaign_of(job):
     """The name of the campaign a job's command runs (`ab run <spec>`, `trees <spec>`, `branch profile <spec>`...): the
     "name" of the first spec file among its arguments, or None."""
@@ -979,13 +985,17 @@ class Server:
                         return self._send(200, server.q.projects())
                     if p == "/api/storage":
                         return self._send(200, {"entries": server.storage_entries(), "projects": server.q.projects()})
-                    m = re.fullmatch(r"/api/jobs/(\d+)(/transcript)?", p)
+                    m = re.fullmatch(r"/api/jobs/(\d+)(/transcript|/card)?", p)
                     if m:
                         j = server.q.get(m.group(1))
                         if j is None:
                             return self._error(404, "no such job")
                         if not m.group(2):
                             return self._send(200, public(j))
+                        if m.group(2) == "/card":  # what its campaign's spec says, for the index's card before its cells
+                            from . import index
+                            f = spec_of(j)
+                            return self._send(200, {"html": index.queued_card(f) if f else ""})
                         f = os.path.join(j["dir"], "output.log") if qs.get("file") == "output" else j["transcript"]
                         try:
                             offset = int(qs["offset"]) if "offset" in qs else None

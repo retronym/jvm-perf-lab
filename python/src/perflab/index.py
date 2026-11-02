@@ -7,7 +7,7 @@ each cell, `perflab run` at its start and end, and the page refreshes itself.
 
   perflab index [<campaigns-dir> [<runs-dir>]]
 """
-import collections, glob, html, json, math, os, re, sys, time
+import collections, glob, html, json, math, os, re, subprocess, sys, time
 
 from . import ab, branchview, config, jmh, kperf, loadgate, metrics, regraph, runinfo, specs, testbed, timeline, ui
 
@@ -736,13 +736,15 @@ def md_text(v):
     return "\n".join(v) if isinstance(v, list) else (v or "")
 
 
-def variants_panel(spec_dir):
+def variants_panel(spec_dir, s=None):
     """The campaign's "description" and, per variant, its "variantDescriptions" entry beside what the variant is: the
-    checkout (`perflab trees`), JVM flags, JMH arguments or paired options. Nothing when the spec has neither."""
-    try:
-        s = json.load(open(os.path.join(spec_dir, "spec.json")))
-    except (OSError, ValueError):
-        return ""
+    checkout (`perflab trees`), JVM flags, JMH arguments or paired options. Nothing when the spec has neither. From
+    `s`, a spec not yet run, instead of the campaign's spec.json."""
+    if s is None:
+        try:
+            s = json.load(open(os.path.join(spec_dir, "spec.json")))
+        except (OSError, ValueError):
+            return ""
     descs = s.get("variantDescriptions") or {}
     capture = (f'<p class="k"><b>asm capture, not for timing</b>: its forks print the machine code of '
                f'{", ".join(f"<code>{esc(m)}</code>" for m in s["asm"])} (perflab asm), which slows them'
@@ -760,6 +762,41 @@ def variants_panel(spec_dir):
         rows.append(f'<tr><th>{esc(v)}</th><td>{md(md_text(descs.get(v)))}</td><td class="k">{"<br>".join(what)}</td></tr>')
     return (f'<div class="about">{capture}{md(md_text(s.get("description")))}'
             + (f'<table class="variants">{"".join(rows)}</table>' if rows else "") + "</div>")
+
+
+def queued_card(spec_file):
+    """The body of the card of a campaign on the server's queue that has no cells yet (the index draws it from the
+    queue): what its spec says it will run, so a reader need not open the spec. "" if the spec cannot be read."""
+    try:
+        s = json.load(open(spec_file))
+    except (OSError, ValueError):
+        return ""
+    base = os.path.dirname(os.path.abspath(spec_file))
+    names = list(s.get("paired") or s.get("variants") or s.get("builds") or {})
+    corpora, rounds = s.get("corpora") or {}, int(s.get("rounds") or 1)
+    jvm = s.get("jvm")
+    facts = [f"testbed {esc(s['testbed'])}" if s.get("testbed") else "",
+             f"{len(names)} variant{'s' if len(names) != 1 else ''} × {len(corpora)} corp{'ora' if len(corpora) != 1 else 'us'}"
+             f" × {rounds} round{'s' if rounds != 1 else ''} = {len(names) * len(corpora) * rounds} cells",
+             f"profile {esc(s.get('profile') or 'none')}" + (" (paired)" if s.get("paired") else ""),
+             f'JDK <span title="{esc(jvm)}">{esc(os.path.basename(os.path.dirname(os.path.dirname(jvm))))}</span>' if jvm else "",
+             f"load gate {s['loadgate'].get('maxCores')} cores" if isinstance(s.get("loadgate"), dict) else ""]
+    builds = []
+    for v, b in (s.get("builds") or {}).items():
+        co = os.path.join(base, b.get("checkout") or "") if isinstance(b, dict) and b.get("checkout") else None
+        sha = None
+        if co and os.path.isdir(co):
+            try:
+                sha = subprocess.run(["git", "-C", co, "rev-parse", "--short=10", "HEAD"], capture_output=True, text=True, timeout=5).stdout.strip()
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+        builds.append(f'<tr><th>{esc(v)}</th><td><code title="{esc(co or "")}">{esc(os.path.basename(os.path.normpath(co)) if co else "?")}</code>'
+                      f'{f" @ <code>{esc(sha)}</code>" if sha else ""}</td></tr>')
+    rows = "".join(f'<tr><th>{esc(c)}</th><td><code>{esc(a)}</code></td></tr>' for c, a in corpora.items())
+    return (f'<p class="facts">{" · ".join(f for f in facts if f)}</p>' + variants_panel(None, s)
+            + (f'<table class="variants"><tr><td colspan="2" class="k">builds</td></tr>{"".join(builds)}</table>' if builds else "")
+            + (f'<table class="variants"><tr><td colspan="2" class="k">corpora (JMH arguments)</td></tr>{rows}</table>' if rows else "")
+            + (f'<details><summary class="k">JVM arguments</summary><code>{esc(s["jvmArgs"])}</code></details>' if s.get("jvmArgs") else ""))
 
 
 def notes(path):
@@ -1678,6 +1715,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
     JOBS = jobs.filter(j => j.project === SRV[1] && j.campaign).sort((a, b) => b.id - a.id);
     jobsOnCards();
   }}
+  const CARDS = new Map();  // job id -> its spec's card body (/api/jobs/<id>/card)
   function jobsOnCards() {{
     document.querySelectorAll('.card-h .jobs, section.card.queued').forEach(e => e.remove());
     const by = new Map();
@@ -1688,8 +1726,11 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       if (!card && js.some(j => j.state === 'queued' || j.state === 'running' || j.state === 'paused')) {{
         card = document.createElement('section');
         card.className = 'card campaign queued'; card.id = 'c-' + name;
+        // what its spec says it will run, from the server (once per job)
+        const act = js.find(j => j.state === 'queued' || j.state === 'running' || j.state === 'paused');
+        if (!CARDS.has(act.id)) {{ CARDS.set(act.id, ''); fetch(`/api/jobs/${{act.id}}/card`).then(r => r.ok ? r.json() : null).then(c => {{ if (c && c.html) {{ CARDS.set(act.id, c.html); jobsOnCards(); }} }}).catch(() => {{}}); }}
         card.innerHTML = `<div class="card-h"><span class="kind">campaign</span><h2>${{escH(name)}}</h2></div>`
-          + '<p class="k">On the perflab server\\'s queue: its cells show here once it starts.</p>';
+          + '<p class="k">On the perflab server\\'s queue: its cells show here once it starts.</p>' + CARDS.get(act.id);
         document.getElementById('campaigns').after(card);
       }}
       const h = card && card.querySelector('.card-h h2');
