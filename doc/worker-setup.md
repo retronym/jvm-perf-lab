@@ -22,7 +22,7 @@ A worker runs the campaigns of its testbed that are queued on a coordinator (the
    ```
    A JDK that SDKMAN does not have (a patched build) is copied over and mapped in `[jdks]` of `~/.perflab/worker/worker.toml` (below). Set `JAVA_HOME` for the build tool (sbt) in the environment the worker runs in, as on the coordinator.
 
-3. **Build tools** the lab's `[build] launch` uses: for the scala3 lab, sbt (and Coursier's cache fills on the first build). Environment variables the lab reads beyond what the spec sets (the scala3 lab's `SCALA3_BENCHMARKS`) are taken from the worker's environment.
+3. **Build tools** the lab's `[build] launch` uses: for the scala3 lab, sbt (and Coursier's cache fills on the first build). Environment variables the lab reads beyond what the spec sets come from the worker's environment, or `[env]` in worker.toml. The scala3 lab's corpora (`scalaz`, `dottyUtil`, ...) are in a lampepfl/scala3-benchmarks checkout, by default beside the compiler checkout, which on a worker is a worktree of its own: clone one at the coordinator's commit and name it in `[env]` (`SCALA3_BENCHMARKS = "~/.perflab/worker/scala3-benchmarks"`). A spec's `-Dcompilerlab.corpus.<name>=<dir>` corpora are copied from the coordinator instead.
 
 4. **Inputs.** A path in a spec's `jvmArgs`, `lib` or JMH arguments (a corpus, jars in Coursier's cache) is mapped from the coordinator's repository and home to the worker's. When the worker does not have it, it copies it from the coordinator (only paths the job's spec names, under the coordinator's home), to the mapped place. So a corpus made by hand on the coordinator (`labs/scala3/out/corpora/...`) needs nothing here; it is copied once into the harness worktree, which keeps it.
 

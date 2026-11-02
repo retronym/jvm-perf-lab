@@ -26,6 +26,8 @@ jobs/<id>/. Settings in <home>/worker.toml, every one optional, the command line
   "/Users/me/jdks/jdk26-patched/bin/java" = "/Users/me/jdk26/bin/java"
   [paths]                                  # a coordinator's path prefix -> this machine's
   "/Users/me/code/corpora" = "/Users/me/corpora"
+  [env]                                    # variables for every job: what a lab reads beyond its spec
+  SCALA3_BENCHMARKS = "~/.perflab/worker/scala3-benchmarks"
 """
 import argparse, glob, io, json, os, re, shutil, signal, socket, subprocess, sys, tarfile, tempfile, threading, time, tomllib
 import urllib.error, urllib.parse, urllib.request
@@ -529,6 +531,7 @@ class Job:
                     testbed.ENV: self.w.testbed, "PYTHONUNBUFFERED": "1",
                     # a perflab server of this machine's own is not the coordinator: the job never registers with it
                     "PERFLAB_SERVER_HOME": os.path.join(self.w.home, "server")})
+        env.update({k: os.path.expanduser(str(v)) for k, v in (self.w.cfg.get("env") or {}).items()})
         if self.java_home:
             env["JAVA_HOME"] = self.java_home
             env["PATH"] = os.pathsep.join([os.path.join(self.java_home, "bin"), env.get("PATH", "")])
