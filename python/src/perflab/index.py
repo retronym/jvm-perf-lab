@@ -1614,7 +1614,12 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       if (code(doc) && code(doc) !== code(document)) {{ location.reload(); return; }}
       // keep what the reader opened
       const open = new Map([...document.querySelectorAll('#live details[id]')].map(d => [d.id, d.open]));
+      // and where a wide table was scrolled to, by the card it is in and its place among that card's scrollers
+      const scrollers = root => [...root.querySelectorAll('section.card[id]')].flatMap(c => [...c.querySelectorAll('*')]
+        .filter(e => /auto|scroll/.test(getComputedStyle(e).overflowX)).map((e, n) => ({{e, key: c.id + '#' + n}})));
+      const scrolled = new Map(scrollers(document.getElementById('live')).filter(s => s.e.scrollLeft).map(s => [s.key, s.e.scrollLeft]));
       document.getElementById('live').innerHTML = doc.getElementById('live').innerHTML;
+      for (const s of scrollers(document.getElementById('live'))) if (scrolled.has(s.key)) s.e.scrollLeft = scrolled.get(s.key);
       for (const [id, o] of open) {{ const d = document.getElementById(id); if (d) d.open = o; }}
       const keep = sel.value;
       sel.innerHTML = doc.getElementById('tl-cell').innerHTML;
