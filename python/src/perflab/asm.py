@@ -889,7 +889,10 @@ def _main(x):
             f.write("\n")
         print(f"wrote {dest}")
         argv = [sys.executable, "-m", "perflab", "ab", "run", dest] + (["--local"] if x.local else []) + (["--dry-run"] if x.dry_run else [])
-        return subprocess.call(argv)
+        env = dict(os.environ)
+        if not x.local:  # the cli runs this command in the foreground; its `ab run` goes to the server's queue as typed would
+            env.pop("PERFLAB_LOCAL", None)
+        return subprocess.call(argv, env=env)
     d = campaign_dir(x.campaign)
     if x.cmd == "list":
         for co, v, r, cell in cells_of(d, x.corpus, x.variant, x.round):
