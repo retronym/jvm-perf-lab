@@ -337,6 +337,7 @@
    "b": "x/b/1"
   },
   "hotFrom": null,
+  "testbed": "m5-pro",
   "methods": [
    {
     "groups": [
@@ -1087,8 +1088,8 @@
     "planned": 8
    },
    "status": "partial",
-   "updated": 1793599717.2922034,
-   "updatedIso": "2026-11-02T16:08:37",
+   "updated": 1793612943.372287,
+   "updatedIso": "2026-11-02T19:49:03",
    "bytes": null,
    "profileOf": null,
    "testbed": "m5-pro",
@@ -1450,8 +1451,8 @@
      "planned": 2
     },
     "status": "finished",
-    "updated": 1793599717.3044033,
-    "updatedIso": "2026-11-02T16:08:37",
+    "updated": 1793612943.3867598,
+    "updatedIso": "2026-11-02T19:49:03",
     "bytes": null,
     "profileOf": null,
     "testbed": "m5-pro",
@@ -1485,8 +1486,8 @@
      "planned": 8
     },
     "status": "partial",
-    "updated": 1793599717.2922034,
-    "updatedIso": "2026-11-02T16:08:37",
+    "updated": 1793612943.372287,
+    "updatedIso": "2026-11-02T19:49:03",
     "bytes": null,
     "profileOf": null,
     "testbed": "m5-pro",
@@ -1507,7 +1508,7 @@
    "score": 10.15,
    "error": 0.1,
    "unit": "ms/op",
-   "finished": 1793599717.288421,
+   "finished": 1793612943.3682613,
    "why": null,
    "voidId": null,
    "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1",
@@ -1710,7 +1711,7 @@
     "score": 10.1,
     "error": 0.1,
     "unit": "ms/op",
-    "finished": 1793599717.2819474,
+    "finished": 1793612943.3615358,
     "why": null,
     "voidId": null,
     "path": "/Users/me/lab/out/perflab/ab/br/a/aaaaaaaaaa/1",
@@ -1725,7 +1726,7 @@
     "score": 10.0,
     "error": 0.1,
     "unit": "ms/op",
-    "finished": 1793599717.282465,
+    "finished": 1793612943.3622677,
     "why": null,
     "voidId": null,
     "path": "/Users/me/lab/out/perflab/ab/br/a/bbbbbbbbbb/1",
@@ -1979,13 +1980,13 @@
   "schema": "Forgotten",
   "version": 1,
   "project": {
-   "id": "tmpinp8crfu-445dba",
-   "name": "tmpinp8crfu",
+   "id": "tmp4fqp821v-5d5b9d",
+   "name": "tmp4fqp821v",
    "root": "/tmp/perflab-server",
    "campaigns": "/tmp/perflab-server/out/perflab/ab",
    "runs": "/tmp/perflab-server/out/perflab/runs",
    "registered": true,
-   "index": "/p/tmpinp8crfu-445dba/ab/index.html"
+   "index": "/p/tmp4fqp821v-5d5b9d/ab/index.html"
   }
  },
  "Jit": {
@@ -2279,8 +2280,8 @@
    "module": "perflab_fakejob",
    "state": "queued",
    "priority": 0,
-   "seq": 1793599717.4056342,
-   "created": 1793599717.4056342,
+   "seq": 1793612943.4931252,
+   "created": 1793612943.4931252,
    "started": null,
    "ended": null,
    "rc": null,
@@ -2318,8 +2319,8 @@
     "module": "perflab_fakejob",
     "state": "queued",
     "priority": 0,
-    "seq": 1793599717.4056342,
-    "created": 1793599717.4056342,
+    "seq": 1793612943.4931252,
+    "created": 1793612943.4931252,
     "started": null,
     "ended": null,
     "rc": null,
@@ -2456,8 +2457,8 @@
    "module": "perflab_fakejob",
    "state": "queued",
    "priority": 0,
-   "seq": 1793599717.4056342,
-   "created": 1793599717.4056342,
+   "seq": 1793612943.4931252,
+   "created": 1793612943.4931252,
    "started": null,
    "ended": null,
    "rc": null,
@@ -2502,27 +2503,27 @@
    "score": 8.2,
    "error": 0.1,
    "unit": "ms/op",
-   "finished": 1793599717.2835221,
+   "finished": 1793612943.363293,
    "why": null,
    "voidId": null,
    "path": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2",
    "url": "/p/lab-3f2a1c/ab/br/a/eeeeeeeeee/2",
    "timeline": null
   },
-  "from": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261102-160837"
+  "from": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261102-194903"
  },
  "Voided": {
   "schema": "Voided",
   "version": 1,
   "campaign": "br",
   "void": {
-   "id": "a/eeeeeeeeee/2-20261102-160837",
+   "id": "a/eeeeeeeeee/2-20261102-194903",
    "corpus": "a",
    "variant": "eeeeeeeeee",
    "round": 2,
    "reason": "other load up to 2.1 cores over iterations 3, 4",
-   "voided": 1793599717.399612,
-   "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261102-160837",
+   "voided": 1793612943.487405,
+   "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261102-194903",
    "restorable": true
   },
   "from": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2"
@@ -2533,13 +2534,13 @@
   "campaign": "br",
   "voids": [
    {
-    "id": "a/eeeeeeeeee/2-20261102-160837",
+    "id": "a/eeeeeeeeee/2-20261102-194903",
     "corpus": "a",
     "variant": "eeeeeeeeee",
     "round": 2,
     "reason": "other load up to 2.1 cores over iterations 3, 4",
-    "voided": 1793599717.399612,
-    "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261102-160837",
+    "voided": 1793612943.487405,
+    "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261102-194903",
     "restorable": true
    }
   ]

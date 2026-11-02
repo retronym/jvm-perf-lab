@@ -128,6 +128,7 @@ class AsmTest(unittest.TestCase):
         self.assertNotIn("profile", s)
         self.assertNotIn("loadgate", s)
         self.assertEqual(s["builds"], {"a": {"checkout": "../a"}, "b": {"checkout": "../b"}})
+        self.assertEqual(asm.capture_spec(parent, ["a.B::f"], on="m5")["testbed"], "m5")
 
     def test_refuse_timing(self):
         timed = os.path.join(self.camps, "t", "x", "a", "1")

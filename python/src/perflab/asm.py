@@ -29,7 +29,7 @@ polls per group, and shades the groups by their share of the samples of an async
 """
 import argparse, collections, difflib, glob, gzip, html, json, os, re, shlex, subprocess, sys
 
-from . import config
+from . import config, testbed
 
 esc = html.escape
 INDEX = "index.json"  # in <cell>/asm
@@ -698,7 +698,8 @@ def diff(campaign, a, b, method, corpus=None, rnd=None, compile_id_a=None, compi
     if not pairs:
         raise LookupError(f"{method}: no overload in both ({sorted(sa)} vs {sorted(sb)}); give its signature")
     out = {"campaign": os.path.basename(d), "a": a, "b": b, "method": method, "corpus": ca[0],
-           "cells": {"a": os.path.relpath(ca[3], d), "b": os.path.relpath(cb[3], d)}, "hotFrom": None, "methods": []}
+           "cells": {"a": os.path.relpath(ca[3], d), "b": os.path.relpath(cb[3], d)}, "hotFrom": None,
+           "testbed": testbed.of_cell(ca[3]) or testbed.of_campaign(d), "methods": []}
     for (m, sig), xa, xb in pairs:
         code_a, code_b = code_of(ca[3], xa), code_of(cb[3], xb)
         ha = hb = None
@@ -712,9 +713,10 @@ def diff(campaign, a, b, method, corpus=None, rnd=None, compile_id_a=None, compi
                     save_hot(cell, m, h, pa if cell == ca[3] else pb)
             ha = shade(ha, keys_a) if ha is not None else None
             hb = shade(hb, keys_b) if hb is not None else None
-            if pa or pb:
+            if ha is not None or hb is not None:
                 out["hotFrom"] = {"a": [os.path.relpath(c, os.path.dirname(d)) for c in pa],
-                                  "b": [os.path.relpath(c, os.path.dirname(d)) for c in pb]}
+                                  "b": [os.path.relpath(c, os.path.dirname(d)) for c in pb],
+                                  "testbed": next((testbed.of_cell(c) for c in pa + pb if testbed.of_cell(c)), None)}
         unplaced = {"a": ha.pop(None, 0.0) if ha is not None else None, "b": hb.pop(None, 0.0) if hb is not None else None}
         r = compare(code_a, code_b, ha, hb)
         if ha is not None or hb is not None:
@@ -779,12 +781,14 @@ def page(out, d):
     A, B = out["a"], out["b"]
     parts = [f"<p class=muted>asm capture <b>{esc(out['campaign'])}</b>, {esc(out['corpus'])}: "
              f"<code>{esc(out['cells']['a'])}</code> vs <code>{esc(out['cells']['b'])}</code>. Printed code from a fork "
-             f"run with <code>CompileCommand=print</code>, not a timed one. Groups are the debug info's inlining path "
+             f"run with <code>CompileCommand=print</code>, not a timed one, on testbed <b>{esc(out.get('testbed') or '?')}</b>. Groups are the debug info's inlining path "
              f"(method:line, outermost first); instructions are normalised (addresses, branch targets as block labels).</p>"]
     hf = out.get("hotFrom")
     if hf and (hf["a"] or hf["b"]):
         parts.append(f"<p class=muted>Heat: share of the compiled unit's cycles by source group, from the async profiles of "
-                     f"{esc(', '.join(hf['a'] + hf['b']))}.</p>")
+                     f"{esc(', '.join(hf['a'] + hf['b']))}"
+                     + (f" on testbed <b>{esc(hf['testbed'])}</b>: another machine's code can differ, so the heat of a group "
+                        f"that differs is approximate" if hf.get("testbed") and hf["testbed"] != out.get("testbed") else "") + ".</p>")
     for r in out["methods"]:
         ta, tb = r["totals"]["a"]["main"], r["totals"]["b"]["main"]
         oa, ob = r["totals"]["a"]["outOfLine"], r["totals"]["b"]["outOfLine"]
@@ -934,15 +938,25 @@ def write_cell_page(cell):
                         f'{t["spill"]} spills, {t["fill"]} fills, {t["call"]} calls, {code["blocks"]} blocks{note}</summary>{body}</details>')
     head = "".join(f"<th>{h}</th>" for h in ("method", "compile", "compiler", "tier", "bytecode", "insns", "spills", "fills", "calls", ""))
     title = f"asm {camp} · {co}/{v}/{r}"
+    tb = _cell_testbed(cell)
     html_ = (f"{ui.HEAD}<title>{esc(title)}</title>{ui.style(ui.BASE, CSS, CELL_CSS)}\n{ui.masthead(title, ui.home_from(os.path.join(cell, 'asm')), slim=True)}"
              f"<main><p class=muted>The machine code this fork compiled for the capture's methods (CompileCommand=print, "
-             f"not a timed fork). Counts are of the main code, from the verified entry. The default compilation of each "
+             f"not a timed fork){tb}. Counts are of the main code, from the verified entry. The default compilation of each "
              f"method is its last top-tier, non-OSR one, the one <code>perflab asm diff</code> compares; groups are its "
              f"debug info's inlining path (method:line, outermost first); heat appears once <code>asm diff</code> has read the "
              f"parent campaign's profile.</p><table class=t>{head}{''.join(rows)}</table>{''.join(secs)}</main>{ui.footer()}")
     with open(page_path(cell), "w") as f:
         f.write(html_)
     return page_path(cell)
+
+
+def _cell_testbed(cell):
+    """ ", on testbed <name> (<cpu>)" for the cell page, or ""."""
+    try:
+        t = json.load(open(os.path.join(cell, testbed.CELL_FILE)))
+    except (OSError, ValueError):
+        return ""
+    return f", on testbed <b>{esc(t.get('name') or '?')}</b>" + (f" ({esc(t['cpu'])})" if t.get("cpu") else "")
 
 
 CELL_CSS = """
@@ -972,8 +986,9 @@ def _iterations(args, n):
     return shlex.join(["-f", "1", "-i", str(n), *out])
 
 
-def capture_spec(parent_path, methods, name=None, iterations=2, corpora=None):
-    """The spec of an asm capture of the campaign whose spec is at `parent_path`."""
+def capture_spec(parent_path, methods, name=None, iterations=2, corpora=None, on=None):
+    """The spec of an asm capture of the campaign whose spec is at `parent_path`, on the parent's testbed or `on`: a
+    capture's scores are not timings, so any machine with the builds' JVM (and hsdis) can print its code."""
     s = json.load(open(parent_path))
     if s.get("branch") or s.get("paired") or s.get("profileOf"):
         sys.exit("perflab asm capture: a branch, paired or profile campaign is not supported yet; write the spec by hand")
@@ -983,6 +998,8 @@ def capture_spec(parent_path, methods, name=None, iterations=2, corpora=None):
     out["asmOf"] = s["name"]
     out["asm"] = list(methods)
     out["rounds"] = 1
+    if on:
+        out["testbed"] = on
     out["corpora"] = {c: _iterations(a, iterations) for c, a in s["corpora"].items() if not corpora or c in corpora}
     if not out["corpora"]:
         sys.exit(f"perflab asm capture: {s['name']} has no corpus {', '.join(corpora)} (it has {', '.join(s['corpora'])})")
@@ -1000,7 +1017,8 @@ def main(argv):
     c.add_argument("--name")
     c.add_argument("--iterations", type=int, default=2)
     c.add_argument("--corpus", action="append", help="only this corpus of the campaign's (repeatable; default all)")
-    c.add_argument("--local", action="store_true")
+    c.add_argument("--testbed", help="the testbed to capture on (default the parent's; with --local, this machine's)")
+    c.add_argument("--local", action="store_true", help="run it here, on this machine's testbed, not on the server's queue")
     c.add_argument("--dry-run", action="store_true")
     l = sub.add_parser("list")
     l.add_argument("campaign")
@@ -1033,7 +1051,8 @@ def _main(x):
     if x.cmd == "capture":
         d = campaign_dir(x.campaign)
         parent = x.campaign if x.campaign.endswith(".json") else os.path.join(d, "spec.json")
-        spec = capture_spec(parent, x.method, x.name, x.iterations, x.corpus)
+        on = x.testbed or (testbed.name() if x.local else None)
+        spec = capture_spec(parent, x.method, x.name, x.iterations, x.corpus, on)
         dest = os.path.join(os.path.dirname(os.path.abspath(parent)) if not ab_is_copy(parent) else _source_dir(d), spec["name"] + ".json")
         with open(dest, "w") as f:
             json.dump(spec, f, indent=2)

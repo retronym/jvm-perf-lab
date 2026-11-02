@@ -357,7 +357,9 @@ define("AsmDiffMethod", "One method (overload) compared", {
 define("AsmDiff", "Two variants' machine code of a method, by source position", {
     "campaign": S("The asm capture"), "a": S("Variant a"), "b": S("Variant b"), "method": S("As asked"), "corpus": S("The corpus"),
     "cells": O("The cells", {"a": S("a's, corpus/variant/round"), "b": S("b's")}),
-    "hotFrom": null(O("The parent's async cells the heat is from", {"a": A(S("cell"), "a's"), "b": A(S("cell"), "b's")})),
+    "hotFrom": null(O("The parent's async cells the heat is from", {"a": A(S("cell"), "a's"), "b": A(S("cell"), "b's"),
+                                                                   "testbed": null(S("The testbed they ran on"))})),
+    "testbed": null(S("The testbed the capture ran on (machine code can differ between CPUs)")),
     "methods": A(ref("AsmDiffMethod"), "Per overload in both"), "page": URL}, top=True)
 define("JitChange", "A decision of one method's last C2 compile that differs between two variants", {
     "caller": S("The caller"), "callee": S("The callee"),
@@ -1622,8 +1624,8 @@ def asm_code(campaign, variant, method, project=None, corpus=None, round=None, c
           hot=B("Shade by the parent campaign's async profile (default true; reading it takes seconds)"))
 def asm_diff(campaign, a, b, method, project=None, corpus=None, round=None, compileIdA=None, compileIdB=None, code=False, hot=True):
     """Each compilation's instructions are grouped by their debug info's inlining path of (method, line), so that two
-    builds align on source; lambda numbers are ignored, and where a build's source moved (a path has no line in both),
-    a path's groups pair in source order. Per group: counts in both (instructions, loads, stores, spills, fills,
+    builds align on source; lambda numbers are ignored, and where a build's source moved, each method's lines are
+    shifted by the offset that lines up the most instructions. Per group: counts in both (instructions, loads, stores, spills, fills,
     calls, branches, polls) and difflib over normalised instructions. With a parent campaign ("asmOf") that has
     async profiles, hotA/hotB are each group's share of the unit's samples by the same key, from the timed forks.
     Also writes <campaign>/asm-diff-<method>-<a>-<b>.html, linked from the card (`page`)."""
