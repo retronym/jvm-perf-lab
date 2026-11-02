@@ -52,7 +52,13 @@ The fixed layout makes the transfer a copy. Uploads never overlap a measurement:
 
 Before the job, the worker downloads the campaign's finished cells of its testbed that it does not have (`result.json` and what the summaries read), so `ab run` resumes from the same state as the coordinator's index.
 
-### 6. The network: an SSH tunnel by default
+### 6. A remote job is watched live through a mirror on the heartbeat
+
+While a local job runs, the index and the queue page poll its files: `<campaigns>/running.json` (the cell being run), the cell's files that the fork timeline reads (`iterations.tsv`, `gc.log`, `load.tsv`, ...), `loadgate.json` and `build.json`. A remote job's are on its worker. Its heartbeat carries them: each beat, what was appended to the running cell's files since the last one, and the small JSON files whole when they changed, written by the coordinator into `<campaigns>/.live/<worker>/` at the paths they have on the worker. The pages read a remote job from that base as a local one from its own, and say which machine it is on.
+
+It costs little: the running cell's files grow by about 25 KB in a 4-minute cell, plus a burst under 200 KB at a fork's end, against the transcript the heartbeat carried already. A beat carries at most 256 KB, so that a large file never delays the lease's renewal. A file that was replaced (the next fork's `gc.log`) is sent again; a coordinator that lost the mirror says so and is sent it from the start. The view lags the worker by up to a heartbeat (10 s). The mirror is never the results: those still come as cells (§5), and the mirror is removed when the job ends or its lease runs out.
+
+### 7. The network: an SSH tunnel by default
 
 The server listens on 127.0.0.1 only. The simplest secure link from the laptop is `ssh -R 8690:127.0.0.1:8690 <laptop>` run on the coordinator (the laptop needs no access to the coordinator, which may not accept SSH). Workers authenticate with the server's token (`--token-file`), on every request including downloads, which carry source. The worker endpoints accept any `Host` with the token, so a tunnel to another local port works too.
 

@@ -73,7 +73,7 @@ compares the work, not the op. The index's summary toggles between per unit and 
 """
 import atexit, glob, json, os, re, shlex, shutil, subprocess, sys, time
 
-from . import branch, config, jmh, kperf, launch, loadgate, metrics, specs, testbed, transcript
+from . import branch, config, jmh, kperf, launch, loadgate, metrics, specs, testbed, timeline, transcript
 
 JMH_LOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "jmh.lock")
 MAX_ATTEMPTS = 10
@@ -194,7 +194,8 @@ class Spec:
         """Writes the cell's arguments file and returns the build command that runs it."""
         extra = []
         if self.gc_log:
-            extra.append(f"-Xlog:gc:file={dest}/gc.log:time,uptime")
+            # each fork's JVM moves the last one's log aside (gc.log.0, .1, ...), up to GC_LOGS of them
+            extra.append(f"-Xlog:gc:file={dest}/gc.log:time,uptime:filecount={timeline.GC_LOGS}")
         # the fork appends its iterations to <dest>/iterations.tsv as they finish (PairedProfiler)
         extra.append(f"-Dperflab.cell={dest}")
         if self.jit_recording:

@@ -61,7 +61,7 @@ benchmark wrote cannot read the index (and its token) or call the API.
 import argparse, fcntl, functools, hashlib, json, os, re, secrets, signal, socket, sqlite3, subprocess, sys, threading, time, traceback
 import http.server, urllib.error, urllib.parse, urllib.request
 
-from . import config, control, httpd, storage, transcript
+from . import config, control, httpd, mirror, storage, transcript
 
 DEFAULT_PORT = 8690
 HOME_ENV, PORT_ENV, GRACE_ENV = "PERFLAB_SERVER_HOME", "PERFLAB_SERVER_PORT", "PERFLAB_SERVER_GRACE"
@@ -350,11 +350,11 @@ class Queue:
             for j in self.running():
                 if j.get("worker") and (j.get("lease") or 0) < now:
                     if j["cancel_requested"]:
-                        out.append(self.transition(j["id"], "cancelled", lease=None))
+                        out.append({**self.transition(j["id"], "cancelled", lease=None), "lostWorker": j["worker"]})
                         continue
                     note = f"{j['worker']} stopped answering at {time.strftime('%H:%M:%S', time.localtime(j.get('lease') or now))}; queued again"
                     # queued again, which only a lease that ran out does to a job that has run (not a transition)
-                    out.append(self.update(j["id"], state="queued", worker=None, lease=None, started=None, note=note))
+                    out.append({**self.update(j["id"], state="queued", worker=None, lease=None, started=None, note=note), "lostWorker": j["worker"]})
         return out
 
     def running(self):
@@ -573,6 +573,7 @@ class Worker(threading.Thread):
                 self.start_concurrent()
                 for j in self.q.expire():
                     print(f"perflab server: job {j['id']}: {j.get('note') or j['state']}", flush=True)
+                    remote_over(self.q.project(j["project"]), j, j["lostWorker"])
             except Exception:
                 traceback.print_exc()
             self.stopping.wait(0.5)
@@ -1142,14 +1143,16 @@ class Server:
                             f.write(body["transcript"])
                     if op == "heartbeat":
                         j = server.q.heartbeat(jid, worker, bool(body.get("paused")))
-                        _live(server.q.project(j["project"]), j, body.get("live"))
+                        project = server.q.project(j["project"])
+                        _live(project, j, body.get("live"))
+                        resync = mirror.apply(project["campaigns"], worker, jid, body["mirror"]) if project and isinstance(body.get("mirror"), list) else []
                         known = (server.workers.get(worker) or {}).get("testbed")  # else its claim's, until its next claim
                         server.seen(worker, job=jid, live=body.get("live"), paused=bool(body.get("paused")),
                                     testbed=known or {"name": j.get("testbed")})
-                        return self._send(200, {"state": j["state"], "control": j["control"]})
+                        return self._send(200, {"state": j["state"], "control": j["control"], "resync": resync})
                     if op == "finish":
                         j = server.q.finish(jid, worker, int(body.get("rc", 1)))
-                        _live(server.q.project(j["project"]), j, None)
+                        remote_over(server.q.project(j["project"]), j, worker)
                         for f in ("control", "control.ack"):
                             control.write(os.path.join(j["dir"], f), None)
                         server.seen(worker, job=None, live=None)
@@ -1195,6 +1198,8 @@ def claim_remote(server, worker, tb):
             server.q.transition(j["id"], "failed", note=str(e)[:500], worker=None, lease=None)
             continue
         transcript_note(j, f"[perflab] job {j['id']} claimed by {worker} (testbed {tb})")
+        if (project := server.q.project(j["project"])) and project.get("campaigns"):
+            mirror.clear(project["campaigns"], worker)  # a job of its before, that it never finished
         server.seen(worker, job=j["id"])
         return {"job": payload, "lease": LEASE}
 
@@ -1208,6 +1213,13 @@ def transcript_note(job, line):
 # the policy of every page under /p/ but the project's index: scripts run (flame graphs need them) in an opaque origin,
 # and links open, but nothing reads the server's pages
 SANDBOX = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads"
+
+
+def remote_over(project, job, worker):
+    """A remote job has ended on its worker, or left it: what the pages showed of it live goes."""
+    _live(project, job, None)
+    if project and project.get("campaigns"):
+        mirror.clear(project["campaigns"], worker)
 
 
 def _live(project, job, live):

@@ -45,9 +45,10 @@ const BenchTimeline = (() => {
 
   async function fetchCell(base) {
     const get = async n => { try { const r = await fetch(base + n, {cache: 'no-store'}); return r.ok ? await r.text() : ''; } catch (e) { return ''; } };
-    const [iterations, timeline, gc, load, profile, jvm] = await Promise.all(
-      ['iterations.tsv', 'timeline.tsv', 'gc.log', 'load.tsv', 'profile.txt', 'jvm-events.tsv'].map(get));
-    return parse({iterations, timeline, gc, load, profile, jvm});
+    // gc.log is the running fork's; the JVM moved the earlier forks' aside as gc.log.0, .1, ... (perflab.timeline.GC_LOGS)
+    const [iterations, timeline, load, profile, jvm, ...gc] = await Promise.all(
+      ['iterations.tsv', 'timeline.tsv', 'load.tsv', 'profile.txt', 'jvm-events.tsv', 'gc.log', ...Array.from({length: 10}, (_, i) => 'gc.log.' + i)].map(get));
+    return parse({iterations, timeline, gc: gc.join(''), load, profile, jvm});
   }
 
   function mount(svg, legend, tip) {
@@ -353,5 +354,15 @@ const BenchTimeline = (() => {
     return {set, reset() { zoomed = false; }};
   }
 
-  return {parse, fetchCell, mount};
+  // where a project's live files are, under its <campaigns> (`base`, ending in /): this machine's, and each remote
+  // worker's mirror (perflab.mirror) whose heartbeat came in the last minute; [{who, base, remote}]
+  async function sources(base, here) {
+    let idx = {};
+    try { const r = await fetch(base + '.live/index.json', {cache: 'no-store'}); idx = r.ok ? await r.json() : {}; } catch (e) {}
+    const now = Date.now() / 1000;
+    return [{who: here, base, remote: false}].concat(Object.entries(idx || {}).filter(([, e]) => e && now - e.at < 60).sort()
+      .map(([w, e]) => ({who: w, base: base + '.live/' + encodeURIComponent(w) + '/', remote: true, job: e.job})));
+  }
+
+  return {parse, fetchCell, mount, sources};
 })();

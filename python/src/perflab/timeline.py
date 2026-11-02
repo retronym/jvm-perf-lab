@@ -25,6 +25,15 @@ svg.timeline .grid { stroke:var(--line); } svg.timeline .axis { stroke:var(--mut
 """
 
 
+GC_LOGS = 10  # a cell's forks' GC logs: gc.log, and the earlier forks' moved aside as gc.log.0 .. gc.log.<GC_LOGS - 1>
+
+
+def gc_logs(d):
+    """The GC logs of a cell or run, one per fork: `perflab ab`'s gc.log and its earlier forks' gc.log.<n> (the JVM's
+    rotation), `perflab run`'s gc-<pid>.log. Their lines carry wall-clock times, so their order does not matter."""
+    return sorted(glob.glob(os.path.join(d, "gc.log")) + glob.glob(os.path.join(d, "gc.log.[0-9]*")) + glob.glob(os.path.join(d, "gc-*.log")))
+
+
 def script():
     return open(os.path.join(HERE, "timeline.js")).read()
 
@@ -34,7 +43,7 @@ def write(d, out=None):
     jvmevents.refresh(d)
     read = lambda n: open(os.path.join(d, n)).read() if os.path.exists(os.path.join(d, n)) else ""
     # a run of several forks: one GC log per fork, and (xctrace) one counter series per fork, named after its trace
-    gc = "".join(open(f).read() for f in sorted(glob.glob(os.path.join(d, "gc.log")) + glob.glob(os.path.join(d, "gc-*.log"))))
+    gc = "".join(open(f).read() for f in gc_logs(d))
     series = read("timeline.tsv")
     if not series:
         parts = [open(f).read().splitlines() for f in sorted(glob.glob(os.path.join(d, "*.timeline.tsv")))]

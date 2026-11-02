@@ -1475,9 +1475,9 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   <label class="k"><input type="checkbox" id="tl-follow" checked> follow the running fork</label><span id="tl-status"></span>{tl_help}</div>
   <div class="tl-legend" id="tl-legend"></div><svg class="timeline" id="tl-chart"></svg></section>
   <div class="tl-tip" id="tl-tip"></div>
-  <section class="card" id="bd" hidden><div class="card-h"><h2>Building <span id="bd-label"></span></h2><span class="badge" title="this machine; a remote worker's build is in its job's transcript on the queue page">on {esc(testbed.name())}</span><span id="bd-status"></span>{bd_help}</div>
+  <section class="card" id="bd" hidden><div class="card-h"><h2>Building <span id="bd-label"></span></h2><span class="badge" id="bd-on">on {esc(testbed.name())}</span><span id="bd-status"></span>{bd_help}</div>
   <p class="k" id="bd-cmd"></p><pre id="bd-tail"></pre></section>
-  <section class="card" id="lg" hidden><div class="card-h"><h2>Waiting for a quiet machine</h2><span class="badge" title="this machine (its load gate); a remote worker's waits are in its job's transcript on the queue page">on {esc(testbed.name())}</span><span id="lg-status"></span>{lg_help}</div>
+  <section class="card" id="lg" hidden><div class="card-h"><h2>Waiting for a quiet machine</h2><span class="badge" id="lg-on">on {esc(testbed.name())}</span><span id="lg-status"></span>{lg_help}</div>
   <p class="k" id="lg-top"></p><div class="bar" id="lg-bar"><i></i></div><svg id="lg-chart"></svg></section>
   <div id="live">
   <h2 class="sec" id="campaigns">Campaigns <span class="k">variants compared over rounds, newest first</span></h2>
@@ -1526,26 +1526,48 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   }}
   addEventListener('scroll', spy, {{passive: true}}); spy();
   // live: the timeline panel shows while a fork runs (running.json, written by `perflab ab` and `perflab run`) and
-  // polls its files; the sections are refetched from this page, which they rebuild around every cell
+  // polls its files; the sections are refetched from this page, which they rebuild around every cell. A remote worker's
+  // job is drawn the same way, from its live mirror (<campaigns>/.live/<worker>/, perflab.mirror)
   const panel = document.getElementById('tl');
   const tl = BenchTimeline.mount(document.getElementById('tl-chart'), document.getElementById('tl-legend'), document.getElementById('tl-tip'));
   const sel = document.getElementById('tl-cell'), follow = document.getElementById('tl-follow'), status = document.getElementById('tl-status');
-  let shown = null, running = null, picked = false;
+  let shown = null, running = null, runs = [], picked = false, srcs = [];
   sel.onchange = () => {{ follow.checked = false; picked = true; tick(); }};
   follow.onchange = tick;
   const base = RUNNING.replace(/[^/]*$/, '');
-  const dir = c => base + c.replace(/\\/?$/, '/');
+  const dir = (c, s) => (s ? s.base : base) + c.replace(/\\/?$/, '/');
+  const escT = s => String(s).replace(/[&<>"]/g, c => ({{'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}})[c]);
+  // the first of this machine's and the workers' live files `name` that `fresh` accepts: [source, its JSON]
+  async function firstLive(name, fresh) {{
+    for (const s of srcs) {{
+      let j = null;
+      try {{ const r = await fetch(s.base + name, {{cache: 'no-store'}}); j = r.ok ? await r.json() : null; }} catch (e) {{}}
+      if (j && fresh(j)) return [s, j];
+    }}
+    return [null, null];
+  }}
+  const onWho = (id, s) => {{ const e = document.getElementById(id); e.textContent = 'on ' + s.who;
+    e.title = s.remote ? `the remote worker ${{s.who}}, as its heartbeat (every 10 s) brings it` : 'this machine'; }};
   // a cell's name as the picker shows it: a run's name, or campaign · corpus · variant #round
   const nameOf = r => r.run || (p => p.length >= 4 ? `${{p[0]}} · ${{p[1]}} · ${{p[2]}} #${{p[3]}}` : r.cell)(r.cell.replace(/\\/$/, '').split('/'));
-  status.onclick = e => {{ if (e.target.closest('a')) {{ e.preventDefault(); follow.checked = true; tick(); }} }};
+  status.onclick = e => {{
+    const a = e.target.closest('a[data-dir]');
+    if (!a) return;
+    e.preventDefault();
+    const r = runs.find(x => x.dir === a.dataset.dir);
+    if (r && r === runs[0]) follow.checked = true;
+    else if (r) {{ follow.checked = false; picked = true; if (![...sel.options].some(o => o.value === r.dir)) sel.add(new Option(r.name, r.dir), 0); sel.value = r.dir; }}
+    tick();
+  }};
   // loadgate.json, written by `perflab loadgate` while a campaign waits for other load to settle before a cell
   const lg = document.getElementById('lg');
   async function gate() {{
-    let g = null;
-    try {{ const r = await fetch(LOADGATE, {{cache: 'no-store'}}); g = r.ok ? await r.json() : null; }} catch (e) {{}}
-    // a killed wait leaves its file behind: samples come every 5 s, so an old last one means nobody is waiting
-    lg.hidden = !g || !g.samples.length || Date.now() / 1000 - g.samples[g.samples.length - 1][0] > 30;
+    // a killed wait leaves its file behind: samples come every 5 s, so an old last one means nobody is waiting (a remote
+    // one's come with its heartbeat, every 10 s)
+    const [src, g] = await firstLive(LOADGATE.replace(/^.*\\//, ''), g => g.samples && g.samples.length && Date.now() / 1000 - g.samples[g.samples.length - 1][0] < 45);
+    lg.hidden = !g;
     if (lg.hidden) return;
+    onWho('lg-on', src);
     const xs = g.samples, last = xs[xs.length - 1], now = last[0], esc = s => String(s).replace(/[&<>]/g, c => ({{'&': '&amp;', '<': '&lt;', '>': '&gt;'}})[c]);
     const mins = s => s >= 60 ? `${{Math.floor(s / 60)}} min ${{Math.round(s % 60)}} s` : `${{Math.round(s)}} s`;
     const q = g.quietSince ? now - g.quietSince : 0;
@@ -1568,38 +1590,47 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   // build.json, written while a launch-mode build step runs; its heartbeat (every 5 s) tells a killed build from a quiet one
   const bd = document.getElementById('bd');
   async function building() {{
-    let b = null;
-    try {{ const r = await fetch(BUILD, {{cache: 'no-store'}}); b = r.ok ? await r.json() : null; }} catch (e) {{}}
-    bd.hidden = !b || Date.now() / 1000 - b.updated > 30;
+    const [src, b] = await firstLive(BUILD.replace(/^.*\\//, ''), b => Date.now() / 1000 - b.updated < 45);
+    bd.hidden = !b;
     // the campaign's card says it is building, before it has a cell running
     document.querySelectorAll('.card-h .bld').forEach(e => e.remove());
     const card = !bd.hidden && b.campaign && document.getElementById('c-' + b.campaign);
     if (card) card.querySelector('.card-h h2').insertAdjacentHTML('afterend', `<a class="badge running bld" href="#bd" title="${{String(b.label).replace(/[&<>"]/g, '')}}">building ${{String(b.label.split(': ').slice(1).join(': ') || 'its build').replace(/[&<>]/g, '').replace(/ \\(.*\\)$/, '')}}</a>`);
     if (bd.hidden) return;
     const esc = s => String(s).replace(/[&<>]/g, c => ({{'&': '&amp;', '<': '&lt;', '>': '&gt;'}})[c]), s = b.updated - b.started;
-    const log = BUILD.replace(/[^/]*$/, '') + b.log;
+    onWho('bd-on', src);
+    // a remote build's full log stays on its worker (the mirror has its last lines)
+    const log = src.remote ? '' : BUILD.replace(/[^/]*$/, '') + b.log;
     document.getElementById('bd-label').textContent = b.label;
     document.getElementById('bd-status').innerHTML = `<span class="badge running">${{s >= 60 ? `${{Math.floor(s / 60)}} min ${{Math.round(s % 60)}} s` : `${{Math.round(s)}} s`}}</span>`
-      + ` <span class="k">${{b.lines}} lines · <a href="${{esc(log)}}">full log</a></span>`;
+      + ` <span class="k">${{b.lines}} lines${{log ? ` · <a href="${{esc(log)}}">full log</a>` : ''}}</span>`;
     document.getElementById('bd-cmd').innerHTML = `<code>${{esc(b.cmd)}}</code>`;
     const pre = document.getElementById('bd-tail'), end = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
     pre.textContent = b.tail.join('\\n');
     if (end) pre.scrollTop = pre.scrollHeight;
   }}
   async function tick() {{
+    srcs = await BenchTimeline.sources(base, TESTBED);
     gate(); building();
-    try {{ const r = await fetch(RUNNING, {{cache: 'no-store'}}); running = r.ok ? await r.json() : null; }} catch (e) {{ running = null; }}
+    // the running forks: this machine's first, then each remote worker's
+    runs = (await Promise.all(srcs.map(async s => {{
+      try {{ const r = await fetch(s.base + 'running.json', {{cache: 'no-store'}}); const j = r.ok ? await r.json() : null;
+            return j && j.cell ? {{src: s, run: j, dir: dir(j.cell, s), name: nameOf(j) + (s.remote ? ` (${{s.who}})` : '')}} : null; }}
+      catch (e) {{ return null; }}
+    }}))).filter(Boolean);
+    running = runs.length ? runs[0].run : null;
     panel.hidden = !running && !picked;
     if (panel.hidden) return;
     if (follow.checked && running) {{
-      const v = dir(running.cell);
-      if (![...sel.options].some(o => o.value === v)) sel.add(new Option(nameOf(running), v), 0);
+      const v = runs[0].dir;
+      if (![...sel.options].some(o => o.value === v)) sel.add(new Option(runs[0].name, v), 0);
       sel.value = v;
     }}
-    const since = running ? new Date(running.started * 1000).toLocaleTimeString([], {{hour: '2-digit', minute: '2-digit', second: '2-digit'}}) : '';
-    status.innerHTML = !running ? '<span class="k">nothing running</span>'
-      : dir(running.cell) === sel.value ? `<span class="badge running" title="on this machine">running on ${{TESTBED}} since ${{since}}</span>`
-      : `<a href="#" class="badge running" title="Show it">${{nameOf(running).replace(/[&<>]/g, c => ({{'&': '&amp;', '<': '&lt;', '>': '&gt;'}})[c])}} running</a>`;
+    const since = r => new Date(r.run.started * 1000).toLocaleTimeString([], {{hour: '2-digit', minute: '2-digit', second: '2-digit'}});
+    const where = r => r.src.remote ? `the remote worker ${{r.src.who}}; its files come with its heartbeat, every 10 s` : 'this machine';
+    status.innerHTML = !runs.length ? '<span class="k">nothing running</span>' : runs.map(r => r.dir === sel.value
+        ? `<span class="badge running" title="${{escT(where(r))}}">running on ${{escT(r.src.who)}} since ${{since(r)}}</span>`
+        : `<a href="#" class="badge running" data-dir="${{escT(r.dir)}}" title="Show it (${{escT(where(r))}})">${{escT(r.name)}} running</a>`).join(' ');
     if (!sel.value) return;
     if (sel.value !== shown) {{ tl.reset(); shown = sel.value; }}
     tl.set(await BenchTimeline.fetchCell(sel.value));

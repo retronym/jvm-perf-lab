@@ -3,7 +3,7 @@ the server's JSON API, and carries the server's token for its POSTs: it is serve
 """
 import html, json, os, time
 
-from . import testbed, timeline, ui
+from . import timeline, ui
 
 CSS = """
 main{max-width:1100px;margin:0 auto;padding:16px 20px 40px}
@@ -176,41 +176,63 @@ function workers() {
     rows.push('<p class="empty">No remote worker has claimed since the server started. <code>perflab worker --server &lt;url&gt;</code> on another machine (doc/worker-setup.md).</p>');
   document.getElementById('workers').innerHTML = rows.join('');
 }
-// the running job's project, live: its fork timeline (<campaigns>/running.json names the cell, as on the index) and
-// its launch-mode build (build.json)
+// the active jobs' projects, live: a job's fork timeline (<campaigns>/running.json names the cell, as on the index) and
+// its launch-mode build (build.json); a remote worker's job from its live mirror (<campaigns>/.live/<worker>/,
+// perflab.mirror), which its heartbeat brings every 10 s. One job at a time: this machine's, else the reader's pick
 const tl = BenchTimeline.mount(document.getElementById('tl-chart'), document.getElementById('tl-legend'), document.getElementById('tl-tip'));
-let shown = null;
+let shown = null, pick = null;
 const getJson = async u => { try { const r = await fetch(u, {cache: 'no-store'}); return r.ok ? await r.json() : null; } catch (e) { return null; } };
 const since = t => new Date(t * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
 async function live() {
-  const j = jobs.find(j => (j.state === 'running' || j.state === 'paused') && !j.worker), p = j && projects[j.project];
-  const base = p ? p.index.replace(/[^/]*$/, '') : null;
-  let b;
-  [run, b] = base ? await Promise.all([getJson(base + 'running.json'), getJson(base + 'build.json')]) : [null, null];
+  const act = jobs.filter(j => (j.state === 'running' || j.state === 'paused') && projects[j.project]).sort((a, b) => !!a.worker - !!b.worker);
+  const all = await Promise.all(act.map(async j => {
+    const p = projects[j.project], dir = p.index.replace(/[^/]*$/, '');
+    const base = j.worker ? dir + '.live/' + encodeURIComponent(j.worker) + '/' : dir;
+    const [r, b] = await Promise.all([getJson(base + 'running.json'), getJson(base + 'build.json')]);
+    return {j, p, dir, base, remote: !!j.worker, who: j.worker || (status ? status.testbed : 'this machine'),
+            run: r && r.cell ? r : null, b: b && Date.now() / 1000 - b.updated < 45 ? b : null};  // a killed build leaves its file
+  }));
+  const local = all.find(s => !s.remote);
+  run = local ? local.run : null;
   workers();
-  const bd = document.getElementById('bd');
-  bd.hidden = !b || Date.now() / 1000 - b.updated > 30;  // a killed build leaves its file: the heartbeat is every 5 s
-  if (!bd.hidden) {
+  const cur = all.find(s => s.j.id === pick) || all.find(s => s.run || s.b) || null;
+  const where = s => s.remote ? `the remote worker ${s.who}; its files come with its heartbeat, every 10 s` : "this machine, the server's own worker";
+  const on = s => `<span class="badge" title="${esc(where(s))}">on ${esc(s.who)}</span>`;
+  // the other active jobs with something to show, to switch to
+  const others = all.filter(s => s !== cur && (s.run || s.b)).map(s => `<a href="#" class="badge running" data-pick="${s.j.id}" title="Show it (${esc(where(s))})">#${s.j.id} on ${esc(s.who)}</a>`).join(' ');
+  const b = cur && cur.b, bd = document.getElementById('bd');
+  bd.hidden = !b;
+  if (b) {
     document.getElementById('bd-label').textContent = b.label;
+    document.getElementById('bd-on').outerHTML = `<span id="bd-on">${on(cur)}</span>`;
+    // a remote build's full log stays on its worker (the mirror has its last lines)
     document.getElementById('bd-status').innerHTML = `<span class="badge running">${dur(b.updated - b.started)}</span>`
-      + ` <span class="k">${b.lines} lines · <a href="${esc(base + b.log)}">full log</a></span>`;
+      + ` <span class="k">${b.lines} lines${cur.remote ? '' : ` · <a href="${esc(cur.dir + b.log)}">full log</a>`}</span>`;
     document.getElementById('bd-cmd').innerHTML = `<code>${esc(b.cmd)}</code>`;
     const pre = document.getElementById('bd-tail'), end = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
     pre.textContent = b.tail.join('\n');
     if (end) pre.scrollTop = pre.scrollHeight;
   }
-  const panel = document.getElementById('tl');
-  panel.hidden = !run;
-  if (!run) { shown = null; return; }
-  const cell = base + run.cell.replace(/\/?$/, '/');
-  const name = run.run || (q => q.length >= 4 ? `${q[0]} · ${q[1]} · ${q[2]} #${q[3]}` : run.cell)(run.cell.replace(/\/$/, '').split('/'));
-  document.getElementById('tl-name').innerHTML = `<a href="${esc(p.index)}">${esc(p.name)}</a> · ${esc(name)}`
-    + ` <span class="badge" title="this machine, the server's own worker">on ${esc(status ? status.testbed : 'this machine')}</span>`;
-  document.getElementById('tl-status').innerHTML = `<span class="badge running">running since ${since(run.started)}</span>`
-    + ` <a class="btn" href="${esc(cell)}timeline.html" title="the cell's own timeline page">↗</a>`;
+  const panel = document.getElementById('tl'), r = cur && cur.run;
+  panel.hidden = !r && !others;
+  document.getElementById('tl-others').innerHTML = others;
+  if (!r) { shown = null; document.getElementById('tl-name').innerHTML = cur ? `#${cur.j.id} ${on(cur)}: between cells` : ''; document.getElementById('tl-status').innerHTML = ''; return; }
+  const cell = cur.base + r.cell.replace(/\/?$/, '/');
+  const name = r.run || (q => q.length >= 4 ? `${q[0]} · ${q[1]} · ${q[2]} #${q[3]}` : r.cell)(r.cell.replace(/\/$/, '').split('/'));
+  document.getElementById('tl-name').innerHTML = `<a href="${esc(cur.p.index)}">${esc(cur.p.name)}</a> · ${esc(name)} ${on(cur)}`;
+  // a remote cell's own page exists once it is uploaded, at the cell's end
+  document.getElementById('tl-status').innerHTML = `<span class="badge running">running since ${since(r.started)}</span>`
+    + (cur.remote ? '' : ` <a class="btn" href="${esc(cell)}timeline.html" title="the cell's own timeline page">↗</a>`);
   if (cell !== shown) { tl.reset(); shown = cell; }
   tl.set(await BenchTimeline.fetchCell(cell));
 }
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[data-pick]');
+  if (!a) return;
+  e.preventDefault();
+  pick = +a.dataset.pick;
+  live();
+});
 document.addEventListener('click', async e => {
   const b = e.target.closest('button[data-op]');
   if (!b) return;
@@ -382,10 +404,10 @@ def queue_page(server):
                               "a worker of its campaign's testbed; numbers of two testbeds are never compared.", right=True)
     body = (f'<h2 class="sec">Workers {wk_help}</h2><section class="card" id="workers"></section>'
             f'<h2 class="sec">Now <span class="k" id="conn"></span></h2><section class="card" id="active"></section>'
-            f'<section class="card" id="bd" hidden><div class="card-h"><h2>Building <span id="bd-label"></span></h2><span class="badge" title="this machine; a remote worker&#39;s build is in its job&#39;s transcript">on {html.escape(testbed.name())}</span><span id="bd-status"></span>{bd_help}</div>'
+            f'<section class="card" id="bd" hidden><div class="card-h"><h2>Building <span id="bd-label"></span></h2><span id="bd-on"></span><span id="bd-status"></span>{bd_help}</div>'
             '<p class="k" id="bd-cmd"></p><pre id="bd-tail"></pre></section>'
             f'<section class="card" id="tl" hidden><div class="card-h"><h2>Fork timeline</h2><span class="k" id="tl-name"></span>'
-            f'<span id="tl-status"></span>{tl_help}</div><div class="tl-legend" id="tl-legend"></div><svg class="timeline" id="tl-chart"></svg></section>'
+            f'<span id="tl-status"></span><span id="tl-others"></span>{tl_help}</div><div class="tl-legend" id="tl-legend"></div><svg class="timeline" id="tl-chart"></svg></section>'
             '<div class="tl-tip" id="tl-tip"></div>'
             f'<h2 class="sec">Queued {help_}</h2><section class="card" id="queued"></section>'
             f'<h2 class="sec">Finished <span class="k">newest first</span></h2><section class="card" id="history"></section>')

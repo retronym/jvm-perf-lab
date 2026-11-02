@@ -13,15 +13,17 @@ Design: [remote-workers.md](remote-workers.md). Setting up a worker: [worker-set
 7. DONE Docs: [worker-setup.md](worker-setup.md), README's Remote workers section; `mise run kperf:install` (the kperf helper as a launchd daemon).
 10. DONE Variance baseline of testbed m4 (`m4-aa-graal25`, stopped after round 2): fork-to-fork sd 0.38% dotc, 0.45% scalaz under the hill-climbing harness on GraalVM 25 (the M5's harness-aa-graal25: 3.5%, 3.8%).
 9. DONE The tunnel (`mise run tunnel:install`) and the worker (`mise run worker:install`) as launchd agents.
+11. DONE Workers on the queue page: a card with this machine and each remote worker (testbed, hardware, online or offline, its job and running cell), every job saying where it runs; the table kept across restarts (`workers.json`).
+12. DONE A remote job's live view (`mirror.py`): the heartbeat carries what changed of the worker's `running.json`, `loadgate.json`, `build.json` and the running cell's timeline files, written into `<campaigns>/.live/<worker>/`; the index and the queue page draw its fork timeline, load gate and build from there, saying which machine.
 8. DONE kperf on the M4: `m4-kperf-smoke` (async cycles and instructions through the helper daemon) under a 1.5-core gate, once the load gate stopped counting `asprof-kperf` as other load.
 
-Tests: test_remote.py (the queue's leases, mapping, and a worker process running a campaign of two builds, one an unpushed commit, with the harness's uncommitted change).
+Tests: test_remote.py (the queue's leases, mapping, and a worker process running a campaign of two builds, one an unpushed commit, with the harness's uncommitted change); test_mirror.py (the live mirror's deltas, a replaced file, a coordinator that lost the mirror, the budget, paths).
 
 ## Future work
 
 - A dedicated user account on a worker machine for the worker (and its launchd agents), logged in with nothing else: no login items, iCloud, Siri, widgets or sync clients of the everyday account, which the load gate otherwise voids cells for (the M4's A/A lost three attempts to Siri, contactsd and calendar widgets).
 
-- A remote job's running cell (its live timeline) on the coordinator's index; today it shows when it is uploaded.
+- Raw xctrace traces (`*.trace`, `*.counters.xml`, 50–80 MB a fork) are uploaded with their cell, and the worker sits paused at the cell boundary meanwhile; the coordinator may not need them.
 - Branch campaigns (and their profiles) on a worker: the range resolved on the coordinator, its commits shipped as for builds.
 - Listening on a LAN interface (TLS) instead of an SSH tunnel.
 - Worker-side storage cleanup (its snapshots and worktrees).

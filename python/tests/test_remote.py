@@ -212,6 +212,8 @@ class EndToEndTest(unittest.TestCase):
         w = next(w for w in st["workers"] if w["name"] == "w1")
         self.assertEqual((w["testbed"]["name"], w["job"], w["live"]), ("sim", None, None))
         self.assertEqual(st["machine"]["name"], st["testbed"])
+        # the job over, its live mirror (perflab.mirror) is gone
+        self.assertFalse(os.path.exists(os.path.join(self.lab, "out", "ab", ".live", "w1")))
         # again: the worker resumes from the coordinator's cells, and has nothing to run
         j2 = server.submit_local(self.srv, {"argv": ["ab", "run", "campaigns/rw.json"], "cwd": self.lab})
         r = self.work()

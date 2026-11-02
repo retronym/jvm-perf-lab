@@ -32,7 +32,7 @@ jobs/<id>/. Settings in <home>/worker.toml, every one optional, the command line
 import argparse, glob, io, json, os, re, shutil, signal, socket, subprocess, sys, tarfile, tempfile, threading, time, tomllib
 import urllib.error, urllib.parse, urllib.request
 
-from . import ab, config, control, remote, testbed, transcript
+from . import ab, config, control, mirror, remote, testbed, transcript
 
 HOME_ENV = "PERFLAB_WORKER_HOME"
 BEAT = float(os.environ.get("PERFLAB_WORKER_BEAT") or 10)  # seconds between heartbeats (the coordinator's lease is server.LEASE, 90 s)
@@ -143,6 +143,7 @@ class Job:
         self.hold = False  # the worker's own pause at a cell boundary, to upload while nothing is measured
         self.ctl_lock = threading.Lock()
         self.stop = threading.Event()
+        self.mirror = None  # once the job runs: the live mirror's sender (perflab.mirror), over its <campaigns>
 
     def say(self, msg):
         with open(self.transcript, "a") as f:
@@ -161,12 +162,20 @@ class Job:
         data = self.chunk()
         body = {"transcript": data.decode(errors="replace"), "paused": control.acked(self.ctl) and self.word == control.PAUSE,
                 "live": self.live()}
+        m = self.mirror
+        if m and final_rc is None:
+            try:
+                body["mirror"] = m.changes()
+            except OSError as e:  # the live view is a courtesy: never the heartbeat's failure
+                print(f"[worker] live mirror: {e}", flush=True)
         if final_rc is not None:
             self.w.client.post(f"/api/workers/jobs/{self.id}/finish", {**body, "rc": final_rc})
             self.sent += len(data)
             return
         r = self.w.client.post(f"/api/workers/jobs/{self.id}/heartbeat", body)
         self.sent += len(data)
+        if m:
+            m.forget(r.get("resync"))
         if r.get("control") != self.word:
             self.word = r.get("control")
             self.apply()
@@ -558,6 +567,7 @@ class Job:
             self.proc = subprocess.Popen(cmd, cwd=project, env=env, stdin=subprocess.DEVNULL, stdout=out,
                                          stderr=subprocess.STDOUT, start_new_session=True)
         running_f = self.running_f = os.path.join(os.path.dirname(camp), ab.RUNNING_NAME)
+        self.mirror = mirror.Sender(os.path.dirname(camp))
         term_at, cancel_at, seen, pending = None, None, None, False
         while self.proc.poll() is None:
             time.sleep(1)
