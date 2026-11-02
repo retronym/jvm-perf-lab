@@ -102,6 +102,8 @@ class MappingTest(unittest.TestCase):
         spec = {"jvmArgs": "-Xmx1G -Da=/x/corpus/ -Db=/y/a.jar:/y/b.jar", "lib": "/z/lib.dylib", "description": "/not/this",
                 "corpora": {"c": "-p corpus=/x/c2"}, "builds": {"b": {"checkout": "/not/a/build"}}}
         self.assertEqual(remote.input_paths(spec), ["/x/c2", "/x/corpus", "/y/a.jar", "/y/b.jar", "/z/lib.dylib"])
+        self.assertEqual(remote.input_paths({"profile": "xctrace:/lab/xctrace/loads.template.xml"}), ["/lab/xctrace/loads.template.xml"])
+        self.assertEqual(remote.input_paths({"profile": "xctrace:ipc"}), [])
 
 
     def job(self, **cfg):

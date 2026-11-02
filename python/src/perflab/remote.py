@@ -202,8 +202,11 @@ PATH_IN = re.compile(r"(?:^|(?<=[\s:=,'\"]))(/[^\s:,'\"]+)")
 
 
 def input_paths(spec):
-    """The absolute paths the spec's JVM arguments, profiler library and JMH arguments name: its inputs."""
+    """The absolute paths the spec's JVM arguments, profiler library, xctrace template and JMH arguments name: its inputs."""
     texts = [spec.get(k) for k in ("jvmArgs", "lib")]
+    p = spec.get("profile")
+    if isinstance(p, str) and p.startswith("xctrace:"):  # a template of the lab's own (one git may not track)
+        texts.append(p.partition(":")[2])
     texts += list((spec.get("corpora") or {}).values()) + list((spec.get("variants") or {}).values())
     texts += list((spec.get("variantJmhArgs") or {}).values())
     return sorted({p.rstrip("/") for t in texts if isinstance(t, str) for p in PATH_IN.findall(t)})
