@@ -142,6 +142,76 @@ sudo launchctl bootout system/io.github.retronym.asprof-kperf 2>/dev/null || tru
 sudo rm -f /Library/LaunchDaemons/io.github.retronym.asprof-kperf.plist /usr/local/libexec/asprof-kperf
 """
 
+[tasks."tunnel:install"]
+description = "On the coordinator: keep an ssh tunnel to a perflab worker up as a launchd agent (TUNNEL_HOST: an ~/.ssh/config host with its RemoteForward; default perflab-tunnel)"
+run = """
+set -euo pipefail
+host="${TUNNEL_HOST:-perflab-tunnel}"
+label="io.github.retronym.perflab.tunnel.$host"
+plist="$HOME/Library/LaunchAgents/$label.plist"
+ssh -G "$host" | grep -qi '^remoteforward ' || { echo "~/.ssh/config: $host has no RemoteForward"; exit 1; }
+mkdir -p "$(dirname "$plist")" "$HOME/.perflab"
+launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+cat > "$plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$label</string>
+  <key>ProgramArguments</key><array>
+    <string>/usr/bin/ssh</string><string>-N</string><string>-o</string><string>BatchMode=yes</string>
+    <string>-o</string><string>ExitOnForwardFailure=yes</string><string>-o</string><string>ServerAliveInterval=30</string>
+    <string>-o</string><string>ServerAliveCountMax=3</string><string>$host</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>StandardOutPath</key><string>$HOME/.perflab/tunnel-$host.log</string>
+  <key>StandardErrorPath</key><string>$HOME/.perflab/tunnel-$host.log</string>
+</dict></plist>
+PLIST
+plutil -lint -s "$plist"
+launchctl bootstrap "gui/$(id -u)" "$plist"
+echo "tunnel $host: launchd agent $label (log ~/.perflab/tunnel-$host.log)"
+"""
+
+[tasks."worker:install"]
+description = "On a worker: run perflab worker (from this checkout) as a launchd agent in the login shell's environment, kept awake (settings: ~/.perflab/worker/worker.toml)"
+run = """
+set -euo pipefail
+label=io.github.retronym.perflab.worker
+plist="$HOME/Library/LaunchAgents/$label.plist"
+home="${PERFLAB_WORKER_HOME:-$HOME/.perflab/worker}"
+lib="${ASYNC_PROFILER_LIB:-}"
+mkdir -p "$home" "$(dirname "$plist")"
+launchctl bootout "gui/$(id -u)/$label" 2>/dev/null || true
+pkill -f "perflab worker" 2>/dev/null || true
+cat > "$plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$label</string>
+  <key>ProgramArguments</key><array>
+    <string>$SHELL</string><string>-lic</string><string>exec caffeinate -i python3 -m perflab worker</string>
+  </array>
+  <key>EnvironmentVariables</key><dict>
+    <key>PYTHONPATH</key><string>{{config_root}}/python/src</string>
+    <key>PERFLAB_WORKER_HOME</key><string>$home</string>
+    $( [ -n "$lib" ] && echo "<key>ASYNC_PROFILER_LIB</key><string>$lib</string>" )
+  </dict>
+  <key>WorkingDirectory</key><string>$home</string>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>30</integer>
+  <key>ProcessType</key><string>Interactive</string>
+  <key>StandardOutPath</key><string>$home/worker.log</string>
+  <key>StandardErrorPath</key><string>$home/worker.log</string>
+</dict></plist>
+PLIST
+plutil -lint -s "$plist"
+launchctl bootstrap "gui/$(id -u)" "$plist"
+sleep 3; tail -1 "$home/worker.log"
+"""
+
 [tasks."server:restart"]
 description = "Restart the launchd perflab server (on this code); running jobs carry on and are adopted. A code change reloads it anyway"
 run = """
