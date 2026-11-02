@@ -11,12 +11,15 @@ Design: [remote-workers.md](remote-workers.md). Setting up a worker: [worker-set
 5. DONE Results: unit tarballs up (cells, `.void/`, top-level files), each replacing the coordinator's whole; finished cells down at start (and a cell the coordinator voided is measured again); reindex.
 6. DONE End to end on the M4 laptop (zMacBook-Air, testbed `m4`, over `ssh -R 127.0.0.1:8691:127.0.0.1:8690`): `m4-smoke`, the scala3 lab's base and tip of batch-84 (unpushed commits as bundles, the dotc corpus copied, GraalVM 25), both cells on the coordinator. It found two things now fixed: the builds' JDK must be the coordinator's (JAVA_HOME mapped), and a worktree built with another JDK loses its build outputs first.
 7. DONE Docs: [worker-setup.md](worker-setup.md), README's Remote workers section; `mise run kperf:install` (the kperf helper as a launchd daemon).
+10. DONE Variance baseline of testbed m4 (`m4-aa-graal25`, stopped after round 2): fork-to-fork sd 0.38% dotc, 0.45% scalaz under the hill-climbing harness on GraalVM 25 (the M5's harness-aa-graal25: 3.5%, 3.8%).
 9. DONE The tunnel (`mise run tunnel:install`) and the worker (`mise run worker:install`) as launchd agents.
 8. DONE kperf on the M4: `m4-kperf-smoke` (async cycles and instructions through the helper daemon) under a 1.5-core gate, once the load gate stopped counting `asprof-kperf` as other load.
 
 Tests: test_remote.py (the queue's leases, mapping, and a worker process running a campaign of two builds, one an unpushed commit, with the harness's uncommitted change).
 
 ## Future work
+
+- A dedicated user account on a worker machine for the worker (and its launchd agents), logged in with nothing else: no login items, iCloud, Siri, widgets or sync clients of the everyday account, which the load gate otherwise voids cells for (the M4's A/A lost three attempts to Siri, contactsd and calendar widgets).
 
 - A remote job's running cell (its live timeline) on the coordinator's index; today it shows when it is uploaded.
 - Branch campaigns (and their profiles) on a worker: the range resolved on the coordinator, its commits shipped as for builds.
