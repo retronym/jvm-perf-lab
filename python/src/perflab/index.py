@@ -102,7 +102,8 @@ def cell_row(spec, corpus, variant, cell):
     except (OSError, ValueError, IndexError, KeyError):
         # JMH writes result.json when the fork ends, so an empty or partial one is the running cell's, or an interrupted run's
         running = ab.is_running(cell)
-        badge = ('<span class="badge running">running</span>' if running else
+        left = running and running_left(cell, _corpus_args(cell))
+        badge = (f'<span class="badge running">running{f" · {eta_text(left)} left" if left else ""}</span>' if running else
                  '<span class="badge interrupted" title="Its run stopped before JMH wrote a result: `perflab ab run` runs it again">interrupted</span>')
         when = time.time() if running else max(os.path.getmtime(os.path.join(cell, f)) for f in os.listdir(cell))
         mark = ' data-running="1"' if running else ""
@@ -751,17 +752,81 @@ def notes(path):
     return f'<div class="notes">{md(open(path).read())}</div>' if os.path.exists(path) else ""
 
 
+def _iter_times(cell):
+  """(start_ms of the first row, end_ms of the last, rows) of a cell's iterations.tsv; None without any."""
+  try:
+    rows = [l.split("\t") for l in open(os.path.join(cell, "iterations.tsv")).read().splitlines()[1:]]
+    rows = [r for r in rows if len(r) >= 10 and r[3] and r[4]]
+    return int(rows[0][3]), int(rows[-1][4]), rows
+  except (OSError, ValueError, IndexError):
+    return None
+
+
+def cell_secs(cell):
+  """How long a finished cell took, from its iterations; None without them."""
+  t = _iter_times(cell)
+  return (t[1] - t[0]) / 1000 if t else None
+
+
+def running_left(cell, corpus_args):
+  """Seconds the running cell has left: the iterations it still has to do (-f, -wi, -i of its corpus's JMH arguments) at
+  the mean of those it has done; None before its first iteration or when the arguments don't say."""
+  t = _iter_times(cell)
+  m = {k: re.search(rf"(?:^|\s){k}\s+(\d+)", corpus_args or "") for k in ("-f", "-wi", "-i")}
+  if not t or not (m["-wi"] and m["-i"]):
+    return None
+  total = int(m["-f"].group(1) if m["-f"] else 1) * (int(m["-wi"].group(1)) + int(m["-i"].group(1)))
+  done = [r for r in t[2] if r[1] in ("warmup", "measure")]
+  if not done:
+    return None
+  mean = sum(int(r[4]) - int(r[3]) for r in done) / len(done) / 1000
+  return max(0.0, (total - len(done)) * mean - (time.time() - t[1] / 1000)) if len(done) < total else 0.0
+
+
+def _corpus_args(cell):
+  """The JMH arguments of a cell's corpus in its campaign's spec.json."""
+  cell = os.path.abspath(cell)
+  try:
+    return json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(cell))), "spec.json")))["corpora"].get(os.path.basename(os.path.dirname(os.path.dirname(cell))))
+  except (OSError, ValueError, KeyError, AttributeError):
+    return None
+
+
+def eta_text(secs):
+  """'~12 min', '~2 h 10 min': a duration, to the minute."""
+  m = max(1, round(secs / 60))
+  return f"~{m} min" if m < 60 else f"~{m // 60} h {m % 60:02d} min"
+
+
 def progress(spec_dir):
-  """(cells with results, cells planned) from the campaign's spec.json; None without one."""
+  """(cells with results, cells planned, seconds left or None) from the campaign's spec.json; None without one. The
+  time left is the running cell's, and for each cell still to run the mean of its corpus's finished cells (any
+  corpus's, if that has none)."""
   try:
     s = json.load(open(os.path.join(spec_dir, "spec.json")))
     variants = 1 if s.get("paired") else len(s["variants"])
     planned = s.get("rounds", 2) * len(s["corpora"]) * variants
   except (OSError, ValueError, KeyError, TypeError):
     return None
-  done = sum(1 for f in glob.glob(os.path.join(spec_dir, "*", "*", "*", "result.json"))
-             if os.path.getsize(f) > 0 and not testbed.foreign(os.path.dirname(f)))
-  return done, planned
+  done = [os.path.dirname(f) for f in glob.glob(os.path.join(spec_dir, "*", "*", "*", "result.json"))
+          if os.path.getsize(f) > 0 and not testbed.foreign(os.path.dirname(f))]
+  left = None
+  run = running_cell(os.path.basename(spec_dir))
+  if run is not None:
+    secs = {}
+    for c in done:
+      d = cell_secs(c)
+      if d:
+        secs.setdefault(os.path.basename(os.path.dirname(os.path.dirname(c))), []).append(d)
+    every = [d for v in secs.values() for d in v]
+    cur = running_left(os.path.join(spec_dir, run[0], run[1], str(run[2])), s["corpora"].get(run[0]))
+    if every and cur is not None:
+      mean = lambda c: sum(secs.get(c) or every) / len(secs.get(c) or every)
+      for c in s["corpora"]:
+        have = len(secs.get(c, [])) + (1 if c == run[0] else 0)
+        left = (left or 0) + max(0, planned // len(s["corpora"]) - have) * mean(c)
+      left = (left or 0) + cur
+  return len(done), planned, left
 
 
 def running_cell(name):
@@ -777,11 +842,13 @@ def running_cell(name):
 def progress_badge(prog, name):
   if not prog:
     return ""
-  done, planned = prog
+  done, planned, left = prog
   running = ""
   try:
     r = json.load(open(os.path.join(CAMPAIGNS, "running.json")))
     running = " · running" if r.get("campaign") == name else ""
+    if running and left is not None:
+      running += f" · {eta_text(left)} left"
   except (OSError, ValueError):
     pass
   cls = "done" if done >= planned else "running" if running else "partial"
