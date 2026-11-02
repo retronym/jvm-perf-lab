@@ -1126,10 +1126,12 @@ class Server:
                             f.write(body["transcript"])
                     if op == "heartbeat":
                         j = server.q.heartbeat(jid, worker, bool(body.get("paused")))
+                        _live(server.q.project(j["project"]), j, body.get("live"))
                         server.seen(worker, job=jid)
                         return self._send(200, {"state": j["state"], "control": j["control"]})
                     if op == "finish":
                         j = server.q.finish(jid, worker, int(body.get("rc", 1)))
+                        _live(server.q.project(j["project"]), j, None)
                         for f in ("control", "control.ack"):
                             control.write(os.path.join(j["dir"], f), None)
                         server.seen(worker, job=None)
@@ -1188,6 +1190,25 @@ def transcript_note(job, line):
 # the policy of every page under /p/ but the project's index: scripts run (flame graphs need them) in an opaque origin,
 # and links open, but nothing reads the server's pages
 SANDBOX = "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox allow-downloads"
+
+
+def _live(project, job, live):
+    """The remote job's running cell for the index (its ETAs): <campaigns>/<campaign>/live.json, as the worker's heartbeat
+    reports it, with the time of the report; removed when there is none (between cells, the job over)."""
+    camp = (live or {}).get("campaign") or next((os.path.basename(a)[:-5] for a in job["argv"] if a.endswith(".json")), None)
+    if not camp or not project:
+        return
+    f = os.path.join(project["campaigns"], camp, "live.json")
+    try:
+        if live:
+            tmp = f + ".tmp"
+            with open(tmp, "w") as fh:
+                json.dump({**live, "at": time.time()}, fh)
+            os.replace(tmp, f)
+        elif os.path.exists(f):
+            os.unlink(f)
+    except OSError:
+        pass
 
 
 def _reindex(project):

@@ -101,8 +101,8 @@ def cell_row(spec, corpus, variant, cell):
         p = r["primaryMetric"]
     except (OSError, ValueError, IndexError, KeyError):
         # JMH writes result.json when the fork ends, so an empty or partial one is the running cell's, or an interrupted run's
-        running = ab.is_running(cell)
-        left = running and running_left(cell, _corpus_args(cell))
+        running = ab.is_running(cell) or remote_is_running(cell)
+        left = running and (remote_left(cell) if remote_is_running(cell) else running_left(cell, _corpus_args(cell)))
         badge = (f'<span class="badge running">running{f" · {eta_text(left)} left" if left else ""}</span>' if running else
                  '<span class="badge interrupted" title="Its run stopped before JMH wrote a result: `perflab ab run` runs it again">interrupted</span>')
         when = time.time() if running else max(os.path.getmtime(os.path.join(cell, f)) for f in os.listdir(cell))
@@ -246,11 +246,11 @@ STAT_TITLE = {"mean": "the mean over rounds of each round's mean, ± the sd over
               "min": "the fastest measured iteration, the forks pooled; Δ ± the sd of a bootstrap over forks and iterations"}
 
 
-def card_summary(recs, order, planned, per_unit=None, norm=None, running=None):
+def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, left=None):
     """A campaign's summary and cells as one table: a row per corpus and variant, its cells as rows beneath (hidden
     until it is expanded), every value as mean, median and min (the card's statistic switch picks one). `recs` are
     the cells (dicts from `cell_rec`), `planned` the (corpus, variant, round)s of the spec, `running` the one being run
-    (running.json), shown so before it has a result. The page's data: per row
+    (running.json), shown so before it has a result, with `left` seconds it has to go. The page's data: per row
     its values per statistic, per cell its iterations per fork per metric, for the hover panel and the chart."""
     by = {}
     for r in recs:
@@ -308,8 +308,9 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None):
             cells = sorted(vs[v], key=lambda r: r["round"])
             n = len(done[v])
             states = collections.Counter(r["state"] for r in cells if r["state"] != "done")
-            pend = " ".join(f'<span class="badge {s}">{m} {s}</span>' for s, m in states.items())
-            rows.append(f'<tr class="sr" data-row="{i}" data-key="{esc(corpus)}|{esc(v)}" data-corpus="{esc(corpus)}"><td><button class="exp" aria-expanded="false" title="Its cells (+ / − expand or collapse all)">▸</button>'
+            eta = f" · {eta_text(left)} left" if left else ""
+            pend = " ".join(f'<span class="badge {s}">{m} {s}{eta if s == "running" else ""}</span>' for s, m in states.items())
+            rows.append(f'<tr class="sr{" live" if "running" in states else ""}" data-row="{i}" data-key="{esc(corpus)}|{esc(v)}" data-corpus="{esc(corpus)}"><td><button class="exp" aria-expanded="false" title="Its cells (+ / − expand or collapse all)">▸</button>'
                         f'{esc(corpus)}{mixed({w: [r["data"] for r in rs if r["data"]] for w, rs in vs.items()}) if v == names[0] else ""}</td><td>{esc(v)}</td><td class="n">{n}{" " + pend if pend else ""}</td>{"".join(vals)}</tr>')
             cell_ids = []
             for r in cells:
@@ -332,7 +333,7 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None):
                         x = metrics.pooled(r["raw"].get(k, []), stat)
                         parts[stat] = metrics.fmt(kind, x) if x is not None else '<span class="k">–</span>'
                     tds.append(f'<td class="n" data-k="{esc(k)}" data-cell="{j}">' + "".join(f'<span class="st st-{s}">{parts[s]}</span>' for s in metrics.STATS) + "</td>")
-                badge = "" if r["state"] == "done" else f' <span class="badge {r["state"]}">{r["state"]}</span>'
+                badge = "" if r["state"] == "done" else f' <span class="badge {r["state"]}">{r["state"]}{eta if r["state"] == "running" else ""}</span>'
                 name = r.get("name") or f"#{r['round']}"
                 attrs = r.get("attrs") or f' data-corpus="{esc(corpus)}"'
                 rows.append(f'<tr class="sub" data-of="{i}"{attrs} hidden><td></td><td>{name}{badge}</td><td></td>{"".join(tds)}</tr>')
@@ -812,10 +813,7 @@ def progress(spec_dir):
           if os.path.getsize(f) > 0 and not testbed.foreign(os.path.dirname(f))]
   left = None
   run = running_cell(os.path.basename(spec_dir))
-  try:
-    building = json.load(open(os.path.join(CAMPAIGNS, ab.RUNNING_NAME))).get("campaign") == os.path.basename(spec_dir)
-  except (OSError, ValueError):
-    building = False
+  building = campaign_active(os.path.basename(spec_dir))
   if run is not None or building:  # between cells (building the next), the cells still to run are all there is
     secs = {}
     for c in done:
@@ -823,7 +821,11 @@ def progress(spec_dir):
       if d:
         secs.setdefault(os.path.basename(os.path.dirname(os.path.dirname(c))), []).append(d)
     every = [d for v in secs.values() for d in v]
-    cur = running_left(os.path.join(spec_dir, run[0], run[1], str(run[2])), s["corpora"].get(run[0])) if run else 0.0
+    live = remote_live(os.path.basename(spec_dir))
+    if live and live.get("left") is not None and run == tuple(live["cell"]):  # a remote worker's, as it reported it
+      cur = max(0.0, live["left"] - (time.time() - live["at"]))
+    else:
+      cur = running_left(os.path.join(spec_dir, run[0], run[1], str(run[2])), s["corpora"].get(run[0])) if run else 0.0
     if every and cur is not None:
       mean = lambda c: sum(secs.get(c) or every) / len(secs.get(c) or every)
       for c in s["corpora"]:
@@ -833,28 +835,74 @@ def progress(spec_dir):
   return len(done), planned, left
 
 
+LIVE_SECS = 120  # a remote job's report (live.json, from the coordinator's heartbeats) is current for this long
+
+
+def remote_live(name):
+  """The cell a remote worker is running for campaign `name`, as its last heartbeat reported it ({cell, left, at}); None
+  without a current one."""
+  try:
+    r = json.load(open(os.path.join(CAMPAIGNS, name, "live.json")))
+    return r if time.time() - r["at"] < LIVE_SECS else None
+  except (OSError, ValueError, KeyError, TypeError):
+    return None
+
+
 def running_cell(name):
-  """(corpus, variant, round) of campaign `name`'s cell being run (running.json), or None."""
+  """(corpus, variant, round) of campaign `name`'s cell being run (running.json, or a remote worker's report), or None."""
   try:
     r = json.load(open(os.path.join(CAMPAIGNS, ab.RUNNING_NAME)))
     camp, corpus, variant, rnd = (r.get("cell") or "").split("/")[-4:]
-    return (corpus, variant, int(rnd)) if camp == name and r.get("campaign") == name else None
+    if camp == name and r.get("campaign") == name:
+      return (corpus, variant, int(rnd))
   except (OSError, ValueError, TypeError):
+    pass
+  live = remote_live(name)
+  return tuple(live["cell"]) if live else None
+
+
+def _remote_cell(cell):
+  """The remote worker's report on campaign `cell` belongs to, when it names this cell."""
+  cell = os.path.abspath(cell)
+  corpus, variant, rnd = cell.split(os.sep)[-3:]
+  live = remote_live(cell.split(os.sep)[-4])
+  return live if live and live["cell"] == [corpus, variant, int(rnd) if rnd.isdigit() else rnd] else None
+
+
+def remote_is_running(cell):
+  return _remote_cell(cell) is not None
+
+
+def remote_left(cell):
+  live = _remote_cell(cell)
+  return None if not live or live.get("left") is None else max(0.0, live["left"] - (time.time() - live["at"]))
+
+
+def running_eta(name, run):
+  """Seconds the running cell `run` of campaign `name` has left, by its worker's report or its own iterations; None."""
+  if not run:
     return None
+  cell = os.path.join(CAMPAIGNS, name, run[0], run[1], str(run[2]))
+  return remote_left(cell) if remote_is_running(cell) else running_left(cell, _corpus_args(cell))
+
+
+def campaign_active(name):
+  """Whether a job of this machine (running.json) or a remote worker (its reports, current) is running campaign `name`."""
+  try:
+    if json.load(open(os.path.join(CAMPAIGNS, ab.RUNNING_NAME))).get("campaign") == name:
+      return True
+  except (OSError, ValueError):
+    pass
+  return remote_live(name) is not None
 
 
 def progress_badge(prog, name):
   if not prog:
     return ""
   done, planned, left = prog
-  running = ""
-  try:
-    r = json.load(open(os.path.join(CAMPAIGNS, "running.json")))
-    running = " · running" if r.get("campaign") == name else ""
-    if running and left is not None:
-      running += f" · {eta_text(left)} left"
-  except (OSError, ValueError):
-    pass
+  running = " · running" if campaign_active(name) else ""
+  if running and left is not None:
+    running += f" · {eta_text(left)} left"
   cls = "done" if done >= planned else "running" if running else "partial"
   return f'<span class="badge {cls}">{done} of {planned} cells{running}</span>'
 
@@ -875,7 +923,7 @@ h2.sec:first-child{margin-top:8px}
 details.specs ul{margin:2px 0 6px;padding-left:20px}
 .diffs{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin:4px 0 8px}
 table.summary td:nth-child(n+3),table.summary th:nth-child(n+3){text-align:right}
-tr[data-running] td{color:var(--muted)} .single-ver .ver{display:none} p.specs{margin:0 0 4px}
+tr[data-running] td{color:var(--muted)} tr.sr.live td:first-child{box-shadow:inset 3px 0 var(--warn)} .single-ver .ver{display:none} p.specs{margin:0 0 4px}
 details.cells{margin:10px 0 0} details.cells>summary,details.metrics>summary{cursor:pointer;font-size:12.5px} .pv{display:block;white-space:nowrap} .pv b{font-weight:normal}
 details.metrics{margin:2px 0 6px} details.metrics>summary{color:var(--muted)} table.m th{font-weight:normal;color:var(--fg);border:0;padding:2px 14px 2px 0} table.m td{border:0;padding:2px 10px}
 .summ.sv-off{display:none} .d{white-space:nowrap;font-size:12px} .pm{font-size:11px;color:var(--muted)} .d.better{color:var(--ok)} .d.worse{color:var(--bad)} .d.flat,.d.na{color:var(--muted)}
@@ -1296,8 +1344,9 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
           except (KeyError, TypeError):
               planned = []
           run_at = running_cell(name)
-          summ = (card_summary(recs, order, planned, per_unit, "unit", run_at) + card_summary(recs, order, planned, None, "op", run_at) if per_unit
-                  else card_summary(recs, order, planned, running=run_at)) if recs or planned else ""
+          run_left = running_eta(name, run_at)
+          summ = (card_summary(recs, order, planned, per_unit, "unit", run_at, run_left) + card_summary(recs, order, planned, None, "op", run_at, run_left) if per_unit
+                  else card_summary(recs, order, planned, running=run_at, left=run_left)) if recs or planned else ""
       about = (f"means over forks, each alternating {esc(', '.join(paired))}; Δ against {esc(paired[0])} within each fork" if paired
                else "Δ against the first variant; counters of the benchmark threads; ▸ shows a row's cells, a value's hover its distribution"
                + (f"; per {esc(metrics.unit_name(per_unit))}: counts, allocation and the score divided by the <code>{esc(per_unit)}</code> counter per op"

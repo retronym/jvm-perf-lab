@@ -159,7 +159,8 @@ class Job:
 
     def beat(self, final_rc=None):
         data = self.chunk()
-        body = {"transcript": data.decode(errors="replace"), "paused": control.acked(self.ctl) and self.word == control.PAUSE}
+        body = {"transcript": data.decode(errors="replace"), "paused": control.acked(self.ctl) and self.word == control.PAUSE,
+                "live": self.live()}
         if final_rc is not None:
             self.w.client.post(f"/api/workers/jobs/{self.id}/finish", {**body, "rc": final_rc})
             self.sent += len(data)
@@ -169,6 +170,22 @@ class Job:
         if r.get("control") != self.word:
             self.word = r.get("control")
             self.apply()
+
+    def live(self):
+        """The cell being run, for the coordinator's index (its ETAs): {cell: [corpus, variant, round], started, left}, where
+        `left` is the seconds the cell has left (perflab.index.running_left); None between cells."""
+        try:
+            from . import index
+            r = _read_json(getattr(self, "running_f", "")) or {}
+            if not r.get("cell") or r.get("campaign") != self.p["campaign"]:
+                return None
+            cell = os.path.join(os.path.dirname(self.running_f), r["cell"])
+            corpus, variant, rnd = r["cell"].split("/")[-3:]
+            spec = _read_json(os.path.join(os.path.dirname(self.running_f), self.p["campaign"], "spec.json")) or {}
+            return {"campaign": self.p["campaign"], "cell": [corpus, variant, int(rnd)], "started": r.get("started"),
+                    "left": index.running_left(cell, (spec.get("corpora") or {}).get(corpus))}
+        except Exception:  # progress is a courtesy: never the heartbeat's failure
+            return None
 
     def apply(self):
         """The control file: the coordinator's word, else the worker's own pause while it uploads."""
@@ -540,7 +557,7 @@ class Job:
         with open(os.path.join(self.dir, "output.log"), "ab") as out:
             self.proc = subprocess.Popen(cmd, cwd=project, env=env, stdin=subprocess.DEVNULL, stdout=out,
                                          stderr=subprocess.STDOUT, start_new_session=True)
-        running_f = os.path.join(os.path.dirname(camp), ab.RUNNING_NAME)
+        running_f = self.running_f = os.path.join(os.path.dirname(camp), ab.RUNNING_NAME)
         term_at, cancel_at, seen, pending = None, None, None, False
         while self.proc.poll() is None:
             time.sleep(1)
