@@ -81,7 +81,7 @@ def harness(root):
 
 
 def jdk(java):
-    """A `java` as the worker matches it: its path and its JDK's `release` file ({JAVA_VERSION, IMPLEMENTOR, ...})."""
+    """A `java` as the worker matches it: its path, its JDK's home and that's `release` file ({JAVA_VERSION, IMPLEMENTOR, ...})."""
     home = os.path.dirname(os.path.dirname(os.path.realpath(java)))
     rel = {}
     try:
@@ -133,6 +133,9 @@ def prepare(job, project):
     payload = {"job": job["id"], "argv": job["argv"], "spec": spec, "specVersion": specs.record(out, path),
                "campaign": spec["name"], "testbed": job["testbed"], "harness": harness(project["root"]),
                "sources": sources, "jvm": jdk(spec["jvm"]) if spec.get("jvm") else None,
+               # the JDK the builds find (the job's JAVA_HOME, as its submitter's shell had it): a build's class files
+               # are of its version, which the benchmark's JVM must be able to load
+               "javaHome": jdk(os.path.join(os.path.realpath(job["env"]["JAVA_HOME"]), "bin", "java")) if (job.get("env") or {}).get("JAVA_HOME") else None,
                "home": os.path.expanduser("~"), "prepared": time.time()}
     with open(os.path.join(job["dir"], PAYLOAD + ".tmp"), "w") as f:
         json.dump(payload, f)

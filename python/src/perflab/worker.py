@@ -8,9 +8,9 @@ every 10 s (which renews its lease, carries the job's transcript, and brings bac
 - checks out the harness (the coordinator's project repository at its HEAD, with its uncommitted diff) into a worktree
   of its own, and each build's commit into a worktree per commit, from a mirror per repository: fetched from the
   repository's remotes, else from a git bundle the coordinator makes;
-- maps the spec's paths (the coordinator's repository and home, and worker.toml's [paths]) and its `jvm` (by its JDK's
-  release file: worker.toml's [jdks], the mapped path, SDKMAN's candidates, /Library/Java), and fails the job, before
-  anything runs, on a JDK or path it does not have;
+- maps the spec's paths (the coordinator's repository and home, and worker.toml's [paths]), and its `jvm` and the
+  builds' JAVA_HOME by their JDK's release file (worker.toml's [jdks], the mapped path, SDKMAN's candidates,
+  /Library/Java), and fails the job, before anything runs, on a JDK or path it does not have;
 - downloads the campaign's finished cells (their results), so `ab run` resumes where the coordinator's index is;
 - runs `ab run` on the mapped spec with the harness's perflab, and uploads each cell when it finishes, each voided
   attempt and the campaign's top-level files, and at the end all of them.
@@ -137,6 +137,7 @@ class Job:
             control.write(f, None)
         open(self.transcript, "w").close()
         self.sent, self.word, self.lost, self.proc = 0, None, None, None
+        self.java_home = None
         self.hold = False  # the worker's own pause at a cell boundary, to upload while nothing is measured
         self.ctl_lock = threading.Lock()
         self.stop = threading.Event()
@@ -450,7 +451,11 @@ class Job:
                 checkouts[v] = self.checkout(v, src)
                 self.say(f"[perflab] build {v}: {src['commit'][:10]} in {checkouts[v]}")
                 self.checkpoint()
-            spec, missing = self.spec(self.mapper(wt), checkouts)
+            map_ = self.mapper(wt)
+            spec, missing = self.spec(map_, checkouts)
+            if self.p.get("javaHome"):  # the builds' JDK, as the coordinator's: a build's class files are of its version
+                self.java_home = os.path.dirname(os.path.dirname(self.jdk(self.p["javaHome"], map_(self.p["javaHome"]["path"]))))
+                self.say(f"[perflab] builds with JAVA_HOME={self.java_home}")
             left = self.copy_inputs(missing)
             if left:
                 raise RuntimeError("the spec names paths this machine does not have and the coordinator could not send "
@@ -502,6 +507,9 @@ class Job:
                     testbed.ENV: self.w.testbed, "PYTHONUNBUFFERED": "1",
                     # a perflab server of this machine's own is not the coordinator: the job never registers with it
                     "PERFLAB_SERVER_HOME": os.path.join(self.w.home, "server")})
+        if self.java_home:
+            env["JAVA_HOME"] = self.java_home
+            env["PATH"] = os.pathsep.join([os.path.join(self.java_home, "bin"), env.get("PATH", "")])
         cmd = [sys.executable, "-m", "perflab", "--transcript", self.transcript, *argv]
         self.say(f"[perflab] running {' '.join(argv)} in {project}")
         with open(os.path.join(self.dir, "output.log"), "ab") as out:

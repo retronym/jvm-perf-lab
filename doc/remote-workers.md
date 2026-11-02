@@ -44,7 +44,7 @@ A spec names the coordinator's paths. The worker maps each absolute path in it b
 - the coordinator's home → the worker's home (Coursier's cache, SDKMAN's JDKs);
 - `[paths]` in `~/.perflab/worker.toml`, for anything else.
 
-A `jvm` is matched on what it is, not where: the coordinator sends its `release` file's version and vendor, and the worker uses the mapped path if that JDK is there, else `[jdks]` in worker.toml (by the coordinator's path, or by version), else fails the job saying which JDK to install (`sdk install java 25.0.4-tem`). A path in the spec that still does not exist after mapping fails the job too, listing them all, before any build. The checks of `ab run` (the JVM, every JVM argument, the snapshot) then run on the mapped spec, as they do locally.
+A `jvm` is matched on what it is, not where: the coordinator sends its `release` file's version and vendor, and the worker uses the mapped path if that JDK is there, else `[jdks]` in worker.toml (by the coordinator's path, or by version), else fails the job saying which JDK to install (`sdk install java 25.0.4-tem`). The JDK the builds find (the job's `JAVA_HOME`, as the submitter's shell had it) is matched the same way and set for the job: a build's class files are of its JDK's version, so a worker whose default JDK is newer would build classes the benchmark's JVM cannot load. A path in the spec that still does not exist after mapping fails the job too, listing them all, before any build. The checks of `ab run` (the JVM, every JVM argument, the snapshot) then run on the mapped spec, as they do locally.
 
 ### 5. Results come back as cells
 
