@@ -811,9 +811,9 @@ def progress(spec_dir):
     return None
   done = [os.path.dirname(f) for f in glob.glob(os.path.join(spec_dir, "*", "*", "*", "result.json"))
           if os.path.getsize(f) > 0 and not testbed.foreign(os.path.dirname(f))]
-  left = None
-  run = running_cell(os.path.basename(spec_dir))
-  building = campaign_active(os.path.basename(spec_dir))
+  left, name = None, os.path.basename(os.path.normpath(spec_dir))
+  run = running_cell(name)
+  building = campaign_active(name)
   if run is not None or building:  # between cells (building the next), the cells still to run are all there is
     secs = {}
     for c in done:
@@ -821,11 +821,13 @@ def progress(spec_dir):
       if d:
         secs.setdefault(os.path.basename(os.path.dirname(os.path.dirname(c))), []).append(d)
     every = [d for v in secs.values() for d in v]
-    live = remote_live(os.path.basename(spec_dir))
+    live = remote_live(name)
     if live and live.get("left") is not None and run == tuple(live["cell"]):  # a remote worker's, as it reported it
       cur = max(0.0, live["left"] - (time.time() - live["at"]))
     else:
       cur = running_left(os.path.join(spec_dir, run[0], run[1], str(run[2])), s["corpora"].get(run[0])) if run else 0.0
+      if cur is None:  # before its first iteration
+        cur = typical_left(name, run)
     if every and cur is not None:
       mean = lambda c: sum(secs.get(c) or every) / len(secs.get(c) or every)
       for c in s["corpora"]:
@@ -878,12 +880,32 @@ def remote_left(cell):
   return None if not live or live.get("left") is None else max(0.0, live["left"] - (time.time() - live["at"]))
 
 
+def typical_left(name, run):
+  """Before a running cell's first iteration: the mean of its campaign's finished cells of its corpus (any corpus's, else)
+  less the time since it started (running.json); None without a finished cell."""
+  d = os.path.join(CAMPAIGNS, name)
+  secs = {}
+  for f in glob.glob(os.path.join(d, "*", "*", "*", "result.json")):
+    c = os.path.dirname(f)
+    if os.path.getsize(f) > 0 and not testbed.foreign(c) and (t := cell_secs(c)):
+      secs.setdefault(c.split(os.sep)[-3], []).append(t)
+  have = secs.get(run[0]) or [t for v in secs.values() for t in v]
+  if not have:
+    return None
+  try:
+    started = json.load(open(os.path.join(CAMPAIGNS, ab.RUNNING_NAME))).get("started") or time.time()
+  except (OSError, ValueError):
+    started = (remote_live(name) or {}).get("started") or time.time()
+  return max(0.0, sum(have) / len(have) - (time.time() - started))
+
+
 def running_eta(name, run):
   """Seconds the running cell `run` of campaign `name` has left, by its worker's report or its own iterations; None."""
   if not run:
     return None
   cell = os.path.join(CAMPAIGNS, name, run[0], run[1], str(run[2]))
-  return remote_left(cell) if remote_is_running(cell) else running_left(cell, _corpus_args(cell))
+  left = remote_left(cell) if remote_is_running(cell) else running_left(cell, _corpus_args(cell))
+  return typical_left(name, run) if left is None else left
 
 
 def campaign_active(name):
