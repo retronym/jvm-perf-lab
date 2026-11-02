@@ -759,7 +759,9 @@ class Server:
         self.url = f"http://127.0.0.1:{self.port}/"
         self.indexing = set()
         self.reexec, self.reload_error = False, None
-        self.workers = {}  # remote workers by name: {name, testbed, seen, job, live, paused}, from their claims and heartbeats
+        # remote workers by name: {name, testbed, seen, job, live, paused}, from their claims and heartbeats; kept in
+        # workers.json, so a restart (a reload) still knows their machines and a worker gone since is listed offline
+        self.workers = {w["name"]: w for w in (_read_json(os.path.join(self.home, "workers.json")) or []) if isinstance(w, dict) and w.get("name")}
         self.reindexing = {}  # project id -> when a reindex after a remote worker's upload is due
 
     def start(self):
@@ -868,8 +870,16 @@ class Server:
         threading.Thread(target=run, daemon=True).start()
 
     def seen(self, worker, **kw):
-        w = self.workers.setdefault(worker, {"name": worker})
-        w.update(kw, seen=time.time())
+        with self.q.lock:
+            w = self.workers.setdefault(worker, {"name": worker})
+            w.update(kw, seen=time.time())
+            f = os.path.join(self.home, "workers.json")
+            try:
+                with open(f + ".tmp", "w") as fh:
+                    json.dump(list(self.workers.values()), fh)
+                os.replace(f + ".tmp", f)
+            except OSError:
+                pass
 
     def storage_entries(self):
         projects = self.q.projects()
@@ -1133,7 +1143,9 @@ class Server:
                     if op == "heartbeat":
                         j = server.q.heartbeat(jid, worker, bool(body.get("paused")))
                         _live(server.q.project(j["project"]), j, body.get("live"))
-                        server.seen(worker, job=jid, live=body.get("live"), paused=bool(body.get("paused")))
+                        known = (server.workers.get(worker) or {}).get("testbed")  # else its claim's, until its next claim
+                        server.seen(worker, job=jid, live=body.get("live"), paused=bool(body.get("paused")),
+                                    testbed=known or {"name": j.get("testbed")})
                         return self._send(200, {"state": j["state"], "control": j["control"]})
                     if op == "finish":
                         j = server.q.finish(jid, worker, int(body.get("rc", 1)))
