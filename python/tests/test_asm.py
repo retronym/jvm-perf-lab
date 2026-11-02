@@ -42,6 +42,19 @@ class AsmTest(unittest.TestCase):
         self.assertFalse(os.path.exists(os.path.join(self.cell, "vm-7.log")))
         self.assertGreater(c["instructions"], 50)
 
+    def test_cell_page(self):
+        page = open(os.path.join(self.cell, "asm", "index.html")).read()  # written by split
+        self.assertIn("<b>default</b>", page)
+        self.assertIn("String::hashCode:2430", page)
+        self.assertNotIn("heat from", page)
+        before = os.path.getmtime(asm.page_path(self.cell))
+        m = "java.lang.String::hashCode"
+        asm.save_hot(self.cell, m, {((m, 2430),): 0.75, ((m, 1),): 0.25}, [os.path.join(self.camps, "p", "x", "a", "1")])
+        os.utime(os.path.join(self.cell, "asm", "hot.json"), (before + 10, before + 10))
+        page = open(asm.ensure_cell_page(self.cell)).read()
+        self.assertIn("heat from p/x/a/1, 25% of it at positions", page)
+        self.assertIn('style="width:75%"', page)
+
     def test_default_is_the_last_top_tier(self):
         sel = asm.select(self.cell, "String::hashCode")
         self.assertEqual([c["compiler"] for c in sel.values()], ["jvmci"])

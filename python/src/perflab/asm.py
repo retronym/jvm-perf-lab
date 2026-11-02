@@ -186,6 +186,7 @@ def split(cell, logs=None):
     index.sort(key=lambda c: (c["method"], c.get("pid") or 0, c["compileId"]))
     with open(os.path.join(out, INDEX), "w") as f:
         json.dump(index, f, indent=1)
+    write_cell_page(cell)
     for lp in [] if given else logs:
         with open(lp, "rb") as src, gzip.open(lp + ".gz", "wb") as dst:
             dst.write(src.read())
@@ -706,6 +707,9 @@ def diff(campaign, a, b, method, corpus=None, rnd=None, compile_id_a=None, compi
             keys_a, keys_b = list(groups(code_a)), list(groups(code_b))
             jc = parent_jfrconv(parent_of(d)) if pa or pb else None
             ha, hb = (hot(pa, m, jc) if pa else None), (hot(pb, m, jc) if pb else None)
+            for cell, h in ((ca[3], ha), (cb[3], hb)):
+                if h is not None:
+                    save_hot(cell, m, h, pa if cell == ca[3] else pb)
             ha = shade(ha, keys_a) if ha is not None else None
             hb = shade(hb, keys_b) if hb is not None else None
             if pa or pb:
@@ -720,6 +724,8 @@ def diff(campaign, a, b, method, corpus=None, rnd=None, compile_id_a=None, compi
                          "b": [_brief(c) for c in load_index(cb[3]) if c["method"] == m and c.get("signature") == sig]})
         out["methods"].append(r)
     if write:
+        for cell in {ca[3], cb[3]}:
+            write_cell_page(cell)
         base = os.path.join(d, f"asm-diff-{_safe(method.split('(')[0].split('.')[-1])}-{a}-{b}")
         with open(base + ".json", "w") as f:
             json.dump(out, f)
@@ -811,6 +817,128 @@ def page(out, d):
     title = f"asm {out['method']}: {A} vs {B}"
     return (f"{ui.HEAD}<title>{esc(title)}</title>{ui.style(ui.BASE, CSS)}\n{ui.masthead(title, ui.home_from(d), slim=True)}"
             f"<main>{''.join(parts)}</main>{ui.footer()}")
+
+
+# a cell's page ------------------------------------------------------------------------------------------------------
+
+HOT = "hot.json"  # in <cell>/asm: {method: {"from": [cells], "paths": [[path, share]]}}, as asm diff read them
+PAGE = "index.html"  # in <cell>/asm
+
+
+def save_hot(cell, method, h, cells):
+    f = os.path.join(cell, "asm", HOT)
+    try:
+        cache = json.load(open(f))
+    except (OSError, ValueError):
+        cache = {}
+    cache[method] = {"from": [os.path.relpath(c, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(cell))))) for c in cells],
+                     "paths": [[[list(x) for x in k], v] for k, v in h.items()]}
+    with open(f, "w") as out:
+        json.dump(cache, out)
+
+
+def load_hot(cell, method):
+    try:
+        e = json.load(open(os.path.join(cell, "asm", HOT)))[method]
+    except (OSError, ValueError, KeyError):
+        return None, []
+    return {tuple(tuple(x) for x in k): v for k, v in e["paths"]}, e["from"]
+
+
+def page_path(cell):
+    return os.path.join(cell, "asm", PAGE)
+
+
+def ensure_cell_page(cell):
+    """<cell>/asm/index.html, written when missing or older than the index or the heat it shows; its path, or None
+    for a cell without a capture."""
+    idx = os.path.join(cell, "asm", INDEX)
+    if not os.path.exists(idx):
+        return None
+    pg = page_path(cell)
+    deps = [idx] + ([os.path.join(cell, "asm", HOT)] if os.path.exists(os.path.join(cell, "asm", HOT)) else [])
+    if not os.path.exists(pg) or os.path.getmtime(pg) < max(os.path.getmtime(x) for x in deps):
+        write_cell_page(cell)
+    return pg
+
+
+def _code_section(code, heat):
+    """One compilation's code by source group, one column: counts, heat, instructions."""
+    gs = groups(code)
+    shaded = shade(heat, list(gs)) if heat else {}
+    unplaced = shaded.pop(None, 0.0) if shaded else None
+    parts = []
+    for k, ins in gs.items():
+        c = counts(ins)
+        label = k[0] if k and isinstance(k[0], str) else scope_label(k)
+        h = shaded.get(k)
+        bar = (f'<span class="heat" title="{100 * h:.1f}% of the unit\'s samples"><i style="width:{min(100, 100 * h):.0f}%"></i></span>'
+               if h is not None else '<span class="heat nohot"></span>' if heat else "")
+        lines = "".join(_line(_insn_out(i), "") for i in ins)
+        parts.append(f'<details class="g"><summary><span class="lab" title="{esc(label)}">{esc(label)}</span>{bar}'
+                     f'<span>{c["insns"]}</span><span class=muted>spills {c["spill"]} · fills {c["fill"]} · calls {c["call"]}</span></summary>'
+                     f'<div class="code one">{lines}</div></details>')
+    return "".join(parts), unplaced
+
+
+def write_cell_page(cell):
+    """A cell's printed compilations: a table of them all, and the code of each method's top-tier ones by source group
+    (the default compilation open), shaded by the heat `asm diff` read for it."""
+    from . import ui
+    idx = load_index(cell) or []
+    co, v, r = cell.rstrip("/").split(os.sep)[-3:]
+    camp = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(cell)))))
+    by = collections.defaultdict(list)
+    for c in idx:
+        by[(c["method"], c.get("signature"))].append(c)
+    defaults = {id(default(cs)) for cs in by.values()}
+    rows = []
+    for c in idx:
+        anchor = f"c{c['compileId']}-{c.get('pid') or 0}"
+        tier = f"t{c['level']}" + (f" OSR@{c['osr']}" if c.get("osr") is not None else "")
+        n = c.get("counts") or {}
+        shown = c["level"] >= 4 or c["compiler"] in ("c2", "jvmci")
+        name = f'<a href="#{anchor}">{esc(c["method"])}</a>' if shown else esc(c["method"])
+        rows.append(f'<tr{" class=def" if id(c) in defaults else ""}><td>{name}<span class=muted>{esc(c.get("signature") or "")}</span></td>'
+                    f'<td>{c["compileId"]}</td><td>{esc(c["compiler"])}</td><td>{tier}</td><td>{c["bytes"]}</td>'
+                    f'<td>{n.get("insns", c.get("instructions", ""))}</td><td>{n.get("spill", "")}</td><td>{n.get("fill", "")}</td>'
+                    f'<td>{n.get("call", "")}</td><td><a href="{esc(os.path.relpath(os.path.join(cell, c["file"]), os.path.join(cell, "asm")))}">.s</a>'
+                    f'{" <b>default</b>" if id(c) in defaults else ""}</td></tr>')
+    secs = []
+    for (m, sig), cs in by.items():
+        heat, frm = load_hot(cell, m)
+        for c in cs:
+            if not (c["level"] >= 4 or c["compiler"] in ("c2", "jvmci")):
+                continue
+            code = code_of(cell, c)
+            body, unplaced = _code_section(code, heat)
+            t = code["totals"]["main"]
+            note = (f' <span class=muted>heat from {esc(", ".join(frm))}'
+                    + (f", {100 * unplaced:.0f}% of it at positions this code has no group for" if unplaced else "") + "</span>") if heat else ""
+            secs.append(f'<details class="comp" id="c{c["compileId"]}-{c.get("pid") or 0}"{" open" if id(c) in defaults else ""}>'
+                        f'<summary><b>{esc(m.split(".")[-1])}</b><span class=muted>{esc(sig or "")}</span> compile {c["compileId"]} '
+                        f'({esc(c["compiler"])} tier {c["level"]}{", default" if id(c) in defaults else ""}): {t["insns"]} instructions, '
+                        f'{t["spill"]} spills, {t["fill"]} fills, {t["call"]} calls, {code["blocks"]} blocks{note}</summary>{body}</details>')
+    head = "".join(f"<th>{h}</th>" for h in ("method", "compile", "compiler", "tier", "bytecode", "insns", "spills", "fills", "calls", ""))
+    title = f"asm {camp} · {co}/{v}/{r}"
+    html_ = (f"{ui.HEAD}<title>{esc(title)}</title>{ui.style(ui.BASE, CSS, CELL_CSS)}\n{ui.masthead(title, ui.home_from(os.path.join(cell, 'asm')), slim=True)}"
+             f"<main><p class=muted>The machine code this fork compiled for the capture's methods (CompileCommand=print, "
+             f"not a timed fork). Counts are of the main code, from the verified entry. The default compilation of each "
+             f"method is its last top-tier, non-OSR one, the one <code>perflab asm diff</code> compares; groups are its "
+             f"debug info's inlining path (method:line, outermost first); heat appears once <code>asm diff</code> has read the "
+             f"parent campaign's profile.</p><table class=t>{head}{''.join(rows)}</table>{''.join(secs)}</main>{ui.footer()}")
+    with open(page_path(cell), "w") as f:
+        f.write(html_)
+    return page_path(cell)
+
+
+CELL_CSS = """
+details.comp{margin:14px 0}
+details.comp>summary{cursor:pointer;font-size:14px;padding:4px 0}
+.code.one{grid-template-columns:1fr}
+tr.def td{background:rgba(230,170,30,.08)}
+.heat.nohot{opacity:.35}
+"""
 
 
 # capture spec ------------------------------------------------------------------------------------------------------

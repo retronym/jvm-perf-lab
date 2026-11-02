@@ -123,6 +123,13 @@ def cell_row(spec, corpus, variant, cell):
     flags = " ".join([a for a in r["jvmArgs"] if pattern.search(a) and not a.startswith("-Dperflab.")] + ([scalac] if scalac else []))
     graphs = flame_graphs(cell)
     tl = timeline_link(cell) if os.path.exists(os.path.join(cell, "timeline.html")) else ""
+    if os.path.exists(os.path.join(cell, "asm", "index.json")):  # an asm capture's cell: its printed compilations
+        from . import asm
+        try:
+            pg = asm.ensure_cell_page(cell)
+            tl += link(pg, "asm", "asm", "The machine code this fork compiled for the capture's methods, by source line")
+        except Exception as e:  # a page that cannot be written is no reason to drop the cell
+            print(f"[index] {cell}: no asm page: {e}", file=sys.stderr)
     when = os.path.getmtime(res_f)
     version = specs.of_cell(cell)
     ver_html = f' <span class="when ver" title="spec version">spec {esc(version)}</span>' if version else ""
@@ -246,11 +253,12 @@ STAT_TITLE = {"mean": "the mean over rounds of each round's mean, ± the sd over
               "min": "the fastest measured iteration, the forks pooled; Δ ± the sd of a bootstrap over forks and iterations"}
 
 
-def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, left=None):
+def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, left=None, timing=True):
     """A campaign's summary and cells as one table: a row per corpus and variant, its cells as rows beneath (hidden
     until it is expanded), every value as mean, median and min (the card's statistic switch picks one). `recs` are
     the cells (dicts from `cell_rec`), `planned` the (corpus, variant, round)s of the spec, `running` the one being run
-    (running.json), shown so before it has a result, with `left` seconds it has to go. The page's data: per row
+    (running.json), shown so before it has a result, with `left` seconds it has to go. Without `timing` (an asm
+    capture, whose forks printed code) no Δ against the first variant. The page's data: per row
     its values per statistic, per cell its iterations per fork per metric, for the hover panel and the chart."""
     by = {}
     for r in recs:
@@ -291,12 +299,14 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, l
                         if k not in st.get(v, {}):
                             ms[stat].append(None); cell_html[stat] = ""; continue
                         mean, sd, d, spread, ok = st[v][k]
+                        if not timing:
+                            d = None
                         shown = metrics.fmt(kind, mean)
                         rel_sd = f' <span class="pm">± {100 * sd / mean:.1f}%</span>' if sd is not None and mean else ""
                         ms[stat].append(view_metric(shown, mean, sd, d, spread, ok))
                         cell_html[stat] = with_delta(f"{shown}{rel_sd}", "" if d is None else delta(d, spread, ok))
                     else:
-                        x, d, spread, ok = metrics.pooled_delta(forks(base, k) if v != base else None, forks(v, k), stat, kind, per_unit)
+                        x, d, spread, ok = metrics.pooled_delta(forks(base, k) if v != base and timing else None, forks(v, k), stat, kind, per_unit)
                         if x is None:
                             ms[stat].append(None); cell_html[stat] = '<span class="k" title="no per-iteration samples">–</span>' if k in st.get(v, {}) else ""; continue
                         shown = metrics.fmt(kind, x)
@@ -1377,8 +1387,10 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
           run_at = running_cell(name)
           run_left = running_eta(name, run_at)
           summ = (card_summary(recs, order, planned, per_unit, "unit", run_at, run_left) + card_summary(recs, order, planned, None, "op", run_at, run_left) if per_unit
-                  else card_summary(recs, order, planned, running=run_at, left=run_left)) if recs or planned else ""
-      about = (f"means over forks, each alternating {esc(', '.join(paired))}; Δ against {esc(paired[0])} within each fork" if paired
+                  else card_summary(recs, order, planned, running=run_at, left=run_left, timing=not spec_json.get("asm"))) if recs or planned else ""
+      about = ("an asm capture: its forks printed machine code, so its scores are not timings and have no Δ; ▸ shows a row's cells and their <b>asm</b> pages"
+               if spec_json.get("asm") else
+               f"means over forks, each alternating {esc(', '.join(paired))}; Δ against {esc(paired[0])} within each fork" if paired
                else "Δ against the first variant; counters of the benchmark threads; ▸ shows a row's cells, a value's hover its distribution"
                + (f"; per {esc(metrics.unit_name(per_unit))}: counts, allocation and the score divided by the <code>{esc(per_unit)}</code> counter per op"
                   if per_unit and not paired else ""))
