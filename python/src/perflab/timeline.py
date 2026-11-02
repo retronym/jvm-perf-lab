@@ -20,8 +20,8 @@ svg.timeline.pannable { cursor:grab; } svg.timeline.pannable.dragging { cursor:g
 svg.timeline text { fill:var(--fg); font-size:11px; } svg.timeline .lab { fill:var(--muted); } svg.timeline text.on { fill:var(--panel); } svg.timeline text.halo { paint-order:stroke; stroke:var(--panel); stroke-width:3px; }
 svg.timeline .grid { stroke:var(--line); } svg.timeline .axis { stroke:var(--muted); opacity:.5; }
 .tl-wrap { position:relative; }
-.tl-fab { position:absolute; right:22px; bottom:30px; display:flex; gap:6px; }
-.tl-fab .btn { box-shadow:var(--shadow, 0 2px 8px rgba(0,0,0,.18)); background:var(--panel); }
+.tl-fab .btn { position:absolute; box-shadow:0 1px 6px rgba(0,0,0,.18); background:var(--panel); opacity:.92; }
+.tl-fab .btn:hover { opacity:1; }
 .tl-fab .btn.on { background:var(--link); border-color:var(--link); color:var(--panel); }
 .tl-fab .btn[hidden] { display:none; }
 .tl-legend { margin:2px 0 6px; } .tl-legend span { display:inline-block; margin-right:14px; font-size:12px; color:var(--muted); }

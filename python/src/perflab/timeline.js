@@ -81,7 +81,14 @@ const BenchTimeline = (() => {
       const now = fab.querySelector('[data-go=now]');
       now.hidden = !zoomed;
       now.classList.toggle('on', stuck);
-      now.textContent = stuck ? 'following now' : 'now ⇥';
+      now.title = stuck ? 'Following now: the newest iterations, as they come (pan back to stop)' : 'Scroll to now, and follow what comes in';
+    }
+    // each button at its own edge of the plot (by its shadow), halfway down
+    function placeFabs(W) {
+      const top = Math.max(8, (height - 22) / 2 - 12) + 'px';
+      const [s, n] = fab.querySelectorAll('button');
+      Object.assign(s.style, {left: L + 8 + 'px', top});
+      Object.assign(n.style, {right: R + 8 + 'px', top});
     }
     let L = 150, R = 16;
     // the score lane: every iteration's score at its time, and at the right, each variant's measurements as a cloud
@@ -157,6 +164,7 @@ const BenchTimeline = (() => {
         return;
       }
       svg.setAttribute('height', height);
+      placeFabs(W);
       let y = 8;
       const ticks = W < 600 ? 6 : 12;
       const span = x1 - x0, step = [100, 200, 500, 1000, 2000, 5000, 10000, 20000, 60000].find(s => span / s < ticks) || 120000;
@@ -355,7 +363,9 @@ const BenchTimeline = (() => {
         }
         if (vs.length > 1) el('text', {x: mid, y: y + r.h + 1, 'text-anchor': 'middle', class: 'lab'}).textContent = (n => v.length > n ? v.slice(0, n - 1) + '…' : v)(Math.max(3, Math.floor(cw / 6.2)));
       });
-      if (!meas.length) el('text', {x: a, y: y + r.h / 2 + 4, class: 'lab'}).textContent = 'no measurements yet';
+      // the column is narrow: two short centred lines, never clipped
+      if (!meas.length) ['measurements', 'go here'].forEach((t, k) =>
+        el('text', {x: a + w / 2, y: y + r.h / 2 - 3 + k * 13, 'text-anchor': 'middle', class: 'lab'}).textContent = t);
     }
 
     function set(data) {
