@@ -270,6 +270,26 @@ class Job:
             git(wt, "checkout", "-q", "--detach", "--force", src["commit"])
         return wt
 
+    def same_jdk(self, d, harness_wt):
+        """A worktree last built with another JDK loses its build outputs (an incremental build would keep class files
+        of that JDK's version): what git ignores, but for the harness the lab's out/ (its campaigns and corpora)."""
+        state = os.path.join(self.w.home, "jdk-of", re.sub(r"[^A-Za-z0-9_.-]", "_", os.path.relpath(d, self.w.home)))
+        want = self.java_home or ""
+        try:
+            had = open(state).read()
+        except OSError:
+            had = None
+        if had is not None and had != want:
+            if d == harness_wt:
+                out = os.path.join(os.path.normpath(os.path.join(d, self.p["harness"]["rel"])), "out")
+                git(d, "clean", "-fdXq", "-e", "!" + os.path.relpath(out, d) + "/")
+            else:
+                git(d, "clean", "-fdxq")
+            self.say(f"[perflab] {d}: built with another JDK last ({had or 'the default'}); its build outputs removed")
+        os.makedirs(os.path.dirname(state), exist_ok=True)
+        with open(state, "w") as f:
+            f.write(want)
+
     # paths and JDKs
 
     def mapper(self, harness_wt):
@@ -456,6 +476,8 @@ class Job:
             if self.p.get("javaHome"):  # the builds' JDK, as the coordinator's: a build's class files are of its version
                 self.java_home = os.path.dirname(os.path.dirname(self.jdk(self.p["javaHome"], map_(self.p["javaHome"]["path"]))))
                 self.say(f"[perflab] builds with JAVA_HOME={self.java_home}")
+            for d in [wt, *checkouts.values()]:
+                self.same_jdk(d, wt)
             left = self.copy_inputs(missing)
             if left:
                 raise RuntimeError("the spec names paths this machine does not have and the coordinator could not send "
