@@ -598,10 +598,10 @@ def sub(title, note, extra=""):
 
 
 def testbed_badge(spec_dir):
-    """The campaign's testbed, when its spec names one (the others run on this machine)."""
-    t = testbed._spec_testbed(os.path.join(spec_dir, "spec.json"), os.stat(os.path.join(spec_dir, "spec.json")).st_mtime_ns) \
-        if os.path.exists(os.path.join(spec_dir, "spec.json")) else None
-    return f' <span class="badge" title="The machine its cells run on: only its cells count">testbed {esc(t)}</span>' if t else ""
+    """The campaign's testbed, on every card: numbers of two testbeds are never to be compared."""
+    t = testbed.of_campaign(spec_dir)
+    return (f' <span class="badge" title="The machine its cells run on: only its cells count, and its numbers compare only '
+            f'with other campaigns of testbed {esc(t)}">testbed {esc(t)}</span>')
 
 
 def card_head(kind, name, badge, when, buttons=""):

@@ -475,6 +475,7 @@ def main(argv):
     ap.add_argument("--no-light", action="store_true", help="without the light diff (the `light` preset) beside the curated one")
     ap.add_argument("--by-leaf", action="store_true", help="also the leaf-rooted differential graph")
     ap.add_argument("--force", action="store_true", help="render the raw diff again even when it is there")
+    ap.add_argument("--cross-testbed", action="store_true", help="compare cells of two testbeds (machines) anyway")
     ap.add_argument("--leaf", choices=sorted(stacks.LEAVES), help="the leaf frame by line or bytecode index (the callers by method)")
     x = ap.parse_args(argv)
     path = x.spec if os.path.isfile(x.spec) else os.path.join(config.get().campaigns, x.spec, "spec.json")
@@ -489,6 +490,8 @@ def main(argv):
     if not common:
         sys.exit(f"{spec['name']}: no round of {corpus} with a recording of both {x.a} and {x.b}")
     ca, cb = rounds[0][common[-1]], rounds[1][common[-1]]
+    from . import testbed
+    testbed.same(ca, cb, x.cross_testbed)
     jfrconv = jmh.jfrconv(jmh.async_lib(spec.get("lib")))
     events = x.event or [label.removeprefix("hw-") for label, _ in regraph.events_of(ca)]
     stem = f"diff-{corpus + '-' if len(corpora) > 1 else ''}{x.a}-{x.b}"

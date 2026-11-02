@@ -80,6 +80,23 @@ class QueueTest(unittest.TestCase):
         self.assertIsNone(server.job_testbed(["ab", "run", "x.json"], d))
 
 
+class CrossTestbedTest(unittest.TestCase):
+    def test_cells_of_two_testbeds_are_not_compared_unless_asked(self):
+        d = tempfile.mkdtemp()
+        cells = []
+        for camp, tb in (("x", "far"), ("y", "near")):
+            c = os.path.join(d, camp, "corpus", "v", "1")
+            os.makedirs(c)
+            json.dump({"name": camp}, open(os.path.join(d, camp, "spec.json"), "w"))
+            json.dump({"name": tb}, open(os.path.join(c, testbed.CELL_FILE), "w"))
+            cells.append(c)
+        with self.assertRaises(SystemExit) as e:
+            testbed.same(*cells)
+        self.assertIn("not comparable", str(e.exception))
+        self.assertIn("far", testbed.same(*cells, allow=True))
+        self.assertIsNone(testbed.same(cells[0], cells[0]))
+
+
 class MappingTest(unittest.TestCase):
     def test_inputs_are_the_paths_the_spec_names(self):
         spec = {"jvmArgs": "-Xmx1G -Da=/x/corpus/ -Db=/y/a.jar:/y/b.jar", "lib": "/z/lib.dylib", "description": "/not/this",

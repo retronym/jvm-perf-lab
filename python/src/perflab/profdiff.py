@@ -145,8 +145,11 @@ def main(argv):
     ap.add_argument("--event", default="cycles")
     ap.add_argument("--jfrconv")
     ap.add_argument("--top", type=int, default=25)
+    ap.add_argument("--cross-testbed", action="store_true", help="compare runs of two testbeds (machines) anyway")
     ap.add_argument("a"); ap.add_argument("b"); ap.add_argument("out")
     x = ap.parse_args(argv)
+    from . import testbed
+    testbed.same(profile_dir(x.a), profile_dir(x.b), x.cross_testbed)
     if not x.jfrconv:
         from . import jmh
         x.jfrconv = jmh.jfrconv(jmh.async_lib())

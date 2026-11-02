@@ -121,6 +121,21 @@ def campaign_of_cell(cell):
     return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(cell))))
 
 
+def same(a, b, allow=False):
+    """Refuses (SystemExit) to compare cells (or runs) of two testbeds: their numbers are not comparable. A cell from
+    before testbeds is its campaign's (a run's: unknown, and not refused). `allow` (--cross-testbed): a warning."""
+    ta = of_cell(a) or (of_campaign(campaign_of_cell(a)) if os.path.exists(os.path.join(campaign_of_cell(a), "spec.json")) else None)
+    tb = of_cell(b) or (of_campaign(campaign_of_cell(b)) if os.path.exists(os.path.join(campaign_of_cell(b), "spec.json")) else None)
+    if ta and tb and ta != tb:
+        msg = (f"{a} ran on testbed {ta} and {b} on {tb}: numbers from two machines are not comparable "
+               "(compare variants within one testbed)")
+        if not allow:
+            raise SystemExit(msg + "; --cross-testbed compares them anyway")
+        print(f"warning: {msg}", file=__import__("sys").stderr)
+        return f"testbeds differ: a {ta}, b {tb}"
+    return None
+
+
 def foreign(cell):
     """The testbed the cell ran on when it is not its campaign's (the cell counts for nothing), else None."""
     t = of_cell(cell)

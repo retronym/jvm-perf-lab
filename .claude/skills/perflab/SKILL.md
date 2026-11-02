@@ -78,6 +78,8 @@ To explain a difference between builds or JIT flags at the level of C2's inlinin
 
 When variants do different amounts of work per op, set `"perUnit"` to the benchmark's aux counter of that work (`"files"`): the summary and `perflab ab report` then compare per unit (cycles/file), not per op. The summary shows every counter the cells recorded; read it there rather than from `result.json`.
 
+**Testbeds: never compare numbers across machines.** Every cell records the machine it ran on (its testbed: `m5-pro`, `m4`), and the index shows each campaign's on its card. Two machines' numbers differ by more than the effects being measured, so compare variants within one campaign, or campaigns of one testbed; `profdiff` and `ab diff` refuse cells of two testbeds (`--cross-testbed` overrides, for a deliberate cross-machine question). Say the testbed with every number you report. For a low-noise A/B, `"testbed": "<name>"` in the spec queues it for that machine's `perflab worker` (`doc/remote-workers.md`, `doc/worker-setup.md`); `perflab server status` and `/api/status` (`workers`) show which workers are polling.
+
 Let perflab choose output directories (`--out` is optional; cells go under `[paths] campaigns`). Don't write scripts that assume a directory exists.
 
 To explain why one build is slower than another (a campaign to establish the gap, then profiles, spot fixes with a ceiling variant, hardware counters, field layouts), follow `doc/optimising.md` in the jvm-perf-lab checkout ([on GitHub](https://github.com/retronym/jvm-perf-lab/blob/main/doc/optimising.md)): it says what to run next given what you have measured.
