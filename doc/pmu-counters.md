@@ -44,7 +44,7 @@ sudo tools/build/async-profiler/build/bin/asprof-kperf -s /tmp/asprof-kperf.sock
 perflab run --profile async:cycles+instructions+cache-misses+branch-misses --kperf /tmp/asprof-kperf.sock -- <jmh args>
 ```
 
-The helper programs the counters (which needs root) and serves PMU samples to profiled JVMs that connect to its socket. Events joined by `+` are recorded in one session into one JFR; `jfrconv --hw <event>` renders each. Counts are user mode only, so time spent in the kernel does not appear. Upstream async-profiler has no hardware-counter events on macOS.
+The helper programs the counters (which needs root) and serves PMU samples to profiled JVMs that connect to its socket. To keep it running, across logins and reboots, without a terminal held open, install it as a launchd daemon: `mise run kperf:install` copies the built helper to `/usr/local/libexec` (root's own copy: root never runs a binary your user can rewrite), and runs it at `/tmp/asprof-kperf.sock` for your user, restarted if it dies, logging to `/tmp/asprof-kperf.log`. Run it again after rebuilding async-profiler; `mise run kperf:uninstall` removes it. (`sudo -b` over ssh does not do: the helper dies with the session's pty.) Events joined by `+` are recorded in one session into one JFR; `jfrconv --hw <event>` renders each. Counts are user mode only, so time spent in the kernel does not appear. Upstream async-profiler has no hardware-counter events on macOS.
 
 ### Choosing a sampling period
 

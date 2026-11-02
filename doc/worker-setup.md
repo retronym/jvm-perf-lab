@@ -26,9 +26,12 @@ A worker runs the campaigns of its testbed that are queued on a coordinator (the
 
 4. **Inputs.** A path in a spec's `jvmArgs`, `lib` or JMH arguments (a corpus, jars in Coursier's cache) is mapped from the coordinator's repository and home to the worker's. When the worker does not have it, it copies it from the coordinator (only paths the job's spec names, under the coordinator's home), to the mapped place. So a corpus made by hand on the coordinator (`labs/scala3/out/corpora/...`) needs nothing here; it is copied once into the harness worktree, which keeps it.
 
-5. **Optional: the kperf helper**, for `async` campaigns with `"kperf"`: build retronym/async-profiler's integration branch (`mise run tools:async-profiler` in the jvm-perf-lab checkout), and start the helper as root at the socket path the specs name ([pmu-counters.md](pmu-counters.md)):
+5. **Optional: the kperf helper**, for `async` campaigns with `"kperf"`: build retronym/async-profiler's integration branch at the coordinator's commit (`tools/build/async-profiler/BUILT_COMMIT` there; a helper and its library come from one build), install the helper as a launchd daemon, and give the worker the library, since the harness worktree has no build of its own ([pmu-counters.md](pmu-counters.md)):
    ```bash
-   sudo ~/code/jvm-perf-lab/tools/build/async-profiler/build/bin/asprof-kperf -s /tmp/asprof-kperf.sock
+   cd ~/code/jvm-perf-lab && mise run tools:async-profiler && mise run kperf:install
+   ```
+   ```bash
+   export ASYNC_PROFILER_LIB=~/code/jvm-perf-lab/tools/build/async-profiler/build/lib/libasyncProfiler.dylib
    ```
 
 6. **Its testbed name.** By default the CPU's (`Apple M4 Pro` → `m4-pro`); `testbed` in worker.toml (below) chooses another.

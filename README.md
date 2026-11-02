@@ -89,8 +89,12 @@ There is no release yet: build a snapshot into `~/.m2` with `mise run install`. 
 
 [labs/](labs/README.md) holds two labs built on perflab: [labs/scala3](labs/scala3/README.md) for a scala/scala3 checkout and [labs/scala2](labs/scala2/README.md) for a scala/scala checkout. Each is an sbt build that loads the compiler checkout as a source dependency, so the compiler branch being measured carries no lab commits.
 
+## Remote workers
+
+A quieter machine can run the campaigns queued on your `perflab server` ([doc/remote-workers.md](doc/remote-workers.md)). A spec that says `"testbed": "m4"` waits on the queue for a worker of that testbed: `perflab worker` on the other machine claims it, fetches the builds' commits (unpushed ones as git bundles from the server), runs `ab run` with the server's own harness, and uploads each cell as it finishes, so results land in the server's campaign and index as local ones do. Every cell records the machine it ran on, and only cells of one testbed are compared. The server stays on 127.0.0.1; the worker reaches it through `ssh -R` from the server's machine, with a key that may open that one port and nothing else. Setting up a worker (perflab, JDKs, the tunnel, the kperf helper as a launchd daemon with `mise run kperf:install`): [doc/worker-setup.md](doc/worker-setup.md).
+
 ## Building
 
-`mise run build` (Java 21 builds the Java 17 release), `mise run test`, `mise run install` for a snapshot in `~/.m2`, `mise run cli` to install `perflab`, `mise run tools:async-profiler` for retronym/async-profiler's integration branch (kperf events, `jfrconv --spans`), `mise run site` and `mise run publish-site` for the sample results.
+`mise run build` (Java 21 builds the Java 17 release), `mise run test`, `mise run install` for a snapshot in `~/.m2`, `mise run cli` to install `perflab`, `mise run tools:async-profiler` for retronym/async-profiler's integration branch (kperf events, `jfrconv --spans`), `mise run kperf:install` to run its kperf helper as a launchd daemon, `mise run site` and `mise run publish-site` for the sample results.
 
 Licensed under the Apache License 2.0.

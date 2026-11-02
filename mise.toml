@@ -99,6 +99,49 @@ for _ in $(seq 50); do test -f "$home/server.json" && break; sleep 0.2; done
 PYTHONPATH="{{config_root}}/python/src" "$python" -m perflab server status
 """
 
+[tasks."kperf:install"]
+description = "Run the asprof-kperf helper (built by tools:async-profiler) as a launchd daemon at /tmp/asprof-kperf.sock, for this user: started at boot, restarted if it dies (sudo)"
+run = """
+set -euo pipefail
+label=io.github.retronym.asprof-kperf
+built="{{config_root}}/tools/build/async-profiler/build/bin/asprof-kperf"
+bin=/usr/local/libexec/asprof-kperf   # root's own copy: root never runs a binary this user can rewrite
+plist="/Library/LaunchDaemons/$label.plist"
+sock="${KPERF_SOCKET:-/tmp/asprof-kperf.sock}"
+test -x "$built" || { echo "no $built: mise run tools:async-profiler first"; exit 1; }
+tmp=$(mktemp)
+cat > "$tmp" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>$label</string>
+  <key>ProgramArguments</key><array>
+    <string>$bin</string><string>-s</string><string>$sock</string><string>-u</string><string>$(id -u)</string><string>-d</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/asprof-kperf.log</string>
+  <key>StandardErrorPath</key><string>/tmp/asprof-kperf.log</string>
+</dict></plist>
+PLIST
+plutil -lint -s "$tmp"
+sudo launchctl bootout "system/$label" 2>/dev/null || true
+sudo install -d -o root -g wheel /usr/local/libexec
+sudo install -o root -g wheel -m 755 "$built" "$bin"
+sudo install -o root -g wheel -m 644 "$tmp" "$plist"
+rm -f "$tmp"
+sudo launchctl bootstrap system "$plist"
+for _ in $(seq 50); do test -S "$sock" && break; sleep 0.2; done
+ls -l "$sock" && tail -1 /tmp/asprof-kperf.log
+"""
+
+[tasks."kperf:uninstall"]
+description = "Stop and remove the asprof-kperf launchd daemon (sudo)"
+run = """
+sudo launchctl bootout system/io.github.retronym.asprof-kperf 2>/dev/null || true
+sudo rm -f /Library/LaunchDaemons/io.github.retronym.asprof-kperf.plist /usr/local/libexec/asprof-kperf
+"""
+
 [tasks."server:restart"]
 description = "Restart the launchd perflab server (on this code); running jobs carry on and are adopted. A code change reloads it anyway"
 run = """
