@@ -881,6 +881,18 @@ def _code_section(code, heat):
     return "".join(parts), unplaced
 
 
+def short_sig(sig):
+    """A descriptor without packages and outer classes: (JLdotty/tools/dotc/core/Contexts$Context;)Z -> (J Context)Z."""
+    if not sig:
+        return ""
+    sig = re.sub(r"L(?:[\w$]*/)*(?:[\w]*\$)*([\w]+);", r" \1 ", sig)
+    return re.sub(r"\s+", " ", sig).replace("( ", "(").replace(" )", ")").strip()
+
+
+def short_method(m):
+    return m.rsplit(".", 1)[-1]
+
+
 def write_cell_page(cell):
     """A cell's printed compilations: a table of them all, and the code of each method's top-tier ones by source group
     (the default compilation open), shaded by the heat `asm diff` read for it."""
@@ -898,8 +910,9 @@ def write_cell_page(cell):
         tier = f"t{c['level']}" + (f" OSR@{c['osr']}" if c.get("osr") is not None else "")
         n = c.get("counts") or {}
         shown = c["level"] >= 4 or c["compiler"] in ("c2", "jvmci")
-        name = f'<a href="#{anchor}">{esc(c["method"])}</a>' if shown else esc(c["method"])
-        rows.append(f'<tr{" class=def" if id(c) in defaults else ""}><td>{name}<span class=muted>{esc(c.get("signature") or "")}</span></td>'
+        full = c["method"] + (c.get("signature") or "")
+        name = f'<a href="#{anchor}">{esc(short_method(c["method"]))}</a>' if shown else esc(short_method(c["method"]))
+        rows.append(f'<tr{" class=def" if id(c) in defaults else ""}><td title="{esc(full)}">{name} <span class=muted>{esc(short_sig(c.get("signature")))}</span></td>'
                     f'<td>{c["compileId"]}</td><td>{esc(c["compiler"])}</td><td>{tier}</td><td>{c["bytes"]}</td>'
                     f'<td>{n.get("insns", c.get("instructions", ""))}</td><td>{n.get("spill", "")}</td><td>{n.get("fill", "")}</td>'
                     f'<td>{n.get("call", "")}</td><td><a href="{esc(os.path.relpath(os.path.join(cell, c["file"]), os.path.join(cell, "asm")))}">.s</a>'
@@ -916,7 +929,7 @@ def write_cell_page(cell):
             note = (f' <span class=muted>heat from {esc(", ".join(frm))}'
                     + (f", {100 * unplaced:.0f}% of it at positions this code has no group for" if unplaced else "") + "</span>") if heat else ""
             secs.append(f'<details class="comp" id="c{c["compileId"]}-{c.get("pid") or 0}"{" open" if id(c) in defaults else ""}>'
-                        f'<summary><b>{esc(m.split(".")[-1])}</b><span class=muted>{esc(sig or "")}</span> compile {c["compileId"]} '
+                        f'<summary title="{esc(m + (sig or ""))}"><b>{esc(short_method(m))}</b> <span class=muted>{esc(short_sig(sig))}</span> compile {c["compileId"]} '
                         f'({esc(c["compiler"])} tier {c["level"]}{", default" if id(c) in defaults else ""}): {t["insns"]} instructions, '
                         f'{t["spill"]} spills, {t["fill"]} fills, {t["call"]} calls, {code["blocks"]} blocks{note}</summary>{body}</details>')
     head = "".join(f"<th>{h}</th>" for h in ("method", "compile", "compiler", "tier", "bytecode", "insns", "spills", "fills", "calls", ""))
