@@ -49,7 +49,17 @@ ssh <worker host> mkdir -p .perflab/worker
 ```bash
 scp ~/.perflab/server/token <worker host>:.perflab/worker/token
 ```
-For a tunnel that comes back after sleep or a network change, run it under `autossh -M 0 -o ServerAliveInterval=30 -o ServerAliveCountMax=3 ...`.
+To keep it up across reboots, sleep and network changes, put it in `~/.ssh/config` and run it as a launchd agent on the coordinator (restarted when it drops; log in `~/.perflab/tunnel-<host>.log`). A dedicated key that the worker restricts to that one listener (`restrict,port-forwarding,permitlisten="127.0.0.1:8691",permitopen="127.0.0.1:9",command="/usr/bin/false"` before it in the worker's `authorized_keys`) needs no agent, so the tunnel comes back unattended. Use another port on the worker if it runs a perflab server of its own on 8690, and point `server` in its worker.toml at it:
+```
+Host perflab-tunnel
+  HostName <worker host>
+  IdentityFile ~/.ssh/perflab_tunnel
+  IdentitiesOnly yes
+  RemoteForward 127.0.0.1:8691 127.0.0.1:8690
+```
+```bash
+mise run tunnel:install
+```
 
 ## Running it
 
@@ -60,10 +70,11 @@ testbed = "m4"
 [jdks]
 "/Users/me/jdks/jdk26-patched/bin/java" = "/Users/me/jdks/jdk26-patched"
 ```
-Then, kept awake while it waits:
+Then run it as a launchd agent, from a jvm-perf-lab checkout of its own (it runs in the login shell's environment, kept awake with `caffeinate`, restarted if it dies; log in `~/.perflab/worker/worker.log`). Pass `ASYNC_PROFILER_LIB` for kperf campaigns:
 ```bash
-caffeinate -i perflab worker
+ASYNC_PROFILER_LIB=~/code/jvm-perf-lab/tools/build/async-profiler/build/lib/libasyncProfiler.dylib mise run worker:install
 ```
+In the foreground instead: `caffeinate -i perflab worker`.
 It polls the queue every 10 s. A job it claims shows on the coordinator's queue page with the worker's name and testbed, with its transcript as it runs; pause and cancel there take effect at the next cell, as for a local job. If the worker stops answering for 90 s (the laptop slept, the tunnel dropped) the job goes back on the queue, and the next claim resumes it from the cells already uploaded.
 
 ## Submitting to it
