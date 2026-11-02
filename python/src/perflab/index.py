@@ -1654,7 +1654,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       for (const [id, o] of open) {{ const d = document.getElementById(id); if (d) d.open = o; }}
       const keep = sel.value;
       sel.innerHTML = doc.getElementById('tl-cell').innerHTML;
-      if (keep && ![...sel.options].some(o => o.value === keep)) sel.add(new Option(keep, keep), 0);
+      if (keep && ![...sel.options].some(o => o.value === keep)) sel.add(new Option((runs.find(r => r.dir === keep) || {{name: keep}}).name, keep), 0);
       sel.value = keep;
       apply(); jobsOnCards();
     }} catch (e) {{}}
