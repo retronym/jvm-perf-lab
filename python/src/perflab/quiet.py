@@ -4,7 +4,8 @@ changed; `perflab quiet off` puts it all back; `perflab quiet status` shows what
 (thermal, power, memory, its performance and efficiency cores) and a sample of other load.
 
   perflab quiet on  [--no-apps] [--no-spotlight]    Time Machine, Spotlight indexing, automatic software update checks
-                                                    and Low Power Mode off; the applications in [quiet] apps quit;
+                                                    and Low Power Mode off; the applications in [quiet] apps quit; the
+                                                    user's launchd agents in [quiet] agents (git maintenance) unloaded;
                                                     caffeinate for the duration
   perflab quiet off [--no-apps]                     restore what `on` recorded (apps relaunched unless --no-apps)
   perflab quiet status                              what is quiet, and a 5 s sample of the machine
@@ -16,6 +17,8 @@ without a terminal or cached credentials it prints those commands for you to run
     apps = ["Docker", "Slack", "Google Chrome"]   # applications to quit (perflab.toml); default: QUIT_APPS
     spotlight = false                             # keep indexing on: for a build directory kept out of Spotlight by a
                                                   # .noindex suffix or its Privacy list, which costs nothing to leave on
+    agents = ["^com\\.example\\.sync$"]           # more labels (regexes) of ~/Library/LaunchAgents to unload, beside
+                                                  # AGENTS: `git maintenance start`'s hourly/daily/weekly gc and repack
 
 What it does not do, because macOS exposes no knob: pin threads to the performance cores (size JMH's threads to
 `hw.perflevel0.logicalcpu` instead), hold the clock frequency, or stop the thermal controller (watch the thermal
@@ -33,6 +36,10 @@ QUIT_APPS = ["Docker", "Slack", "Discord", "Microsoft Teams", "zoom.us", "Google
              "Arc", "Photos", "Music", "Mail", "Messages", "IntelliJ IDEA", "Visual Studio Code", "Xcode", "Dropbox",
              "Google Drive", "OneDrive", "Spotify"]
 TM_PREFS = "/Library/Preferences/com.apple.TimeMachine"
+# the user's launchd agents that wake up to do heavy background work: `git maintenance start`'s (gc, repack, prefetch,
+# commit-graph of every registered repository) and anything that runs it
+AGENTS = [r"^org\.git-scm\.git\.(hourly|daily|weekly)$", r"git-maintenance"]
+AGENTS_DIR = os.path.expanduser("~/Library/LaunchAgents")
 
 
 def state_path():
@@ -157,6 +164,30 @@ def configured_spotlight():
     return v is None or bool(v)
 
 
+def configured_agents():
+    from . import config
+    more = config.get().get("quiet", "agents")
+    return AGENTS + (list(more) if isinstance(more, list) else [])
+
+
+def loaded_agents(patterns, agents_dir=None):
+    """{label: plist} of the user's loaded launchd agents (in ~/Library/LaunchAgents) whose label matches a pattern."""
+    d = agents_dir or AGENTS_DIR
+    loaded = {line.split("\t")[-1] for line in run(["launchctl", "list"]).stdout.splitlines()[1:]}
+    out = {}
+    for f in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+        label = f.removesuffix(".plist")
+        if f.endswith(".plist") and label in loaded and any(re.search(p, label) for p in patterns):
+            out[label] = os.path.join(d, f)
+    return out
+
+
+def unload_agents(agents):
+    """Unloads each agent (no root: the user's own domain); the labels it unloaded. A run in progress is stopped."""
+    uid = os.getuid()
+    return [label for label in agents if run(["launchctl", "bootout", f"gui/{uid}/{label}"]).returncode == 0]
+
+
 # --- on / off
 
 def quit_apps(apps):
@@ -194,7 +225,7 @@ def on(argv):
     with_apps, with_spotlight = "--no-apps" not in argv, "--no-spotlight" not in argv and configured_spotlight()
     sudo = Sudo()
     # what `on` turned off, for `off` to turn back on: only what ran, not what was left for the user
-    state = {"since": time.time(), "done": {}, "apps": [], "caffeinate": None, "pending": []}
+    state = {"since": time.time(), "done": {}, "apps": [], "agents": {}, "caffeinate": None, "pending": []}
     done = []
     if time_machine() and sudo.run(["tmutil", "disable"]):
         run(["tmutil", "stopbackup"])
@@ -219,6 +250,11 @@ def on(argv):
                 done.append(f"quit {', '.join(state['apps'])}")
             if left:
                 print(f"  still running (quit them yourself): {', '.join(left)}")
+    agents = loaded_agents(configured_agents())
+    if agents:
+        state["agents"] = {label: agents[label] for label in unload_agents(agents)}
+        if state["agents"]:
+            done.append(f"unloaded {', '.join(state['agents'])}")
     try:
         p = subprocess.Popen(["caffeinate", "-dimsu"], start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         state["caffeinate"] = p.pid
@@ -256,6 +292,10 @@ def off(argv):
             done.append("caffeinate stopped")
         except OSError:
             pass
+    back = [label for label, plist in (state.get("agents") or {}).items()
+            if run(["launchctl", "bootstrap", f"gui/{os.getuid()}", plist]).returncode == 0]
+    if back:
+        done.append(f"loaded {', '.join(back)}")
     if "--no-apps" not in argv and state.get("apps"):
         for app in state["apps"]:
             run(["open", "-g", "-a", app])
@@ -267,7 +307,7 @@ def off(argv):
         print("if you ran what `on` left to you, reverse it:\n  " + "\n  ".join("sudo " + u for u in undo if u))
     if sudo.deferred:  # `done` stays as it was: another `off`, with root, restores the rest
         state["pending"] = list(sudo.deferred)
-        state["caffeinate"], state["apps"] = None, []
+        state["caffeinate"], state["apps"], state["agents"] = None, [], {}
         save_state(state)
         sudo.report()
         return 1
@@ -283,6 +323,7 @@ def status(argv):
                                  ("software update", did.get("softwareUpdate")), ("Low Power Mode", did.get("lowPower"))) if on_]
         print(f"quiet: on since {time.strftime('%H:%M', time.localtime(state['since']))}"
               + (f", turned off {', '.join(what)}" if what else ", nothing turned off") + (f"; quit {', '.join(state['apps'])}" if state.get("apps") else "")
+              + (f"; unloaded {', '.join(state['agents'])}" if state.get("agents") else "")
               + ("; caffeinate" if caffeinate_pid(state) else ""))
         if state.get("pending"):
             print("  left to you (no root): " + "; ".join(state["pending"]))
@@ -296,6 +337,9 @@ def status(argv):
     apps = running_apps(configured_apps())
     if apps:
         print("running: " + ", ".join(apps))
+    agents = loaded_agents(configured_agents())
+    if agents:
+        print("background agents loaded: " + ", ".join(agents))
     c = cores()
     if c:
         print(f"cores: {c[0]} performance, {c[1]} efficiency (size JMH's threads to the performance cores)")

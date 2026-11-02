@@ -117,6 +117,26 @@ class OnOffTest(unittest.TestCase):
         self.assertEqual([c for c in self.cmds if c[:1] == ["sudo"]], [])
         self.assertFalse(os.path.exists(self.state))
 
+    def test_background_agents_unloaded_then_loaded_back(self):
+        agents = {"org.git-scm.git.hourly": "/la/org.git-scm.git.hourly.plist"}
+        with mock.patch.object(quiet, "loaded_agents", lambda patterns: agents):
+            self.assertEqual(quiet.on([]), 0)
+        uid = os.getuid()
+        self.assertIn(["launchctl", "bootout", f"gui/{uid}/org.git-scm.git.hourly"], self.cmds)
+        self.assertEqual(json.load(open(self.state))["agents"], agents)
+        self.cmds.clear()
+        self.assertEqual(quiet.off([]), 0)
+        self.assertIn(["launchctl", "bootstrap", f"gui/{uid}", "/la/org.git-scm.git.hourly.plist"], self.cmds)
+
+    def test_loaded_agents_match_by_label(self):
+        d = tempfile.mkdtemp()
+        for label in ("org.git-scm.git.daily", "au.id.x.git-maintenance-sync", "com.other.thing", "org.git-scm.git.weekly"):
+            open(os.path.join(d, label + ".plist"), "w").close()
+        listing = "PID\tStatus\tLabel\n-\t0\torg.git-scm.git.daily\n-\t0\tau.id.x.git-maintenance-sync\n12\t0\tcom.other.thing\n"
+        with mock.patch.object(quiet, "run", lambda cmd, timeout=30: quiet.subprocess.CompletedProcess(cmd, 0, listing, "")):
+            got = quiet.loaded_agents(quiet.AGENTS, d)
+        self.assertEqual(sorted(got), ["au.id.x.git-maintenance-sync", "org.git-scm.git.daily"])  # weekly: not loaded
+
     def test_off_without_on(self):
         self.assertEqual(quiet.off([]), 0)
         self.assertEqual(self.cmds, [])
