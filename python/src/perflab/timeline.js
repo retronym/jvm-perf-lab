@@ -363,9 +363,6 @@ const BenchTimeline = (() => {
         }
         if (vs.length > 1) el('text', {x: mid, y: y + r.h + 1, 'text-anchor': 'middle', class: 'lab'}).textContent = (n => v.length > n ? v.slice(0, n - 1) + '…' : v)(Math.max(3, Math.floor(cw / 6.2)));
       });
-      // the column is narrow: two short centred lines, never clipped
-      if (!meas.length) ['measurements', 'go here'].forEach((t, k) =>
-        el('text', {x: a + w / 2, y: y + r.h / 2 - 3 + k * 13, 'text-anchor': 'middle', class: 'lab'}).textContent = t);
     }
 
     function set(data) {
