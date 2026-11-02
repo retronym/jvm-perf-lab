@@ -79,7 +79,9 @@ final class InMemoryCompiler(val corpus: Corpus, options: List[String] = Nil, re
         try doCompile(compiler, corpus.files)(using ctx1)
         finally if costs then CostHooks.disarm()
       catch case e: Exception =>
-        throw new IllegalStateException(s"${corpus.name}: compiler crashed after:\n${store.removeBufferedMessages(using root).take(10).mkString("\n")}", e)
+        // a given rather than `(using root)`: the Context parameter is gone since scala/scala3#27005
+        val buffered = { given Context = root; store.removeBufferedMessages }
+        throw new IllegalStateException(s"${corpus.name}: compiler crashed after:\n${buffered.take(10).mkString("\n")}", e)
     if reporter.hasErrors then
       throw new IllegalStateException(s"${corpus.name} failed to compile:\n${reporter.allErrors.take(10).mkString("\n")}")
 
