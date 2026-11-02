@@ -11,6 +11,8 @@ TEXT = ("text/", "application/json", "application/javascript")
 class Handler(http.server.SimpleHTTPRequestHandler):
     def guess_type(self, path):
         t = super().guess_type(path)
+        if t == "text/markdown":  # browsers download it rather than show it (the table link of a compare page: a blank pane)
+            t = "text/plain"
         return f"{t}; charset=utf-8" if t.startswith(TEXT) and "charset" not in t else t
 
     def log_message(self, *args):
