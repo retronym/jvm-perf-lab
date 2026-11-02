@@ -20,6 +20,9 @@ A spec:
     "jfrsync": "+jdk.PromoteObjectInNewPLAB",  # optional, for async: the JDK events in its .jfr, instead of the lab's
                                               # [async] jfrsync: a .jfc, false, or `+event...` added to the lab's .jfc
                                               # (written to <campaign>/jfrsync.jfc); recorded in <cell>/jfrsync.json
+    "asm": ["pkg.Class::method"],             # optional: an asm capture, its forks printing these methods' machine code
+                                              # (hsdis; perflab.asm, doc/asm.md) into <cell>/asm; its scores are not for timing
+    "asmOf": "exp12",                         # optional, with "asm": the campaign it explains, whose builds it reuses
     "jitRecording": true,                     # optional: record the JIT over each whole fork, from JVM start (perflab-jit.jfc:
                                               # compilations, deopts, inlining decisions) in <cell>/jit-<pid>.jitrec, for
                                               # `perflab api jit` and `jitDiff`; any profile. Large: for a pilot of one fork
@@ -118,6 +121,8 @@ class Spec:
         self.kperf, self.lib = s.get("kperf"), s.get("lib")
         self.jfrsync = s.get("jfrsync", jmh.LAB)  # the campaign's, else the lab's [async] jfrsync
         self.jit_recording = bool(s.get("jitRecording"))
+        # "asm": methods whose compilations the forks print (perflab.asm); "asmOf": the campaign it explains
+        self.asm, self.asm_of = list(s.get("asm") or []), s.get("asmOf")
         self.jvm_args = s.get("jvmArgs", cfg.get("benchmark", "jvmArgs") or "")
         self.jvm = s.get("jvm")
         self.rounds = s.get("rounds", 2)
@@ -194,6 +199,9 @@ class Spec:
         extra.append(f"-Dperflab.cell={dest}")
         if self.jit_recording:
             extra.append(jmh.jit_recording(dest))
+        if self.asm:
+            from . import asm
+            extra += asm.jvm_flags(self.asm, dest)
         jvm_args = " ".join(x for x in [self.jvm_args, flags, *extra] if x)
         args = (["-jvm", self.jvm] if self.jvm else []) + ["-p", f"{self.corpus_param}={corpus}"]
         args += shlex.split(iters) + shlex.split(self.variant_jmh_args.get(variant, "")) + [self.benchmark]
@@ -399,6 +407,12 @@ def run(spec, dry, retry_unbuildable=False):
             log(f"index not served: {e}")
     # launch mode: the campaign's build, or each variant's, made once and kept, so every cell (and a resumed campaign)
     # measures the same build
+    if spec.asm and todo and not dry:
+        from . import asm
+        java = spec.jvm or os.path.join(os.environ.get("JAVA_HOME") or os.path.dirname(os.path.dirname(shutil.which("java") or "/x/bin/java")), "bin", "java")
+        problem = asm.check_hsdis(java)
+        if problem:
+            sys.exit(f"{spec.name}: {problem}")
     built = {}
     if spec.builds:  # builds are snapshots: launch mode, for this campaign (and a dry run shows it)
         os.environ["PERFLAB_BUILD_MODE"] = "launch"
@@ -413,7 +427,12 @@ def run(spec, dry, retry_unbuildable=False):
             else:
                 env = {k: str(x).replace("{checkout}", b["checkout"] or "") for k, x in (b.get("env") or {}).items()}
                 log(f"build of {v}: {b['checkout'] or ''}")
-                built[v] = launch.build(os.path.join(spec.out, launch.BUILD_DIR, v), env,
+                bdir = os.path.join(spec.out, launch.BUILD_DIR, v)
+                if spec.asm_of and not launch.reusable(bdir):  # an asm capture measures its parent's builds
+                    theirs = os.path.join(os.path.dirname(spec.out), spec.asm_of, launch.BUILD_DIR, v)
+                    if launch.reusable(theirs):
+                        bdir = theirs
+                built[v] = launch.build(bdir, env,
                                         label=f"{spec.name}: {v} ({b['checkout'] or ''})")
     # a branch's commits that did not build: their cells are skipped (until a run with --retry-unbuildable)
     unbuildable = branch.unbuildable(spec.build_out) if spec.branch_info and not retry_unbuildable else {}
@@ -490,6 +509,16 @@ def run(spec, dry, retry_unbuildable=False):
         if not problem and spec.kperf:
             for w in kperf.check(dest):
                 log(f"  warning: {w}")
+        if not problem and spec.asm:
+            from . import asm
+            try:
+                idx = asm.split(dest)
+                if not idx:
+                    log(f"  warning: no compilation of {', '.join(spec.asm)} was printed (not compiled, or a misspelt name: Class::method, $ for a nested or module class)")
+                else:
+                    log(f"  asm: {len(idx)} compilations of {len({c['method'] for c in idx})} methods in {dest}/asm")
+            except RuntimeError as e:
+                problem = str(e)
         if problem and spec.branch_info:
             # a commit whose run fails is a result of the branch, not the end of the campaign: recorded in the cell (the
             # view shows it), the other cells run, and a resume tries it again

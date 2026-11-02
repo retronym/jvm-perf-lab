@@ -734,7 +734,10 @@ def variants_panel(spec_dir):
     except (OSError, ValueError):
         return ""
     descs = s.get("variantDescriptions") or {}
-    if not s.get("description") and not descs:
+    capture = (f'<p class="k"><b>asm capture, not for timing</b>: its forks print the machine code of '
+               f'{", ".join(f"<code>{esc(m)}</code>" for m in s["asm"])} (perflab asm), which slows them'
+               + (f'; it explains <a href="#c-{esc(s["asmOf"])}">{esc(s["asmOf"])}</a>' if s.get("asmOf") else "") + ".</p>") if s.get("asm") else ""
+    if not s.get("description") and not descs and not capture:
         return ""
     trees, jmh_args = s.get("trees") or {}, s.get("variantJmhArgs") or {}
     names = list(s.get("paired") or s.get("variants") or {})
@@ -745,7 +748,7 @@ def variants_panel(spec_dir):
                else [f"JVM flags <code>{esc(s['variants'][v])}</code>"] if (s.get("variants") or {}).get(v) else []) \
             + ([f"JMH <code>{esc(jmh_args[v])}</code>"] if v in jmh_args else [])
         rows.append(f'<tr><th>{esc(v)}</th><td>{md(md_text(descs.get(v)))}</td><td class="k">{"<br>".join(what)}</td></tr>')
-    return (f'<div class="about">{md(md_text(s.get("description")))}'
+    return (f'<div class="about">{capture}{md(md_text(s.get("description")))}'
             + (f'<table class="variants">{"".join(rows)}</table>' if rows else "") + "</div>")
 
 
@@ -1331,9 +1334,11 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
                                else glob.glob(os.path.join(d, "*.html"))))
       # perflab inlinetree pages: the cells' compilation units compared, one per event
       trees_ = sorted(glob.glob(os.path.join(spec_dir, "inlinetree*.html")))
+      # perflab asm diff pages: two variants' machine code of a method
+      asm_pages = sorted(glob.glob(os.path.join(spec_dir, "asm-diff-*.html")))
       prog = progress(spec_dir)
       history = branchview.parts(spec_dir, root, config.get().corpus_param)
-      if not rows and not diffs and not trees_ and not prog and not history:
+      if not rows and not diffs and not trees_ and not asm_pages and not prog and not history:
           continue
       sid = "c-" + esc(name)
       diff_html = (f'<div class="diffs" data-lb-group="{esc(name)} · differential flame graphs"><span class="k">Differential flame graphs (a → b)</span>'
@@ -1343,6 +1348,10 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       diff_html += (f'<div class="diffs" data-lb-group="{esc(name)} · inline trees"><span class="k">Inline trees (perflab inlinetree)</span>'
                     + "".join(link(f, ev_of(f), "inlinetree|" + ev_of(f), "What the JIT inlined where, per build, against a baseline")
                               for f in trees_) + "</div>") if trees_ else ""
+      asm_of = lambda f: os.path.basename(f)[:-5].removeprefix("asm-diff-")
+      diff_html += (f'<div class="diffs" data-lb-group="{esc(name)} · machine code"><span class="k">Machine code (perflab asm diff)</span>'
+                    + "".join(link(f, asm_of(f), "asm|" + asm_of(f), "Two variants' machine code of a method, by source line")
+                              for f in asm_pages) + "</div>") if asm_pages else ""
       last = max(whens) if whens else os.path.getmtime(spec_dir)
       when = span(min(whens), last) if whens else stamp(last)
       has_notes = os.path.exists(os.path.join(spec_dir, "NOTES.md"))

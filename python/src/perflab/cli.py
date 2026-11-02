@@ -10,6 +10,7 @@
   regraph    flame graphs of async-profiler runs
   profdiff   two async-profiler runs compared per op
   inlinetree JIT compilation units of async-profiler runs: what was inlined where, against a baseline
+  asm        machine code of JIT compilations (hsdis): `asm capture` a campaign's methods, `asm diff` two variants' code
   frameweight, subtree   weight of frames, and of one frame's subtree, across runs
   analyze    hot methods and phase split of async-profiler runs
   auditfold  merge and fold caller-audit reports
@@ -41,9 +42,9 @@ COMMANDS = {"run": "jmh", "ab": "ab", "trees": "trees", "index": "index", "timel
             "profdiff": "profdiff", "inlinetree": "inlinetree", "frameweight": "frameweight", "subtree": "subtree", "analyze": "analyze",
             "auditfold": "auditfold", "loadgate": "loadgate", "quiet": "quiet", "site": "site", "serve": "serve", "defcosts": "defcosts",
             "server": "server", "submit": "server:submit_main", "jobs": "server:jobs_main",
-            "branch": "branchprofile", "api": "api", "mcp": "mcp", "worker": "worker"}
+            "branch": "branchprofile", "asm": "asm", "api": "api", "mcp": "mcp", "worker": "worker"}
 # the commands that become a job of a running `perflab server`: command -> the subcommands that do (None: all)
-SUBMITS = {"run": None, "ab": {"run", "diff"}, "branch": {"profile", "diff"}}
+SUBMITS = {"run": None, "ab": {"run", "diff"}, "branch": {"profile", "diff"}}  # `asm capture` submits its `ab run`
 LOCAL_ENV = "PERFLAB_LOCAL"  # server.LOCAL_ENV
 
 

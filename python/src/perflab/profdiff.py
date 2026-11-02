@@ -150,6 +150,8 @@ def main(argv):
     x = ap.parse_args(argv)
     from . import testbed
     testbed.same(profile_dir(x.a), profile_dir(x.b), x.cross_testbed)
+    from . import asm
+    asm.refuse_timing(profile_dir(x.a), profile_dir(x.b))
     if not x.jfrconv:
         from . import jmh
         x.jfrconv = jmh.jfrconv(jmh.async_lib())

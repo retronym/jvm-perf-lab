@@ -309,6 +309,56 @@ define("Jit", "The JIT's work in a cell, from its whole-fork JIT recording (a sp
                      "The largest methods' failed decisions")}),
     "methods": null(A(ref("JitMethod"), "With `method`: the methods it matches, with their decisions")),
     "note": null(S("What the recording cannot say"))}, top=True)
+define("AsmCounts", "Instruction counts of some code (perflab.asm.KINDS)", {
+    "insns": I("Instructions"), "load": I("Loads"), "store": I("Stores"), "spill": I("Stores to the stack (spills; the frame's setup too)"),
+    "fill": I("Loads from the stack"), "call": I("Calls (bl, blr; call)"), "branch": I("Branches and returns"),
+    "poll": I("Safepoint polls"), "nop": I("nops")})
+define("AsmCompilation", "One printed compilation of a method in a cell's fork", {
+    "compileId": I("The JVM's compile id"), "compiler": S("c1, c2 or jvmci"), "level": I("Tier: 3 C1 with profiling, 4 top tier"),
+    "osr": null(I("The OSR entry bci, or null")), "method": S("pkg.Class::name"), "signature": null(S("Its descriptor")),
+    "bytes": I("Bytecode size"), "instructions": I("Instructions of its main code (from the verified entry, without stubs)"),
+    "counts": ref("AsmCounts"), "stamp": null(N("Seconds since JVM start")), "pid": null(I("The fork's pid")), "flags": S("HotSpot's flags (%, s, !, b, n)"),
+    "file": S("Its printout, relative to the cell"), "default": B("The one compared by default: the last top-tier non-OSR compile of its (method, signature)")},
+    optional=("default", "flags", "counts"))
+define("AsmCell", "One cell's printed compilations", {
+    "cell": S("corpus/variant/round"), "compilations": A(ref("AsmCompilation"), "By method, then compile id")})
+define("Asm", "An asm capture's printed compilations per cell (a spec's \"asm\")", {
+    "campaign": S("The campaign"), "methods": A(S("Class::method"), "What the spec prints"), "asmOf": null(S("The campaign it explains")),
+    "cells": A(ref("AsmCell"), "Its cells with a capture")}, top=True)
+define("AsmInsn", "One instruction", {
+    "addr": S("Its address (hex)"), "op": S("Mnemonic"), "args": S("Operands as printed"),
+    "norm": S("`op args` normalised: branch targets as block labels, addresses and the immediates that build them as ADDR/IMM, relocations"),
+    "kinds": A(S("load, store, spill, fill, call, branch, poll, nop"), "Its classes"), "block": I("Basic block index"),
+    "bytecode": null(S("The bytecode its debug info names (*invokevirtual ...), at a call or safepoint")),
+    "scope": A(O("A frame", {"method": S("Class::method, lambda numbers removed"), "line": null(I("Source line")), "bci": I("bci")}),
+               "Its inlining path, outermost (the compiled method) first")})
+define("AsmGroup", "The instructions of one source position: an inlining path of (method, line)", {
+    "label": S("method:line → callee:line ..."), "key": null(A({"description": "A frame"}, "The path, or an out-of-line section's name")),
+    "counts": ref("AsmCounts"), "insns": A(ref("AsmInsn"), "Its instructions in address order")})
+define("AsmCode", "One compilation's code by source group", {
+    "cell": S("corpus/variant/round"), "compilation": ref("AsmCompilation"), "blocks": I("Basic blocks"),
+    "totals": O("Counts", {"main": ref("AsmCounts"), "entry": ref("AsmCounts"), "outOfLine": ref("AsmCounts")}),
+    "groups": A(ref("AsmGroup"), "Groups in order of their first instruction")}, top=True)
+define("AsmDiffGroup", "One source position in both builds", {
+    "label": S("method:line → ...; line a/b where the source moved"), "keyA": null(A({"description": "A frame"}, "a's path, null when only b has it")),
+    "keyB": null(A({"description": "A frame"}, "b's path")), "outOfLine": B("A stub or handler section"),
+    "a": ref("AsmCounts"), "b": ref("AsmCounts"), "same": B("The same normalised instructions"),
+    "hotA": null(N("Share of a's compiled unit's cycles at this position, from the parent campaign's async profile")), "hotB": null(N("b's")),
+    "ops": A(O("A diff hunk", {"tag": S("equal, replace, delete, insert"), "a": A(ref("AsmInsn"), "a's"), "b": A(ref("AsmInsn"), "b's")}),
+             "difflib over the normalised instructions (omitted for groups that are the same, unless code)")})
+define("AsmDiffMethod", "One method (overload) compared", {
+    "method": S("pkg.Class::name"), "signature": null(S("Descriptor")),
+    "compilations": O("The compared compilations", {"a": {"description": "a's"}, "b": {"description": "b's"}}, extra=True),
+    "others": O("Each side's compilations of the method", {"a": {"description": "a's"}, "b": {"description": "b's"}}, extra=True),
+    "totals": O("Counts per side", {"a": {"description": "main, entry, outOfLine"}, "b": {"description": "as a"}}),
+    "blocks": O("Basic blocks", {"a": I("a's"), "b": I("b's")}),
+    "hotUnplaced": null(O("The share of samples at a position that no group has", {"a": null(N("a's")), "b": null(N("b's"))})),
+    "groups": A(ref("AsmDiffGroup"), "a's groups in order, b's own after the group they follow")}, optional=("hotUnplaced",))
+define("AsmDiff", "Two variants' machine code of a method, by source position", {
+    "campaign": S("The asm capture"), "a": S("Variant a"), "b": S("Variant b"), "method": S("As asked"), "corpus": S("The corpus"),
+    "cells": O("The cells", {"a": S("a's, corpus/variant/round"), "b": S("b's")}),
+    "hotFrom": null(O("The parent's async cells the heat is from", {"a": A(S("cell"), "a's"), "b": A(S("cell"), "b's")})),
+    "methods": A(ref("AsmDiffMethod"), "Per overload in both"), "page": URL}, top=True)
 define("JitChange", "A decision of one method's last C2 compile that differs between two variants", {
     "caller": S("The caller"), "callee": S("The callee"),
     "a": null(S("In a: inlined, not inlined, mixed (some call sites each), or null when a's compile did not consider it")),
@@ -1506,6 +1556,91 @@ def jit_diff(campaign, a, b, corpus, round, project=None, top=30, method=None, m
                     recordings={"a": ja["recording"], "b": jb["recording"]}, source={"a": ja["source"], "b": jb["source"]},
                     totals={k: {"a": ta[k], "b": tb[k]} for k in ta}, methods=rows[:int(top)],
                     onlyA=only(ma, mb), onlyB=only(mb, ma), note="; ".join(notes) or None)
+
+
+def _asm_cell(d, campaign, variant, corpus, round):
+    from . import asm
+    try:
+        return asm.cell_of(d, variant, corpus, round)
+    except LookupError as e:
+        raise ApiError("not_found", e.args[0]) from None
+
+
+@endpoint("read", "Asm", "An asm capture's printed compilations (hsdis machine code), per cell; which one each method compares by default",
+          project=PROJECT_P, campaign=CAMPAIGN_P, corpus=S("Only this corpus"), variant=S("Only this variant"),
+          round=I("Only this round", minimum=1), method=S("Only compilations of this method (Class::method, a dotted suffix, or with its descriptor)"))
+def asm(campaign, project=None, corpus=None, variant=None, round=None, method=None):
+    """A campaign with "asm" in its spec prints its methods' compilations (CompileCommand=print) into <cell>/asm
+    (perflab.asm, doc/asm.md). Every tier and recompilation is listed; `default` marks the one asmDiff compares: the
+    last top-tier, non-OSR compile of each (method, signature). Its forks are not timed runs: read its scores as
+    nothing, and the code as what the JIT made of that fork's profile."""
+    from . import asm as asm_
+    p = resolve(project)
+    with _config(p):
+        d = _camp_dir(p, campaign)
+        spec = _json(os.path.join(d, "spec.json"), {}) or {}
+        cells = []
+        for co, v, r, cell in asm_.cells_of(d, corpus, variant, round):
+            idx = [c for c in asm_.load_index(cell) or [] if not method or asm_.matches(c, method)]
+            defaults = {id(c) for c in (asm_.default([x for x in idx if (x["method"], x.get("signature")) == k])
+                                        for k in {(x["method"], x.get("signature")) for x in idx})}
+            cells.append({"cell": f"{co}/{v}/{r}", "compilations": [{**c, "default": id(c) in defaults} for c in idx]})
+    return envelope("Asm", campaign=campaign, methods=spec.get("asm") or [], asmOf=spec.get("asmOf"), cells=cells)
+
+
+@endpoint("read", "AsmCode", "One compilation's machine code, normalised, by source position (inlining path and line), with counts",
+          project=PROJECT_P, campaign=CAMPAIGN_P, variant=S("The variant"), method=S("Class::method (a dotted suffix, or with its descriptor)"),
+          corpus=S("The corpus (default: the first with a capture)"), round=I("The round", minimum=1),
+          compileId=I("A compile id (see asm); default: the method's default compilation", minimum=0))
+def asm_code(campaign, variant, method, project=None, corpus=None, round=None, compileId=None):
+    """Read this, not the .s files: each instruction with its normalised form, classes (load, store, spill, fill,
+    call, branch, poll), basic block, the bytecode at a call, and the debug info's inlining path. An instruction
+    without debug info takes the next annotated one's in its block (the capture runs with DebugNonSafepoints)."""
+    from . import asm as asm_
+    p = resolve(project)
+    with _config(p):
+        d = _camp_dir(p, campaign)
+        co, v, r, cell = _asm_cell(d, campaign, variant, corpus, round)
+        sel = asm_.select(cell, method, compileId)
+        if not sel:
+            raise ApiError("not_found", f"no compilation of {method} in {co}/{v}/{r}")
+        if len(sel) > 1:
+            raise ApiError("bad_request", f"{method} is overloaded: " + ", ".join(m + (sg or "") for m, sg in sel) + "; give its descriptor")
+        comp = next(iter(sel.values()))
+        code = asm_.code_of(cell, comp)
+    gs = [{"label": k[0] if k and isinstance(k[0], str) else asm_.scope_label(k), "key": asm_._key_out(k),
+           "counts": asm_.counts(ins), "insns": [asm_._insn_out(i) for i in ins]} for k, ins in asm_.groups(code).items()]
+    return envelope("AsmCode", cell=f"{co}/{v}/{r}", compilation=comp, blocks=code["blocks"], totals=code["totals"], groups=gs)
+
+
+@endpoint("read", "AsmDiff", "Two variants' machine code of a method compared by source position: counts, spills, calls, a diff per position, heat from the parent's profile",
+          project=PROJECT_P, campaign=CAMPAIGN_P, a=S("Variant a (the base)"), b=S("Variant b"),
+          method=S("Class::method (a dotted suffix, e.g. SourceLanguage$::apply, or with its descriptor)"),
+          corpus=S("The corpus (default: the first with a capture)"), round=I("The round", minimum=1),
+          compileIdA=I("a's compile id (default: the default compilation)", minimum=0), compileIdB=I("b's", minimum=0),
+          code=B("Every group's instructions, not only those of groups that differ (default false)"),
+          hot=B("Shade by the parent campaign's async profile (default true; reading it takes seconds)"))
+def asm_diff(campaign, a, b, method, project=None, corpus=None, round=None, compileIdA=None, compileIdB=None, code=False, hot=True):
+    """Each compilation's instructions are grouped by their debug info's inlining path of (method, line), so that two
+    builds align on source; lambda numbers are ignored, and where a build's source moved (a path has no line in both),
+    a path's groups pair in source order. Per group: counts in both (instructions, loads, stores, spills, fills,
+    calls, branches, polls) and difflib over normalised instructions. With a parent campaign ("asmOf") that has
+    async profiles, hotA/hotB are each group's share of the unit's samples by the same key, from the timed forks.
+    Also writes <campaign>/asm-diff-<method>-<a>-<b>.html, linked from the card (`page`)."""
+    from . import asm as asm_
+    p = resolve(project)
+    with _config(p):
+        d = _camp_dir(p, campaign)
+        try:
+            out = asm_.diff(d, a, b, method, corpus, round, compileIdA, compileIdB, hot_path=bool(hot))
+        except LookupError as e:
+            raise ApiError("not_found", e.args[0]) from None
+        out["page"] = _url(p, out["page"])
+    for m in out["methods"]:
+        for g in m["groups"]:
+            if g["same"] and not code:
+                g["ops"] = []
+    return envelope("AsmDiff", **out)
 
 
 # ---- branch campaigns

@@ -49,6 +49,605 @@
    }
   ]
  },
+ "Asm": {
+  "schema": "Asm",
+  "version": 1,
+  "campaign": "plain-asm",
+  "methods": [
+   "java.lang.String::hashCode"
+  ],
+  "asmOf": "plain",
+  "cells": [
+   {
+    "cell": "x/a/1",
+    "compilations": [
+     {
+      "compileId": 2,
+      "compiler": "c1",
+      "level": 3,
+      "stamp": 0.016,
+      "method": "java.lang.String::hashCode",
+      "signature": "()I",
+      "bytes": 60,
+      "osr": null,
+      "flags": "",
+      "pid": 7,
+      "file": "asm/java.lang.String__hashCode/2-t3.s",
+      "counts": {
+       "insns": 320,
+       "load": 52,
+       "store": 52,
+       "spill": 7,
+       "fill": 2,
+       "call": 7,
+       "branch": 54,
+       "poll": 1,
+       "nop": 3
+      },
+      "instructions": 320,
+      "default": false
+     },
+     {
+      "compileId": 99,
+      "compiler": "jvmci",
+      "level": 4,
+      "stamp": 0.027,
+      "method": "java.lang.String::hashCode",
+      "signature": "()I",
+      "bytes": 60,
+      "osr": null,
+      "flags": "",
+      "pid": 7,
+      "file": "asm/java.lang.String__hashCode/99-t4.s",
+      "counts": {
+       "insns": 88,
+       "load": 12,
+       "store": 11,
+       "spill": 2,
+       "fill": 2,
+       "call": 5,
+       "branch": 17,
+       "poll": 2,
+       "nop": 4
+      },
+      "instructions": 88,
+      "default": true
+     }
+    ]
+   },
+   {
+    "cell": "x/b/1",
+    "compilations": [
+     {
+      "compileId": 4,
+      "compiler": "c1",
+      "level": 3,
+      "stamp": 0.022,
+      "method": "java.lang.String::hashCode",
+      "signature": "()I",
+      "bytes": 60,
+      "osr": null,
+      "flags": "",
+      "pid": 7,
+      "file": "asm/java.lang.String__hashCode/4-t3.s",
+      "counts": {
+       "insns": 316,
+       "load": 52,
+       "store": 52,
+       "spill": 7,
+       "fill": 2,
+       "call": 7,
+       "branch": 52,
+       "poll": 1,
+       "nop": 3
+      },
+      "instructions": 316,
+      "default": false
+     },
+     {
+      "compileId": 126,
+      "compiler": "jvmci",
+      "level": 4,
+      "stamp": 0.046,
+      "method": "java.lang.String::hashCode",
+      "signature": "()I",
+      "bytes": 60,
+      "osr": null,
+      "flags": "",
+      "pid": 7,
+      "file": "asm/java.lang.String__hashCode/126-t4.s",
+      "counts": {
+       "insns": 77,
+       "load": 12,
+       "store": 10,
+       "spill": 2,
+       "fill": 2,
+       "call": 4,
+       "branch": 17,
+       "poll": 2,
+       "nop": 3
+      },
+      "instructions": 77,
+      "default": true
+     }
+    ]
+   }
+  ]
+ },
+ "AsmCode": {
+  "schema": "AsmCode",
+  "version": 1,
+  "cell": "x/a/1",
+  "compilation": {
+   "compileId": 99,
+   "compiler": "jvmci",
+   "level": 4,
+   "stamp": 0.027,
+   "method": "java.lang.String::hashCode",
+   "signature": "()I",
+   "bytes": 60,
+   "osr": null,
+   "flags": "",
+   "pid": 7,
+   "file": "asm/java.lang.String__hashCode/99-t4.s",
+   "counts": {
+    "insns": 88,
+    "load": 12,
+    "store": 11,
+    "spill": 2,
+    "fill": 2,
+    "call": 5,
+    "branch": 17,
+    "poll": 2,
+    "nop": 4
+   },
+   "instructions": 88
+  },
+  "blocks": 30,
+  "totals": {
+   "main": {
+    "insns": 88,
+    "load": 12,
+    "store": 11,
+    "spill": 2,
+    "fill": 2,
+    "call": 5,
+    "branch": 17,
+    "poll": 2,
+    "nop": 4
+   },
+   "entry": {
+    "insns": 16,
+    "load": 2,
+    "store": 0,
+    "spill": 0,
+    "fill": 0,
+    "call": 0,
+    "branch": 2,
+    "poll": 0,
+    "nop": 11
+   },
+   "outOfLine": {
+    "insns": 4,
+    "load": 0,
+    "store": 0,
+    "spill": 0,
+    "fill": 0,
+    "call": 1,
+    "branch": 1,
+    "poll": 0,
+    "nop": 0
+   }
+  },
+  "groups": [
+   {
+    "label": "<entry>",
+    "key": [
+     "<entry>"
+    ],
+    "counts": {
+     "insns": 16,
+     "load": 2,
+     "store": 0,
+     "spill": 0,
+     "fill": 0,
+     "call": 0,
+     "branch": 2,
+     "poll": 0,
+     "nop": 11
+    },
+    "insns": [
+     {
+      "addr": "0x1331e9100",
+      "op": "nop",
+      "args": "",
+      "norm": "nop",
+      "kinds": [
+       "nop"
+      ],
+      "block": 0,
+      "bytecode": null,
+      "scope": []
+     },
+     {
+      "addr": "0x1331e9104",
+      "op": "nop",
+      "args": "",
+      "norm": "nop",
+      "kinds": [
+       "nop"
+      ],
+      "block": 0,
+      "bytecode": null,
+      "scope": []
+     }
+    ]
+   },
+   {
+    "label": "(before any debug info: the frame's setup)",
+    "key": [],
+    "counts": {
+     "insns": 10,
+     "load": 2,
+     "store": 2,
+     "spill": 2,
+     "fill": 0,
+     "call": 0,
+     "branch": 1,
+     "poll": 0,
+     "nop": 1
+    },
+    "insns": [
+     {
+      "addr": "0x1331e9140",
+      "op": "nop",
+      "args": "",
+      "norm": "nop",
+      "kinds": [
+       "nop"
+      ],
+      "block": 2,
+      "bytecode": null,
+      "scope": []
+     },
+     {
+      "addr": "0x1331e9144",
+      "op": "mov",
+      "args": "x8, #-0x4000",
+      "norm": "mov x8, #IMM",
+      "kinds": [],
+      "block": 2,
+      "bytecode": null,
+      "scope": []
+     }
+    ]
+   }
+  ]
+ },
+ "AsmDiff": {
+  "schema": "AsmDiff",
+  "version": 1,
+  "campaign": "plain-asm",
+  "a": "a",
+  "b": "b",
+  "method": "String::hashCode",
+  "corpus": "x",
+  "cells": {
+   "a": "x/a/1",
+   "b": "x/b/1"
+  },
+  "hotFrom": null,
+  "methods": [
+   {
+    "groups": [
+     {
+      "keyA": [
+       "<entry>"
+      ],
+      "keyB": [
+       "<entry>"
+      ],
+      "label": "<entry>",
+      "outOfLine": true,
+      "a": {
+       "insns": 16,
+       "load": 2,
+       "store": 0,
+       "spill": 0,
+       "fill": 0,
+       "call": 0,
+       "branch": 2,
+       "poll": 0,
+       "nop": 11
+      },
+      "b": {
+       "insns": 16,
+       "load": 2,
+       "store": 0,
+       "spill": 0,
+       "fill": 0,
+       "call": 0,
+       "branch": 2,
+       "poll": 0,
+       "nop": 11
+      },
+      "same": true,
+      "ops": [],
+      "hotA": null,
+      "hotB": null
+     },
+     {
+      "keyA": [],
+      "keyB": [],
+      "label": "(before any debug info: the frame's setup)",
+      "outOfLine": false,
+      "a": {
+       "insns": 10,
+       "load": 2,
+       "store": 2,
+       "spill": 2,
+       "fill": 0,
+       "call": 0,
+       "branch": 1,
+       "poll": 0,
+       "nop": 1
+      },
+      "b": {
+       "insns": 10,
+       "load": 2,
+       "store": 2,
+       "spill": 2,
+       "fill": 0,
+       "call": 0,
+       "branch": 1,
+       "poll": 0,
+       "nop": 1
+      },
+      "same": false,
+      "ops": [
+       {
+        "tag": "equal",
+        "a": [
+         {
+          "addr": "0x1331e9140",
+          "op": "nop",
+          "args": "",
+          "norm": "nop",
+          "kinds": [
+           "nop"
+          ],
+          "block": 2,
+          "bytecode": null,
+          "scope": []
+         },
+         {
+          "addr": "0x1331e9144",
+          "op": "mov",
+          "args": "x8, #-0x4000",
+          "norm": "mov x8, #IMM",
+          "kinds": [],
+          "block": 2,
+          "bytecode": null,
+          "scope": []
+         }
+        ],
+        "b": [
+         {
+          "addr": "0x12e9e9ec0",
+          "op": "nop",
+          "args": "",
+          "norm": "nop",
+          "kinds": [
+           "nop"
+          ],
+          "block": 2,
+          "bytecode": null,
+          "scope": []
+         },
+         {
+          "addr": "0x12e9e9ec4",
+          "op": "mov",
+          "args": "x8, #-0x4000",
+          "norm": "mov x8, #IMM",
+          "kinds": [],
+          "block": 2,
+          "bytecode": null,
+          "scope": []
+         }
+        ]
+       },
+       {
+        "tag": "replace",
+        "a": [
+         {
+          "addr": "0x1331e9164",
+          "op": "b.ne",
+          "args": "#0x1331e9254",
+          "norm": "b.ne L11",
+          "kinds": [
+           "branch"
+          ],
+          "block": 2,
+          "bytecode": null,
+          "scope": []
+         }
+        ],
+        "b": [
+         {
+          "addr": "0x12e9e9ee4",
+          "op": "b.ne",
+          "args": "#0x12e9e9fa8",
+          "norm": "b.ne L9",
+          "kinds": [
+           "branch"
+          ],
+          "block": 2,
+          "bytecode": null,
+          "scope": []
+         }
+        ]
+       }
+      ],
+      "hotA": null,
+      "hotB": null
+     }
+    ],
+    "totals": {
+     "a": {
+      "main": {
+       "insns": 88,
+       "load": 12,
+       "store": 11,
+       "spill": 2,
+       "fill": 2,
+       "call": 5,
+       "branch": 17,
+       "poll": 2,
+       "nop": 4
+      },
+      "entry": {
+       "insns": 16,
+       "load": 2,
+       "store": 0,
+       "spill": 0,
+       "fill": 0,
+       "call": 0,
+       "branch": 2,
+       "poll": 0,
+       "nop": 11
+      },
+      "outOfLine": {
+       "insns": 4,
+       "load": 0,
+       "store": 0,
+       "spill": 0,
+       "fill": 0,
+       "call": 1,
+       "branch": 1,
+       "poll": 0,
+       "nop": 0
+      }
+     },
+     "b": {
+      "main": {
+       "insns": 77,
+       "load": 12,
+       "store": 10,
+       "spill": 2,
+       "fill": 2,
+       "call": 4,
+       "branch": 17,
+       "poll": 2,
+       "nop": 3
+      },
+      "entry": {
+       "insns": 16,
+       "load": 2,
+       "store": 0,
+       "spill": 0,
+       "fill": 0,
+       "call": 0,
+       "branch": 2,
+       "poll": 0,
+       "nop": 11
+      },
+      "outOfLine": {
+       "insns": 5,
+       "load": 0,
+       "store": 0,
+       "spill": 0,
+       "fill": 0,
+       "call": 1,
+       "branch": 1,
+       "poll": 0,
+       "nop": 0
+      }
+     }
+    },
+    "blocks": {
+     "a": 30,
+     "b": 27
+    },
+    "method": "java.lang.String::hashCode",
+    "signature": "()I",
+    "compilations": {
+     "a": {
+      "compileId": 99,
+      "compiler": "jvmci",
+      "level": 4,
+      "osr": null,
+      "bytes": 60,
+      "instructions": 88,
+      "stamp": 0.027,
+      "pid": 7,
+      "file": "asm/java.lang.String__hashCode/99-t4.s"
+     },
+     "b": {
+      "compileId": 126,
+      "compiler": "jvmci",
+      "level": 4,
+      "osr": null,
+      "bytes": 60,
+      "instructions": 77,
+      "stamp": 0.046,
+      "pid": 7,
+      "file": "asm/java.lang.String__hashCode/126-t4.s"
+     }
+    },
+    "others": {
+     "a": [
+      {
+       "compileId": 2,
+       "compiler": "c1",
+       "level": 3,
+       "osr": null,
+       "bytes": 60,
+       "instructions": 320,
+       "stamp": 0.016,
+       "pid": 7,
+       "file": "asm/java.lang.String__hashCode/2-t3.s"
+      },
+      {
+       "compileId": 99,
+       "compiler": "jvmci",
+       "level": 4,
+       "osr": null,
+       "bytes": 60,
+       "instructions": 88,
+       "stamp": 0.027,
+       "pid": 7,
+       "file": "asm/java.lang.String__hashCode/99-t4.s"
+      }
+     ],
+     "b": [
+      {
+       "compileId": 4,
+       "compiler": "c1",
+       "level": 3,
+       "osr": null,
+       "bytes": 60,
+       "instructions": 316,
+       "stamp": 0.022,
+       "pid": 7,
+       "file": "asm/java.lang.String__hashCode/4-t3.s"
+      },
+      {
+       "compileId": 126,
+       "compiler": "jvmci",
+       "level": 4,
+       "osr": null,
+       "bytes": 60,
+       "instructions": 77,
+       "stamp": 0.046,
+       "pid": 7,
+       "file": "asm/java.lang.String__hashCode/126-t4.s"
+      }
+     ]
+    }
+   }
+  ],
+  "page": "/p/lab-3f2a1c/ab/plain-asm/asm-diff-String__hashCode-a-b.html"
+ },
  "Audit": {
   "schema": "Audit",
   "version": 1,
@@ -488,8 +1087,8 @@
     "planned": 8
    },
    "status": "partial",
-   "updated": 1793575550.285437,
-   "updatedIso": "2026-11-02T09:25:50",
+   "updated": 1793599717.2922034,
+   "updatedIso": "2026-11-02T16:08:37",
    "bytes": null,
    "profileOf": null,
    "testbed": "m5-pro",
@@ -827,6 +1426,40 @@
   },
   "campaigns": [
    {
+    "name": "plain-asm",
+    "kind": "plain",
+    "benchmark": null,
+    "profile": "none",
+    "rounds": 1,
+    "corpora": [
+     "x"
+    ],
+    "variants": [
+     "a",
+     "b"
+    ],
+    "description": null,
+    "progress": {
+     "done": 2,
+     "running": 0,
+     "failed": 0,
+     "interrupted": 0,
+     "unbuildable": 0,
+     "void": 0,
+     "foreign": 0,
+     "planned": 2
+    },
+    "status": "finished",
+    "updated": 1793599717.3044033,
+    "updatedIso": "2026-11-02T16:08:37",
+    "bytes": null,
+    "profileOf": null,
+    "testbed": "m5-pro",
+    "profiles": null,
+    "jobs": [],
+    "url": "/p/lab-3f2a1c/ab/index.html#c-plain-asm"
+   },
+   {
     "name": "plain",
     "kind": "plain",
     "benchmark": "B",
@@ -852,48 +1485,14 @@
      "planned": 8
     },
     "status": "partial",
-    "updated": 1793575550.285437,
-    "updatedIso": "2026-11-02T09:25:50",
+    "updated": 1793599717.2922034,
+    "updatedIso": "2026-11-02T16:08:37",
     "bytes": null,
     "profileOf": null,
     "testbed": "m5-pro",
     "profiles": null,
     "jobs": [],
     "url": "/p/lab-3f2a1c/ab/index.html#c-plain"
-   },
-   {
-    "name": "br.profile",
-    "kind": "profile",
-    "benchmark": null,
-    "profile": "async:cpu,alloc",
-    "rounds": 1,
-    "corpora": [
-     "a"
-    ],
-    "variants": [
-     "dddddddddd",
-     "eeeeeeeeee"
-    ],
-    "description": null,
-    "progress": {
-     "done": 2,
-     "running": 0,
-     "failed": 0,
-     "interrupted": 0,
-     "unbuildable": 0,
-     "void": 0,
-     "foreign": 0,
-     "planned": 2
-    },
-    "status": "finished",
-    "updated": 1793575550.2785277,
-    "updatedIso": "2026-11-02T09:25:50",
-    "bytes": null,
-    "profileOf": "br",
-    "testbed": "m5-pro",
-    "profiles": null,
-    "jobs": [],
-    "url": "/p/lab-3f2a1c/ab/index.html#c-br.profile"
    }
   ]
  },
@@ -908,7 +1507,7 @@
    "score": 10.15,
    "error": 0.1,
    "unit": "ms/op",
-   "finished": 1793575550.2811964,
+   "finished": 1793599717.288421,
    "why": null,
    "voidId": null,
    "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1",
@@ -1021,7 +1620,9 @@
      "end": 3.0,
      "score": 10.0,
      "cores": 2.0,
-     "top": "java 2.0"
+     "top": "java 2.0",
+     "thermal": null,
+     "lowpower": false
     }
    ],
    "disturbed": []
@@ -1109,7 +1710,7 @@
     "score": 10.1,
     "error": 0.1,
     "unit": "ms/op",
-    "finished": 1793575550.273681,
+    "finished": 1793599717.2819474,
     "why": null,
     "voidId": null,
     "path": "/Users/me/lab/out/perflab/ab/br/a/aaaaaaaaaa/1",
@@ -1124,7 +1725,7 @@
     "score": 10.0,
     "error": 0.1,
     "unit": "ms/op",
-    "finished": 1793575550.2742858,
+    "finished": 1793599717.282465,
     "why": null,
     "voidId": null,
     "path": "/Users/me/lab/out/perflab/ab/br/a/bbbbbbbbbb/1",
@@ -1378,13 +1979,13 @@
   "schema": "Forgotten",
   "version": 1,
   "project": {
-   "id": "tmpp1nuf5c_-e4346f",
-   "name": "tmpp1nuf5c_",
+   "id": "tmpinp8crfu-445dba",
+   "name": "tmpinp8crfu",
    "root": "/tmp/perflab-server",
    "campaigns": "/tmp/perflab-server/out/perflab/ab",
    "runs": "/tmp/perflab-server/out/perflab/runs",
    "registered": true,
-   "index": "/p/tmpp1nuf5c_-e4346f/ab/index.html"
+   "index": "/p/tmpinp8crfu-445dba/ab/index.html"
   }
  },
  "Jit": {
@@ -1678,8 +2279,8 @@
    "module": "perflab_fakejob",
    "state": "queued",
    "priority": 0,
-   "seq": 1793575550.414778,
-   "created": 1793575550.414778,
+   "seq": 1793599717.4056342,
+   "created": 1793599717.4056342,
    "started": null,
    "ended": null,
    "rc": null,
@@ -1689,6 +2290,9 @@
    "transcript": "/Users/me/.perflab/server/jobs/1/transcript.txt",
    "note": null,
    "pid_start": null,
+   "testbed": null,
+   "worker": null,
+   "lease": null,
    "control": null,
    "acked": false,
    "envKeys": [
@@ -1714,8 +2318,8 @@
     "module": "perflab_fakejob",
     "state": "queued",
     "priority": 0,
-    "seq": 1793575550.414778,
-    "created": 1793575550.414778,
+    "seq": 1793599717.4056342,
+    "created": 1793599717.4056342,
     "started": null,
     "ended": null,
     "rc": null,
@@ -1725,6 +2329,9 @@
     "transcript": "/Users/me/.perflab/server/jobs/1/transcript.txt",
     "note": null,
     "pid_start": null,
+    "testbed": null,
+    "worker": null,
+    "lease": null,
     "control": null,
     "acked": false,
     "position": 1,
@@ -1849,8 +2456,8 @@
    "module": "perflab_fakejob",
    "state": "queued",
    "priority": 0,
-   "seq": 1793575550.414778,
-   "created": 1793575550.414778,
+   "seq": 1793599717.4056342,
+   "created": 1793599717.4056342,
    "started": null,
    "ended": null,
    "rc": null,
@@ -1860,6 +2467,9 @@
    "transcript": "/Users/me/.perflab/server/jobs/1/transcript.txt",
    "note": null,
    "pid_start": null,
+   "testbed": null,
+   "worker": null,
+   "lease": null,
    "control": null,
    "acked": false,
    "position": 1,
@@ -1892,27 +2502,27 @@
    "score": 8.2,
    "error": 0.1,
    "unit": "ms/op",
-   "finished": 1793575550.2756553,
+   "finished": 1793599717.2835221,
    "why": null,
    "voidId": null,
    "path": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2",
    "url": "/p/lab-3f2a1c/ab/br/a/eeeeeeeeee/2",
    "timeline": null
   },
-  "from": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261102-092550"
+  "from": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261102-160837"
  },
  "Voided": {
   "schema": "Voided",
   "version": 1,
   "campaign": "br",
   "void": {
-   "id": "a/eeeeeeeeee/2-20261102-092550",
+   "id": "a/eeeeeeeeee/2-20261102-160837",
    "corpus": "a",
    "variant": "eeeeeeeeee",
    "round": 2,
    "reason": "other load up to 2.1 cores over iterations 3, 4",
-   "voided": 1793575550.411278,
-   "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261102-092550",
+   "voided": 1793599717.399612,
+   "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261102-160837",
    "restorable": true
   },
   "from": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2"
@@ -1923,13 +2533,13 @@
   "campaign": "br",
   "voids": [
    {
-    "id": "a/eeeeeeeeee/2-20261102-092550",
+    "id": "a/eeeeeeeeee/2-20261102-160837",
     "corpus": "a",
     "variant": "eeeeeeeeee",
     "round": 2,
     "reason": "other load up to 2.1 cores over iterations 3, 4",
-    "voided": 1793575550.411278,
-    "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261102-092550",
+    "voided": 1793599717.399612,
+    "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261102-160837",
     "restorable": true
    }
   ]

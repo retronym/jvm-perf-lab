@@ -8,6 +8,7 @@ os.environ["PERFLAB_API_NO_REINDEX"] = "1"
 from perflab import ab, api, branchview, config, control, server  # noqa: E402
 from test_branchview import SHAS, fixture, result  # noqa: E402
 from test_branchprofile import fake_profile_cell, stub_profdiff  # noqa: E402
+from test_asm import asm_fixture  # noqa: E402
 
 V = [s[:10] for s in SHAS]
 TABLE = """cpu per op (benchmark threads): a 1.2k, b 1.0k, -16.7%  (ms/op a 10, b 8; ops a 3, b 3; a = base/1, b = tip/1)
@@ -128,6 +129,7 @@ class Fixture:
         self.br = fixture(self.camps)
         self.prof = profile_fixture(self.br)
         self.plain = plain_fixture(self.camps)
+        self.cap = asm_fixture(self.camps, "plain-asm", parent="plain")
 
     def tearDown(self):
         api.DEFAULT_ROOT = None
@@ -154,7 +156,9 @@ def every_read(t):
             ("voids", {"campaign": "br"}), ("jobs", {}), ("audit", {"campaign": "plain"}),
             ("promotion", {"campaign": "plain", "corpus": "a", "variant": "base", "round": 1}),
             ("jit", {"campaign": "plain", "corpus": "a", "variant": "tip", "round": 1, "method": "findRef"}),
-            ("jit_diff", {"campaign": "plain", "a": "base", "b": "tip", "corpus": "a", "round": 1})]
+            ("jit_diff", {"campaign": "plain", "a": "base", "b": "tip", "corpus": "a", "round": 1}),
+            ("asm", {"campaign": "plain-asm"}), ("asm_code", {"campaign": "plain-asm", "variant": "a", "method": "String::hashCode"}),
+            ("asm_diff", {"campaign": "plain-asm", "a": "a", "b": "b", "method": "String::hashCode", "hot": False})]
 
 
 class ReadTest(Fixture, unittest.TestCase):
@@ -224,7 +228,7 @@ class ReadTest(Fixture, unittest.TestCase):
 
     def test_campaigns(self):
         cs = {c["name"]: c for c in api.campaigns()["campaigns"]}
-        self.assertEqual(set(cs), {"br", "br.profile", "plain"})
+        self.assertEqual(set(cs), {"br", "br.profile", "plain", "plain-asm"})
         self.assertEqual((cs["br"]["kind"], cs["br.profile"]["kind"], cs["plain"]["kind"]), ("branch", "profile", "plain"))
         self.assertEqual(cs["br"]["variants"], V)
         self.assertEqual(cs["br"]["profiles"], "br.profile")
@@ -392,7 +396,7 @@ class ReadTest(Fixture, unittest.TestCase):
     def test_unknown_names_list_what_there_is(self):
         with self.assertRaises(api.ApiError) as e:
             api.campaign("nope")
-        self.assertEqual(e.exception.details["campaigns"], ["br", "br.profile", "plain"])
+        self.assertEqual(e.exception.details["campaigns"], ["br", "br.profile", "plain", "plain-asm"])
         with self.assertRaises(api.ApiError) as e:
             api.call("campaign", {"campaign": "br", "bogus": 1})
         self.assertEqual(e.exception.code, "bad_request")

@@ -55,6 +55,40 @@ git -C "$dir" rev-parse HEAD > "$dir/BUILT_COMMIT"
 echo "async-profiler $(cut -c1-10 "$dir/BUILT_COMMIT") ($ref): $dir/build/lib, $dir/build/bin"
 """
 
+[tasks."tools:hsdis"]
+description = "Build hsdis (HotSpot's disassembler plugin, on capstone) and install it into the JDKs of HSDIS_JDKS (default: $JAVA_HOME), for `perflab asm`"
+run = """
+set -euo pipefail
+jdks="${HSDIS_JDKS:-${JAVA_HOME:-}}"   # JDK homes, space-separated
+test -n "$jdks" || { echo "HSDIS_JDKS (or JAVA_HOME): the JDK homes to install hsdis into"; exit 1; }
+tag="${HSDIS_TAG:-jdk-26+35}"            # OpenJDK's hsdis sources: two files, from this tag (or HSDIS_SRC, a JDK checkout)
+cs="$(brew --prefix capstone 2>/dev/null || true)"
+test -f "$cs/lib/libcapstone.a" || { echo "no static capstone: brew install capstone"; exit 1; }
+case "$(uname -m)" in
+  arm64|aarch64) arch=aarch64; mode=CS_MODE_ARM; csarch=$(grep -q CS_ARCH_AARCH64 "$cs/include/capstone/capstone.h" && echo CS_ARCH_AARCH64 || echo CS_ARCH_ARM64) ;;
+  x86_64) arch=amd64; mode=CS_MODE_64; csarch=CS_ARCH_X86 ;;
+  *) echo "unsupported $(uname -m)"; exit 1 ;;
+esac
+case "$(uname -s)" in Darwin) ext=dylib; os=darwin ;; *) ext=so; os=linux ;; esac
+out=tools/build/hsdis
+mkdir -p "$out/src"
+if [ -n "${HSDIS_SRC:-}" ]; then
+  cp "$HSDIS_SRC/src/utils/hsdis/capstone/hsdis-capstone.c" "$HSDIS_SRC/src/utils/hsdis/hsdis.h" "$out/src/"
+else
+  for f in capstone/hsdis-capstone.c hsdis.h; do
+    curl -fsSL "https://raw.githubusercontent.com/openjdk/jdk/$tag/src/utils/hsdis/$f" -o "$out/src/$(basename $f)"
+  done
+fi
+lib="$out/hsdis-$arch.$ext"
+first=${jdks%% *}
+# capstone linked statically: the library is self-contained; jni.h from the first JDK
+cc -O2 -shared -fPIC -DCAPSTONE_ARCH=$csarch -DCAPSTONE_MODE=$mode -I"$first/include" -I"$first/include/$os" -I"$out/src" \
+   -I"$cs/include/capstone" -I"$cs/include" "$out/src/hsdis-capstone.c" "$cs/lib/libcapstone.a" -o "$lib"
+for j in $jdks; do
+  if cp "$lib" "$j/lib/" 2>/dev/null; then echo "installed $j/lib/$(basename $lib)"; else echo "could not write $j/lib: sudo cp $lib $j/lib/"; fi
+done
+"""
+
 # The perflab server as a launchd agent (macOS): started at login, restarted if it dies, run from this checkout's
 # python/src with this mise's Python and the PATH of the shell that installed it (jobs bring their submitter's own).
 # `perflab server stop` exits cleanly and launchd leaves it stopped; `mise run server:restart` brings it back. Jobs run

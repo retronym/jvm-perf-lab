@@ -1,0 +1,740 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<hotspot_log version='160 1' process='28793' time_ms='1793599140994'>
+<vm_version>
+<name>
+Java HotSpot(TM) 64-Bit Server VM
+</name>
+<release>
+25.0.4.1.1+1-LTS-jvmci-25.4-b23
+</release>
+<info>
+Java HotSpot(TM) 64-Bit Server VM (25.0.4.1.1+1-LTS-jvmci-25.4-b23) for bsd-aarch64 JRE (25.0.4.1.1+1-LTS-jvmci-25.4-b23), built on 2026-08-20T09:55:03Z with clang Apple LLVM 15.0.0 (clang-1500.3.9.4)
+</info>
+</vm_version>
+<tty>
+<writer thread='5635'/>
+<blob name='MethodHandlesAdapterBlob' total_size='32448'>
+<sect index='1' capacity='32448' size='508' remaining='31940'/>
+</blob>
+<writer thread='27651'/>
+<print_nmethod compile_id='2' compiler='c1' level='3' stamp='0.016'>
+
+============================= C1-compiled nmethod ==============================
+----------------------------------- Assembly -----------------------------------
+
+Compiled method (c1) 17    2       3       java.lang.String::hashCode (60 bytes)
+ total in heap  [0x000000012b604208,0x000000012b6048c0] = 1720
+ main code      [0x000000012b604300,0x000000012b604840] = 1344
+ stub code      [0x000000012b604840,0x000000012b6048c0] = 128
+ mutable data [0x0000007cc3109f80,0x0000007cc310a058] = 216
+ relocation     [0x0000007cc3109f80,0x0000007cc310a018] = 152
+ metadata       [0x0000007cc310a018,0x0000007cc310a058] = 64
+ immutable data [0x0000007cc3089200,0x0000007cc30894e0] = 736
+ dependencies   [0x0000007cc3089200,0x0000007cc3089208] = 8
+ nul chk table  [0x0000007cc3089208,0x0000007cc3089218] = 16
+ scopes pcs     [0x0000007cc3089218,0x0000007cc3089408] = 496
+ scopes data    [0x0000007cc3089408,0x0000007cc30894e0] = 216
+
+[Disassembly]
+--------------------------------------------------------------------------------
+[Constant Pool (empty)]
+
+--------------------------------------------------------------------------------
+
+[Instructions begin]
+  0x000000012b604300:   nop		
+  0x000000012b604304:   nop		
+  0x000000012b604308:   nop		
+  0x000000012b60430c:   nop		
+  0x000000012b604310:   nop		
+  0x000000012b604314:   nop		
+  0x000000012b604318:   nop		
+  0x000000012b60431c:   nop		
+  0x000000012b604320:   nop		
+  0x000000012b604324:   nop		
+  0x000000012b604328:   nop		
+[Entry Point]
+  # {method} {0x000006000017b798} &apos;hashCode&apos; &apos;()I&apos; in &apos;java/lang/String&apos;
+  #           [sp+0x60]  (sp of caller)
+  0x000000012b60432c:   ldr		w8, [x1, #8]
+  0x000000012b604330:   ldr		w10, [x9, #8]
+  0x000000012b604334:   cmp		w8, w10
+  0x000000012b604338:   b.eq		#0x12b604340
+  0x000000012b60433c:   b		#0x132a57400        ;   {runtime_call Shared Runtime ic_miss_blob}
+[Verified Entry Point]
+  0x000000012b604340:   nop		
+  0x000000012b604344:   sub		x9, sp, #0x14, lsl #12
+  0x000000012b604348:   str		xzr, [x9]
+  0x000000012b60434c:   sub		sp, sp, #0x60
+  0x000000012b604350:   stp		x29, x30, [sp, #0x50]
+  0x000000012b604354:   ldr		w8, #0x12b604378
+  0x000000012b604358:   ldr		w9, [x28, #0x20]
+  0x000000012b60435c:   cmp		x8, x9
+  0x000000012b604360:   b.eq		#0x12b60437c
+  0x000000012b604364:   mov		x8, #0x6c0          ;   {runtime_call Stub::method_entry_barrier}
+  0x000000012b604368:   movk		x8, #0x32a6, lsl #16
+  0x000000012b60436c:   movk		x8, #1, lsl #32
+  0x000000012b604370:   blr		x8
+  0x000000012b604374:   b		#0x12b60437c
+  0x000000012b604378:   udf		#1
+  0x000000012b60437c:   mov		x29, x1
+  0x000000012b604380:   mov		x1, #0x9a30         ;   {metadata(method data for {method} {0x000006000017b798} &apos;hashCode&apos; &apos;()I&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b604384:   movk		x1, #0x2300, lsl #16
+  0x000000012b604388:   movk		x1, #1, lsl #32
+  0x000000012b60438c:   ldr		w2, [x1, #0x90]
+  0x000000012b604390:   add		w2, w2, #2
+  0x000000012b604394:   str		w2, [x1, #0x90]
+  0x000000012b604398:   and		w2, w2, #0x7fe
+  0x000000012b60439c:   cmp		w2, #0
+  0x000000012b6043a0:   b.eq		#0x12b6047b4        ;*aload_0 {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@0 (line 2430)
+  0x000000012b6043a4:   ldr		w1, [x29, #0xc]     ;*getfield hash {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@1 (line 2430)
+  0x000000012b6043a8:   cmp		w1, #0
+  0x000000012b6043ac:   mov		x2, #0x9a30         ;   {metadata(method data for {method} {0x000006000017b798} &apos;hashCode&apos; &apos;()I&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b6043b0:   movk		x2, #0x2300, lsl #16
+  0x000000012b6043b4:   movk		x2, #1, lsl #32
+  0x000000012b6043b8:   mov		x8, #0xd8
+  0x000000012b6043bc:   mov		x9, #0xe8
+  0x000000012b6043c0:   csel		x3, x8, x9, ne
+  0x000000012b6043c4:   ldr		x4, [x2, x3]
+  0x000000012b6043c8:   add		x4, x4, #1
+  0x000000012b6043cc:   str		x4, [x2, x3]
+  0x000000012b6043d0:   b.ne		#0x12b604798        ;*ifne {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@6 (line 2431)
+  0x000000012b6043d4:   ldrb		w2, [x29, #0x11]    ;*getfield hashIsZero {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@10 (line 2431)
+  0x000000012b6043d8:   cmp		w2, #0
+  0x000000012b6043dc:   mov		x2, #0x9a30         ;   {metadata(method data for {method} {0x000006000017b798} &apos;hashCode&apos; &apos;()I&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b6043e0:   movk		x2, #0x2300, lsl #16
+  0x000000012b6043e4:   movk		x2, #1, lsl #32
+  0x000000012b6043e8:   mov		x8, #0xf8
+  0x000000012b6043ec:   mov		x9, #0x108
+  0x000000012b6043f0:   csel		x3, x8, x9, ne
+  0x000000012b6043f4:   ldr		x4, [x2, x3]
+  0x000000012b6043f8:   add		x4, x4, #1
+  0x000000012b6043fc:   str		x4, [x2, x3]
+  0x000000012b604400:   b.ne		#0x12b604798        ;*ifne {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@13 (line 2431)
+  0x000000012b604404:   mov		x1, x29
+  0x000000012b604408:   mov		x2, #0x9a30         ;   {metadata(method data for {method} {0x000006000017b798} &apos;hashCode&apos; &apos;()I&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b60440c:   movk		x2, #0x2300, lsl #16
+  0x000000012b604410:   movk		x2, #1, lsl #32
+  0x000000012b604414:   ldr		w1, [x1, #8]
+  0x000000012b604418:   eor		x1, x1, #0x60000000000
+  0x000000012b60441c:   ldr		x8, [x2, #0x120]
+  0x000000012b604420:   cmp		x1, x8
+  0x000000012b604424:   b.ne		#0x12b604438
+  0x000000012b604428:   ldr		x8, [x2, #0x128]
+  0x000000012b60442c:   add		x8, x8, #1
+  0x000000012b604430:   str		x8, [x2, #0x128]
+  0x000000012b604434:   b		#0x12b6045c8
+  0x000000012b604438:   ldr		x8, [x2, #0x130]
+  0x000000012b60443c:   cmp		x1, x8
+  0x000000012b604440:   b.ne		#0x12b604454
+  0x000000012b604444:   ldr		x8, [x2, #0x138]
+  0x000000012b604448:   add		x8, x8, #1
+  0x000000012b60444c:   str		x8, [x2, #0x138]
+  0x000000012b604450:   b		#0x12b6045c8
+  0x000000012b604454:   ldr		x8, [x2, #0x140]
+  0x000000012b604458:   cmp		x1, x8
+  0x000000012b60445c:   b.ne		#0x12b604470
+  0x000000012b604460:   ldr		x8, [x2, #0x148]
+  0x000000012b604464:   add		x8, x8, #1
+  0x000000012b604468:   str		x8, [x2, #0x148]
+  0x000000012b60446c:   b		#0x12b6045c8
+  0x000000012b604470:   ldr		x8, [x2, #0x150]
+  0x000000012b604474:   cmp		x1, x8
+  0x000000012b604478:   b.ne		#0x12b60448c
+  0x000000012b60447c:   ldr		x8, [x2, #0x158]
+  0x000000012b604480:   add		x8, x8, #1
+  0x000000012b604484:   str		x8, [x2, #0x158]
+  0x000000012b604488:   b		#0x12b6045c8
+  0x000000012b60448c:   ldr		x8, [x2, #0x160]
+  0x000000012b604490:   cmp		x1, x8
+  0x000000012b604494:   b.ne		#0x12b6044a8
+  0x000000012b604498:   ldr		x8, [x2, #0x168]
+  0x000000012b60449c:   add		x8, x8, #1
+  0x000000012b6044a0:   str		x8, [x2, #0x168]
+  0x000000012b6044a4:   b		#0x12b6045c8
+  0x000000012b6044a8:   ldr		x8, [x2, #0x170]
+  0x000000012b6044ac:   cmp		x1, x8
+  0x000000012b6044b0:   b.ne		#0x12b6044c4
+  0x000000012b6044b4:   ldr		x8, [x2, #0x178]
+  0x000000012b6044b8:   add		x8, x8, #1
+  0x000000012b6044bc:   str		x8, [x2, #0x178]
+  0x000000012b6044c0:   b		#0x12b6045c8
+  0x000000012b6044c4:   ldr		x8, [x2, #0x180]
+  0x000000012b6044c8:   cmp		x1, x8
+  0x000000012b6044cc:   b.ne		#0x12b6044e0
+  0x000000012b6044d0:   ldr		x8, [x2, #0x188]
+  0x000000012b6044d4:   add		x8, x8, #1
+  0x000000012b6044d8:   str		x8, [x2, #0x188]
+  0x000000012b6044dc:   b		#0x12b6045c8
+  0x000000012b6044e0:   ldr		x8, [x2, #0x190]
+  0x000000012b6044e4:   cmp		x1, x8
+  0x000000012b6044e8:   b.ne		#0x12b6044fc
+  0x000000012b6044ec:   ldr		x8, [x2, #0x198]
+  0x000000012b6044f0:   add		x8, x8, #1
+  0x000000012b6044f4:   str		x8, [x2, #0x198]
+  0x000000012b6044f8:   b		#0x12b6045c8
+  0x000000012b6044fc:   ldr		x8, [x2, #0x120]
+  0x000000012b604500:   cbnz		x8, #0x12b604514
+  0x000000012b604504:   str		x1, [x2, #0x120]
+  0x000000012b604508:   mov		x8, #1
+  0x000000012b60450c:   str		x8, [x2, #0x128]
+  0x000000012b604510:   b		#0x12b6045c8
+  0x000000012b604514:   ldr		x8, [x2, #0x130]
+  0x000000012b604518:   cbnz		x8, #0x12b60452c
+  0x000000012b60451c:   str		x1, [x2, #0x130]
+  0x000000012b604520:   mov		x8, #1
+  0x000000012b604524:   str		x8, [x2, #0x138]
+  0x000000012b604528:   b		#0x12b6045c8
+  0x000000012b60452c:   ldr		x8, [x2, #0x140]
+  0x000000012b604530:   cbnz		x8, #0x12b604544
+  0x000000012b604534:   str		x1, [x2, #0x140]
+  0x000000012b604538:   mov		x8, #1
+  0x000000012b60453c:   str		x8, [x2, #0x148]
+  0x000000012b604540:   b		#0x12b6045c8
+  0x000000012b604544:   ldr		x8, [x2, #0x150]
+  0x000000012b604548:   cbnz		x8, #0x12b60455c
+  0x000000012b60454c:   str		x1, [x2, #0x150]
+  0x000000012b604550:   mov		x8, #1
+  0x000000012b604554:   str		x8, [x2, #0x158]
+  0x000000012b604558:   b		#0x12b6045c8
+  0x000000012b60455c:   ldr		x8, [x2, #0x160]
+  0x000000012b604560:   cbnz		x8, #0x12b604574
+  0x000000012b604564:   str		x1, [x2, #0x160]
+  0x000000012b604568:   mov		x8, #1
+  0x000000012b60456c:   str		x8, [x2, #0x168]
+  0x000000012b604570:   b		#0x12b6045c8
+  0x000000012b604574:   ldr		x8, [x2, #0x170]
+  0x000000012b604578:   cbnz		x8, #0x12b60458c
+  0x000000012b60457c:   str		x1, [x2, #0x170]
+  0x000000012b604580:   mov		x8, #1
+  0x000000012b604584:   str		x8, [x2, #0x178]
+  0x000000012b604588:   b		#0x12b6045c8
+  0x000000012b60458c:   ldr		x8, [x2, #0x180]
+  0x000000012b604590:   cbnz		x8, #0x12b6045a4
+  0x000000012b604594:   str		x1, [x2, #0x180]
+  0x000000012b604598:   mov		x8, #1
+  0x000000012b60459c:   str		x8, [x2, #0x188]
+  0x000000012b6045a0:   b		#0x12b6045c8
+  0x000000012b6045a4:   ldr		x8, [x2, #0x190]
+  0x000000012b6045a8:   cbnz		x8, #0x12b6045bc
+  0x000000012b6045ac:   str		x1, [x2, #0x190]
+  0x000000012b6045b0:   mov		x8, #1
+  0x000000012b6045b4:   str		x8, [x2, #0x198]
+  0x000000012b6045b8:   b		#0x12b6045c8
+  0x000000012b6045bc:   ldr		x8, [x2, #0x118]
+  0x000000012b6045c0:   add		x8, x8, #1
+  0x000000012b6045c4:   str		x8, [x2, #0x118]
+  0x000000012b6045c8:   mov		x1, #0x9dd8         ;   {metadata(method data for {method} {0x000006000049eeb0} &apos;isLatin1&apos; &apos;()Z&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b6045cc:   movk		x1, #0x2300, lsl #16
+  0x000000012b6045d0:   movk		x1, #1, lsl #32
+  0x000000012b6045d4:   ldr		w2, [x1, #0x90]
+  0x000000012b6045d8:   add		w2, w2, #2
+  0x000000012b6045dc:   str		w2, [x1, #0x90]
+  0x000000012b6045e0:   and		w2, w2, #0x1ffffe
+  0x000000012b6045e4:   cmp		w2, #0
+  0x000000012b6045e8:   b.eq		#0x12b6047d4
+  0x000000012b6045ec:   mov		x1, #0x9dd8         ;   {metadata(method data for {method} {0x000006000049eeb0} &apos;isLatin1&apos; &apos;()Z&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b6045f0:   movk		x1, #0x2300, lsl #16
+  0x000000012b6045f4:   movk		x1, #1, lsl #32
+  0x000000012b6045f8:   ldr		x2, [x1, #0xe8]
+  0x000000012b6045fc:   add		x2, x2, #1
+  0x000000012b604600:   str		x2, [x1, #0xe8]     ;*ifeq {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::isLatin1@3 (line 4893)
+                                                            ; - java.lang.String::hashCode@17 (line 2432)
+  0x000000012b604604:   ldrsb		x1, [x29, #0x10]    ;*getfield coder {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::isLatin1@7 (line 4893)
+                                                            ; - java.lang.String::hashCode@17 (line 2432)
+  0x000000012b604608:   cmp		w1, #0
+  0x000000012b60460c:   mov		x1, #0x9dd8         ;   {metadata(method data for {method} {0x000006000049eeb0} &apos;isLatin1&apos; &apos;()Z&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b604610:   movk		x1, #0x2300, lsl #16
+  0x000000012b604614:   movk		x1, #1, lsl #32
+  0x000000012b604618:   mov		x8, #0xf8
+  0x000000012b60461c:   mov		x9, #0x108
+  0x000000012b604620:   csel		x2, x8, x9, ne
+  0x000000012b604624:   ldr		x3, [x1, x2]
+  0x000000012b604628:   add		x3, x3, #1
+  0x000000012b60462c:   str		x3, [x1, x2]
+  0x000000012b604630:   b.ne		#0x12b604654        ;*ifne {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::isLatin1@10 (line 4893)
+                                                            ; - java.lang.String::hashCode@17 (line 2432)
+  0x000000012b604634:   mov		x1, #0x9dd8         ;   {metadata(method data for {method} {0x000006000049eeb0} &apos;isLatin1&apos; &apos;()Z&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b604638:   movk		x1, #0x2300, lsl #16
+  0x000000012b60463c:   movk		x1, #1, lsl #32
+  0x000000012b604640:   ldr		x2, [x1, #0x118]
+  0x000000012b604644:   add		x2, x2, #1
+  0x000000012b604648:   str		x2, [x1, #0x118]
+  0x000000012b60464c:   mov		w1, #1
+  0x000000012b604650:   b		#0x12b604658        ;*goto {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::isLatin1@14 (line 4893)
+                                                            ; - java.lang.String::hashCode@17 (line 2432)
+  0x000000012b604654:   movz		w1, #0, lsl #16     ;*ireturn {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::isLatin1@18 (line 4893)
+                                                            ; - java.lang.String::hashCode@17 (line 2432)
+  0x000000012b604658:   and		w1, w1, #1
+  0x000000012b60465c:   cmp		w1, #0
+  0x000000012b604660:   mov		x1, #0x9a30         ;   {metadata(method data for {method} {0x000006000017b798} &apos;hashCode&apos; &apos;()I&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b604664:   movk		x1, #0x2300, lsl #16
+  0x000000012b604668:   movk		x1, #1, lsl #32
+  0x000000012b60466c:   mov		x8, #0x1a8
+  0x000000012b604670:   mov		x9, #0x1b8
+  0x000000012b604674:   csel		x2, x8, x9, eq
+  0x000000012b604678:   ldr		x3, [x1, x2]
+  0x000000012b60467c:   add		x3, x3, #1
+  0x000000012b604680:   str		x3, [x1, x2]
+  0x000000012b604684:   b.eq		#0x12b604720        ;*ifeq {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@20 (line 2432)
+  0x000000012b604688:   ldr		w1, [x29, #0x14]
+  0x000000012b60468c:   cbz		x1, #0x12b604694
+  0x000000012b604690:   add		x1, x27, x1, lsl #3 ;*getfield value {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@24 (line 2432)
+  0x000000012b604694:   mov		x2, #0x9a30         ;   {metadata(method data for {method} {0x000006000017b798} &apos;hashCode&apos; &apos;()I&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b604698:   movk		x2, #0x2300, lsl #16
+  0x000000012b60469c:   movk		x2, #1, lsl #32
+  0x000000012b6046a0:   ldr		x8, [x2, #0x1c8]
+  0x000000012b6046a4:   add		x8, x8, #1
+  0x000000012b6046a8:   str		x8, [x2, #0x1c8]
+  0x000000012b6046ac:   mov		x2, #0x9fb8         ;   {metadata(method data for {method} {0x00000600001923d0} &apos;hashCode&apos; &apos;([B)I&apos; in &apos;java/lang/StringLatin1&apos;)}
+  0x000000012b6046b0:   movk		x2, #0x2300, lsl #16
+  0x000000012b6046b4:   movk		x2, #1, lsl #32
+  0x000000012b6046b8:   ldr		w3, [x2, #0x90]
+  0x000000012b6046bc:   add		w3, w3, #2
+  0x000000012b6046c0:   str		w3, [x2, #0x90]
+  0x000000012b6046c4:   and		w3, w3, #0x1ffffe
+  0x000000012b6046c8:   cmp		w3, #0
+  0x000000012b6046cc:   b.eq		#0x12b6047f4
+  0x000000012b6046d0:   ldr		w3, [x1, #0xc]      ; implicit exception: dispatches to 0x000000012b604814
+                                                            ;*arraylength {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.StringLatin1::hashCode@3 (line 195)
+                                                            ; - java.lang.String::hashCode@27 (line 2432)
+  0x000000012b6046d4:   mov		x2, #0x9fb8         ;   {metadata(method data for {method} {0x00000600001923d0} &apos;hashCode&apos; &apos;([B)I&apos; in &apos;java/lang/StringLatin1&apos;)}
+  0x000000012b6046d8:   movk		x2, #0x2300, lsl #16
+  0x000000012b6046dc:   movk		x2, #1, lsl #32
+  0x000000012b6046e0:   ldr		x8, [x2, #0xd8]
+  0x000000012b6046e4:   add		x8, x8, #1
+  0x000000012b6046e8:   str		x8, [x2, #0xd8]
+  0x000000012b6046ec:   movz		w2, #0, lsl #16
+  0x000000012b6046f0:   movz		w4, #0, lsl #16     ;*invokestatic hashCodeOfUnsigned {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.StringLatin1::hashCode@5 (line 195)
+                                                            ; - java.lang.String::hashCode@27 (line 2432)
+  0x000000012b6046f4:   bl		#0x12b604880        ; ImmutableOopMap {rfp=Oop }
+                                                            ;*invokestatic hashCodeOfUnsigned {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.StringLatin1::hashCode@5 (line 195)
+                                                            ; - java.lang.String::hashCode@27 (line 2432)
+                                                            ;   {static_call}
+  0x000000012b6046f8:   nop		                    ;   {post_call_nop}
+  0x000000012b6046fc:   movk		xzr, #0x4f0
+  0x000000012b604700:   movk		xzr, #0             ;*invokestatic hashCodeOfUnsigned {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.StringLatin1::hashCode@5 (line 195)
+                                                            ; - java.lang.String::hashCode@27 (line 2432)
+  0x000000012b604704:   mov		x1, #0x9a30         ;   {metadata(method data for {method} {0x000006000017b798} &apos;hashCode&apos; &apos;()I&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b604708:   movk		x1, #0x2300, lsl #16
+  0x000000012b60470c:   movk		x1, #1, lsl #32
+  0x000000012b604710:   ldr		x2, [x1, #0x1d8]
+  0x000000012b604714:   add		x2, x2, #1
+  0x000000012b604718:   str		x2, [x1, #0x1d8]
+  0x000000012b60471c:   b		#0x12b60473c        ;*goto {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@30 (line 2432)
+  0x000000012b604720:   ldr		w1, [x29, #0x14]
+  0x000000012b604724:   cbz		x1, #0x12b60472c
+  0x000000012b604728:   add		x1, x27, x1, lsl #3 ;*getfield value {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@34 (line 2433)
+  0x000000012b60472c:   bl		#0x132a57a00        ; ImmutableOopMap {rfp=Oop }
+                                                            ;*invokestatic hashCode {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@37 (line 2433)
+                                                            ;   {static_call}
+  0x000000012b604730:   nop		                    ;   {post_call_nop}
+  0x000000012b604734:   movk		xzr, #0x528
+  0x000000012b604738:   movk		xzr, #0x100         ;*invokestatic hashCode {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@37 (line 2433)
+  0x000000012b60473c:   cmp		w0, #0
+  0x000000012b604740:   mov		x1, #0x9a30         ;   {metadata(method data for {method} {0x000006000017b798} &apos;hashCode&apos; &apos;()I&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b604744:   movk		x1, #0x2300, lsl #16
+  0x000000012b604748:   movk		x1, #1, lsl #32
+  0x000000012b60474c:   mov		x8, #0x200
+  0x000000012b604750:   mov		x9, #0x210
+  0x000000012b604754:   csel		x2, x8, x9, ne
+  0x000000012b604758:   ldr		x3, [x1, x2]
+  0x000000012b60475c:   add		x3, x3, #1
+  0x000000012b604760:   str		x3, [x1, x2]
+  0x000000012b604764:   b.ne		#0x12b604790        ;*ifne {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@42 (line 2434)
+  0x000000012b604768:   mov		w1, #1
+  0x000000012b60476c:   strb		w1, [x29, #0x11]    ;*putfield hashIsZero {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@47 (line 2435)
+  0x000000012b604770:   mov		x1, #0x9a30         ;   {metadata(method data for {method} {0x000006000017b798} &apos;hashCode&apos; &apos;()I&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b604774:   movk		x1, #0x2300, lsl #16
+  0x000000012b604778:   movk		x1, #1, lsl #32
+  0x000000012b60477c:   ldr		x2, [x1, #0x220]
+  0x000000012b604780:   add		x2, x2, #1
+  0x000000012b604784:   str		x2, [x1, #0x220]
+  0x000000012b604788:   mov		x1, x0
+  0x000000012b60478c:   b		#0x12b604798        ;*goto {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@50 (line 2435)
+  0x000000012b604790:   str		w0, [x29, #0xc]     ;*putfield hash {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@55 (line 2437)
+  0x000000012b604794:   mov		x1, x0              ;*iload_1 {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@58 (line 2440)
+  0x000000012b604798:   mov		x0, x1
+  0x000000012b60479c:   ldp		x29, x30, [sp, #0x50]
+  0x000000012b6047a0:   add		sp, sp, #0x60
+  0x000000012b6047a4:   ldr		x8, [x28, #0x28]    ;   {poll_return}
+  0x000000012b6047a8:   cmp		sp, x8
+  0x000000012b6047ac:   b.hi		#0x12b604818
+  0x000000012b6047b0:   ret		
+  0x000000012b6047b4:   mov		x8, #0xb798         ;   {metadata({method} {0x000006000017b798} &apos;hashCode&apos; &apos;()I&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b6047b8:   movk		x8, #0x17, lsl #16
+  0x000000012b6047bc:   movk		x8, #0x600, lsl #32
+  0x000000012b6047c0:   str		x8, [sp, #8]
+  0x000000012b6047c4:   mov		x8, #-1
+  0x000000012b6047c8:   str		x8, [sp]
+  0x000000012b6047cc:   bl		#0x132b2dd80        ; ImmutableOopMap {rfp=Oop }
+                                                            ;*synchronization entry
+                                                            ; - java.lang.String::hashCode@-1 (line 2430)
+                                                            ;   {runtime_call C1 Runtime counter_overflow_blob}
+  0x000000012b6047d0:   b		#0x12b6043a4
+  0x000000012b6047d4:   mov		x8, #0xeeb0         ;   {metadata({method} {0x000006000049eeb0} &apos;isLatin1&apos; &apos;()Z&apos; in &apos;java/lang/String&apos;)}
+  0x000000012b6047d8:   movk		x8, #0x49, lsl #16
+  0x000000012b6047dc:   movk		x8, #0x600, lsl #32
+  0x000000012b6047e0:   str		x8, [sp, #8]
+  0x000000012b6047e4:   mov		x8, #-1
+  0x000000012b6047e8:   str		x8, [sp]
+  0x000000012b6047ec:   bl		#0x132b2dd80        ; ImmutableOopMap {rfp=Oop }
+                                                            ;*synchronization entry
+                                                            ; - java.lang.String::isLatin1@-1 (line 4893)
+                                                            ; - java.lang.String::hashCode@17 (line 2432)
+                                                            ;   {runtime_call C1 Runtime counter_overflow_blob}
+  0x000000012b6047f0:   b		#0x12b6045ec
+  0x000000012b6047f4:   mov		x8, #0x23d0         ;   {metadata({method} {0x00000600001923d0} &apos;hashCode&apos; &apos;([B)I&apos; in &apos;java/lang/StringLatin1&apos;)}
+  0x000000012b6047f8:   movk		x8, #0x19, lsl #16
+  0x000000012b6047fc:   movk		x8, #0x600, lsl #32
+  0x000000012b604800:   str		x8, [sp, #8]
+  0x000000012b604804:   mov		x8, #-1
+  0x000000012b604808:   str		x8, [sp]
+  0x000000012b60480c:   bl		#0x132b2dd80        ; ImmutableOopMap {rfp=Oop c_rarg1=Oop }
+                                                            ;*synchronization entry
+                                                            ; - java.lang.StringLatin1::hashCode@-1 (line 195)
+                                                            ; - java.lang.String::hashCode@27 (line 2432)
+                                                            ;   {runtime_call C1 Runtime counter_overflow_blob}
+  0x000000012b604810:   b		#0x12b6046d0
+  0x000000012b604814:   bl		#0x132b2a700        ; ImmutableOopMap {rfp=Oop c_rarg1=Oop }
+                                                            ;*arraylength {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.StringLatin1::hashCode@3 (line 195)
+                                                            ; - java.lang.String::hashCode@27 (line 2432)
+                                                            ;   {runtime_call C1 Runtime throw_null_pointer_exception_blob}
+  0x000000012b604818:   adr		x8, #0x12b6047a4    ;   {internal_word}
+  0x000000012b60481c:   str		x8, [x28, #0x4c0]
+  0x000000012b604820:   b		#0x132a58c80        ;   {runtime_call SafepointBlob}
+  0x000000012b604824:   ldr		x0, [x28, #0x568]
+  0x000000012b604828:   str		xzr, [x28, #0x568]
+  0x000000012b60482c:   str		xzr, [x28, #0x570]
+  0x000000012b604830:   ldp		x29, x30, [sp, #0x50]
+  0x000000012b604834:   add		sp, sp, #0x60
+  0x000000012b604838:   b		#0x132b29f80        ;   {runtime_call C1 Runtime unwind_exception_blob}
+  0x000000012b60483c:   udf		#0
+[Stub Code]
+  0x000000012b604840:   ldr		x8, #0x12b604848    ;   {trampoline_stub}
+  0x000000012b604844:   br		x8
+  0x000000012b604848:   .byte		0x80, 0x48, 0x60, 0x2b
+  0x000000012b60484c:   udf		#1
+  0x000000012b604850:   isb		                    ;   {static_stub}
+  0x000000012b604854:   mov		x12, #0             ;   {metadata(nullptr)}
+  0x000000012b604858:   movk		x12, #0, lsl #16
+  0x000000012b60485c:   movk		x12, #0, lsl #32
+  0x000000012b604860:   mov		x8, #0
+  0x000000012b604864:   movk		x8, #0, lsl #16
+  0x000000012b604868:   movk		x8, #0, lsl #32
+  0x000000012b60486c:   br		x8
+  0x000000012b604870:   ldr		x8, #0x12b604878    ;   {trampoline_stub}
+  0x000000012b604874:   br		x8
+  0x000000012b604878:   .byte		0x00, 0x7a, 0xa5, 0x32
+  0x000000012b60487c:   udf		#1
+  0x000000012b604880:   isb		                    ;   {static_stub}
+  0x000000012b604884:   mov		x12, #0xca80        ;   {metadata({method} {0x000006000048ca80} &apos;hashCodeOfUnsigned&apos; &apos;([BIII)I&apos; in &apos;jdk/internal/util/ArraysSupport&apos;)}
+  0x000000012b604888:   movk		x12, #0x48, lsl #16
+  0x000000012b60488c:   movk		x12, #0x600, lsl #32
+  0x000000012b604890:   mov		x8, #0x4f2c
+  0x000000012b604894:   movk		x8, #0x32a4, lsl #16
+  0x000000012b604898:   movk		x8, #1, lsl #32
+  0x000000012b60489c:   br		x8
+[Exception Handler]
+  0x000000012b6048a0:   bl		#0x132b2bf80        ;   {runtime_call C1 Runtime handle_exception_from_callee_blob}
+  0x000000012b6048a4:   mov		x0, #0x7a56         ;   {external_word}
+  0x000000012b6048a8:   movk		x0, #0x126d, lsl #16
+  0x000000012b6048ac:   movk		x0, #1, lsl #32
+  0x000000012b6048b0:   dcps1		#0xdeae
+[Deopt Handler Code]
+  0x000000012b6048b4:   adr		x30, #0x12b6048b4
+  0x000000012b6048b8:   b		#0x132a58680        ;   {runtime_call DeoptimizationBlob}
+  0x000000012b6048bc:   udf		#0
+--------------------------------------------------------------------------------
+[/Disassembly]
+</print_nmethod>
+<writer thread='5635'/>
+<dependency_failed type='leaf_type' ctxk='java/util/HashMap' witness='java/util/LinkedHashMap' stamp='0.025'/>
+<dependency_failed type='leaf_type' ctxk='java/util/HashMap' witness='java/util/LinkedHashMap' stamp='0.025'/>
+<dependency_failed type='leaf_type' ctxk='java/util/HashMap' witness='java/util/LinkedHashMap' stamp='0.025'/>
+<dependency_failed type='leaf_type' ctxk='java/util/HashMap' witness='java/util/LinkedHashMap' stamp='0.025'/>
+<writer thread='26115'/>
+<print_nmethod compile_id='99' compiler='jvmci' level='4' stamp='0.027'>
+
+=========================== JVMCI-compiled nmethod =============================
+----------------------------------- Assembly -----------------------------------
+
+Compiled method (JVMCI) 26   99       4       java.lang.String::hashCode (60 bytes)
+ total in heap  [0x00000001331e8fc8,0x00000001331e92b0] = 744
+ constants      [0x00000001331e90c0,0x00000001331e9100] = 64
+ main code      [0x00000001331e9100,0x00000001331e92b0] = 432
+ mutable data [0x0000007cc2c9d3b0,0x0000007cc2c9d418] = 104
+ relocation     [0x0000007cc2c9d3b0,0x0000007cc2c9d3d0] = 32
+ metadata       [0x0000007cc2c9d3d0,0x0000007cc2c9d400] = 48
+ JVMCI data     [0x0000007cc2c9d400,0x0000007cc2c9d418] = 24
+ immutable data [0x0000007cc2e70280,0x0000007cc2e70490] = 528
+ dependencies   [0x0000007cc2e70280,0x0000007cc2e70290] = 16
+ nul chk table  [0x0000007cc2e70290,0x0000007cc2e702a0] = 16
+ scopes pcs     [0x0000007cc2e702a0,0x0000007cc2e703f0] = 336
+ scopes data    [0x0000007cc2e703f0,0x0000007cc2e70468] = 120
+ speculations   [0x0000007cc2e70468,0x0000007cc2e70490] = 40
+
+[Disassembly]
+--------------------------------------------------------------------------------
+
+[Constant Pool]
+             Address          hex4                    hex8      
+  0x00000001331e90c0:   0x00000001      0x0000000000000001      
+  0x00000001331e90c4:   0x00000000                              
+  0x00000001331e90c8:   0x00000000      0x0000000000000000      
+  0x00000001331e90cc:   0x00000000                              
+  0x00000001331e90d0:   0x00000000      0x0000000000000000      
+  0x00000001331e90d4:   0x00000000                              
+  0x00000001331e90d8:   0x00000000      0x0000000000000000      
+  0x00000001331e90dc:   0x00000000                              
+  0x00000001331e90e0:   0x00000000      0x0000000000000000      
+  0x00000001331e90e4:   0x00000000                              
+  0x00000001331e90e8:   0x00000000      0x0000000000000000      
+  0x00000001331e90ec:   0x00000000                              
+  0x00000001331e90f0:   0x00000000      0x0000000000000000      
+  0x00000001331e90f4:   0x00000000                              
+  0x00000001331e90f8:   0x00000000      0x0000000000000000      
+  0x00000001331e90fc:   0x00000000                              
+
+--------------------------------------------------------------------------------
+
+[Instructions begin]
+  0x00000001331e9100:   nop		                    ;   {other}
+  0x00000001331e9104:   nop		
+  0x00000001331e9108:   nop		
+  0x00000001331e910c:   nop		
+  0x00000001331e9110:   nop		
+  0x00000001331e9114:   nop		
+  0x00000001331e9118:   nop		
+  0x00000001331e911c:   nop		
+  0x00000001331e9120:   nop		
+  0x00000001331e9124:   nop		
+  0x00000001331e9128:   nop		
+[Entry Point]
+  # {method} {0x000006000017b798} &apos;hashCode&apos; &apos;()I&apos; in &apos;java/lang/String&apos;
+  #           [sp+0x30]  (sp of caller)
+  0x00000001331e912c:   ldr		w8, [x1, #8]
+  0x00000001331e9130:   ldr		w10, [x9, #8]
+  0x00000001331e9134:   cmp		w8, w10
+  0x00000001331e9138:   b.eq		#0x1331e9140
+  0x00000001331e913c:   b		#0x132a57400        ;   {runtime_call Shared Runtime ic_miss_blob}
+[Verified Entry Point]
+  0x00000001331e9140:   nop		
+  0x00000001331e9144:   mov		x8, #-0x4000
+  0x00000001331e9148:   movk		x8, #0xfffe, lsl #16
+  0x00000001331e914c:   str		xzr, [sp, x8]
+  0x00000001331e9150:   sub		sp, sp, #0x30
+  0x00000001331e9154:   stp		x29, x30, [sp, #0x20]
+  0x00000001331e9158:   ldr		w8, #0x1331e90c0    ;   {section_word}
+  0x00000001331e915c:   ldr		w9, [x28, #0x20]
+  0x00000001331e9160:   cmp		w8, w9
+  0x00000001331e9164:   b.ne		#0x1331e9254
+  0x00000001331e9168:   mov		x11, x1
+  0x00000001331e916c:   ldr		w0, [x11, #0xc]     ;*getfield hash {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@1 (line 2430)
+  0x00000001331e9170:   cbz		w0, #0x1331e918c
+  0x00000001331e9174:   ldp		x29, x30, [sp, #0x20]
+  0x00000001331e9178:   add		sp, sp, #0x30
+  0x00000001331e917c:   ldr		x8, [x28, #0x28]    ;   {poll_return}
+  0x00000001331e9180:   cmp		sp, x8
+  0x00000001331e9184:   b.hi		#0x1331e9260
+  0x00000001331e9188:   ret		                    ;*ifne {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@6 (line 2431)
+  0x00000001331e918c:   ldrb		w1, [x11, #0x11]
+  0x00000001331e9190:   cbnz		w1, #0x1331e91d4    ;*ifne {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@13 (line 2431)
+  0x00000001331e9194:   ldr		w1, [x11, #0x14]    ;*getfield value {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@24 (line 2432)
+  0x00000001331e9198:   mov		w0, w1
+  0x00000001331e919c:   cbz		w0, #0x1331e91a4
+  0x00000001331e91a0:   add		x0, x27, x0, lsl #3 ; ImmutableOopMap {c_rarg0=Oop r11=Oop }
+                                                            ;*aload_0 {reexecute=1 rethrow=0 return_oop=0}
+                                                            ; - (reexecute) java.lang.String::hashCode@0 (line 2430)
+  0x00000001331e91a4:   ldr		w2, [x0, #0xc]      ; implicit exception: dispatches to 0x00000001331e9280
+  0x00000001331e91a8:   ldrsb		w1, [x11, #0x10]
+  0x00000001331e91ac:   cbnz		w1, #0x1331e9220    ;*ifeq {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@20 (line 2432)
+  0x00000001331e91b0:   cmp		w2, #0
+  0x00000001331e91b4:   b.eq		#0x1331e91ec
+  0x00000001331e91b8:   cmp		w2, #1
+  0x00000001331e91bc:   b.eq		#0x1331e9218        ;*lookupswitch {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - jdk.internal.util.ArraysSupport::hashCodeOfUnsigned@1 (line 273)
+                                                            ; - java.lang.StringLatin1::hashCode@5 (line 195)
+                                                            ; - java.lang.String::hashCode@27 (line 2432)
+  0x00000001331e91c0:   add		x1, x0, #0x10       ;* unwind (locked if synchronized)
+                                                            ; - jdk.internal.util.ArraysSupport::vectorizedHashCode@-3
+                                                            ; - jdk.internal.util.ArraysSupport::hashCodeOfUnsigned@51 (line 276)
+                                                            ; - java.lang.StringLatin1::hashCode@5 (line 195)
+                                                            ; - java.lang.String::hashCode@27 (line 2432)
+  0x00000001331e91c4:   mov		w3, wzr
+  0x00000001331e91c8:   bl		#0x132d72040        ;   {runtime_call Stub&lt;IntrinsicStubsGen.vectorizedHashCodeBoolean&gt;}
+  0x00000001331e91cc:   cbz		w0, #0x1331e9228    ;*ifne {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@42 (line 2434)
+  0x00000001331e91d0:   str		w0, [x11, #0xc]     ;*putfield hash {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@55 (line 2437)
+  0x00000001331e91d4:   ldp		x29, x30, [sp, #0x20]
+  0x00000001331e91d8:   add		sp, sp, #0x30
+  0x00000001331e91dc:   ldr		x8, [x28, #0x28]    ;   {poll_return}
+  0x00000001331e91e0:   cmp		sp, x8
+  0x00000001331e91e4:   b.hi		#0x1331e9270
+  0x00000001331e91e8:   ret		                    ;*lookupswitch {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - jdk.internal.util.ArraysSupport::hashCodeOfUnsigned@1 (line 273)
+                                                            ; - java.lang.StringLatin1::hashCode@5 (line 195)
+                                                            ; - java.lang.String::hashCode@27 (line 2432)
+  0x00000001331e91ec:   mov		x0, #0x294
+  0x00000001331e91f0:   mov		w1, #-0x13
+  0x00000001331e91f4:   str		w1, [x28, #0x4e8]   ;*arraylength {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.StringLatin1::hashCode@3 (line 195)
+                                                            ; - java.lang.String::hashCode@27 (line 2432)
+  0x00000001331e91f8:   str		x0, [x28, #0x4f0]
+  0x00000001331e91fc:   mov		x8, #0x8770         ;   {runtime_call DeoptimizationBlob}
+  0x00000001331e9200:   movk		x8, #0x32a5, lsl #16
+  0x00000001331e9204:   movk		x8, #1, lsl #32
+  0x00000001331e9208:   blr		x8                  ; ImmutableOopMap {r11=Oop }
+                                                            ;*aload_0 {reexecute=1 rethrow=0 return_oop=0}
+                                                            ; - (reexecute) java.lang.String::hashCode@0 (line 2430)
+  0x00000001331e920c:   nop		
+  0x00000001331e9210:   movk		xzr, #0
+  0x00000001331e9214:   movk		xzr, #0             ;*arraylength {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.StringLatin1::hashCode@3 (line 195)
+                                                            ; - java.lang.String::hashCode@27 (line 2432)
+  0x00000001331e9218:   ldrb		w0, [x0, #0x10]
+  0x00000001331e921c:   b		#0x1331e91cc        ;*iload_1 {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@58 (line 2440)
+  0x00000001331e9220:   mov		x0, #0x14
+  0x00000001331e9224:   b		#0x1331e91f0        ;*arraylength {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.StringLatin1::hashCode@3 (line 195)
+                                                            ; - java.lang.String::hashCode@27 (line 2432)
+  0x00000001331e9228:   mov		w0, #-0x13
+  0x00000001331e922c:   str		w0, [x28, #0x4e8]
+  0x00000001331e9230:   mov		x0, #0x294          ;*ifne {reexecute=0 rethrow=0 return_oop=0}
+                                                            ; - java.lang.String::hashCode@42 (line 2434)
+  0x00000001331e9234:   str		x0, [x28, #0x4f0]
+  0x00000001331e9238:   mov		x8, #0x8770         ;   {runtime_call DeoptimizationBlob}
+  0x00000001331e923c:   movk		x8, #0x32a5, lsl #16
+  0x00000001331e9240:   movk		x8, #1, lsl #32
+  0x00000001331e9244:   blr		x8                  ; ImmutableOopMap {r11=Oop }
+                                                            ;*ireturn {reexecute=1 rethrow=0 return_oop=0}
+                                                            ; - (reexecute) java.lang.StringLatin1::hashCode@8 (line 195)
+                                                            ; - java.lang.String::hashCode@27 (line 2432)
+  0x00000001331e9248:   nop		
+  0x00000001331e924c:   movk		xzr, #0
+  0x00000001331e9250:   movk		xzr, #0
+  0x00000001331e9254:   bl		#0x132a606c0        ;   {runtime_call Stub::method_entry_barrier}
+  0x00000001331e9258:   b		#0x1331e9168
+  0x00000001331e925c:   .byte		0xff, 0xff, 0xff, 0xff
+  0x00000001331e9260:   adr		x8, #0x1331e917c
+  0x00000001331e9264:   str		x8, [x28, #0x4c0]
+  0x00000001331e9268:   b		#0x132a58c80        ;   {runtime_call SafepointBlob}
+  0x00000001331e926c:   .byte		0xff, 0xff, 0xff, 0xff
+  0x00000001331e9270:   adr		x8, #0x1331e91dc
+  0x00000001331e9274:   str		x8, [x28, #0x4c0]
+  0x00000001331e9278:   b		#0x132a58c80        ;   {runtime_call SafepointBlob}
+  0x00000001331e927c:   .byte		0xff, 0xff, 0xff, 0xff
+  0x00000001331e9280:   mov		w8, #-0xb
+  0x00000001331e9284:   str		w8, [x28, #0x4e8]
+  0x00000001331e9288:   mov		x8, xzr
+  0x00000001331e928c:   str		x8, [x28, #0x4f0]
+  0x00000001331e9290:   bl		#0x132a58770        ; ImmutableOopMap {c_rarg0=Oop r11=Oop }
+                                                            ;*aload_0 {reexecute=1 rethrow=0 return_oop=0}
+                                                            ; - (reexecute) java.lang.String::hashCode@0 (line 2430)
+                                                            ;   {runtime_call DeoptimizationBlob}
+  0x00000001331e9294:   nop		
+  0x00000001331e9298:   movk		xzr, #0
+  0x00000001331e929c:   movk		xzr, #0
+[Exception Handler]
+  0x00000001331e92a0:   bl		#0x132d72200        ;   {runtime_call Stub&lt;ExceptionHandlerStub.exceptionHandler&gt;}
+  0x00000001331e92a4:   .byte		0xff, 0xff, 0xff, 0xff
+[Deopt Handler Code]
+  0x00000001331e92a8:   adr		x30, #0x1331e92a8
+  0x00000001331e92ac:   b		#0x132a58680        ;   {runtime_call DeoptimizationBlob}
+--------------------------------------------------------------------------------
+[/Disassembly]
+</print_nmethod>
+<writer thread='5635'/>
+------------------------------------------------------------------------
+java.lang.String::hashCode()I
+  interpreter_invocation_count:        8828
+  invocation_counter:                  8828
+  backedge_counter:                       0
+  decompile_count:                        0
+  mdo size: 616 bytes
+
+   0 nofast_aload_0
+   1 nofast_getfield 19 &lt;java/lang/String.hash:I&gt; 
+   4 istore_1
+   5 iload_1
+   6 ifne 58
+  0    bci: 6    BranchData         taken(8366) displacement(352)
+                                    not taken(137)
+   9 nofast_aload_0
+  10 nofast_getfield 23 &lt;java/lang/String.hashIsZero:Z&gt; 
+  13 ifne 58
+  32   bci: 13   BranchData         taken(4) displacement(320)
+                                    not taken(133)
+  16 nofast_aload_0
+  17 invokevirtual 496 &lt;java/lang/String.isLatin1()Z&gt; 
+  64   bci: 17   VirtualCallData    count(0) entries(1)
+                                    &apos;java/lang/String&apos;(133 1.00)
+  20 ifeq 33
+  208  bci: 20   BranchData         taken(0) displacement(72)
+                                    not taken(133)
+  23 nofast_aload_0
+  24 nofast_getfield 9 &lt;java/lang/String.value:[B&gt; 
+  27 invokestatic 644 &lt;java/lang/StringLatin1.hashCode([B)I&gt; 
+  240  bci: 27   CounterData        count(133)
+  30 goto 40
+  256  bci: 30   JumpData           taken(133) displacement(40)
+  33 nofast_aload_0
+  34 nofast_getfield 9 &lt;java/lang/String.value:[B&gt; 
+  37 invokestatic 648 &lt;java/lang/StringUTF16.hashCode([B)I&gt; 
+  280  bci: 37   CounterData        count(0)
+  40 istore_1
+  41 iload_1
+  42 ifne 53
+  296  bci: 42   BranchData         taken(133) displacement(56)
+                                    not taken(0)
+  45 nofast_aload_0
+  46 iconst_1
+  47 nofast_putfield 23 &lt;java/lang/String.hashIsZero:Z&gt; 
+  50 goto 58
+  328  bci: 50   JumpData           taken(0) displacement(24)
+  53 nofast_aload_0
+  54 iload_1
+  55 nofast_putfield 19 &lt;java/lang/String.hash:I&gt; 
+  58 iload_1
+  59 ireturn
+------------------------------------------------------------------------
+Total MDO size: 616 bytes
+<writer thread='18691'/>
+<destroy_vm stamp='0.036'/>
+<tty_done stamp='0.036'/>
+</tty>
+<hotspot_log_done stamp='0.036'/>
+</hotspot_log>
