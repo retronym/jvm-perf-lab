@@ -3,7 +3,7 @@ the server's JSON API, and carries the server's token for its POSTs: it is serve
 """
 import html, json, os, time
 
-from . import timeline, ui
+from . import testbed, timeline, ui
 
 CSS = """
 main{max-width:1100px;margin:0 auto;padding:16px 20px 40px}
@@ -382,7 +382,7 @@ def queue_page(server):
                               "a worker of its campaign's testbed; numbers of two testbeds are never compared.", right=True)
     body = (f'<h2 class="sec">Workers {wk_help}</h2><section class="card" id="workers"></section>'
             f'<h2 class="sec">Now <span class="k" id="conn"></span></h2><section class="card" id="active"></section>'
-            f'<section class="card" id="bd" hidden><div class="card-h"><h2>Building <span id="bd-label"></span></h2><span id="bd-status"></span>{bd_help}</div>'
+            f'<section class="card" id="bd" hidden><div class="card-h"><h2>Building <span id="bd-label"></span></h2><span class="badge" title="this machine; a remote worker&#39;s build is in its job&#39;s transcript">on {html.escape(testbed.name())}</span><span id="bd-status"></span>{bd_help}</div>'
             '<p class="k" id="bd-cmd"></p><pre id="bd-tail"></pre></section>'
             f'<section class="card" id="tl" hidden><div class="card-h"><h2>Fork timeline</h2><span class="k" id="tl-name"></span>'
             f'<span id="tl-status"></span>{tl_help}</div><div class="tl-legend" id="tl-legend"></div><svg class="timeline" id="tl-chart"></svg></section>'

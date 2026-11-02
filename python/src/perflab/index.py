@@ -1475,9 +1475,9 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
   <label class="k"><input type="checkbox" id="tl-follow" checked> follow the running fork</label><span id="tl-status"></span>{tl_help}</div>
   <div class="tl-legend" id="tl-legend"></div><svg class="timeline" id="tl-chart"></svg></section>
   <div class="tl-tip" id="tl-tip"></div>
-  <section class="card" id="bd" hidden><div class="card-h"><h2>Building <span id="bd-label"></span></h2><span id="bd-status"></span>{bd_help}</div>
+  <section class="card" id="bd" hidden><div class="card-h"><h2>Building <span id="bd-label"></span></h2><span class="badge" title="this machine; a remote worker's build is in its job's transcript on the queue page">on {esc(testbed.name())}</span><span id="bd-status"></span>{bd_help}</div>
   <p class="k" id="bd-cmd"></p><pre id="bd-tail"></pre></section>
-  <section class="card" id="lg" hidden><div class="card-h"><h2>Waiting for a quiet machine</h2><span id="lg-status"></span>{lg_help}</div>
+  <section class="card" id="lg" hidden><div class="card-h"><h2>Waiting for a quiet machine</h2><span class="badge" title="this machine (its load gate); a remote worker's waits are in its job's transcript on the queue page">on {esc(testbed.name())}</span><span id="lg-status"></span>{lg_help}</div>
   <p class="k" id="lg-top"></p><div class="bar" id="lg-bar"><i></i></div><svg id="lg-chart"></svg></section>
   <div id="live">
   <h2 class="sec" id="campaigns">Campaigns <span class="k">variants compared over rounds, newest first</span></h2>
