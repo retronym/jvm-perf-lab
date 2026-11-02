@@ -459,8 +459,9 @@ def _project(r):
 
 def _mount(project, rel):
     """The directory `rel` (a URL path below /p/<project>/, unquoted) is in, and its path there; None if it is in
-    neither the campaigns nor the runs, or names a dot file or directory."""
-    if any(s.startswith(".") for s in rel.split("/")):
+    neither the campaigns nor the runs, or names a dot file or directory but the remote workers' live mirrors (.live,
+    perflab.mirror, which has no dot files of its own)."""
+    if any(s.startswith(".") and s != mirror.DIR for s in rel.split("/")):
         return None
     for prefix, d in sorted(project["mounts"], key=lambda m: -len(m[0])):
         if prefix == ".":

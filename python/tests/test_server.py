@@ -334,7 +334,7 @@ class ServerTest(unittest.TestCase):
         out = os.path.join(self.root, "out", "perflab")
         files = {"ab/index.html": "<!doctype html><p>the index</p>", "ab/running.json": "{}", "ab/c1/x-cpu.html": "<p>flame",
                  "ab/c1/v/1/timeline.tsv": "bin_ms\n", "ab/c1/.build/v/a.jar": "jar", "ab/.serve.json": "{}",
-                 "runs/r1/report.html": "<p>run", "secret.txt": "not a campaign or a run"}
+                 "ab/.live/w1/running.json": "{}", "runs/r1/report.html": "<p>run", "secret.txt": "not a campaign or a run"}
         for rel, text in files.items():
             os.makedirs(os.path.dirname(os.path.join(out, rel)), exist_ok=True)
             open(os.path.join(out, rel), "w").write(text)
@@ -343,7 +343,8 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(code, 200)
         self.assertIn(self.srv.token, page)
         self.assertIsNone(h["Content-Security-Policy"])  # it fetches running.json, build.json, cells' TSVs, itself, the API
-        for rel in ("ab/c1/x-cpu.html", "runs/r1/report.html", "ab/running.json", "ab/c1/v/1/timeline.tsv", "ab/c1/"):
+        # a remote worker's live mirror (perflab.mirror) too
+        for rel in ("ab/c1/x-cpu.html", "runs/r1/report.html", "ab/running.json", "ab/c1/v/1/timeline.tsv", "ab/c1/", "ab/.live/w1/running.json"):
             code, h, _ = self.get(base + rel)
             self.assertEqual(code, 200, rel)
             self.assertEqual(h["Content-Security-Policy"], server.SANDBOX, rel)
