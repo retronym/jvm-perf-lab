@@ -1032,7 +1032,7 @@ function svFmt(x, kind) {
   return a >= 100 ? Math.round(x).toLocaleString() : x.toPrecision(4);
 }
 const svStats = (d, kind) => `n ${d.n} · min ${svFmt(d.min, kind)} · p25 ${svFmt(d.p25, kind)} · median ${svFmt(d.median, kind)} · mean ${svFmt(d.mean, kind)} · p75 ${svFmt(d.p75, kind)} · max ${svFmt(d.max, kind)}` + (d.cv != null ? ` · cv ${(100 * d.cv).toFixed(1)}%` : '');
-// the hover panel of a value in a card's table: its iterations in run order (a segment per fork, warmup faint,
+// the hover panel of a value in a card's table: its iterations in run order (a colour per fork, warmup faint,
 // iterations other load disturbed marked), against the baseline's on one axis, and their numbers
 const svTip = document.createElement('div'); svTip.className = 'sv-tip'; svTip.hidden = true;
 if (document.body) document.body.appendChild(svTip); else document.addEventListener('DOMContentLoaded', () => document.body.appendChild(svTip));
@@ -1048,17 +1048,19 @@ function svPanel(td) {
   const baseXs = baseRow ? baseRow.cells.flatMap(j => (data.cells[j].raw[k] || []).flat()) : [];
   const xs = forks.flatMap(f => f.xs), d = svDescribe(xs), bd = svDescribe(baseXs);
   const W = 360, H = 70, all = forks.flatMap(f => [...f.warm, ...f.xs]), n = all.length;
-  // the scale spans the measured iterations, this row's and the baseline's: warmup beyond them is drawn at the edge
+  // the scale spans the measured iterations, this row's and the baseline's: warmup beyond them is drawn as a triangle at the edge it passed
   let lo = Math.min(...xs, ...baseXs), hi = Math.max(...xs, ...baseXs); if (hi === lo) { lo *= 0.99; hi *= 1.01; }
   const Y = x => 6 + (1 - (Math.min(hi, Math.max(lo, x)) - lo) / (hi - lo)) * (H - 12), X = i => 4 + i / Math.max(1, n - 1) * (W - 8);
   const COL = ['#4f8ef7', '#e8590c', '#2f9e44', '#ae3ec9', '#f08c00', '#1098ad'];
   let i = 0, run = '';
   forks.forEach((f, fi) => {
-    const col = COL[fi % COL.length], pts = [];
-    f.warm.forEach(x => { run += `<circle cx="${X(i).toFixed(1)}" cy="${Y(x).toFixed(1)}" r="1.3" fill="${col}" opacity="0.25"/>`; i++; });
-    f.xs.forEach((x, j) => { pts.push(`${X(i).toFixed(1)},${Y(x).toFixed(1)}`);
+    const col = COL[fi % COL.length];
+    f.warm.forEach(x => {
+      const cx = X(i).toFixed(1), cy = Y(x).toFixed(1), t = x > hi ? 1 : x < lo ? -1 : 0;
+      run += t ? `<path d="M${cx} ${cy}m-2.2 ${2.2 * t}h4.4l-2.2 ${-4 * t}z" fill="${col}" opacity="0.35"><title>warmup ${svFmt(x, metric.kind)}, beyond the axis</title></path>`
+        : `<circle cx="${cx}" cy="${cy}" r="1.3" fill="${col}" opacity="0.25"/>`; i++; });
+    f.xs.forEach((x, j) => { run += `<circle cx="${X(i).toFixed(1)}" cy="${Y(x).toFixed(1)}" r="1.8" fill="${col}"/>`;
       if (f.dist[j]) run += `<circle cx="${X(i).toFixed(1)}" cy="${Y(x).toFixed(1)}" r="3.2" fill="none" stroke="#e03131"><title>disturbed by other load</title></circle>`; i++; });
-    run += `<polyline points="${pts.join(' ')}" fill="none" stroke="${col}" stroke-width="1.4"/>`;
   });
   const hl = (x, cls) => `<line class="${cls}" x1="0" x2="${W}" y1="${Y(x).toFixed(1)}" y2="${Y(x).toFixed(1)}"/>`;
   run = hl(d.median, 'tmed') + (bd ? hl(bd.median, 'tbase') : '') + run;
@@ -1070,7 +1072,7 @@ function svPanel(td) {
     + xs.map((x, j) => `<circle class="it" cx="${SX(x).toFixed(1)}" cy="${y + 9 + (j % 3)}" r="0.9"/>`).join('');
   const cmp = `<svg viewBox="0 0 ${W} ${bd ? 58 : 30}">${strip(d, xs, 10, row ? row.v : '')}${bd ? strip(bd, baseXs, 38, row.base) : ''}</svg>`;
   return `<b>${svEsc(title)}</b> <span class="k">${metric.h}</span>`
-    + `<svg viewBox="0 0 ${W} ${H}" class="run">${run}</svg><div class="k">run order: a line per fork${forks.some(f => f.warm.length) ? ', warmup faint' : ''}; `
+    + `<svg viewBox="0 0 ${W} ${H}" class="run">${run}</svg><div class="k">run order: a colour per fork${forks.some(f => f.warm.length) ? ', warmup faint (a triangle: beyond the axis)' : ''}; `
     + `line: its median${bd ? ', dashed: ' + svEsc(row.base) + "'s" : ''}</div>${cmp}<div class="nums">${svStats(d, metric.kind)}</div>`
     + (bd ? `<div class="nums k">${svEsc(row.base)}: ${svStats(bd, metric.kind)}</div>` : '');
 }
