@@ -222,6 +222,32 @@ OUTPUTS = ["jmh.log", JFRSYNC, JIT_RECORDING, "jit.json", "result.json", "report
            "iterations.tsv", "timeline.tsv", "gc.log", "gc-*.log", "run.json"]
 
 
+def java_feature(java):
+    """The feature release (25) of the JDK of `java`, from its home's `release` file; None if it cannot be read."""
+    try:
+        home = os.path.dirname(os.path.dirname(os.path.realpath(java)))
+        with open(os.path.join(home, "release")) as f:
+            v = next(l.split("=", 1)[1].strip().strip('"') for l in f if l.startswith("JAVA_VERSION="))
+        parts = v.split(".")
+        return int(parts[1] if parts[0] == "1" else parts[0])
+    except (OSError, StopIteration, ValueError, IndexError, TypeError):
+        return None
+
+
+def quiet_jdk_warnings(java, jvm_args=""):
+    """The options that keep a fork on `java` from warning about what JMH and the benchmarks do: sun.misc.Unsafe's
+    memory access (JMH's Utils; JDK 23+) and restricted methods of unnamed modules (the Linker; JDK 22+). Neither changes
+    what runs, only the warning. Only for a JDK known by its release file (an option an older one does not know stops
+    it), and not when the arguments set them already."""
+    v = java_feature(java) if java else None
+    out = []
+    if v and v >= 22 and "--enable-native-access" not in (jvm_args or ""):
+        out.append("--enable-native-access=ALL-UNNAMED")
+    if v and v >= 23 and "--sun-misc-unsafe-memory-access" not in (jvm_args or ""):
+        out.append("--sun-misc-unsafe-memory-access=allow")
+    return " ".join(out)
+
+
 def prepare(out, profile, jmh_args, kperf=None, lib=None, jvm_append=None, built=None, sync=LAB):
     """Writes <out>/jmh.args for this run and returns the build command that runs it."""
     os.makedirs(out, exist_ok=True)
@@ -235,6 +261,8 @@ def prepare(out, profile, jmh_args, kperf=None, lib=None, jvm_append=None, built
     args = ["-o", os.path.join(out, "jmh.log"), "-rf", "json", "-rff", os.path.join(out, "result.json"), *prof]
     if prepend:
         args += ["-jvmArgsPrepend", " ".join(prepend)]
+    quiet = quiet_jdk_warnings(jmh_args[jmh_args.index("-jvm") + 1] if "-jvm" in jmh_args[:-1] else None, jvm_append)
+    jvm_append = " ".join(x for x in [quiet, jvm_append] if x)
     if jvm_append:
         args += ["-jvmArgsAppend", jvm_append]
     args += jmh_args
