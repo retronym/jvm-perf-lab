@@ -76,6 +76,7 @@ const BenchTimeline = (() => {
       draw();
     }
     function fabs() {
+      svg.classList.toggle('pannable', zoomed);
       fab.querySelector('[data-go=start]').hidden = !zoomed || x0 <= t0;
       const now = fab.querySelector('[data-go=now]');
       now.hidden = !zoomed;
@@ -132,6 +133,12 @@ const BenchTimeline = (() => {
       const p = el('pattern', {id: 'tl-hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)'}, d);
       el('rect', {width: 6, height: 6, fill: 'var(--life)', opacity: 0.35}, p);
       el('line', {x1: 0, y1: 0, x2: 0, y2: 6, stroke: 'var(--life)', 'stroke-width': 3}, p);
+      // the edge shadows of a view with more beyond it (as a scrolled table's, ui.py's .scroll)
+      for (const [id, x2] of [['tl-shade-l', 1], ['tl-shade-r', 0]]) {
+        const g = el('linearGradient', {id, x1: 1 - x2, x2, y1: 0, y2: 0}, d);
+        el('stop', {offset: 0, 'stop-color': '#000', 'stop-opacity': 0.2}, g);
+        el('stop', {offset: 1, 'stop-color': '#000', 'stop-opacity': 0}, g);
+      }
     }
     function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; }
 
@@ -281,6 +288,9 @@ const BenchTimeline = (() => {
         }
         y += r.h + 8;
       }
+      // shadows at the plot's edges while the view hides data beyond them
+      if (x0 > t0) el('rect', {x: L, y: 0, width: 12, height: height - 22, fill: 'url(#tl-shade-l)', 'pointer-events': 'none'});
+      if (x1 < t1) el('rect', {x: W - R - 12, y: 0, width: 12, height: height - 22, fill: 'url(#tl-shade-r)', 'pointer-events': 'none'});
     }
 
     // Student's t at 99.9% (two-sided), the confidence JMH reports its score error at, by degrees of freedom
@@ -375,7 +385,7 @@ const BenchTimeline = (() => {
       }
       const at = x0 + (e.offsetX - L) / (W - L - R) * (x1 - x0); x0 = Math.max(t0, at - (at - x0) * f); x1 = Math.min(t1, at + (x1 - at) * f); moved(); }, {passive: false});
     let drag = null;
-    svg.addEventListener('pointerdown', e => { drag = {x: e.clientX, x0, x1}; svg.setPointerCapture(e.pointerId); });
+    svg.addEventListener('pointerdown', e => { drag = {x: e.clientX, x0, x1}; svg.setPointerCapture(e.pointerId); svg.classList.add('dragging'); });
     svg.addEventListener('pointermove', e => {
       const t = e.target.dataset && e.target.dataset.tip;
       if (tip && t && !drag) { tip.textContent = t; tip.style.display = 'block'; tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY + 12) + 'px'; }
@@ -384,7 +394,7 @@ const BenchTimeline = (() => {
       const W = svg.clientWidth, dt = (e.clientX - drag.x) / (W - L - R) * (drag.x1 - drag.x0), w = drag.x1 - drag.x0;
       x0 = Math.min(Math.max(t0, drag.x0 - dt), t1 - w); x1 = x0 + w; moved();
     });
-    svg.addEventListener('pointerup', () => drag = null);
+    svg.addEventListener('pointerup', () => { drag = null; svg.classList.remove('dragging'); });
     svg.addEventListener('dblclick', () => { zoomed = stuck = false; x0 = t0; x1 = t1; draw(); });
     window.addEventListener('resize', draw);
     return {set, reset() { zoomed = stuck = false; }};

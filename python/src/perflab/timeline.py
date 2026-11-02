@@ -15,7 +15,8 @@ CSS = """
 :root { --life:#8a96a3; --v0:#2f6fb2; --v1:#c2571a; --v2:#2e8a57; --v3:#8a4fbf; --v4:#b8860b; --v5:#3a9aa6; --pause:#d33; --grey:#c3c9d1; }
 @media (prefers-color-scheme: dark) { :root { --v0:#6ea8e6; --v1:#e58a4e; --v2:#5cc08a; --v3:#b58ae6; --v4:#e0b84a; --v5:#6cc6d1;
   --pause:#ff6b6b; --grey:#46505c; --life:#7d8996; } }
-svg.timeline { background:var(--panel); border:1px solid var(--line); border-radius:8px; width:100%; touch-action:none; cursor:grab; display:block; }
+svg.timeline { background:var(--panel); border:1px solid var(--line); border-radius:8px; width:100%; touch-action:none; display:block; }
+svg.timeline.pannable { cursor:grab; } svg.timeline.pannable.dragging { cursor:grabbing; }
 svg.timeline text { fill:var(--fg); font-size:11px; } svg.timeline .lab { fill:var(--muted); } svg.timeline text.on { fill:var(--panel); } svg.timeline text.halo { paint-order:stroke; stroke:var(--panel); stroke-width:3px; }
 svg.timeline .grid { stroke:var(--line); } svg.timeline .axis { stroke:var(--muted); opacity:.5; }
 .tl-wrap { position:relative; }
