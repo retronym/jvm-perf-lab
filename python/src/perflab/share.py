@@ -182,9 +182,11 @@ def main(argv):
             return 0
         cmd, env = settings()
         slug = (rec or {}).get("slug") or slug_for(name)
-        p = subprocess.run([cmd, "-s", slug, "-d", dest], env=env, stdout=subprocess.PIPE, text=True)
+        p = subprocess.run([cmd, "-s", slug, "-d", dest], env=env, capture_output=True, text=True)
+        sys.stderr.write(p.stderr)  # wrangler's progress, and why it failed
         if p.returncode:
-            raise SystemExit(f"perflab share: `share` failed (exit {p.returncode})")
+            why = [l.strip() for l in p.stderr.splitlines() if re.search(r"error|fail|share:|denied|not ", l, re.I)][-3:]
+            raise SystemExit(f"perflab share: `share` failed (exit {p.returncode})" + (": " + " / ".join(why) if why else ""))
         url = p.stdout.strip().splitlines()[-1]
     rec = {"url": url, "slug": slug, "depth": depth, "at": datetime.datetime.now().isoformat(timespec="seconds"),
            "files": r["files"], "bytes": r["bytes"]}
