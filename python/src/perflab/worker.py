@@ -32,7 +32,7 @@ jobs/<id>/. Settings in <home>/worker.toml, every one optional, the command line
 import argparse, glob, io, json, os, re, shutil, signal, socket, subprocess, sys, tarfile, tempfile, threading, time, tomllib
 import urllib.error, urllib.parse, urllib.request
 
-from . import ab, config, control, mirror, remote, testbed, transcript
+from . import ab, branch, config, control, mirror, remote, testbed, transcript
 
 HOME_ENV = "PERFLAB_WORKER_HOME"
 BEAT = float(os.environ.get("PERFLAB_WORKER_BEAT") or 10)  # seconds between heartbeats (the coordinator's lease is server.LEASE, 90 s)
@@ -298,6 +298,24 @@ class Job:
             git(wt, "checkout", "-q", "--detach", "--force", src["commit"])
         return wt
 
+    def place_branch(self, cfg, repo):
+        """A branch campaign's commits as the coordinator resolved them (branch.json), with this machine's checkout of the
+        branch, in the campaign that builds them (a profile campaign's branch campaign, with that one's spec if this
+        machine has not run it): `ab run` reads them there, as it does a resumed campaign's."""
+        b = self.p["branch"]
+        lacking = [c for c in remote.branch_commits(b) if not has(repo, c)]
+        if lacking:
+            raise RuntimeError(f"the branch's commits {', '.join(c[:10] for c in lacking)} are not in the history of its tip {b['tip'][:10]}")
+        of = self.p["spec"].get("profileOf")
+        out = os.path.join(cfg.campaigns, of or self.p["campaign"])
+        os.makedirs(out, exist_ok=True)
+        with open(os.path.join(out, branch.BRANCH), "w") as f:
+            json.dump({**b, "checkout": repo}, f, indent=2)
+        if of and self.p.get("branchSpec") and not os.path.exists(os.path.join(out, "spec.json")):
+            bs = self.p["branchSpec"]
+            with open(os.path.join(out, "spec.json"), "w") as f:
+                json.dump({**bs, "branch": {**(bs.get("branch") or {}), "checkout": repo}}, f, indent=2)
+
     def same_jdk(self, d, harness_wt):
         """A worktree last built with another JDK loses its build outputs (an incremental build would keep class files
         of that JDK's version): what git ignores, but for the harness the lab's out/ (its campaigns and corpora)."""
@@ -367,6 +385,10 @@ class Job:
             return x
         s = walk(self.p["spec"])
         for v, wt in checkouts.items():
+            if v == remote.BRANCH_SOURCE and self.p.get("branch"):  # a branch's repository, not a variant's build
+                if s.get("branch"):
+                    s["branch"] = {**s["branch"], "checkout": wt}
+                continue
             s["builds"][v] = {**s["builds"][v], "checkout": wt}
         if self.p.get("jvm"):
             s["jvm"] = self.jdk(self.p["jvm"], map_(self.p["jvm"]["path"]))
@@ -513,6 +535,8 @@ class Job:
                                    + ", ".join(left))
             cfg = config.find(project)
             camp = os.path.join(cfg.campaigns, self.p["campaign"])
+            if self.p.get("branch"):
+                self.place_branch(cfg, checkouts[remote.BRANCH_SOURCE])
             self.resume_from_coordinator(camp)
             spec_path = os.path.join(self.dir, "spec.json")
             with open(spec_path, "w") as f:

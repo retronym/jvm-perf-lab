@@ -33,6 +33,8 @@ Remote jobs are `ab run <spec>`. That is where the time goes and what the queue'
 
 The coordinator resolves each of the spec's checkouts when the job is claimed (a local job sees its checkouts at run time too), to a commit and the URLs of its repository's remotes. A dirty checkout is refused: the worker could not build the same tree, and a measured tree should be a commit anyway.
 
+A branch campaign (or its profiles) is no different: the coordinator resolves its range once, as `ab run` would, into the campaign's `branch.json`, and sends the branch's repository as its tip with the resolved commits; the worker puts that `branch.json`, naming its own checkout, in its campaign, and `ab run` builds and measures the commits there as it would a resumed campaign's. The coordinator keeps its own `branch.json`.
+
 The worker keeps one bare mirror per repository, and a worktree per commit. A commit it lacks comes from a **git bundle** the coordinator makes of that commit less what its remotes already have (`--not --remotes`), which for an unpushed branch such as `claude/ov-combo5` is a few commits. The bundle's prerequisites the mirror lacks are fetched from the remotes first; without a remote, or when the remotes do not have them, the coordinator sends the whole history.
 
 The **harness** is a commit too: the project's repository (jvm-perf-lab) at the coordinator's HEAD, with its uncommitted diff. The worker checks it out, the same way, into a worktree of its own clone, applies the diff, and runs the job's perflab from it, so the lab's build and perflab's own code are the coordinator's. The project's ignored state (corpora under `out/`, the worker's campaign directories) stays in the worker's clone across jobs.

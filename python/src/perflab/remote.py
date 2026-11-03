@@ -3,18 +3,20 @@
 A job of another testbed is `ab run <spec>`. When a worker claims it, `prepare` resolves what the worker needs into
 <job dir>/remote.json, the job's payload: the spec as the coordinator has it, the spec version its cells are tagged
 with, the harness (the project's repository at HEAD and its uncommitted diff), each build's checkout as a commit with
-its repository's remotes, the JDK the spec names (its `release` file), and the coordinator's home and repository paths,
+its repository's remotes (for a branch campaign, or its profiles, the branch's repository at its tip, and the commits
+as resolved here), the JDK the spec names (its `release` file), and the coordinator's home and repository paths,
 for the worker to map. `bundle` makes a git bundle of a commit for a worker that cannot fetch it, `finished_cells` the
 campaign's finished cells (their results only) for it to resume from, and `receive` puts a unit the worker uploads (a
 cell, a voided attempt, the campaign's top-level files) in place.
 """
 import io, json, os, re, shutil, subprocess, tarfile, tempfile, time
 
-from . import ab, config, specs, testbed
+from . import ab, branch, config, specs, testbed
 
 PAYLOAD = "remote.json"  # in the job's directory
 # the campaign's top-level files that are the coordinator's own: the worker's copies name the worker's paths
-OWN = {"spec.json", ab.SOURCE, "jfrsync.jfc", "index.html", ab.RUNNING_NAME}
+OWN = {"spec.json", ab.SOURCE, "jfrsync.jfc", "index.html", ab.RUNNING_NAME, branch.BRANCH}
+BRANCH_SOURCE = "branch"  # the sources' key of a branch campaign's repository (its variants are short shas)
 CELL_UNIT = re.compile(r"[^./][^/]*/[^/]+/\d+")
 VOID_UNIT = re.compile(r"\.void/[^./][^/]*/[^/]+/[^/]+")
 # what a finished cell contributes to a resume: its result, and what says it is the campaign's and of which version
@@ -104,15 +106,48 @@ def _spec(argv, cwd):
         return path, json.load(f)
 
 
+def branch_of(spec, here, cfg, out):
+    """A branch campaign's commits (branch.json: resolved here once and kept, as `ab run` does), or a profile campaign's
+    (its branch campaign's); None for another campaign."""
+    if spec.get("branch"):
+        co = os.path.normpath(os.path.join(here, spec["branch"]["checkout"]))
+        try:
+            return branch.load(out, {**spec["branch"], "checkout": co})
+        except SystemExit as e:  # git could not resolve the range
+            raise ValueError(str(e.code)) from None
+    if spec.get("profileOf"):
+        f = os.path.join(cfg.campaigns, spec["profileOf"], branch.BRANCH)
+        if not os.path.exists(f):
+            raise ValueError(f"profileOf {spec['profileOf']}: no {f}; that campaign has not run")
+        with open(f) as fh:
+            return json.load(fh)
+    return None
+
+
+def branch_commits(b):
+    return [c["sha"] for c in b["commits"]]
+
+
+def branch_source(b):
+    """The branch's repository as a commit, its tip (whose history has the range's commits), with every commit of it."""
+    repo = b["checkout"]
+    if not os.path.isdir(repo):
+        raise ValueError(f"branch: no checkout at {repo}")
+    rs = remotes(repo)
+    return {"checkout": repo, "commit": b["tip"], "tree": git(repo, "rev-parse", f"{b['tip']}^{{tree}}"),
+            "key": repo_key(repo, rs), "remotes": rs, "commits": branch_commits(b)}
+
+
 def check(argv, cwd, project):
     """What the worker needs, resolved (without the harness's diff); ValueError for what it could not run."""
     path, spec = _spec(argv, cwd)
-    if spec.get("branch") or spec.get("profileOf"):
-        raise ValueError("a branch campaign (or its profiles) runs on this machine only, for now: no \"testbed\"")
     cfg = config.find(project["root"])
     out = os.path.join(cfg.campaigns, spec["name"])
     here = ab.spec_dir(path, out)
     sources = {}
+    b = branch_of(spec, here, cfg, out)
+    if b:
+        sources[BRANCH_SOURCE] = branch_source(b)
     for v, b in (spec.get("builds") or {}).items():
         if b.get("checkout"):
             sources[v] = source(os.path.normpath(os.path.join(here, b["checkout"])), f"build {v}")
@@ -126,13 +161,20 @@ def prepare(job, project):
     it, so that the index lists the campaign and its plan."""
     path, spec, out, sources = check(job["argv"], job["cwd"], project)
     os.makedirs(out, exist_ok=True)
+    cfg = config.find(project["root"])
+    b = branch_of(spec, ab.spec_dir(path, out), cfg, out)
+    of = os.path.join(cfg.campaigns, spec["profileOf"], "spec.json") if spec.get("profileOf") else None
     if not ab.is_copy(path, out):
         shutil.copy(path, os.path.join(out, "spec.json"))
         with open(os.path.join(out, ab.SOURCE), "w") as f:
             f.write(path + "\n")
     payload = {"job": job["id"], "argv": job["argv"], "spec": spec, "specVersion": specs.record(out, path),
                "campaign": spec["name"], "testbed": job["testbed"], "harness": harness(project["root"]),
-               "sources": sources, "jvm": jdk(spec["jvm"]) if spec.get("jvm") else None,
+               "sources": sources,
+               # a branch campaign's commits as resolved here, and a profile campaign's branch campaign's spec: the worker
+               # puts them in its campaigns, with its own checkout, where `ab run` reads them as for a resumed campaign
+               "branch": b, "branchSpec": json.load(open(of)) if of and os.path.exists(of) else None,
+               "jvm": jdk(spec["jvm"]) if spec.get("jvm") else None,
                # the JDK the builds find (the job's JAVA_HOME, as its submitter's shell had it): a build's class files
                # are of its version, which the benchmark's JVM must be able to load
                "javaHome": jdk(os.path.join(os.path.realpath(job["env"]["JAVA_HOME"]), "bin", "java")) if (job.get("env") or {}).get("JAVA_HOME") else None,

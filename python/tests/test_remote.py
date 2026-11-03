@@ -165,6 +165,10 @@ class EndToEndTest(unittest.TestCase):
             "jvmArgs": f"-Dfake.data={lab}/data.txt",
             "builds": {"base": {"checkout": "../../../base", "env": env}, "tip": {"checkout": "../../../src", "env": env},
                        "tip2": {"checkout": "../../../src", "env": env}}})
+        # a branch campaign over the source repository's two commits (the base pushed, the tip not), its range as shas
+        files["lab/campaigns/rb.json"] = json.dumps({
+            "name": "rb", "testbed": "sim", "rounds": 1, "corpora": {"c": ""}, "jvmArgs": "-Dfake.data=" + f"{lab}/data.txt",
+            "branch": {"checkout": "../../../src", "range": f"{self.pushed}..{self.unpushed}", "env": env}})
         commit(h, "lab", **files)
         open(os.path.join(lab, "data.txt"), "w").write("2")
         self.lab = lab
@@ -221,6 +225,24 @@ class EndToEndTest(unittest.TestCase):
         j2 = self.srv.q.get(j2["id"])
         self.assertEqual(j2["state"], "done", r.stdout + r.stderr)
         self.assertIn("3 cells, 0 to run", open(j2["transcript"]).read())
+
+    def test_a_worker_runs_a_branch_campaign_as_this_machine_would(self):
+        j = server.submit_local(self.srv, {"argv": ["ab", "run", "campaigns/rb.json"], "cwd": self.lab})
+        self.assertEqual(j["testbed"], "sim")
+        camp = os.path.join(self.lab, "out", "ab", "rb")
+        b = json.load(open(os.path.join(camp, "branch.json")))  # resolved here when it was queued, as `ab run` would
+        self.assertEqual([c["sha"] for c in b["commits"]], [self.pushed, self.unpushed])
+        r = self.work()
+        j = self.srv.q.get(j["id"])
+        log = open(j["transcript"]).read()
+        self.assertEqual(j["state"], "done", r.stdout + r.stderr + log)
+        for sha, want in ((self.pushed, 5 + 2), (self.unpushed, 7 + 2)):  # each commit's VERSION + the harness's data.txt
+            cell = os.path.join(camp, "c", sha[:10], "1")
+            self.assertEqual(json.load(open(os.path.join(cell, "result.json")))[0]["primaryMetric"]["score"], want, sha)
+            self.assertEqual(testbed.of_cell(cell), "sim")
+        # the coordinator's branch.json stays its own (the worker's names the worker's checkout)
+        self.assertEqual(json.load(open(os.path.join(camp, "branch.json")))["checkout"], b["checkout"])
+        self.assertTrue(os.path.exists(os.path.join(camp, "builds.json")))
 
 
 def glob_campaigns(whome):
