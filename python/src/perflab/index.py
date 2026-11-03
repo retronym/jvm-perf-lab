@@ -982,6 +982,11 @@ def progress_badge(prog, name):
 
 
 CSS = """
+#share-dlg{position:fixed;inset:0;z-index:90;background:rgba(10,14,20,.45);display:flex;align-items:flex-start;justify-content:center;padding:10vh 16px}
+#share-dlg[hidden]{display:none} #share-dlg .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;
+  max-width:560px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35)} #share-dlg label.opt{display:block;margin:4px 0}
+#share-dlg .btn.go{background:var(--link);border-color:var(--link);color:var(--panel)} #share-dlg .btn.bad{color:var(--bad)}
+#share-dlg button.btn{font:inherit;font-size:12px;cursor:pointer} #share-dlg button.btn:disabled{opacity:.5;cursor:default}
 main{max-width:1400px;margin:0 auto;padding:16px 20px 40px}
 .tabsrow .in{max-width:1400px}
 .tabsrow details.help>summary{border-color:var(--ink-line);color:var(--ink-muted)}
@@ -1338,10 +1343,11 @@ def title_of():
     return c.get("index", "title") or os.path.basename(os.path.normpath(c.root))
 
 
-def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
+def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=True):
   """One page over the project's campaigns (<campaigns>) and runs of `perflab run` (<runs>, default [paths] runs): an
   intro when one is given, the campaigns, the runs' PMU counters side by side, and the runs. `perflab serve` and the
-  campaigns' tools write it to <campaigns>/index.html (`out` by default); `perflab site` to the site's root."""
+  campaigns' tools write it to <campaigns>/index.html (`out` by default); `perflab site` and `perflab share` to the site's
+  root, not `live` (a published copy: nothing runs there, so it polls for nothing)."""
   global root, CAMPAIGNS, HOME
   CAMPAIGNS = campaigns
   runs = runs or config.get().runs
@@ -1407,6 +1413,12 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       report = os.path.join(spec_dir, "report.md")
       buttons = (link(runinfo.md_page(report, os.path.join(spec_dir, "report.html"), f"{name}: report", home=HOME), "report", "report",
                       "The campaign's report (perflab ab report)") if os.path.exists(report) else "")
+      try:  # shared (perflab share): its site, as last published
+        sh = json.load(open(os.path.join(spec_dir, "share.json")))
+        buttons += (f'<a class="btn" href="{esc(sh["url"])}" target="_blank" rel="noopener" title="Shared {esc(sh.get("at", ""))}'
+                    f'{" with " + ", ".join(sh.get("depth") or []) if sh.get("depth") else ", results only"}">shared ↗</a>')
+      except (OSError, ValueError, KeyError, TypeError):
+        pass
       units = {c[7] for vs in cells.values() for cs in vs.values() for c in cs}
       heads = [(esc(unit(units.pop())) if len(units) == 1 else "score", n) if h == "{unit}" else (esc(config.get().corpus_param), n) if h == "{corpus}" else (h, n)
                for h, n in CELL_HEADS]
@@ -1713,7 +1725,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       + '<span class="sep"></span>';
     nav.hidden = false;
     JOBS = jobs.filter(j => j.project === SRV[1] && j.campaign).sort((a, b) => b.id - a.id);
-    jobsOnCards();
+    jobsOnCards(); shareButtons();
   }}
   const CARDS = new Map();  // job id -> its spec's card body (/api/jobs/<id>/card)
   function jobsOnCards() {{
@@ -1737,10 +1749,72 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer=""):
       if (h) h.insertAdjacentHTML('afterend', links);
     }}
   }}
+  // served by the server: a Share button on each campaign's card (perflab share, POST /api/share), its dialog choosing
+  // how much goes, a dry run's size, then publishing; nothing leaves the machine before Publish
+  const TOKEN = (document.querySelector('meta[name="perflab-token"]') || {{}}).content;
+  function shareButtons() {{
+    if (!TOKEN) return;
+    document.querySelectorAll('section.card.campaign[id^="c-"]:not(.queued)').forEach(card => {{
+      if (card.querySelector('.share-btn')) return;
+      const h = card.querySelector('.card-h');
+      let b = h.querySelector('.btns');
+      if (!b) {{ b = document.createElement('span'); b.className = 'btns'; h.appendChild(b); }}
+      b.insertAdjacentHTML('beforeend', `<button type="button" class="btn share-btn" title="Publish its results as a microsite (perflab share)">share</button>`);
+    }});
+  }}
+  document.addEventListener('click', e => {{ const b = e.target.closest('.share-btn'); if (b) shareDialog(b.closest('section.card').id.slice(2)); }});
+  async function shareCall(body) {{
+    const r = await fetch('/api/share', {{method: 'POST', headers: {{'Content-Type': 'application/json', 'X-Perflab-Token': TOKEN}},
+                                         body: JSON.stringify({{project: SRV[1], ...body}})}});
+    const j = await r.json().catch(() => ({{error: r.statusText}}));
+    if (!r.ok) throw new Error(j.error || r.statusText);
+    return j;
+  }}
+  function shareDialog(name) {{
+    let d = document.getElementById('share-dlg');
+    if (!d) {{ d = document.createElement('div'); d.id = 'share-dlg'; document.body.appendChild(d); }}
+    d.hidden = false;
+    d.innerHTML = `<div class="box"><div class="card-h"><h2>Share ${{escH(name)}}</h2></div>`
+      + '<p class="k">A microsite of the campaign, public to anyone with its link (not indexed). Its results always go; raw recordings never.</p>'
+      + '<p>' + [['profiles', 'flame graphs and profile diffs'], ['asm', 'machine code pages'], ['logs', 'build and JMH logs (they name paths and hosts)']]
+          .map(([k, t]) => `<label class="opt"><input type="checkbox" data-d="${{k}}"> <b>${{k}}</b>: ${{t}}</label>`).join('') + '</p>'
+      + '<p id="share-what" class="k">…</p><p class="btns"><button type="button" class="btn go" id="share-go" disabled>Publish</button>'
+      + '<button type="button" class="btn bad" id="share-rm" hidden>Unshare</button><button type="button" class="btn" id="share-close">Close</button></p></div>';
+    const what = d.querySelector('#share-what'), go = d.querySelector('#share-go'), rm = d.querySelector('#share-rm');
+    const depth = () => Object.fromEntries([...d.querySelectorAll('input[data-d]')].map(c => [c.dataset.d, c.checked]));
+    const link = u => `<a href="${{escH(u)}}" target="_blank" rel="noopener">${{escH(u)}}</a>`;
+    let seq = 0;
+    async function dry() {{
+      const n = ++seq;
+      go.disabled = true; what.textContent = 'building the site to see what goes…';
+      try {{
+        const r = await shareCall({{campaign: name, dryRun: true, ...depth()}});
+        if (n !== seq) return;
+        what.innerHTML = `${{r.files}} files, ${{(r.bytes / 1e6).toFixed(1)}} MB` + (r.campaigns.length > 1 ? ` (with ${{r.campaigns.slice(1).map(escH).join(', ')}})` : '')
+          + (r.url ? `; it replaces ${{link(r.url)}}` : '');
+        go.textContent = r.url ? 'Update' : 'Publish'; go.disabled = false; rm.hidden = !r.url;
+      }} catch (e) {{ if (n === seq) what.textContent = 'Cannot share: ' + e.message; }}
+    }}
+    d.querySelectorAll('input[data-d]').forEach(c => c.onchange = dry);
+    d.querySelector('#share-close').onclick = () => {{ d.hidden = true; }};
+    go.onclick = async () => {{
+      go.disabled = true; what.textContent = 'publishing…';
+      try {{ const r = await shareCall({{campaign: name, dryRun: false, ...depth()}}); what.innerHTML = `Published: ${{link(r.url)}}`; rm.hidden = false; }}
+      catch (e) {{ what.textContent = 'Publishing failed: ' + e.message; go.disabled = false; }}
+    }};
+    rm.onclick = async () => {{
+      if (!confirm(`Take down the shared site of ${{name}}?`)) return;
+      rm.disabled = true;
+      try {{ await shareCall({{campaign: name, rm: true}}); what.textContent = 'Taken down.'; rm.hidden = true; go.textContent = 'Publish'; go.disabled = false; }}
+      catch (e) {{ what.textContent = 'Unsharing failed: ' + e.message; }}
+      rm.disabled = false;
+    }};
+    dry();
+  }}
   if (SRV) {{ server(); setInterval(server, 10000); }}
   apply(); tick();
-  // served (not from a file): follow what runs
-  if (location.protocol.startsWith('http')) {{ setInterval(tick, 5000); setInterval(refresh, 10000); }}
+  // served (not from a file, nor a published copy): follow what runs
+  if (location.protocol.startsWith('http') && {json.dumps(live)}) {{ setInterval(tick, 5000); setInterval(refresh, 10000); }}
   </script>"""
   with open(out, "w") as f:
       f.write(page)

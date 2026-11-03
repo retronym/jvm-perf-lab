@@ -481,6 +481,27 @@ def public(job):
     return {k: v for k, v in job.items() if k != "env"} | {"envKeys": sorted(job.get("env") or {}), "campaign": campaign_of(job)}
 
 
+def share_campaign(server, body):
+    """The index's Share button: `perflab share` of a project's campaign (perflab.share), a dry run, a publish or a
+    removal; (status, its JSON outcome)."""
+    project = server.q.project(body.get("project") or "")
+    name = body.get("campaign") or ""
+    if not project or not re.fullmatch(r"[A-Za-z0-9_.+-]{1,200}", name) or name.startswith("."):
+        return 404, {"error": "no such project or campaign"}
+    argv = [name, "--json"] + [f"--{d}" for d in ("profiles", "asm", "logs") if body.get(d)]
+    argv += ["--rm"] if body.get("rm") else ["--dry-run"] if body.get("dryRun", True) else []
+    try:
+        r = subprocess.run([sys.executable, "-m", "perflab", "share", *argv], cwd=project["root"], capture_output=True,
+                           text=True, timeout=900, env={**os.environ, "PYTHONPATH": PKG})
+    except subprocess.TimeoutExpired:
+        return 504, {"error": "perflab share took over 15 minutes"}
+    if r.returncode:
+        return 500, {"error": (r.stderr.strip().splitlines() or [f"exit {r.returncode}"])[-1]}
+    if not body.get("dryRun", True):
+        _reindex(project)  # the card's shared badge
+    return 200, json.loads(r.stdout.strip().splitlines()[-1])
+
+
 def spec_of(job):
     """The spec file a job's command names (its first .json argument, in its directory); None if none."""
     a = next((a for a in job.get("argv") or () if a.endswith(".json")), None)
@@ -1111,6 +1132,8 @@ class Server:
                             return self._error(404, "no such campaign or run")
                         storage.pin(e["path"], bool(body.get("pinned", True)))
                         return self._send(200, {"pinned": bool(body.get("pinned", True))})
+                    if p == "/api/share":
+                        return self._send(*share_campaign(server, body))
                     return self._error(404, "not found")
                 except KeyError:
                     return self._error(404, "no such job")

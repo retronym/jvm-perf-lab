@@ -67,7 +67,7 @@ def main(argv):
         copy_tree(cfg.runs, os.path.join(dest, "runs"), x.with_raw)
     os.makedirs(os.path.join(dest, "campaigns"), exist_ok=True)
     index.build(os.path.join(dest, "campaigns"), os.path.join(dest, "runs"), out=os.path.join(dest, "index.html"),
-                title=x.title, intro=intro, footer=x.footer or "")
+                title=x.title, intro=intro, footer=x.footer or "", live=False)
     with open(os.path.join(dest, "campaigns", "index.html"), "w") as f:
         f.write(REDIRECT)
     open(os.path.join(dest, ".nojekyll"), "w").close()

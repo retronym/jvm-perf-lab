@@ -17,6 +17,7 @@
   loadgate   wait for a quiet machine, or sample competing load and the machine's state (thermal, power, memory)
   quiet      make the machine quiet for a measurement (`quiet on|off|status`: Time Machine, Spotlight, updates, apps)
   site       a static site of the campaigns and runs, for publishing
+  share      a campaign's results as a microsite, published with `share` (--profiles, --asm, --logs for more)
   defcosts   cost per definition from a compiler's table (Scala 3 -Yprofile-defs): histograms, outliers, comparison
   server     the per-user perflab server: a queue of jobs run one at a time, its UI and storage admin (start|stop|status)
   submit     queue `perflab <arguments>` on the server and follow it (`perflab submit -- ab run spec.json`)
@@ -40,7 +41,7 @@ from . import transcript
 
 COMMANDS = {"run": "jmh", "ab": "ab", "trees": "trees", "index": "index", "timeline": "timeline", "regraph": "regraph",
             "profdiff": "profdiff", "inlinetree": "inlinetree", "frameweight": "frameweight", "subtree": "subtree", "analyze": "analyze",
-            "auditfold": "auditfold", "loadgate": "loadgate", "quiet": "quiet", "site": "site", "serve": "serve", "defcosts": "defcosts",
+            "auditfold": "auditfold", "loadgate": "loadgate", "quiet": "quiet", "site": "site", "share": "share", "serve": "serve", "defcosts": "defcosts",
             "server": "server", "submit": "server:submit_main", "jobs": "server:jobs_main",
             "branch": "branchprofile", "asm": "asm", "api": "api", "mcp": "mcp", "worker": "worker"}
 # the commands that become a job of a running `perflab server`: command -> the subcommands that do (None: all)
