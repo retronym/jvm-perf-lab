@@ -1076,7 +1076,7 @@ class MetricsTest(unittest.TestCase):
         unit, op = re.findall(r'<div class="summ card-s" data-stat="mean" data-norm="(\w+)">.*?<script type="application/json">(.*?)</script>', page)
         self.assertEqual(unit[0], "unit")
         data = json.loads(re.search(r'data-norm="unit">.*?<script type="application/json">(.*?)</script>', page).group(1))
-        self.assertIn({"k": "ev:LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS/cycles", "h": "LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS % of cycles", "kind": "pct"}, data["metrics"])
+        self.assertIn({"k": "ev:LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS/cycles", "h": "LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS % of cycles", "kind": "pct", "up": False}, data["metrics"])
         cycles = [m["k"] for m in data["metrics"]].index("cycles")
         self.assertEqual(data["rows"][1]["m"]["mean"][cycles][0], "41.1M")  # 80G / 1948: per file, the same cycles at 1.03x
         self.assertAlmostEqual(data["rows"][1]["m"]["mean"][cycles][3], 100 * (80e9 / 1948 / (20e9 / 487) - 1))
@@ -1090,6 +1090,34 @@ class MetricsTest(unittest.TestCase):
         with contextlib.redirect_stdout(out):
             ab.report(ab.Spec(spec), per_op=True)
         self.assertIn("| cycles/op | 20G | 80G (+300.0%) |", out.getvalue())
+
+    def test_higher_is_better_for_ipc_and_throughput(self):
+        self.assertTrue(all(metrics.higher_is_better(k) for k in ("ipc", "ipc:jit", "ipc:all")))
+        self.assertFalse(any(metrics.higher_is_better(k) for k in ("cycles", "instructions", "alloc", "ev:L1D_MISS/kinst", "cyc%:jit")))
+        self.assertTrue(metrics.higher_is_better("score", "ops/s"))
+        self.assertFalse(metrics.higher_is_better("score", "ms/op"))
+        self.assertEqual([index.verdict(d, 0.5) for d in (1.37, -1.37, 0.3)], ["worse", "better", "flat"])
+        self.assertEqual([index.verdict(d, 0.5, up=True) for d in (1.37, -1.37, 0.3)], ["better", "worse", "flat"])
+        self.assertIn('class="d better" title="higher, beyond the spread"', index.delta(1.37, 0.5, up=True))
+
+    def test_summary_counts_a_rise_in_ipc_as_better(self):
+        # main at IPC 4.26, the tip at 4.31 on fewer cycles (the m4-main-int148 campaign): both green
+        Project('[build]\njmh = "x"\n')
+        camp = config.get().campaigns
+        for v, cyc in (("main", 20e9), ("tip", 19.75e9)):
+            for rnd, jitter in ((1, 1.0), (2, 1.001)):
+                d = os.path.join(camp, "c", "k", v, str(rnd))
+                os.makedirs(d)
+                json.dump(self.cell(2922, cyc * jitter, 85.2e9 * jitter, 16.4, 7.5), open(os.path.join(d, "result.json"), "w"))
+        json.dump({"name": "c", "rounds": 2, "corpora": {"k": ""}, "variants": {"main": "", "tip": ""}, "benchmark": "B"},
+                  open(os.path.join(camp, "c", "spec.json"), "w"))
+        page = open(index.build(camp)).read()
+        data = json.loads(re.search(r'<div class="summ card-s" data-stat="mean">.*?<script type="application/json">(.*?)</script>', page).group(1))
+        ks = [m["k"] for m in data["metrics"]]
+        self.assertTrue(data["metrics"][ks.index("ipc")]["up"])
+        tip = data["rows"][1]["m"]["mean"]
+        self.assertEqual((tip[ks.index("ipc")][5], tip[ks.index("cycles")][5]), ("better", "better"))
+        self.assertGreater(tip[ks.index("ipc")][3], 1)
 
 
 class CompareTest(unittest.TestCase):

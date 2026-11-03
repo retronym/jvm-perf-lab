@@ -169,8 +169,8 @@ define("Delta", "A change against another variant or commit: Welch's t on the fo
     "pct": N("Δ in percent of the other's mean: 100 × (this / other − 1)"),
     "halfWidth": null(N("Half-width of Δ's 99.9% confidence interval, in percentage points (Welch–Satterthwaite df); null "
                         "without a spread on either side")),
-    "verdict": S("better: lower, significantly (|pct| > halfWidth; perflab counts lower as better for every metric, even "
-                 "IPC); worse: higher, significantly; flat: not significant, or no spread; na: the other's value is about "
+    "verdict": S("better: lower (higher for a metric whose higherIsBetter), significantly (|pct| > halfWidth); worse: "
+                 "the other way, significantly; flat: not significant, or no spread; na: the other's value is about "
                  "zero, so a percent change means nothing", enum=list(VERDICTS)),
     "against": S("The variant (or commit) this is against"),
     "pooled": B("Whether either side has one fork and borrowed the campaign's pooled spread")})
@@ -193,7 +193,8 @@ define("MetricInfo", "A metric the cells recorded (perflab.metrics.of)", {
     "kind": S("score: the benchmark's primary score (its unit in the label); count: events per op; alloc: bytes per op; "
               "ratio: a ratio (IPC, events per 1,000 instructions); pct: percent; total: a fork's total, not per op (JIT "
               "compilations, compile ms, deopts)", enum=["score", "count", "alloc", "ratio", "pct", "total"]),
-    "main": B("Whether the index's summary table shows it (the others are in its pivot and chart)")})
+    "main": B("Whether the index's summary table shows it (the others are in its pivot and chart)"),
+    "higherIsBetter": B("Whether a rise is an improvement: IPC, and a throughput score (ops/s); lower is better for the rest")})
 define("SummaryRow", "One corpus × variant of a campaign's summary", {
     "corpus": S("The corpus"), "variant": S("The variant"), "rounds": I("Rounds with a result"),
     "forks": I("Forks over those rounds"),
@@ -961,7 +962,7 @@ def _stats(per_v, per_unit):
                          "pooled": pooled, "shown": metrics.fmt(kind, mean),
                          "ciShown": "" if ci is None else branchview.ci_shown(kind, ci, mean),
                          "median": f(metrics.pooled(raw.get(k, []), "median")), "min": f(metrics.pooled(raw.get(k, []), "min")),
-                         "_ok": metrics.delta_ok(mean, kind, per_unit)}
+                         "_ok": metrics.delta_ok(mean, kind, per_unit), "_up": metrics.higher_is_better(k, cols[k][1])}
     return out
 
 
@@ -970,7 +971,7 @@ def _delta(a, b, against):
     d, half, _ = metrics.welch((a["mean"], a["sd"], a["n"], a["df"]), (b["mean"], b["sd"], b["n"], b["df"]))
     if d is None:
         return None
-    return {"pct": branchview.fin(d), "halfWidth": branchview.fin(half), "verdict": index.verdict(d, half, a["_ok"]),
+    return {"pct": branchview.fin(d), "halfWidth": branchview.fin(half), "verdict": index.verdict(d, half, a["_ok"], a["_up"]),
             "against": against, "pooled": a["pooled"] or b["pooled"]}
 
 
@@ -1044,7 +1045,7 @@ def campaign(campaign, project=None):
                 for k, (mean, sd, dd, spread, ok) in idx[v].items():
                     f = branchview.fin
                     rr[k] = {"mean": f(mean), "sd": f(sd), "pct": f(dd), "spread": f(spread),
-                             "verdict": "" if dd is None else index.verdict(dd, spread, ok)}
+                             "verdict": "" if dd is None else index.verdict(dd, spread, ok, metrics.higher_is_better(k, cols[k][1]))}
                 rows.append({"corpus": corpus, "variant": v, "rounds": len(rs[v]), "forks": max((len(u) for u in per_v[v][0].values()), default=0),
                              "metrics": ms, "card": rr})
         vinfo = []
@@ -1064,7 +1065,7 @@ def campaign(campaign, project=None):
     return envelope("Campaign", campaign=summ, spec=spec, variantInfo=vinfo,
                     corpusInfo=[{"name": c, "jmhArgs": corp.get(c, "") if isinstance(corp, dict) else ""} for c in corpora],
                     baseline=variants[0] if variants else None, perUnit=per_unit,
-                    metrics=[{"key": k, "label": l, "kind": kd, "main": m} for k, l, kd, m in cols.values()],
+                    metrics=[{"key": k, "label": l, "kind": kd, "main": m, "higherIsBetter": metrics.higher_is_better(k, l)} for k, l, kd, m in cols.values()],
                     summary=rows, links=links)
 
 

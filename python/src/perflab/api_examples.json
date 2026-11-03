@@ -1151,13 +1151,15 @@
     "key": "score",
     "label": "ms/op",
     "kind": "score",
-    "main": true
+    "main": true,
+    "higherIsBetter": false
    },
    {
     "key": "alloc",
     "label": "alloc/op",
     "kind": "alloc",
-    "main": true
+    "main": true,
+    "higherIsBetter": false
    }
   ],
   "summary": [

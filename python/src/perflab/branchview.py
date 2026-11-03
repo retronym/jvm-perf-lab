@@ -419,7 +419,8 @@ def branch_view(campaign_dir, rel_to=None):
                     pm = per_v[last[k]]["m"][k]
                     d, half, _ = metrics.welch(fork_stats(pm), fork_stats(m))
                     if d is not None:
-                        x["d"][k] = [fin(d), fin(half), index.verdict(d, half, pm[3]), pm[6] or m[6]]
+                        up = metrics.higher_is_better(k, (cols.get(k) or pcols.get(k) or (k, ""))[1])
+                        x["d"][k] = [fin(d), fin(half), index.verdict(d, half, pm[3], up), pm[6] or m[6]]
                         if last[k] != x["prev"]:  # the commit before it lacks this metric: what its Δ is against
                             x.setdefault("pv", {})[k] = last[k]
                 last[k] = v
@@ -437,8 +438,9 @@ def branch_view(campaign_dir, rel_to=None):
                          "date": c.get("date", ""), "shown": date_shown(c.get("date")), "index": c.get("index", i),
                          "merged": c.get("merged") or []}
                         for i, (c, v) in reversed(list(enumerate(zip(commits, variants))))],
-            "corpora": corpora, "metrics": [{"k": k, "h": label, "kind": kind} for k, label, kind in cols.values()]
-                                          + [{"k": k, "h": label, "kind": kind, "src": "profile"} for k, label, kind in pcols.values()],
+            "corpora": corpora, "metrics": [{"k": k, "h": label, "kind": kind, "up": metrics.higher_is_better(k, label)} for k, label, kind in cols.values()]
+                                          + [{"k": k, "h": label, "kind": kind, "up": metrics.higher_is_better(k, label), "src": "profile"}
+                                             for k, label, kind in pcols.values()],
             "cells": cells, "diffs": diffs, "range": branch.get("range", ""), "perUnit": per_unit,
             "unbuildable": unbuildable(campaign_dir, rel_to), "measureProfile": spec.get("profile"),
             "profile": profiles(campaign_dir, variants, rel_to)}
@@ -660,7 +662,8 @@ svg.bh-g .hot{fill:none;stroke:var(--bh-load);stroke-width:1.3} svg.bh-g .w1{str
 """
 
 # `metrics.t999` and `metrics.welch` for the page, on a cell's metric as `branch_view` has it: [mean, sd, CI, Δ ok,
-# n forks, df, pooled]; welch(x, y) is [Δ% of y against x, half-width of its 99.9% CI, verdict, a side pooled] or null
+# n forks, df, pooled]; welch(x, y, up) is [Δ% of y against x, half-width of its 99.9% CI, verdict (higher is better
+# with `up`, `metrics.higher_is_better`), a side pooled] or null
 STATS_JS = r"""
 const BH_STATS = (() => {
   const T999 = __T999__;
@@ -674,7 +677,7 @@ const BH_STATS = (() => {
     }
     return T999[T999.length - 1][1];
   }
-  function welch(x, y) {
+  function welch(x, y, up) {
     if (!x || !y || x[0] == null || y[0] == null || !x[0]) return null;
     const d = 100 * (y[0] / x[0] - 1);
     let h = null;
@@ -686,7 +689,7 @@ const BH_STATS = (() => {
         h = 100 * t999(df) * Math.sqrt(va + vb) / Math.abs(x[0]);
       }
     }
-    const v = !x[3] ? 'na' : h == null || Math.abs(d) <= h || Math.abs(d) < 0.005 ? 'flat' : d > 0 ? 'worse' : 'better';
+    const v = !x[3] ? 'na' : h == null || Math.abs(d) <= h || Math.abs(d) < 0.005 ? 'flat' : (d > 0) !== !!up ? 'worse' : 'better';
     return [d, h, v, !!(x[6] || y[6])];
   }
   return {t999, welch};
@@ -777,17 +780,16 @@ const BH = (() => {
   }
   function step(span) { const p = Math.pow(10, Math.floor(Math.log10(span / 4))), r = span / 4 / p; return p * (r >= 5 ? 5 : r >= 2 ? 2 : 1); }
   const pct = (d, sp) => `${d >= 0 ? '+' : ''}${d.toFixed(1)}%` + (sp != null ? ` <span class="pm">± ${sp.toFixed(1)}</span>` : '');
-  const TITLE = {flat: 'inconclusive: not significant at 99.9% (Welch’s t over forks)', worse: 'higher, significant at 99.9% (Welch’s t over forks)',
-                 better: 'lower, significant at 99.9% (Welch’s t over forks)'};
+  const SIG = 'significant at 99.9% (Welch’s t over forks)';
   const POOLED = '† its spread is the fork-to-fork sd pooled over this corpus’s commits with two forks or more, which has more degrees of freedom than its own forks';
   function delta(x) {
     if (!x || x[0] == null) return '';
     if (x[2] === 'na') return '<span class="d na" title="the values are about zero: no percent change">–</span>';
-    const t = x[1] == null ? '1 fork: no spread yet' : TITLE[x[2]] + '; ± the 99.9% CI of Δ' + (x[3] ? '. ' + POOLED : '');
+    const t = x[1] == null ? '1 fork: no spread yet' : (x[2] === 'flat' ? 'inconclusive: not ' + SIG : (x[0] > 0 ? 'higher, ' : 'lower, ') + SIG) + '; ± the 99.9% CI of Δ' + (x[3] ? '. ' + POOLED : '');
     return `<span class="d ${x[2]}" title="${t}">${pct(x[0], x[1])}${x[1] != null && x[3] ? '†' : ''}</span>`;
   }
   // Δ of b against a, as `branchview.branch_view` computes the Δ column (`metrics.welch`)
-  const pairDelta = (a, b, k) => BH_STATS.welch(a && a.m && a.m[k], b && b.m && b.m[k]);
+  const pairDelta = (d, a, b, k) => BH_STATS.welch(a && a.m && a.m[k], b && b.m && b.m[k], metric(d, k).up);
   // the extent of a metric's mean ± CI (and with `withRaw` its samples) down a corpus's column
   function extent(d, c, k, withRaw) {
     let lo = Infinity, hi = -Infinity;
@@ -1071,11 +1073,11 @@ const BH = (() => {
     const head = one ? `<h4>${sha(b)} against the commit measured before it</h4><span class="k">tick a second row to compare any two</span>`
       : `<h4>${sha(picked[0])} → ${sha(b)}</h4><span class="k">${esc(picked[0].subject)} → ${esc(b.subject)}</span>`;
     // the corpora both have results on
-    cs = cs.filter(c => d.metrics.some(m => pairDelta(cellOf(d, c, base(c, m.k)), cellOf(d, c, b.v), m.k)));
+    cs = cs.filter(c => d.metrics.some(m => pairDelta(d, cellOf(d, c, base(c, m.k)), cellOf(d, c, b.v), m.k)));
     let rows = '';
     for (const m of d.metrics) {
       const tds = cs.map(c => {
-        const bv = base(c, m.k), a = cellOf(d, c, bv), y = cellOf(d, c, b.v), x = pairDelta(a, y, m.k);
+        const bv = base(c, m.k), a = cellOf(d, c, bv), y = cellOf(d, c, b.v), x = pairDelta(d, a, y, m.k);
         const vs = bv !== base(c) && byV(bv) ? ` (vs ${sha(byV(bv), 7)})` : '';
         return x ? `<td>${delta(x)}<span class="ab">${esc(shown(d, m.k, a.m[m.k], a.s[m.k])[0])} → ${esc(shown(d, m.k, y.m[m.k], y.s[m.k])[0])}${vs}</span></td>` : '<td></td>';
       });

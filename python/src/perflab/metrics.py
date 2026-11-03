@@ -194,6 +194,12 @@ def fmt(kind, x):
     return {"score": ui.num, "count": ui.si, "alloc": ui.size, "ratio": lambda y: f"{y:.3g}", "total": ui.num, "pct": lambda y: f"{y:.1f}%"}[kind](x)
 
 
+def higher_is_better(key, label=""):
+    """Whether a rise in the metric `key` (labelled `label`) is an improvement: IPC (the benchmark's, a thread group's,
+    all threads'), and a throughput score (ops/s); for every other metric lower is better."""
+    return key == "ipc" or key.startswith("ipc:") or key == "score" and label.startswith("ops/")
+
+
 def delta_ok(base, kind, per_unit):
     """Whether a percent change against `base` means anything; per unit, a count of a few is no longer about zero."""
     from . import ui

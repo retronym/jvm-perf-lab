@@ -204,15 +204,17 @@ class BranchViewTest(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("node"), "needs node")
     def test_the_page_computes_the_same_deltas(self):
-        out = page_deltas(self, branchview.branch_view(self.camp)["cells"])
+        out = page_deltas(self, branchview.branch_view(self.camp))
         self.assertIn("a|" + self.v[4] + "|score", out)
 
 
-def page_deltas(t, cells):
-    """Check that the page's `welch` (as the comparison panel uses it) gives each cell's Δ column; the page's Δs."""
-    js = branchview.STATS_JS + (f"const cells = {json.dumps(cells)};\nconst out = {{}};\n"
+def page_deltas(t, view):
+    """Check that the page's `welch` (as the comparison panel uses it) gives each cell's Δ column of a `branch_view`;
+    the page's Δs."""
+    cells, up = view["cells"], {m["k"]: m["up"] for m in view["metrics"]}
+    js = branchview.STATS_JS + (f"const cells = {json.dumps(cells)}, up = {json.dumps(up)};\nconst out = {{}};\n"
                                 "for (const [c, vs] of Object.entries(cells)) for (const [v, x] of Object.entries(vs))\n"
-                                "  for (const k of Object.keys(x.d || {})) out[c + '|' + v + '|' + k] = BH_STATS.welch(vs[(x.pv || {})[k] || x.prev].m[k], x.m[k]);\n"
+                                "  for (const k of Object.keys(x.d || {})) out[c + '|' + v + '|' + k] = BH_STATS.welch(vs[(x.pv || {})[k] || x.prev].m[k], x.m[k], up[k]);\n"
                                 "console.log(JSON.stringify(out));")
     r = subprocess.run(["node", "-e", js], capture_output=True, text=True)
     t.assertEqual(r.returncode, 0, r.stderr)
@@ -482,7 +484,7 @@ class ProfiledCampaignTest(unittest.TestCase):
         self.assertEqual(c4["d"]["cycles"][2], "better")
         self.assertNotIn("graphs", c3)  # xctrace: no flame graphs
         if shutil.which("node"):
-            self.assertIn(f"a|{self.v[3]}|cycles", page_deltas(self, d["cells"]))
+            self.assertIn(f"a|{self.v[3]}|cycles", page_deltas(self, d))
 
     def test_an_async_campaign_links_its_cells_graphs(self):
         for rnd in (1, 2):

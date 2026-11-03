@@ -268,7 +268,7 @@ class ProfileViewTest(unittest.TestCase):
         self.assertAlmostEqual(c4["d"]["score"][0], 100 * (8.15 / 10.1 - 1))  # the measurement's, unchanged
         if shutil.which("node"):
             from test_branchview import page_deltas
-            self.assertIn(f"a|{self.v[3]}|p:alloc", page_deltas(self, d["cells"]))
+            self.assertIn(f"a|{self.v[3]}|p:alloc", page_deltas(self, d))
         # the profile's graphs still link from its rows
         self.assertEqual(d["profile"]["cells"]["a"][self.v[2]]["graphs"][0][2], f"br.profile/a/{self.v[2]}/1/rec-cpu.html")
 
