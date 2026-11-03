@@ -1,0 +1,64 @@
+{
+  "name": "m4-release-main-int-jdk26",
+  "description": [
+    "Full compile of scalap on the M4: the 2.13.18 release vs 2.13.x (main) vs retronym's refreshed `scala2-perf-integration`, with and without retronym/scala#148, each build in its own forks (one scala-library each, so not paired).",
+    "",
+    "All builds compiled with the release optimizer settings (`-opt:l:inline -opt-inline-from:scala/**`, the lab's `SCALA_RELEASE_OPT`); patched JDK 26 (`jdk26-integration-branch-e9e67e`), ~50 s warmup, 2 rounds."
+  ],
+  "variantDescriptions": {
+    "release": "`v2.13.18`",
+    "main": "scala/scala 2.13.x at `278cab1040`",
+    "int": "`scala2-perf-integration` refreshed onto `278cab1040` (`195578522f`): open perf PRs scala/scala#11307, #11306, #11312, #11350, #11352, #11353 rebased, plus the Symbol.filter allocation fix",
+    "int148": "int + retronym/scala#148 (typing transformers' contexts made lazily), `70634e2e68`"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "release": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/v2.13.18",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "main": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/2-13-perf-test-c402bd",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "int": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-int-195578",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "int148": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-rebase",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "release": "",
+    "main": "",
+    "int": "",
+    "int148": ""
+  },
+  "rounds": 2,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scalap": "-f 1 -wi 25 -w 2 -i 10 -r 2"
+  }
+}

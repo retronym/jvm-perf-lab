@@ -1,0 +1,46 @@
+{
+  "name": "m4-release-main-int-jdk26-scala",
+  "description": [
+    "Full compile of the scala corpus (library, reflect, compiler) on the M4, with xctrace ipc: 2.13.x (main) vs retronym's refreshed `scala2-perf-integration` with retronym/scala#148 (int148), each build in its own forks (one scala-library each, so not paired).",
+    "",
+    "All builds compiled with the release optimizer settings (`-opt:l:inline -opt-inline-from:scala/**`, the lab's `SCALA_RELEASE_OPT`); patched JDK 26 (`jdk26-integration-branch-e9e67e`), 8G heap, 6 \u00d7 20 s warmup, 6 \u00d7 20 s measured, 2 rounds. Follows `m4-release-main-int-jdk26` (scalap)."
+  ],
+  "variantDescriptions": {
+    "main": "scala/scala 2.13.x at `278cab1040`",
+    "int148": "int + retronym/scala#148 (typing transformers' contexts made lazily), `70634e2e68`"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:ipc",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "main": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/2-13-perf-test-c402bd",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "int148": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-rebase",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "main": "",
+    "int148": ""
+  },
+  "rounds": 2,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -wi 6 -w 20 -i 6 -r 20"
+  }
+}
