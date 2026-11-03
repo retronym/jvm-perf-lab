@@ -568,7 +568,7 @@ class Job:
                                          stderr=subprocess.STDOUT, start_new_session=True)
         running_f = self.running_f = os.path.join(os.path.dirname(camp), ab.RUNNING_NAME)
         self.mirror = mirror.Sender(os.path.dirname(camp))
-        term_at, cancel_at, seen, pending = None, None, None, False
+        term_at, cancel_at, held_for = None, None, None
         while self.proc.poll() is None:
             time.sleep(1)
             if self.lost:
@@ -582,20 +582,17 @@ class Job:
                 elif term_at and now - term_at >= KILL_AFTER:
                     self.kill(signal.SIGKILL)
                     term_at = float("inf")
-            # a cell ended: its upload waits for the next cell boundary, where the job pauses (its checkpoint) while it
-            # goes, so that nothing is measured meanwhile; the load gate's quiet period then follows it
+            # a cell started: ask for a pause at the boundary that ends it (its runner's checkpoint before the next cell),
+            # so that it is uploaded there, with nothing measured meanwhile; the load gate's quiet period then follows.
+            # Asked once per cell: a runner resumes only once it reads the word gone, so asking again at once would hold it
             r = _read_json(running_f) or {}
             now_running = (r.get("cell"), r.get("started")) if r.get("campaign") == self.p["campaign"] else None
-            if now_running != seen:
-                pending = pending or seen is not None
-                seen = now_running
-            if pending and not self.hold and self.word is None:
-                self.hold = True
+            if now_running and now_running != held_for and not self.hold and self.word is None:
+                self.hold, held_for = True, now_running
                 self.apply()
             elif self.hold and control.acked(self.ctl):
                 try:
                     self.sync(camp)
-                    pending = False
                 except (OSError, RuntimeError) as e:
                     print(f"[worker] upload failed ({e}); at the next cell boundary", flush=True)
                 self.hold = False

@@ -204,8 +204,9 @@ class EndToEndTest(unittest.TestCase):
             self.assertTrue(ab.done(cell))
         self.assertIn("from the coordinator's bundle", log)  # the unpushed commit
         self.assertIn("uploaded c/tip/1", log)
-        # a cell is uploaded at a cell boundary, the job paused meanwhile: never while a later cell measures
-        self.assertLess(log.index("uploaded c/base/1"), log.index("round 1 c tip2"))
+        # a cell is uploaded at the boundary that ends it, the job paused meanwhile: before the next cell measures
+        self.assertLess(log.index("uploaded c/base/1"), log.index("round 1 c tip\n"))
+        self.assertLess(log.index("uploaded c/tip/1"), log.index("round 1 c tip2"))
         self.assertNotIn(self.whome, json.load(open(os.path.join(camp, "spec.json")))["jvmArgs"])  # the coordinator's own spec
         # the queue page's Workers card: the worker, idle again, and this machine
         st = server.status(self.srv)
