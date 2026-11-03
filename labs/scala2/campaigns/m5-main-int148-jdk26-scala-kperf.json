@@ -1,0 +1,46 @@
+{
+  "name": "m5-main-int148-jdk26-scala-kperf",
+  "description": [
+    "CPU profile of `m4-main-int148-jdk26-scala` on the M5 Pro: async-profiler kperf sampling of cycles and instructions, to attribute int148's −13.5% cycles / −12.3% instructions on the scala corpus to methods (profdiff main vs int148).",
+    "",
+    "Same builds, JDK, heap and corpus arguments as the m4 campaign (release optimizer settings, patched JDK 26, 8G heap, `jdkHome=25.0.4-tem`, 6 × 20 s warmup, 6 × 20 s measured); one fork per variant, 1 round."
+  ],
+  "variantDescriptions": {
+    "main": "scala/scala 2.13.x at `278cab1040`",
+    "int148": "int + retronym/scala#148 (typing transformers' contexts made lazily), `70634e2e68`"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "async:cycles@2000000+instructions@5000000",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "main": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/2-13-perf-test-c402bd",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "int148": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-rebase",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "main": "",
+    "int148": ""
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 2.5,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -wi 6 -w 20 -i 6 -r 20 -p jdkHome=25.0.4-tem"
+  },
+  "kperf": "/tmp/asprof-kperf.sock",
+  "gcLog": true
+}
