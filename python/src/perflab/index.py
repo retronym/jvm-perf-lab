@@ -1705,7 +1705,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
       sel.innerHTML = doc.getElementById('tl-cell').innerHTML;
       if (keep && ![...sel.options].some(o => o.value === keep)) sel.add(new Option((runs.find(r => r.dir === keep) || {{name: keep}}).name, keep), 0);
       sel.value = keep;
-      apply(); jobsOnCards();
+      apply(); jobsOnCards(); shareButtons();
     }} catch (e) {{}}
   }}
   // served by `perflab server` (under /p/<project>/): its tabs before this page's, and each campaign's jobs, #<id> linking
