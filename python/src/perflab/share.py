@@ -21,6 +21,8 @@ The `share` command and its site come from ~/.perflab/share.toml:
   url = "https://share.example.org"                 # its SHARE_URL
   [env]                                             # for the command, e.g. its wrangler
   SHARE_WRANGLER = "~/code/retronym/share/node_modules/.bin/wrangler"
+  XDG_CONFIG_HOME = "~/.config"                     # if your shell sets it: where `wrangler login` keeps its token,
+                                                    # which the perflab server's environment may not say
 
 else `share` on the PATH with SHARE_URL from the environment.
 """
