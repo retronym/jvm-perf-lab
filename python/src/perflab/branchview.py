@@ -36,35 +36,11 @@ from . import loadgate, metrics, ui
 BRANCH_NAME = "branch.json"
 esc = html.escape
 
-# where a metric of `metrics.of` has per-iteration samples: the primary metric, or a secondary metric of result.json
-RAW_SOURCE = {"score": None, "alloc": "gc.alloc.rate.norm", "cycles": "xctrace.CORE_ACTIVE_CYCLE", "instructions": "xctrace.INST_ALL"}
-
-
-def raw_source(k):
-    if k.startswith("jit:"):
-        return f"jit.{k[4:]}"  # one sample per fork
-    return RAW_SOURCE.get(k, f"xctrace.{k[3:]}" if k.startswith("ev:") and "/" not in k else False)
-
-
-def raw_of(r, k, u):
-    """The forks' measurement iterations of metric `k` in a JMH result, divided by `u` (units per op), [[x, ...] per fork]."""
-    src = raw_source(k)
-    if src is False:
-        return []
-    m = r["primaryMetric"] if src is None else r.get("secondaryMetrics", {}).get(src)
-    if k.startswith("jit:"):
-        u = 1.0  # a fork's total, not per op
-    raw = (m or {}).get("rawData") or []
-    return [[x / u for x in fork if isinstance(x, (int, float)) and math.isfinite(x)] for fork in raw] if u else []
+raw_source, raw_of = metrics.raw_source, metrics.raw_of
 
 
 def fin(x):
     return x if x is not None and math.isfinite(x) else None
-
-
-def fork_stats(m):
-    """A cell's metric `m` (as `branch_view` has it) as `metrics.welch` takes it: (mean, sd, n forks, df)."""
-    return m[0], m[1], m[4], m[5]
 
 
 def sig(x, n=5):
@@ -116,25 +92,12 @@ PROFILED = "p:"  # a profile pass's metric is keyed apart from the measurement's
 
 
 def fork_units(rs, per_unit, prefix="", keep=lambda k, kind: True):
-    """A commit's metrics (`metrics.of`, with an async kperf profile's events) over its cells `rs` ([(result, cell)]),
-    those `keep` takes, keyed `prefix` + key: ({key: [per fork, the mean of its measurement iterations]}, {key: kind},
-    {key: [[iteration, ...] per fork]}, [(key, label, kind)] in the order first seen). A metric without per-iteration
-    samples has a value per round (JMH's mean over the round's forks)."""
-    of = [metrics.of(r, per_unit, metrics.cached_hw_events(cell)) for r, cell in rs]
-    kinds, raw, us, cols, wf = {}, {}, {}, [], {}
-    for ms in of:
-        for k, label, kind, _, _ in ms:
-            if keep(k, kind) and prefix + k not in kinds:
-                kinds[prefix + k] = kind
-                cols.append((prefix + k, label, kind))
-    for pk in kinds:
-        k = pk[len(prefix):]
-        forks = [f for (r, _) in rs for f in raw_of(r, k, metrics.units_per_op(r, per_unit) if per_unit else 1.0) if f]
-        if forks:
-            raw[pk] = [[sig(x) for x in f] for f in forks]
-            wf[pk] = [within(f) for f in forks]
-        us[pk] = [sum(f) / len(f) for f in forks] or [x for ms in of for kk, _, _, _, x in ms if kk == k and fin(x) is not None]
-    return us, kinds, raw, cols, wf
+    """`metrics.fork_units` of a commit's cells `rs` ([(result, cell)], with an async kperf profile's events), and per
+    metric each fork's `within`: ({key: [per fork]}, {key: kind}, {key: [[iteration, ...] per fork]} to `sig` digits,
+    [(key, label, kind)], {key: [`within` per fork]})."""
+    us, kinds, raw, cols = metrics.fork_units([(r, metrics.cached_hw_events(cell)) for r, cell in rs], per_unit, prefix, keep)
+    return (us, kinds, {k: [[sig(x) for x in f] for f in fs] for k, fs in raw.items()}, [c[:3] for c in cols],
+            {k: [within(f) for f in fs] for k, fs in raw.items()})
 
 
 def within(xs):
@@ -336,7 +299,6 @@ def branch_view(campaign_dir, rel_to=None):
     bf = os.path.join(campaign_dir, BRANCH_NAME)
     if not os.path.exists(bf):
         return None
-    from . import index
     branch = json.load(open(bf))
     try:
         spec = json.load(open(os.path.join(campaign_dir, "spec.json")))
@@ -398,45 +360,37 @@ def branch_view(campaign_dir, rel_to=None):
             units[v] = ({**us, **pus}, {**kinds, **pkinds}, {**wf, **pwf})
             if "score" in us:
                 prev = v
-        # per metric, the fork-to-fork relative sd pooled over the commits with two forks or more (ANOVA's within-group
-        # estimate, assuming a common relative spread), for a commit of fewer than metrics.OWN_FORKS forks when the pool has more
-        # degrees of freedom: with two forks a commit's own 99.9% CI is t(1) = 637 times its sd, with three t(2) = 32;
-        # from four, its own spread says something (a commit whose forks land in two places should show it)
-        stat = {v: {k: (*metrics.stats(xs), len(xs)) for k, xs in us.items() if xs} for v, (us, _, _) in units.items()}
-        keys = {k for st in stat.values() for k in st}
-        pool = {k: metrics.pooled_rel_sd([(st[k][0], st[k][1], st[k][2] - 1) for st in stat.values() if k in st]) for k in keys}
+        # per metric, a commit's mean over its forks ± its 99.9% CI, the sd pooled over the commits for one of fewer than
+        # metrics.OWN_FORKS forks (with two forks a commit's own 99.9% CI is t(1) = 637 times its sd, with three t(2) = 32);
+        # its Δ against the latest commit with it before it (`metrics.compare`), and for the pooled statistics, as an A/B
+        # card has them, `metrics.pooled_delta`'s
+        st = metrics.fork_stats({v: us for v, (us, _, _) in units.items()})
         last = {}  # per metric, the latest commit with it so far: a Δ is against it
         for v, (us, kinds, wfs) in units.items():
             x = per_v[v]
-            for k, (mean, sd, n) in stat[v].items():
+            for k, (mean, sd, ci, n, df, pooled) in st[v].items():
                 kind = kinds[k]
-                sd, df, pooled = metrics.fork_spread(mean, sd, n, pool[k])
-                ci = None if sd is None else metrics.t999(df) * sd / n ** 0.5
                 x["m"][k] = [fin(mean), fin(sd), fin(ci), metrics.delta_ok(mean, kind, per_unit), n, df, pooled]
                 x["s"][k] = [metrics.fmt(kind, mean), "" if ci is None else ci_shown(kind, ci, mean)]
                 w = within_of(wfs.get(k), sd)
                 if w:
                     x["w"][k] = [fin(w[0]), fin(w[1]), "" if w[0] is None else ci_shown(kind, w[0], mean)]
-            for k, m in x["m"].items():
+            for k in x["m"]:
                 up = metrics.higher_is_better(k, (cols.get(k) or pcols.get(k) or (k, ""))[1])
                 if k in last:
-                    pm = per_v[last[k]]["m"][k]
-                    d, half, _ = metrics.welch(fork_stats(pm), fork_stats(m))
-                    if d is not None:
-                        x["d"][k] = [fin(d), fin(half), index.verdict(d, half, pm[3], up), pm[6] or m[6]]
+                    c = metrics.compare(st[last[k]][k], st[v][k], per_v[last[k]]["m"][k][3], up)
+                    if c:
+                        x["d"][k] = [fin(c[0]), fin(c[1]), c[2], c[3]]
                         if last[k] != x["prev"]:  # the commit before it lacks this metric: what its Δ is against
                             x.setdefault("pv", {})[k] = last[k]
-                # the pooled statistics, as an A/B card has them (`metrics.pooled_delta`); the Δ's ± a 99.9% CI from
-                # the bootstrap's sd, as the mean's is
                 forks = x["raw"].get(k)
                 base = per_v[last[k]]["raw"].get(k) if k in last else None
                 for ps in metrics.STATS[1:]:
                     if not forks:
                         continue
-                    y, d, sp, ok = metrics.pooled_delta(base, forks, ps, kinds[k], per_unit)
-                    half = None if sp is None else metrics.t999(math.inf) * sp
+                    y, d, half, ok = metrics.pooled_delta(base, forks, ps, kinds[k], per_unit)
                     x["ps"].setdefault(ps, {})[k] = [fin(y), metrics.fmt(kinds[k], y)] + (
-                        [] if d is None else [fin(d), fin(half), index.verdict(d, half, ok, up)])
+                        [] if d is None else [fin(d), fin(half), metrics.verdict(d, half, ok, up)])
                 last[k] = v
         if per_v:
             cells[corpus] = per_v

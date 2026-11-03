@@ -198,11 +198,7 @@ define("MetricInfo", "A metric the cells recorded (perflab.metrics.of)", {
 define("SummaryRow", "One corpus × variant of a campaign's summary", {
     "corpus": S("The corpus"), "variant": S("The variant"), "rounds": I("Rounds with a result"),
     "forks": I("Forks over those rounds"),
-    "metrics": M(ref("Stat"), "By metric key: its value over forks, with Δ against the baseline"),
-    "card": M(O("The index card's own numbers: over rounds, not forks", {
-        "mean": null(N("Mean over rounds")), "sd": null(N("sd over rounds (null with one)")),
-        "pct": null(N("Δ% against the baseline")), "spread": null(N("Spread of Δ in percentage points, from both sides' sd over rounds")),
-        "verdict": S("As Delta.verdict, against the spread", enum=list(VERDICTS) + [""])}), "By metric key, as the index card shows them")})
+    "metrics": M(ref("Stat"), "By metric key: its value over forks, with Δ against the baseline, as the index card and the branch view show them")})
 LINKS = O("Pages of the campaign on the server", {
     "card": URL, "spec": URL, "report": URL,
     "timelines": A(O("A cell's timeline", {"corpus": S("corpus"), "variant": S("variant"), "round": I("round"), "url": URL}),
@@ -933,46 +929,33 @@ def _results(d, corpus, variant):
 def _forks(rs, per_unit):
     """Per metric, the forks' means (a metric without rawData: each round's value), the metrics' (label, kind, main),
     and per metric the forks' measurement iterations (none without rawData)."""
-    of = [metrics.of(r, per_unit, metrics.cached_hw_events(c)) for r, c in rs]
-    cols, us, raw = {}, {}, {}
-    for ms in of:
-        for k, label, kind, main, _ in ms:
-            cols.setdefault(k, (k, label, kind, main))
-    for k in cols:
-        forks = [f for (r, _) in rs for f in branchview.raw_of(r, k, metrics.units_per_op(r, per_unit) if per_unit else 1.0) if f]
-        us[k] = [sum(f) / len(f) for f in forks] or [x for ms in of for kk, _, _, _, x in ms if kk == k and branchview.fin(x) is not None]
-        raw[k] = forks
-    return us, cols, raw
+    us, _, raw, cols = metrics.fork_units([(r, metrics.cached_hw_events(c)) for r, c in rs], per_unit)
+    return us, {c[0]: c for c in cols}, raw
 
 
 def _stats(per_v, per_unit):
-    """{variant: (forks' means by metric, cols)} -> {variant: {metric: Stat}}, the pooled sd for one of few forks (metrics.fork_spread)."""
-    stat = {v: {k: (*metrics.stats(xs), len(xs)) for k, xs in us.items() if xs} for v, (us, *_) in per_v.items()}
-    keys = {k for st in stat.values() for k in st}
-    pool = {k: metrics.pooled_rel_sd([(st[k][0], st[k][1], st[k][2] - 1) for st in stat.values() if k in st]) for k in keys}
+    """{variant: (forks' means by metric, cols, raw)} -> {variant: {metric: Stat}} (`metrics.fork_stats`)."""
+    st = metrics.fork_stats({v: us for v, (us, *_) in per_v.items()})
     out = {}
     for v, (us, cols, raw) in per_v.items():
         out[v] = {}
-        for k, (mean, sd, n) in stat[v].items():
+        for k, (mean, sd, ci, n, df, pooled) in st[v].items():
             kind = cols[k][2]
-            sd, df, pooled = metrics.fork_spread(mean, sd, n, pool[k])
-            ci = None if sd is None else metrics.t999(df) * sd / n ** 0.5
             f = branchview.fin
             out[v][k] = {"mean": f(mean), "sd": f(sd), "ci": f(ci), "n": n, "df": f(df),
                          "pooled": pooled, "shown": metrics.fmt(kind, mean),
                          "ciShown": "" if ci is None else branchview.ci_shown(kind, ci, mean),
                          "median": f(metrics.pooled(raw.get(k, []), "median")), "min": f(metrics.pooled(raw.get(k, []), "min")),
-                         "_ok": metrics.delta_ok(mean, kind, per_unit), "_up": metrics.higher_is_better(k, cols[k][1])}
+                         "_ok": metrics.delta_ok(mean, kind, per_unit), "_up": metrics.higher_is_better(k, cols[k][1]), "_t": (mean, sd, ci, n, df, pooled)}
     return out
 
 
 def _delta(a, b, against):
-    """Stat b against Stat a: a Delta, or None."""
-    d, half, _ = metrics.welch((a["mean"], a["sd"], a["n"], a["df"]), (b["mean"], b["sd"], b["n"], b["df"]))
-    if d is None:
+    """Stat b against Stat a: a Delta (`metrics.compare`), or None."""
+    c = metrics.compare(a["_t"], b["_t"], a["_ok"], a["_up"])
+    if c is None:
         return None
-    return {"pct": branchview.fin(d), "halfWidth": branchview.fin(half), "verdict": index.verdict(d, half, a["_ok"], a["_up"]),
-            "against": against, "pooled": a["pooled"] or b["pooled"]}
+    return {"pct": branchview.fin(c[0]), "halfWidth": branchview.fin(c[1]), "verdict": c[2], "against": against, "pooled": c[3]}
 
 
 def _public_stat(s):
@@ -1013,8 +996,8 @@ def _variant_ref(d, spec, ref_):
 def campaign(campaign, project=None):
     """One campaign in full. `summary` has, per corpus and variant, every metric the cells recorded (score, cycles,
     instructions, IPC, alloc, PMU counters, thread groups' shares) as mean ± 99.9% CI over forks, with Δ against the
-    baseline (the first variant) by Welch's t and a verdict (better, worse, flat, na); `card` has the index card's
-    own numbers (over rounds). `links` are the server's pages: the card, cell timelines, flame graphs, diffs."""
+    baseline (the first variant) by Welch's t and a verdict (better, worse, flat, na), as the index card shows them.
+    `links` are the server's pages: the card, cell timelines, flame graphs, diffs."""
     p = resolve(project)
     with _config(p):
         d = _camp_dir(p, campaign)
@@ -1032,7 +1015,6 @@ def campaign(campaign, project=None):
             names = [v for v in variants if v in per_v]
             if not names:
                 continue
-            _, idx = metrics.summarise({v: [metrics.of(r, per_unit, metrics.cached_hw_events(c)) for r, c in rs[v]] for v in names}, per_unit)
             b = names[0]
             for v in names:
                 ms = {}
@@ -1041,13 +1023,8 @@ def campaign(campaign, project=None):
                     if v != b and k in st[b]:
                         x["delta"] = _delta(st[b][k], s, b)
                     ms[k] = x
-                rr = {}
-                for k, (mean, sd, dd, spread, ok) in idx[v].items():
-                    f = branchview.fin
-                    rr[k] = {"mean": f(mean), "sd": f(sd), "pct": f(dd), "spread": f(spread),
-                             "verdict": "" if dd is None else index.verdict(dd, spread, ok, metrics.higher_is_better(k, cols[k][1]))}
                 rows.append({"corpus": corpus, "variant": v, "rounds": len(rs[v]), "forks": max((len(u) for u in per_v[v][0].values()), default=0),
-                             "metrics": ms, "card": rr})
+                             "metrics": ms})
         vinfo = []
         vd = spec.get("variantDescriptions") or {}
         builds = spec.get("builds") or {}

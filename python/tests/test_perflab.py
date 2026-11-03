@@ -249,7 +249,7 @@ class IndexTest(unittest.TestCase):
         Project('[build]\njmh = "x"\n')
         camp = config.get().campaigns
         s = lambda x: {"score": x}
-        for r, (d, a) in enumerate([(-2.0, 87e6), (-3.0, 86e6)], 1):
+        for r, (d, a) in enumerate([(-2.0, 87e6), (-3.0, 86e6), (-2.5, 86.5e6), (-2.4, 86.6e6), (-2.6, 86.4e6)], 1):
             cell = os.path.join(camp, "c", "k", "paired", str(r))
             os.makedirs(cell)
             m = {"paired.base": s(100.0), "paired.fast": s(98.0), "paired.fast.delta%": s(d),
@@ -257,12 +257,13 @@ class IndexTest(unittest.TestCase):
                  "gc.alloc.rate.norm": s(1e6)}
             json.dump([{"primaryMetric": {"score": 99.0, "scoreError": 1.0}, "jvmArgs": [], "secondaryMetrics": m}],
                       open(os.path.join(cell, "result.json"), "w"))
-        json.dump({"name": "c", "rounds": 2, "corpora": {"k": ""}, "paired": {"base": "-Yx", "fast": ""}},
+        json.dump({"name": "c", "rounds": 5, "corpora": {"k": ""}, "paired": {"base": "-Yx", "fast": ""}},
                   open(os.path.join(camp, "c", "spec.json"), "w"))
         page = open(index.build(camp)).read()
-        better = '<span class="d better" title="lower, beyond the spread">'
-        self.assertIn(f'<td>fast</td><td>2</td><td>98<br>{better}-2.50% <span class="pm">± 0.71</span></span></td>', page)
-        self.assertIn(f'<td>86.5MB<br>{better}-2.81% <span class="pm">± 0.79</span></span></td>', page)
+        # Δ ± the 99.9% CI over the 5 forks' differences: t(4) · sd / √5
+        better = '<span class="d better" title="lower, significant at 99.9%; ± the 99.9% CI of Δ">'
+        self.assertIn(f'<td>fast</td><td>5</td><td>98<br>{better}-2.50% <span class="pm">± 1.39</span></span></td>', page)
+        self.assertIn(f'<td>86.5MB<br>{better}-2.81% <span class="pm">± 1.56</span></span></td>', page)
         self.assertIn('<span class="pv">base <b>89.0MB</b></span><span class="pv">fast <b>87.0MB</b></span>', page)
         self.assertIn("<td>fork 1</td>", page)
         self.assertNotIn("1.0MB", page)  # -prof gc mixes the variants
@@ -1098,7 +1099,7 @@ class MetricsTest(unittest.TestCase):
         self.assertFalse(metrics.higher_is_better("score", "ms/op"))
         self.assertEqual([index.verdict(d, 0.5) for d in (1.37, -1.37, 0.3)], ["worse", "better", "flat"])
         self.assertEqual([index.verdict(d, 0.5, up=True) for d in (1.37, -1.37, 0.3)], ["better", "worse", "flat"])
-        self.assertIn('class="d better" title="higher, beyond the spread"', index.delta(1.37, 0.5, up=True))
+        self.assertIn('class="d better" title="higher, significant at 99.9%', index.delta(1.37, 0.5, up=True))
 
     def test_summary_counts_a_rise_in_ipc_as_better(self):
         # main at IPC 4.26, the tip at 4.31 on fewer cycles (the m4-main-int148 campaign): both green

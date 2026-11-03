@@ -160,7 +160,7 @@ def score_head(units, suffix=""):
 
 
 def summary(name, cells):
-    """Per corpus and variant: the means over rounds of the cells' `metrics` (score, the benchmark threads' cycles,
+    """Per corpus and variant: the means over forks of the cells' `metrics` (score, the benchmark threads' cycles,
     instructions and IPC, allocation, every PMU counter recorded, the thread groups' share of cycles), each against the
     spec's first variant (in the order of the campaign's spec.json, else alphabetical); per unit of work with the spec's
     "perUnit", toggled with per op on the card. The table shows the main metrics, the pivot and chart all of them. For a paired campaign, each variant's
@@ -182,7 +182,7 @@ def metric_summary(cells, order, per_unit, norm=None):
     for corpus in sorted(cells):
         vs = cells[corpus]
         names = [v for v in order if v in vs] + sorted(v for v in vs if v not in order)
-        cs, st = metrics.summarise({v: [metrics.of(c[8], per_unit, metrics.cached_hw_events(c[9])) for c in vs[v]] for v in names}, per_unit)
+        cs, st = metrics.summarise({v: [(c[8], metrics.cached_hw_events(c[9])) for c in vs[v]] for v in names}, per_unit)
         for c in cs:
             cols.setdefault(c[0], c)
         rows.append((corpus, vs, names, st))
@@ -199,12 +199,11 @@ def metric_summary(cells, order, per_unit, norm=None):
                     if is_main:
                         tds.append("")
                     continue
-                mean, sd, d, spread, ok = st[v][k]
+                mean, ci, d, half, ok = st[v][k]
                 shown, up = metrics.fmt(kind, mean), metrics.higher_is_better(k, label)
-                ms.append(view_metric(shown, mean, sd, d, spread, ok, up))
+                ms.append(view_metric(shown, mean, ci, d, half, ok, up))
                 if is_main:
-                    rel_sd = f' <span class="pm">± {100 * sd / mean:.1f}%</span>' if sd is not None and mean else ""
-                    tds.append(with_delta(f"{shown}{rel_sd}", "" if d is None else delta(d, spread, ok, up)))
+                    tds.append(with_delta(f"{shown}{rel_ci(ci, mean)}", "" if d is None else delta(d, half, ok, up)))
             out.append(("", tds)); data.append({"c": corpus, "v": v, "n": len(vs[v]), "m": ms})
     units = {c[7] for vs in cells.values() for cs in vs.values() for c in cs}
     head = lambda k, label: (esc(unit(label)) if per_unit else score_head(units)) if k == "score" else esc(label)
@@ -248,9 +247,9 @@ def iteration_log(cell, u=1.0):
     return [warm.get(p, []) for p in pids], [dist.get(p, []) for p in pids]
 
 
-STAT_TITLE = {"mean": "the mean over rounds of each round's mean, ± the sd over rounds; Δ ± its spread over rounds",
-              "median": "the median of every measured iteration, the forks pooled; Δ ± the sd of a bootstrap over forks and iterations",
-              "min": "the fastest measured iteration, the forks pooled; Δ ± the sd of a bootstrap over forks and iterations"}
+STAT_TITLE = {"mean": "the mean over forks of each fork's mean, ± its 99.9% CI over forks; Δ by Welch's t, ± its 99.9% CI",
+              "median": "the median of every measured iteration, the forks pooled; Δ ± the 99.9% CI of a bootstrap over forks and iterations",
+              "min": "the fastest measured iteration, the forks pooled; Δ ± the 99.9% CI of a bootstrap over forks and iterations"}
 
 
 def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, left=None, timing=True):
@@ -272,7 +271,7 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, l
         for v in by[c]:
             for r in by[c][v]:
                 if r["data"]:
-                    hw = metrics.cached_hw_events(r["cell"])
+                    hw = r["hw"] = metrics.cached_hw_events(r["cell"])
                     r["of"] = metrics.of(r["data"][8], per_unit, hw)
                     u = metrics.units_per_op(r["data"][8], per_unit) if per_unit else 1.0
                     r["raw"] = {k: f for k, *_ in r["of"] if (f := [x for x in branchview.raw_of(r["data"][8], k, u) if x])}
@@ -286,7 +285,7 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, l
         vs = by[corpus]
         names = [v for v in order if v in vs] + sorted(v for v in vs if v not in order)
         done = {v: sorted((r for r in vs[v] if r["data"]), key=lambda r: r["round"]) for v in names}
-        _, st = metrics.summarise({v: [r["of"] for r in done[v]] for v in names if done[v]}, per_unit)
+        _, st = metrics.summarise({v: [(r["data"][8], r["hw"]) for r in done[v]] for v in names if done[v]}, per_unit)
         base = next((v for v in names if done[v]), None)
         forks = lambda v, k: [f for r in done.get(v, []) for f in r["raw"].get(k, [])]
         for v in names:
@@ -298,20 +297,19 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, l
                     if stat == "mean":
                         if k not in st.get(v, {}):
                             ms[stat].append(None); cell_html[stat] = ""; continue
-                        mean, sd, d, spread, ok = st[v][k]
+                        mean, ci, d, half, ok = st[v][k]
                         if not timing:
                             d = None
                         shown = metrics.fmt(kind, mean)
-                        rel_sd = f' <span class="pm">± {100 * sd / mean:.1f}%</span>' if sd is not None and mean else ""
-                        ms[stat].append(view_metric(shown, mean, sd, d, spread, ok, up))
-                        cell_html[stat] = with_delta(f"{shown}{rel_sd}", "" if d is None else delta(d, spread, ok, up))
+                        ms[stat].append(view_metric(shown, mean, ci, d, half, ok, up))
+                        cell_html[stat] = with_delta(f"{shown}{rel_ci(ci, mean)}", "" if d is None else delta(d, half, ok, up))
                     else:
-                        x, d, spread, ok = metrics.pooled_delta(forks(base, k) if v != base and timing else None, forks(v, k), stat, kind, per_unit)
+                        x, d, half, ok = metrics.pooled_delta(forks(base, k) if v != base and timing else None, forks(v, k), stat, kind, per_unit)
                         if x is None:
                             ms[stat].append(None); cell_html[stat] = '<span class="k" title="no per-iteration samples">–</span>' if k in st.get(v, {}) else ""; continue
                         shown = metrics.fmt(kind, x)
-                        ms[stat].append(view_metric(shown, x, None, d, spread, ok, up))
-                        cell_html[stat] = with_delta(shown, "" if d is None else delta(d, spread, ok, up))
+                        ms[stat].append(view_metric(shown, x, None, d, half, ok, up))
+                        cell_html[stat] = with_delta(shown, "" if d is None else delta(d, half, ok, up))
                 if is_main:
                     vals.append(f'<td class="n" data-k="{esc(k)}" data-row="{i}">' + "".join(
                         f'<span class="st st-{stat}">{cell_html[stat]}</span>' for stat in metrics.STATS) + "</td>")
@@ -366,24 +364,26 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, l
             f'<script type="application/json">{blob}</script></div>')
 
 
-def verdict(d, spread=None, ok=True, up=False):
-    """A percent change's class: better or worse when the spread over rounds or forks doesn't cross zero (lower is
-    better, or with `up` higher, `metrics.higher_is_better`), flat when it does or is unknown, na when the base is
+verdict = metrics.verdict
+
+
+def delta(d, half=None, ok=True, up=False):
+    """A percent change ± the half-width of its 99.9% CI as html, coloured by its `verdict`; a dash when the base is
     about zero."""
-    return "na" if not ok else "flat" if spread is None or abs(d) <= spread or abs(d) < 0.005 else "worse" if (d > 0) != up else "better"
-
-
-def delta(d, spread=None, ok=True, up=False):
-    """A percent change as html, coloured by its `verdict`; a dash when the base is about zero."""
     if d is None:
         return ""
-    cls = verdict(d, spread, ok, up)
+    cls = verdict(d, half, ok, up)
     if cls == "na":
         return '<span class="d na" title="the values are about zero: no percent change">–</span>'
-    title = ("inconclusive: within the spread" if spread is not None else "one round: no spread") if cls == "flat" \
-        else f'{"higher" if d > 0 else "lower"}, beyond the spread'
-    return (f'<span class="d {cls}" title="{title}">{d:+.2f}%' + (f' <span class="pm">± {spread:.2f}</span>' if spread is not None else "")
+    title = ("inconclusive: not significant at 99.9%" if half is not None else "no spread: one fork and nothing to pool, or one sample") if cls == "flat" \
+        else f'{"higher" if d > 0 else "lower"}, significant at 99.9%'
+    return (f'<span class="d {cls}" title="{title}{"; ± the 99.9% CI of Δ" if half is not None else ""}">{d:+.2f}%' + (f' <span class="pm">± {half:.2f}</span>' if half is not None else "")
             + "</span>")
+
+
+def rel_ci(ci, mean):
+    """A mean's 99.9% CI over forks, relative to it, as a summary cell shows it."""
+    return f' <span class="pm" title="the 99.9% CI over forks">± {100 * ci / abs(mean):.1f}%</span>' if ci is not None and mean else ""
 
 
 def with_delta(value, d):
@@ -391,12 +391,12 @@ def with_delta(value, d):
     return f"{value}<br>{d}" if d else value
 
 
-def view_metric(text, mean, sd, d, spread, ok, up=False):
-    """One metric of a summary row for the page's pivot and chart: [shown value, mean, sd over rounds, Δ%, spread of Δ,
-    verdict]; numbers JSON can't carry become null."""
+def view_metric(text, mean, ci, d, half, ok, up=False):
+    """One metric of a summary row for the page's pivot and chart: [shown value, mean, half-width of its 99.9% CI, Δ%,
+    half-width of Δ's 99.9% CI, verdict]; numbers JSON can't carry become null."""
     fin = lambda x: x if x is not None and math.isfinite(x) else None
     d = fin(d)
-    return [text, fin(mean), fin(sd), d, fin(spread), "" if d is None else verdict(d, spread, ok, up)]
+    return [text, fin(mean), fin(ci), d, fin(half), "" if d is None else verdict(d, half, ok, up)]
 
 
 # the summary's views, as icons: a row per corpus and variant; corpora as columns; a chart
@@ -405,7 +405,7 @@ HISTORY_VIEW = ("history", "History: a row per commit, newest first, a column pe
                 '<path d="M8 4.5h5.5M8 11.5h5.5M8 8h3.5"/>')
 VIEWS = (("table", "Table: a row per corpus and variant, its cells beneath (▸)",
           '<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M2.5 9.75h11"/>'),
-         ("chart", "Chart: Δ against the first variant with its spread, or each variant's distribution",
+         ("chart", "Chart: Δ against the first variant with its 99.9% CI, or each variant's distribution",
           '<path d="M8 2v12"/><rect x="8" y="3.5" width="5.5" height="2.4" fill="currentColor" stroke="none"/>'
           '<rect x="3" y="6.8" width="5" height="2.4" fill="currentColor" stroke="none"/><rect x="8" y="10.1" width="3" height="2.4" fill="currentColor" stroke="none"/>'))
 def view_toggle(views):
@@ -459,7 +459,7 @@ def mixed(variants):
 def paired_summary(names, cells):
     """A paired campaign's variants alternate within each fork (cell), so its JMH score mixes them: per corpus and
     variant, the variant's own metrics (`ab.PAIRED_METRICS`) as means over forks, and the paired difference against
-    the first variant, as the mean and spread over forks of each fork's difference."""
+    the first variant, as the mean over forks of each fork's difference ± its 99.9% CI."""
     out, data = [], []
     units = {c[7] for vs in cells.values() for cs in vs.values() for c in cs}
     for corpus in sorted(cells):
@@ -471,13 +471,12 @@ def paired_summary(names, cells):
                 m, ds, _ = ab.paired_metric(forks, key.format(v))
                 b, _, _ = ab.paired_metric(forks, key.format(names[0]))
                 show = size if kind == "alloc" else si if kind == "count" else num
-                d = sd = None
+                d = half = None
                 if ds:
-                    d = sum(ds) / len(ds)
-                    sd = (sum((x - d) ** 2 for x in ds) / (len(ds) - 1)) ** 0.5 if len(ds) > 1 else None
+                    d, half = metrics.ci999(ds)
                 ok = ui.delta_ok(b, kind) and ui.delta_ok(m, kind)
-                tds.append(with_delta((show(m) or "0") if m is not None else "", delta(d, sd, ok, up)))
-                ms.append(None if m is None else view_metric(show(m) or "0", m, None, d, sd, ok, up))
+                tds.append(with_delta((show(m) or "0") if m is not None else "", delta(d, half, ok, up)))
+                ms.append(None if m is None else view_metric(show(m) or "0", m, None, d, half, ok, up))
             out.append(("", tds)); data.append({"c": corpus, "v": v, "n": len(forks), "m": ms})
     heads = [(esc(config.get().corpus_param), False), ("variant", False), ("forks", False)]
     heads += [h for label, *_ in ab.PAIRED_METRICS
@@ -1075,7 +1074,7 @@ svg.sv-c .wh{stroke:var(--fg);stroke-width:1.2;opacity:.7}
 """
 
 # draws each campaign's summary (`views`) as the reader picked: the table as built, a pivot with the corpora as columns
-# and a row per variant and metric, or a chart per metric of Δ against the first variant with its spread as whiskers
+# and a row per variant and metric, or a chart per metric of Δ against the first variant with its 99.9% CI as whiskers
 # (or of the values, a panel per corpus). The view, metrics and scale are remembered in this browser; `apply` redraws.
 SUMMARY_JS = r"""
 const SV = (() => { try { return JSON.parse(localStorage.getItem('perflab.summary')) || {}; } catch (e) { return {}; } })();
@@ -1149,7 +1148,7 @@ function drawSummary(el) {
     : `<div class="sv-charts">${m.sel.map(x => scale === 'dist' ? svDist(m, x) : scale === 'abs' ? svAbs(m, x) : svBars(m, x)).join('')}</div>`);
 }
 const svStep = span => { const p = Math.pow(10, Math.floor(Math.log10(span / 4))), r = span / 4 / p; return p * (r >= 5 ? 5 : r >= 2 ? 2 : 1); };
-// Δ% against the first variant per corpus and variant, whiskers the spread; coloured only when the spread doesn't cross zero
+// Δ% against the first variant per corpus and variant, whiskers its 99.9% CI; coloured only when that excludes zero
 function svBars({vs, base, corpora, cell}, m) {
   const others = vs.filter(v => v !== base);
   const cap = `<figcaption>${m.h} <span class="k">Δ against ${svEsc(base)}, ${m.up ? 'higher' : 'lower'} is better</span></figcaption>`;
@@ -1186,7 +1185,7 @@ function svBars({vs, base, corpora, cell}, m) {
   }
   return `<figure>${cap}<svg class="sv-c" viewBox="0 0 ${W} ${y + 16}">${grid}${bars}</svg></figure>`;
 }
-// the values from zero, a panel per corpus (their scales differ), whiskers ± the standard deviation over rounds
+// the values from zero, a panel per corpus (their scales differ), whiskers ± their 99.9% CI over forks
 function svAbs({vs, base, corpora, cell}, m) {
   const W = 220, L = 64, R = 58, RH = 17;
   const panels = corpora.map(c => {

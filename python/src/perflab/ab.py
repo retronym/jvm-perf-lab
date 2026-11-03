@@ -655,10 +655,9 @@ def paired_metric(cells, key):
 
 
 def delta_summary(ds):
-    """The mean of per-fork paired differences, with their spread over forks."""
-    d = mean(ds)
-    sd = (sum((x - d) ** 2 for x in ds) / (len(ds) - 1)) ** 0.5 if len(ds) > 1 else 0.0
-    return f"{d:+.2f}% ± {sd:.2f}"
+    """The mean of per-fork paired differences ± its 99.9% CI over forks (`metrics.ci999`)."""
+    d, half = metrics.ci999(ds)
+    return f"{d:+.2f}%" + (f" ± {half:.2f}" if half is not None else "")
 
 
 def describe(spec):
@@ -716,8 +715,8 @@ def report_paired(spec):
 
 
 def report(spec, per_op=False):
-    """Per corpus, a row per metric (`metrics`) and a column per variant: the mean over rounds and Δ against the first
-    variant, ± the spread over rounds; the score of each round and the GC time beneath."""
+    """Per corpus, a row per metric (`metrics`) and a column per variant: the mean over forks ± its 99.9% CI and Δ
+    against the first variant ± its 99.9% CI (`metrics.summarise`); the score of each round and the GC time beneath."""
     if spec.paired:
         return report_paired(spec)
     print(f"### {spec.name}\n")
@@ -737,7 +736,7 @@ def report(spec, per_op=False):
                 results.setdefault(variant, []).append((res, metrics.hw_events(cell, spec.profile, jfrconv) if jfrconv else {}))
         if not results:
             continue
-        cols, st = metrics.summarise({v: [metrics.of(res, spec.per_unit, hw) for res, hw in rs] for v, rs in results.items()}, spec.per_unit)
+        cols, st = metrics.summarise(results, spec.per_unit)
         names = list(results)
         missing = [v for v, rs in results.items() for res, _ in rs if spec.per_unit and metrics.units_per_op(res, spec.per_unit) is None]
         print(f"#### {spec.corpus_param} {corpus}\n")
@@ -754,10 +753,10 @@ def report(spec, per_op=False):
             for v in names:
                 if k not in st[v]:
                     tds.append("–"); continue
-                m, sd, d, spread, ok = st[v][k]
-                text = metrics.fmt(kind, m) + (f" ± {100 * sd / m:.1f}%" if sd is not None and m else "")
+                m, ci, d, half, ok = st[v][k]
+                text = metrics.fmt(kind, m) + (f" ± {100 * ci / abs(m):.1f}%" if ci is not None and m else "")
                 if d is not None:
-                    text += f" ({d:+.1f}%" + (f" ± {spread:.1f}" if spread is not None else "") + ")" if ok else " (–)"
+                    text += f" ({d:+.1f}%" + (f" ± {half:.1f}" if half is not None else "") + ")" if ok else " (–)"
                 tds.append(text)
             print(f"| {label} | " + " | ".join(tds) + " |")
         gc = {v: mean(res["secondaryMetrics"].get("gc.time", {}).get("score") for res, _ in results[v]) for v in names}

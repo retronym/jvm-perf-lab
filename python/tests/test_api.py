@@ -263,7 +263,7 @@ class ReadTest(Fixture, unittest.TestCase):
         self.assertEqual((s["delta"]["against"], s["delta"]["verdict"]), ("base", "better"))
         self.assertAlmostEqual(s["delta"]["pct"], 100 * (s["mean"] / rows[("a", "base")]["metrics"]["score"]["mean"] - 1))
         self.assertLess(s["delta"]["pct"] + s["delta"]["halfWidth"], 0)
-        self.assertAlmostEqual(tip["card"]["score"]["pct"], s["delta"]["pct"])  # the same means, over rounds
+        self.assertNotIn("card", tip)  # the card shows these very numbers
         self.assertEqual([v["name"] for v in c["variantInfo"]], ["base", "tip"])
         self.assertEqual(c["variantInfo"][1]["flags"], "-Dx=1")
         self.assertEqual(c["metrics"][0]["key"], "score")

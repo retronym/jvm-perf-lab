@@ -283,36 +283,112 @@ def welch(a, b):
     return d, 100 * t999(df) * (va + vb) ** 0.5 / abs(ma), df
 
 
+# ---- comparing variants or commits: the one rule every view (an A/B card, the branch view, the API, `perflab ab
+# report`) gives a Δ. The fork is the unit: a metric's value per fork is the mean of its measurement iterations
+# (`fork_units`); a variant's or commit's is the mean over its forks ± the 99.9% CI over them (`fork_stats`, with a pooled
+# sd for one of few forks); a Δ is Welch's t on the forks' means (`compare`), or for the median and min of every
+# iteration a bootstrap over forks and iterations (`pooled_delta`). Either way it is ± the half-width of its 99.9% CI,
+# and better or worse (`verdict`) only when that excludes zero.
+
+# where a metric of `of` has per-iteration samples: the primary metric, or a secondary metric of result.json
+RAW_SOURCE = {"score": None, "alloc": "gc.alloc.rate.norm", "cycles": "xctrace.CORE_ACTIVE_CYCLE", "instructions": "xctrace.INST_ALL"}
+
+
+def raw_source(k):
+    if k.startswith("jit:"):
+        return f"jit.{k[4:]}"  # one sample per fork
+    return RAW_SOURCE.get(k, f"xctrace.{k[3:]}" if k.startswith("ev:") and "/" not in k else False)
+
+
+def raw_of(r, k, u):
+    """The forks' measurement iterations of metric `k` in a JMH result, divided by `u` (units per op), [[x, ...] per fork]."""
+    src = raw_source(k)
+    if src is False:
+        return []
+    m = r["primaryMetric"] if src is None else r.get("secondaryMetrics", {}).get(src)
+    if k.startswith("jit:"):
+        u = 1.0  # a fork's total, not per op
+    raw = (m or {}).get("rawData") or []
+    return [[x / u for x in fork if isinstance(x, (int, float)) and math.isfinite(x)] for fork in raw] if u else []
+
+
+def fork_units(rs, per_unit=None, prefix="", keep=lambda k, kind: True):
+    """The metrics (`of`) of rounds `rs` ([(JMH result, hw events)]), those `keep` takes, keyed `prefix` + key:
+    ({key: [per fork, the mean of its measurement iterations]}, {key: kind}, {key: [[iteration, ...] per fork]},
+    [(key, label, kind, main)] in the order first seen). A metric without per-iteration samples has a value per round
+    (JMH's mean over the round's forks)."""
+    of_ = [of(r, per_unit, hw) for r, hw in rs]
+    kinds, raw, us, cols = {}, {}, {}, []
+    for ms in of_:
+        for k, label, kind, main, _ in ms:
+            if keep(k, kind) and prefix + k not in kinds:
+                kinds[prefix + k] = kind
+                cols.append((prefix + k, label, kind, main))
+    for pk in kinds:
+        k = pk[len(prefix):]
+        forks = [f for r, _ in rs for f in raw_of(r, k, units_per_op(r, per_unit) if per_unit else 1.0) if f]
+        if forks:
+            raw[pk] = forks
+        us[pk] = [sum(f) / len(f) for f in forks] or [x for ms in of_ for kk, _, _, _, x in ms if kk == k and x is not None and math.isfinite(x)]
+    return us, kinds, raw, cols
+
+
+def fork_stats(units):
+    """{group (a variant, a commit): {key: [value per fork]}} -> {group: {key: (mean, sd, half-width of the mean's 99.9%
+    CI, n forks, df, sd pooled)}}, the groups those to compare (a campaign's variants on a corpus, a branch's commits).
+    sd, CI and df are None without a spread; for a group of few forks the sd is the relative sd pooled over the groups
+    (`fork_spread`)."""
+    stat = {g: {k: (*stats(xs), len(xs)) for k, xs in us.items() if xs} for g, us in units.items()}
+    keys = {k for st in stat.values() for k in st}
+    pool = {k: pooled_rel_sd([(st[k][0], st[k][1], st[k][2] - 1) for st in stat.values() if k in st]) for k in keys}
+    out = {}
+    for g, st in stat.items():
+        out[g] = {}
+        for k, (mean, sd, n) in st.items():
+            sd, df, pooled_ = fork_spread(mean, sd, n, pool[k])
+            out[g][k] = (mean, sd, None if sd is None else t999(df) * sd / n ** 0.5, n, df, pooled_)
+    return out
+
+
+def compare(a, b, ok=True, up=False):
+    """`fork_stats` b against a: (Δ%, half-width of its 99.9% CI or None, `verdict`, a side's sd pooled), None when a's
+    mean is zero. `ok`: a Δ against a means something (`delta_ok`); `up`: higher is better."""
+    d, half, _ = welch((a[0], a[1], a[3], a[4]), (b[0], b[1], b[3], b[4]))
+    return None if d is None else (d, half, verdict(d, half, ok, up), a[5] or b[5])
+
+
+def verdict(d, half=None, ok=True, up=False):
+    """A percent change's class: better or worse when its 99.9% CI (± `half`) excludes zero (lower is better, or with
+    `up` higher, `higher_is_better`), flat when it does not or is unknown, na when the base is about zero."""
+    return "na" if not ok else "flat" if half is None or abs(d) <= half or abs(d) < 0.005 else "worse" if (d > 0) != up else "better"
+
+
 def summarise(variants, per_unit=None):
-    """{variant: [metrics of each round (`of`)]}, the first variant the baseline -> (columns [(key, label, kind, main)]
-    in the order first seen, {variant: {key: (mean, sd or None for one round, Δ% or None, spread of Δ or None, Δ ok)}}).
-    The spread of a Δ combines both variants' relative spreads over rounds."""
-    cols, rounds = {}, {}
-    for v, rs in variants.items():
-        rounds[v] = [{k: x for k, _, _, _, x in ms} for ms in rs]
-        for ms in rs:
-            for k, label, kind, main, _ in ms:
-                cols.setdefault(k, (k, label, kind, main))
+    """{variant: [(JMH result, hw events) per round]}, the first variant the baseline -> (columns [(key, label, kind,
+    main)] in the order first seen, {variant: {key: (mean over forks, half-width of its 99.9% CI or None, Δ% or None,
+    half-width of Δ's 99.9% CI or None, Δ ok)}}), by `fork_stats` and `compare`."""
+    per = {v: fork_units(rs, per_unit) for v, rs in variants.items()}
+    cols = {}
+    for _, _, _, cs in per.values():
+        for c in cs:
+            cols.setdefault(c[0], c)
+    st = fork_stats({v: us for v, (us, _, _, _) in per.items()})
     names = list(variants)
-    base = {k: stats([r.get(k) for r in rounds[names[0]]]) for k in cols}
+    base = st.get(names[0], {}) if names else {}
     out = {}
     for v in names:
-        n, nb = len(rounds[v]), len(rounds[names[0]])
         out[v] = {}
-        for k, (_, _, kind, _) in cols.items():
-            mean, sd = stats([r.get(k) for r in rounds[v]])
-            if mean is None:
-                continue
-            b, bsd = base[k]
-            spread = 100 * ((sd / mean) ** 2 + (bsd / b) ** 2) ** 0.5 if b and mean and n > 1 and nb > 1 else None
-            d = None if v == names[0] or not b else 100 * (mean / b - 1)
-            out[v][k] = (mean, sd if n > 1 else None, d, spread, delta_ok(b, kind, per_unit))
+        for k, m in st[v].items():
+            b = base.get(k)
+            ok = delta_ok(b[0] if b else m[0], cols[k][2], per_unit)
+            c = compare(b, m, ok) if b and v != names[0] else None
+            out[v][k] = (m[0], m[2], c and c[0], c and c[1], ok)
     return list(cols.values()), out
 
 
 # ---- distributions: statistics of every measured iteration, pooled over a variant's forks
 
-STATS = ("mean", "median", "min")  # what a summary can show; mean is `summarise`'s (over rounds), the rest `pooled`'s
+STATS = ("mean", "median", "min")  # what a summary can show; mean is `fork_stats`'s (over forks), the rest `pooled`'s
 BOOT = 200  # bootstrap resamples for the spread of a pooled statistic's Δ
 
 
@@ -331,8 +407,9 @@ def resample(forks, rng):
 
 
 def pooled_delta(base, forks, stat, kind="score", per_unit=None, seed=0):
-    """(value, Δ% against `base`'s, spread of Δ (the bootstrap's sd, in percentage points, as `summarise`'s), Δ ok) of
-    the pooled `stat` of `forks` against `base` (both [[x, ...] per fork]); Δ and spread None without a base."""
+    """(value, Δ% against `base`'s, half-width of Δ's 99.9% CI (from the bootstrap's sd, in percentage points, as
+    `compare`'s), Δ ok) of the pooled `stat` of `forks` against `base` (both [[x, ...] per fork]); Δ and half-width None
+    without a base."""
     x = pooled(forks, stat)
     b = pooled(base, stat) if base else None
     if x is None or not b:
@@ -340,14 +417,16 @@ def pooled_delta(base, forks, stat, kind="score", per_unit=None, seed=0):
     d = 100 * (x / b - 1)
     if base is forks:
         return x, 0.0, 0.0, delta_ok(b, kind, per_unit)
+    if min(sum(map(len, base)), sum(map(len, forks))) < 2:  # one sample a side: a bootstrap of it has no spread
+        return x, d, None, delta_ok(b, kind, per_unit)
     rng = random.Random(seed)
     ds = []
     for _ in range(BOOT):
         bb = pooled(resample(base, rng), stat)
         if bb:
             ds.append(100 * (pooled(resample(forks, rng), stat) / bb - 1))
-    spread = statistics.stdev(ds) if len(ds) > 1 else None
-    return x, d, spread, delta_ok(b, kind, per_unit)
+    half = t999(math.inf) * statistics.stdev(ds) if len(ds) > 1 else None
+    return x, d, half, delta_ok(b, kind, per_unit)
 
 
 def describe(xs):
