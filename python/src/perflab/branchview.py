@@ -317,6 +317,9 @@ def branch_view(campaign_dir, rel_to=None):
                                   "s": {k: [mean shown, CI shown]}, "raw": {k: [[x, ...] per fork, of every round]},
                                   "d": {k: [Δ%, half-width of its CI, verdict, a side pooled]},
                                   "prev": variant of the previous measured commit,
+                                  "ps": {stat: {k: [value, shown, Δ%, half-width of its 99.9% CI, verdict]}} per pooled
+                                  statistic but the mean (`metrics.STATS`), of the metrics with per-iteration samples,
+                                  the Δ against the commit "d"'s is against, by `metrics.pooled_delta`'s bootstrap,
                                   "w": {k: [within-fork CI (`within_of`), between/within-fork sd ratio, the CI shown]},
                                   "wf": {k: [each fork's within-fork CI, as "raw" has the forks]},
                                   "rd": [its rounds, `rounds_of`], "hot": [[fork, j] of "raw"'s iterations other load
@@ -381,7 +384,7 @@ def branch_view(campaign_dir, rel_to=None):
             for c in pcs:
                 pcols.setdefault(c[0], c)
             x = per_v[v] = {"state": "done", "rounds": len(rs), "forks": max((len(u) for u in us.values()), default=0),
-                            "m": {}, "s": {}, "raw": {**raw, **praw}, "d": {}, "prev": prev, "w": {},
+                            "m": {}, "s": {}, "ps": {}, "raw": {**raw, **praw}, "d": {}, "prev": prev, "w": {},
                             "wf": {k: [None if h is None else sig(h, 3) for h, _ in fs] for k, fs in {**wf, **pwf}.items()}, **extra}
             if prs:
                 x["pr"] = len(prs)
@@ -415,14 +418,25 @@ def branch_view(campaign_dir, rel_to=None):
                 if w:
                     x["w"][k] = [fin(w[0]), fin(w[1]), "" if w[0] is None else ci_shown(kind, w[0], mean)]
             for k, m in x["m"].items():
+                up = metrics.higher_is_better(k, (cols.get(k) or pcols.get(k) or (k, ""))[1])
                 if k in last:
                     pm = per_v[last[k]]["m"][k]
                     d, half, _ = metrics.welch(fork_stats(pm), fork_stats(m))
                     if d is not None:
-                        up = metrics.higher_is_better(k, (cols.get(k) or pcols.get(k) or (k, ""))[1])
                         x["d"][k] = [fin(d), fin(half), index.verdict(d, half, pm[3], up), pm[6] or m[6]]
                         if last[k] != x["prev"]:  # the commit before it lacks this metric: what its Δ is against
                             x.setdefault("pv", {})[k] = last[k]
+                # the pooled statistics, as an A/B card has them (`metrics.pooled_delta`); the Δ's ± a 99.9% CI from
+                # the bootstrap's sd, as the mean's is
+                forks = x["raw"].get(k)
+                base = per_v[last[k]]["raw"].get(k) if k in last else None
+                for ps in metrics.STATS[1:]:
+                    if not forks:
+                        continue
+                    y, d, sp, ok = metrics.pooled_delta(base, forks, ps, kinds[k], per_unit)
+                    half = None if sp is None else metrics.t999(math.inf) * sp
+                    x["ps"].setdefault(ps, {})[k] = [fin(y), metrics.fmt(kinds[k], y)] + (
+                        [] if d is None else [fin(d), fin(half), index.verdict(d, half, ok, up)])
                 last[k] = v
         if per_v:
             cells[corpus] = per_v
@@ -735,7 +749,35 @@ const BH = (() => {
   const memOf = el => mem[el.dataset.campaign] = mem[el.dataset.campaign] || {open: new Set(), hover: null, jobs: {}};
   let filter = new Set();
   const key = n => 'b.' + n;
-  const data = el => el._d || (el._d = JSON.parse(el.querySelector('script').textContent));
+  const raw = el => el._d || (el._d = JSON.parse(el.querySelector('script').textContent));
+  // the summary's statistic switch (SV.stat, the index's): mean, or a statistic pooled over every iteration
+  const statOf = () => (typeof SV !== 'undefined' && ['median', 'min'].includes(SV.stat)) ? SV.stat : 'mean';
+  // the history as the statistic switch picks it: for median or min, the cells' metrics with per-iteration samples as
+  // their "ps" has them (no CI over forks; a Δ ± the 99.9% CI of a bootstrap), the others left out
+  function data(el) {
+    const d = raw(el), s = statOf();
+    if (s === 'mean') return d;
+    el._ds = el._ds || {};
+    return el._ds[s] || (el._ds[s] = byStat(d, s));
+  }
+  function byStat(d, s) {
+    const cells = {};
+    for (const [c, per] of Object.entries(d.cells)) {
+      cells[c] = {};
+      for (const [v, x] of Object.entries(per)) {
+        if (x.state !== 'done') { cells[c][v] = x; continue; }
+        const m = {}, sh = {}, dd = {};
+        for (const [k, p] of Object.entries((x.ps || {})[s] || {})) {
+          const mm = x.m[k] || [];
+          m[k] = [p[0], null, null, mm[3], mm[4], null, false];
+          sh[k] = [p[1], ''];
+          if (p.length > 2) dd[k] = [p[2], p[3], p[4], false, 'boot'];
+        }
+        cells[c][v] = {...x, m, s: sh, d: dd, w: {}};
+      }
+    }
+    return {...d, cells, stat: s};
+  }
   // ?b.<campaign>=form:bar;chart:0;c:<corpus>;m2:<metric>;sel:<variant>,<variant>
   function state(el) {
     const d = data(el), st = {form: 'bar', chart: false, c: '', m2: '', sel: []};
@@ -781,15 +823,32 @@ const BH = (() => {
   function step(span) { const p = Math.pow(10, Math.floor(Math.log10(span / 4))), r = span / 4 / p; return p * (r >= 5 ? 5 : r >= 2 ? 2 : 1); }
   const pct = (d, sp) => `${d >= 0 ? '+' : ''}${d.toFixed(1)}%` + (sp != null ? ` <span class="pm">± ${sp.toFixed(1)}</span>` : '');
   const SIG = 'significant at 99.9% (Welch’s t over forks)';
+  const SIG_BOOT = 'significant at 99.9% (a bootstrap over forks and iterations, metrics.pooled_delta)';
   const POOLED = '† its spread is the fork-to-fork sd pooled over this corpus’s commits with two forks or more, which has more degrees of freedom than its own forks';
-  function delta(x) {
+  // a Δ (`BH_STATS.welch`'s, or for a pooled statistic [Δ, half-width, verdict, false, 'boot' (a bootstrap's) | 'pair'
+  // (none)]), `vs` what it is against
+  function delta(x, vs) {
     if (!x || x[0] == null) return '';
-    if (x[2] === 'na') return '<span class="d na" title="the values are about zero: no percent change">–</span>';
-    const t = x[1] == null ? '1 fork: no spread yet' : (x[2] === 'flat' ? 'inconclusive: not ' + SIG : (x[0] > 0 ? 'higher, ' : 'lower, ') + SIG) + '; ± the 99.9% CI of Δ' + (x[3] ? '. ' + POOLED : '');
+    const on = vs ? `against ${esc(vs)}: ` : '';
+    if (x[2] === 'na') return `<span class="d na" title="${on}the values are about zero: no percent change">–</span>`;
+    const sig = x[4] === 'boot' ? SIG_BOOT : SIG;
+    const t = on + (x[4] === 'pair' ? 'no spread: the bootstrap is run against the commit measured before it only'
+      : x[1] == null ? '1 fork: no spread yet' : (x[2] === 'flat' ? 'inconclusive: not ' + sig : (x[0] > 0 ? 'higher, ' : 'lower, ') + sig) + '; ± the 99.9% CI of Δ' + (x[3] ? '. ' + POOLED : ''));
     return `<span class="d ${x[2]}" title="${t}">${pct(x[0], x[1])}${x[1] != null && x[3] ? '†' : ''}</span>`;
   }
+  // what a cell's Δ of metric k is against: the commit and its value
+  function vsOf(d, c, x, k) {
+    const v = x && ((x.pv || {})[k] || x.prev), cm = v && d.commits.find(y => y.v === v), a = v && cellOf(d, c, v);
+    if (!cm) return '';
+    const s = a && a.m && a.m[k] ? shown(d, k, a.m[k], a.s[k])[0] : '';
+    return `${cm.short.slice(0, 7)} ${cm.subject}${s ? ` (${s})` : ''}`;
+  }
   // Δ of b against a, as `branchview.branch_view` computes the Δ column (`metrics.welch`)
-  const pairDelta = (d, a, b, k) => BH_STATS.welch(a && a.m && a.m[k], b && b.m && b.m[k], metric(d, k).up);
+  // (for a pooled statistic, no spread: its bootstrap is the Δ column's, against the commit before it)
+  function pairDelta(d, a, b, k) {
+    const x = BH_STATS.welch(a && a.m && a.m[k], b && b.m && b.m[k], metric(d, k).up);
+    return x && d.stat ? [x[0], null, x[2] === 'na' ? 'na' : 'flat', false, 'pair'] : x;
+  }
   // the extent of a metric's mean ± CI (and with `withRaw` its samples) down a corpus's column
   function extent(d, c, k, withRaw) {
     let lo = Infinity, hi = -Infinity;
@@ -846,7 +905,7 @@ const BH = (() => {
     const P = d.profile || {};
     return `from the profile pass, ${P.campaign || 'the profile campaign'}${P.profile ? ` (${P.profile})` : ''}: runs of their own under the profiler, so no score from them`;
   }
-  const th = (d, k, cls) => `<th class="${cls}"${fromProfile(d, k) ? ` title="${esc(headTip(d, k))}"` : ''}>${esc(heading(d, k))}</th>`;
+  const th = (d, k, cls) => `<th class="${cls}"${fromProfile(d, k) ? ` title="${esc(headTip(d, k))}"` : ''}>${esc(heading(d, k))}${d.stat ? ` <span class="k">${d.stat}</span>` : ''}</th>`;
   // a commit's score when it is profiled and not measured: its measurement's state
   function unmeasured(x, v, d) {
     const u = (d.unbuildable || {})[v];
@@ -904,7 +963,8 @@ const BH = (() => {
       : ws ? ` <span class="pm wi" title="${WITHIN}">±~ ${esc(ws)}</span>` : ''}`;
     const hot = k === 'score' && disturbed(x).length ? `<span class="bh-hot" role="img" aria-label="disturbed by other load"></span>` : '';
     const g = st.form === 'num' || !exts[c + '|' + k] ? '' : bar(m, exts[c + '|' + k]);
-    const tip = `${esc(s[0])}${un}${s[1] ? ' ± ' + esc(s[1]) + un + dag + ' (99.9% CI over forks)' : ''}; ${m[4]} fork${m[4] > 1 ? 's' : ''}, ${rounds} round${rounds > 1 ? 's' : ''}${fromProfile(d, k) ? ' of the profile pass' : ''}`
+    const tip = d.stat ? `${esc(s[0])}${un}: the ${d.stat} of every measured iteration, its forks pooled; ${m[4]} fork${m[4] > 1 ? 's' : ''}, ${rounds} round${rounds > 1 ? 's' : ''}${fromProfile(d, k) ? ' of the profile pass' : ''}. Click for its rounds`
+      : `${esc(s[0])}${un}${s[1] ? ' ± ' + esc(s[1]) + un + dag + ' (99.9% CI over forks)' : ''}; ${m[4]} fork${m[4] > 1 ? 's' : ''}, ${rounds} round${rounds > 1 ? 's' : ''}${fromProfile(d, k) ? ' of the profile pass' : ''}`
       + (m[1] == null ? '; 1 fork: no spread yet' : m[6] ? `. ${POOLED}: ${(100 * m[1] / m[0]).toFixed(1)}%` : `, sd of the forks’ means ${(100 * m[1] / m[0]).toFixed(1)}%`)
       + (ws ? `. ±~ ${esc(ws)}${un} ${m[4] > 1 ? '(root mean square over its forks) ' : ''}is the 99.9% CI ${WITHIN}` : '')
       + (w && w[1] != null ? `. Between/within-fork sd ratio ${w[1].toFixed(1)}${m[6] ? ' (between: pooled)' : ''}: ≈1, forks agree; ≫1, forks land in different places, so more forks pay off` : '')
@@ -961,8 +1021,8 @@ const BH = (() => {
         + ownBadge(el, d, c) + profBadge(d, c) + '</span></span></div></td>';
       for (const cp of cs) {
         const x = cellOf(d, cp, c.v), dd = x && x.d || {};
-        h += `<td class="n gs">${value(d, st, cp, c.v, 'score', exts)}</td><td>${delta(dd.score)}</td>`;
-        if (m2) h += `<td class="n">${x && x.state === 'done' ? value(d, st, cp, c.v, m2.k, exts) : ''}</td><td>${delta(dd[m2.k])}</td>`;
+        h += `<td class="n gs">${value(d, st, cp, c.v, 'score', exts)}</td><td>${delta(dd.score, vsOf(d, cp, x, 'score'))}</td>`;
+        if (m2) h += `<td class="n">${x && x.state === 'done' ? value(d, st, cp, c.v, m2.k, exts) : ''}</td><td>${delta(dd[m2.k], vsOf(d, cp, x, m2.k))}</td>`;
       }
       h += '</tr>';
       if (opened)
@@ -1077,7 +1137,7 @@ const BH = (() => {
     let rows = '';
     for (const m of d.metrics) {
       const tds = cs.map(c => {
-        const bv = base(c, m.k), a = cellOf(d, c, bv), y = cellOf(d, c, b.v), x = pairDelta(d, a, y, m.k);
+        const bv = base(c, m.k), a = cellOf(d, c, bv), y = cellOf(d, c, b.v), x = one && d.stat ? y && y.d[m.k] : pairDelta(d, a, y, m.k);
         const vs = bv !== base(c) && byV(bv) ? ` (vs ${sha(byV(bv), 7)})` : '';
         return x ? `<td>${delta(x)}<span class="ab">${esc(shown(d, m.k, a.m[m.k], a.s[m.k])[0])} → ${esc(shown(d, m.k, y.m[m.k], y.s[m.k])[0])}${vs}</span></td>` : '<td></td>';
       });

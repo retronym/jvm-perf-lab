@@ -1336,7 +1336,8 @@ document.addEventListener('click', e => {
   }
   try { localStorage.setItem('perflab.summary', JSON.stringify(SV)); } catch (e) {}
   drawSummaries();
-  if (b.dataset.sv && svBranch(b) && typeof BH !== 'undefined') BH.draw(svCorpora);  // drawn at its width once shown
+  // drawn at its width once shown, and in the statistic picked
+  if ((b.dataset.ss || b.dataset.sv && svBranch(b)) && typeof BH !== 'undefined') BH.draw(svCorpora);
 });
 """
 
