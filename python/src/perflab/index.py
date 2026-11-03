@@ -983,7 +983,7 @@ def progress_badge(prog, name):
 
 CSS = """
 #share-dlg{position:fixed;inset:0;z-index:90;background:rgba(10,14,20,.45);display:flex;align-items:flex-start;justify-content:center;padding:10vh 16px}
-#share-dlg[hidden]{display:none} #share-dlg .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;
+#share-dlg[hidden],#share-dlg [hidden]{display:none} #share-dlg .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;
   max-width:560px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35)} #share-dlg label.opt{display:block;margin:4px 0}
 #share-dlg .btn.go{background:var(--link);border-color:var(--link);color:var(--panel)} #share-dlg .btn.bad{color:var(--bad)}
 #share-dlg button.btn{font:inherit;font-size:12px;cursor:pointer} #share-dlg button.btn:disabled{opacity:.5;cursor:default}
