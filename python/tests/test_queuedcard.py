@@ -20,6 +20,15 @@ class QueuedCardTest(unittest.TestCase):
         self.assertEqual(server.spec_of({"argv": ["ab", "run", "c.json"], "cwd": d}), f)
         self.assertEqual(index.queued_card(os.path.join(d, "missing.json")), "")
 
+    def test_a_jdk_is_named_by_its_version_when_its_home_does_not_say_it(self):
+        d = tempfile.mkdtemp()
+        home = os.path.join(d, "build", "release", "images", "jdk")  # a JDK build's image
+        os.makedirs(os.path.join(home, "bin"))
+        with open(os.path.join(home, "release"), "w") as f:
+            f.write('JAVA_VERSION="26.0.2.1"\nJAVA_RUNTIME_VERSION="26.0.2.1-internal-integration"\n')
+        self.assertEqual(index.jdk_label(os.path.join(home, "bin", "java")), "26.0.2.1-internal-integration")
+        self.assertEqual(index.jdk_label("/sdk/candidates/java/21.0.12+1.1-tem/bin/java"), "21.0.12+1.1-tem")
+
 
 if __name__ == "__main__":
     unittest.main()

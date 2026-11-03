@@ -764,6 +764,24 @@ def variants_panel(spec_dir, s=None):
             + (f'<table class="variants">{"".join(rows)}</table>' if rows else "") + "</div>")
 
 
+def jdk_label(java):
+    """A short name for a `java`: its JDK home's directory (an SDKMAN candidate such as `21.0.12+1.1-tem`), or, where
+    that names no version (a JDK build's `images/jdk`, a bundle's `Contents/Home`), its `release` file's version."""
+    home = os.path.dirname(os.path.dirname(java))
+    name = os.path.basename(home)
+    if any(c.isdigit() for c in name):
+        return name
+    try:
+        with open(os.path.join(home, "release")) as f:
+            for line in f:
+                k, _, v = line.strip().partition("=")
+                if k == "JAVA_RUNTIME_VERSION":
+                    return v.strip().strip('"') or name
+    except OSError:
+        pass
+    return name
+
+
 def queued_card(spec_file):
     """The body of the card of a campaign on the server's queue that has no cells yet (the index draws it from the
     queue): what its spec says it will run, so a reader need not open the spec. "" if the spec cannot be read."""
@@ -779,7 +797,7 @@ def queued_card(spec_file):
              f"{len(names)} variant{'s' if len(names) != 1 else ''} × {len(corpora)} corp{'ora' if len(corpora) != 1 else 'us'}"
              f" × {rounds} round{'s' if rounds != 1 else ''} = {len(names) * len(corpora) * rounds} cells",
              f"profile {esc(s.get('profile') or 'none')}" + (" (paired)" if s.get("paired") else ""),
-             f'JDK <span title="{esc(jvm)}">{esc(os.path.basename(os.path.dirname(os.path.dirname(jvm))))}</span>' if jvm else "",
+             f'JDK <span title="{esc(jvm)}">{esc(jdk_label(jvm))}</span>' if jvm else "",
              f"load gate {s['loadgate'].get('maxCores')} cores" if isinstance(s.get("loadgate"), dict) else ""]
     builds = []
     for v, b in (s.get("builds") or {}).items():
@@ -1725,9 +1743,19 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
       + '<span class="sep"></span>';
     nav.hidden = false;
     JOBS = jobs.filter(j => j.project === SRV[1] && j.campaign).sort((a, b) => b.id - a.id);
+    WORKERS = Array.isArray(st.workers) ? st.workers : [];
     jobsOnCards(); shareButtons();
   }}
   const CARDS = new Map();  // job id -> its spec's card body (/api/jobs/<id>/card)
+  let WORKERS = [];  // /api/status's workers: where a remote job runs, and its cell
+  function jobState(j) {{
+    // a remote job's cells reach this machine as each one ends (perflab.worker uploads it at the boundary after it)
+    if (j.state === 'queued') return "On the perflab server's queue: its cells show here once it starts.";
+    const w = j.worker && WORKERS.find(w => w.name === j.worker);
+    const cell = w && w.live && Array.isArray(w.live.cell) ? ` measuring <code>${{escH(w.live.cell.join('/'))}}</code>` : '';
+    const where = j.worker ? ` on ${{escH(j.worker)}}` + (j.testbed ? ` (testbed ${{escH(j.testbed)}})` : '') : '';
+    return `${{j.state === 'paused' ? 'Paused' : 'Running'}}${{where}}${{cell}}: its cells show here as each one ends.`;
+  }}
   function jobsOnCards() {{
     document.querySelectorAll('.card-h .jobs, section.card.queued').forEach(e => e.remove());
     const by = new Map();
@@ -1742,7 +1770,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
         const act = js.find(j => j.state === 'queued' || j.state === 'running' || j.state === 'paused');
         if (!CARDS.has(act.id)) {{ CARDS.set(act.id, ''); fetch(`/api/jobs/${{act.id}}/card`).then(r => r.ok ? r.json() : null).then(c => {{ if (c && c.html) {{ CARDS.set(act.id, c.html); jobsOnCards(); }} }}).catch(() => {{}}); }}
         card.innerHTML = `<div class="card-h"><span class="kind">campaign</span><h2>${{escH(name)}}</h2></div>`
-          + '<p class="k">On the perflab server\\'s queue: its cells show here once it starts.</p>' + CARDS.get(act.id);
+          + `<p class="k">${{jobState(act)}}</p>` + CARDS.get(act.id);
         document.getElementById('campaigns').after(card);
       }}
       const h = card && card.querySelector('.card-h h2');
