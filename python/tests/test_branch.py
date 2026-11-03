@@ -175,6 +175,24 @@ class ResolveTest(unittest.TestCase):
         self.assertEqual(branch.checkout(out, b, b["commits"][1]), wt)
         self.assertEqual(git(wt, "rev-parse", "HEAD"), b["commits"][1]["sha"])
 
+    def test_a_range_carried_further_appends_its_commits(self):
+        out = tempfile.mkdtemp()
+        first = git(self.repo, "rev-parse", "HEAD~1")
+        kept = branch.load(out, {"checkout": self.repo, "range": f"{self.base}..{first}"})
+        self.assertEqual(len(kept["commits"]), 3)
+        b = branch.load(out, {"checkout": self.repo, "range": f"{self.base}..main"})
+        self.assertEqual(b["commits"][:3], kept["commits"])
+        self.assertEqual(b["commits"][3]["sha"], self.tip)
+        self.assertEqual(b["order"], kept["order"] + [b["commits"][3]["variant"]])
+        self.assertEqual(json.load(open(os.path.join(out, branch.BRANCH)))["tip"], self.tip)
+
+    def test_a_range_on_another_history_keeps_the_resolved_one(self):
+        out = tempfile.mkdtemp()
+        kept = branch.load(out, {"checkout": self.repo, "range": f"{self.base}..main"})
+        c1 = kept["commits"][1]["sha"]
+        self.assertEqual(branch.load(out, {"checkout": self.repo, "range": f"{c1}..main"}), kept)
+        self.assertEqual(branch.load(out, {"checkout": self.repo, "range": f"{self.base}..{c1}"}), kept)
+
     def test_every_commit_without_first_parent(self):
         b = branch.resolve(self.repo, f"{self.base}..main", first_parent=False)
         self.assertEqual(len(b["commits"]), 6)

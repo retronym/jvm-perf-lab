@@ -4,7 +4,8 @@ build, explored coarse-first.
     "branch": {"checkout": "<repo>", "range": "<base>..<tip>", "firstParent": true, "env": {"SCALA3_CHECKOUT": "{checkout}"}}
 
 The range is resolved once, oldest first with its base, into <campaign>/branch.json; a resumed campaign keeps it (a
-moved ref doesn't change what it measures). Every commit is checked out in turn into one detached worktree of the
+moved ref doesn't change what it measures). A spec whose range now ends further along the same history extends it: the
+new commits are appended, after the kept ones in the explore order, and the commits measured so far keep their cells. Every commit is checked out in turn into one detached worktree of the
 campaign, <campaign>/.worktree, and the user's checkout is left alone; "{checkout}" in env is that worktree. The
 explore order visits far-apart commits first, so consecutive builds are mostly not of neighbours; the build tool's
 incremental state still carries over in the worktree, and saves recompiling the modules the two commits share. A
@@ -64,19 +65,42 @@ def load(out, spec_branch, write=True):
     """branch.json of the campaign in `out`, resolving the spec's range the first time (and keeping it, with `write`)."""
     path = os.path.join(out, BRANCH)
     if os.path.exists(path):
-        return json.load(open(path))
+        kept = json.load(open(path))
+        b = extended(kept, spec_branch)
+        if write and b is not kept:
+            save(out, b)
+        return b
     b = resolve(spec_branch["checkout"], spec_branch["range"], spec_branch.get("firstParent", True))
     if write:
         save(out, b)
     return b
 
 
+def extended(kept, spec_branch):
+    """`kept` with the commits the spec's range adds after its tip, when that range is the kept one's history carried
+    further (same base, its commits first); otherwise `kept` itself."""
+    if spec_branch["range"] == kept["range"] or spec_branch.get("firstParent", True) != kept["firstParent"]:
+        return kept
+    try:
+        b = resolve(spec_branch["checkout"], spec_branch["range"], kept["firstParent"])
+    except SystemExit:
+        return kept
+    shas = [c["sha"] for c in kept["commits"]]
+    if b["base"] != kept["base"] or [c["sha"] for c in b["commits"][:len(shas)]] != shas or len(b["commits"]) == len(shas):
+        return kept
+    commits = kept["commits"] + b["commits"][len(shas):]
+    added = [c["variant"] for c in b["commits"][len(shas):]]
+    return {**kept, "range": b["range"], "tip": b["tip"], "commits": commits, "order": kept["order"] + added}
+
+
 def save(out, b):
+    """Writes branch.json, unless it is there already with the same commits."""
     path = os.path.join(out, BRANCH)
-    if not os.path.exists(path):
-        os.makedirs(out, exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(b, f, indent=2)
+    if os.path.exists(path) and json.load(open(path))["commits"] == b["commits"]:
+        return
+    os.makedirs(out, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(b, f, indent=2)
 
 
 def van_der_corput(i):
