@@ -1496,7 +1496,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
           + (f'<a href="#overview" data-sec="overview">Overview</a>' if intro else "")
           + f'<a href="#campaigns" data-sec="campaigns">Campaigns<span class="n" id="n-campaigns">{len(camp_sections)}</span></a>'
           + (f'<a href="#counters" data-sec="counters">Counters<span class="n">{n_counters}</span></a>' if n_counters else "")
-          + f'<a href="#runs" data-sec="runs">Runs<span class="n" id="n-runs">{len(run_sections)}</span></a>')
+          + (f'<a href="#runs" data-sec="runs">Runs<span class="n" id="n-runs">{len(run_sections)}</span></a>' if live or run_sections else ""))
   running_json = os.path.relpath(os.path.join(campaigns, ab.RUNNING_NAME), root)
   loadgate_json = os.path.relpath(os.path.join(campaigns, loadgate.STATE_NAME), root)
   build_json = os.path.relpath(os.path.join(campaigns, jmh.BUILD_STATE), root)
@@ -1533,8 +1533,8 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
   {notes(os.path.join(campaigns, "FINDINGS.md")).replace('class="notes"', 'class="notes" id="findings"', 1)}
   {newest(camp_sections) or '<p class="k">No campaigns yet: <code>perflab ab run &lt;spec&gt;</code>.</p>'}
   {counters_sec}
-  <h2 class="sec" id="runs">Runs <span class="k">one benchmark under one profile, newest first</span></h2>
-  {newest(run_sections) or '<p class="k">No runs yet: <code>perflab run</code>.</p>'}
+  {'' if not live and not run_sections else f'<h2 class="sec" id="runs">Runs <span class="k">one benchmark under one profile, newest first</span></h2>'}
+  {newest(run_sections) or ('<p class="k">No runs yet: <code>perflab run</code>.</p>' if live else '')}
   </div></main>{f'<footer>{footer}</footer>' if footer else ''}<div id="srv-foot" hidden>{ui.footer()}</div>
   <script>{timeline.script()}</script>{ui.lightbox_script()}{ui.shortcuts('card', 'lightbox', 'void', 'timeline')}
   <script>{SUMMARY_JS}</script>
