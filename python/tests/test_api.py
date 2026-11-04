@@ -324,15 +324,27 @@ class ReadTest(Fixture, unittest.TestCase):
                 if ((x["metrics"].get("score") or {}).get("delta") or {}).get("verdict") in ("better", "worse")}
         ch = api.changes("br")
         self.assertEqual({(c["corpus"], c["variant"]) for c in ch["changes"]}, want)
+        self.assertIn("b", {u["corpus"] for u in ch["untested"]})  # one fork per commit
         self.assertIn(("a", V[4]), want)  # 20% faster than its predecessor, over 4 forks each
         pcts = [abs(c["delta"]["pct"]) for c in ch["changes"]]
         self.assertEqual(pcts, sorted(pcts, reverse=True))
-        # corpus b: one fork per commit: JMH's test has its three iterations to go on, so its step is tested, and flat at t(2)
-        self.assertNotIn(("b", V[1]), {(u["corpus"], u["variant"]) for u in ch["untested"]})
-        self.assertEqual(api.changes("br", corpus="b")["changes"], [])
+
+    def test_a_step_with_one_fork_is_untested_whatever_jmhs_test_says(self):
+        # corpus b, one fork per commit, its iterations tight enough for JMH's test to call the step significant
+        for i, x in ((0, 5.0), (1, 5.01)):
+            scores = [[x + (k % 3 - 1) * 0.001 for k in range(10)]]
+            json.dump([result("b", scores, [[2e6, 2e6]])], open(os.path.join(self.br, "b", V[i], "1", "result.json"), "w"))
         s = next(c for c in api.branch("br")["commits"] if c["variant"] == V[1])["corpora"]["b"]["metrics"]["score"]
-        self.assertIsNotNone(s["delta"]["jmh"]["halfWidth"])
+        self.assertEqual((s["n"], s["delta"]["verdict"], s["delta"]["forkVerdict"]), (1, "worse", "flat"))
         self.assertIsNone(s["delta"]["halfWidth"])
+        ch = self.valid(api.changes("br", corpus="b"))
+        self.assertEqual(ch["changes"], [])
+        [u] = ch["untested"]
+        self.assertEqual((u["variant"], u["previous"], u["verdict"]), (V[1], V[0], "worse"))
+        # one fork on one side is enough: in corpus a, the commit before V[3] has one fork and V[3] four
+        c = next(c for c in api.branch("br")["commits"] if c["variant"] == V[3])["corpora"]["a"]
+        self.assertEqual((c["previous"], c["metrics"]["score"]["n"]), (V[1], 4))
+        self.assertIn(V[3], {u["variant"] for u in api.changes("br", corpus="a")["untested"]})
 
     def test_compare_by_sha_prefix(self):
         c = api.compare("br", V[3], SHAS[4][:6])

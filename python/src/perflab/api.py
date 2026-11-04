@@ -471,8 +471,9 @@ define("Change", "A significant step between neighbouring measured commits", {
 define("Changes", "The commits whose Δ against the previous measured commit is significant at 99.9%, largest |Δ| first", {
     "campaign": S("The campaign"), "metric": METRIC_KEY, "changes": A(ref("Change"), "Largest |Δ| first"),
     "untested": A(O("A step that could not be tested", {"corpus": S("corpus"), "variant": S("The commit's variant"),
-                                                       "previous": S("The previous measured commit"), "pct": null(N("Its Δ%"))}),
-                  "Steps with no interval (N ≤ 2 iterations on a side, or no spread on either side without per-iteration samples): no verdict either way, largest |Δ| first")}, top=True)
+                                                       "previous": S("The previous measured commit"), "pct": null(N("Its Δ%")),
+                                                       "verdict": S("What the test said, which is not to be taken as a change", enum=list(VERDICTS))}),
+                  "Steps that can't be called: one fork on a side, where JMH's test can't tell a change from what differs between any two forks, or no interval (N ≤ 2 iterations on a side, or no spread on either side without per-iteration samples). Largest |Δ| first")}, top=True)
 SIDE = O("One side of a comparison", {"mean": null(N("Mean over forks")), "ci": null(N("99.9% CI half-width")), "n": I("Forks"),
                                       "shown": S("Mean, shown"), "jmh": null({**ref("Jmh"), "description": "What JMH reports over these forks"})})
 define("Compare", "Two variants (or commits) of a campaign: every metric's Δ of b against a, per corpus", {
@@ -1728,22 +1729,27 @@ def branch(campaign, project=None, raw=False):
 def changes(campaign, project=None, metric="score", corpus=None):
     """The steps of a branch campaign: commits whose `metric` moved against the previous measured commit by more than
     the 99.9% CI of the difference by JMH's test (verdict better or worse; delta.forkVerdict is the test over forks), on
-    each corpus (or `corpus`), sorted by |Δ|, largest first. `untested` has the steps with no interval to test."""
+    each corpus (or `corpus`), sorted by |Δ|, largest first. `untested` has the steps with no interval to test, and those
+    with one fork on a side: within one fork JMH's test can't tell a change from what differs between any two forks, and
+    flags commits that can't have changed the metric."""
     b = branch(campaign, project)
+    commits = {c["variant"]: c for c in b["commits"]}
     out, untested = [], []
     for c in b["commits"]:
         for corp, x in c["corpora"].items():
             if corpus and corp != corpus:
                 continue
             s = x["metrics"].get(metric)
-            if s and s.get("delta") and (s["delta"].get("jmh") or s["delta"])["halfWidth"] is None and s["delta"]["verdict"] != "na":
-                untested.append({"corpus": corp, "variant": c["variant"], "previous": x["previous"], "pct": s["delta"]["pct"]})
-            if not s or not s.get("delta") or s["delta"]["verdict"] not in ("better", "worse"):
+            d = s.get("delta") if s else None
+            if not d or d["verdict"] == "na":
                 continue
-            prev = next(cc for cc in b["commits"] if cc["variant"] == x["previous"])
-            out.append({"corpus": corp, "metric": metric, "variant": c["variant"], "sha": c["sha"], "subject": c["subject"],
-                        "index": c["index"], "previous": x["previous"], "mean": s["mean"],
-                        "previousMean": prev["corpora"][corp]["metrics"][metric]["mean"], "shown": s["shown"], "delta": s["delta"]})
+            prev = commits[x["previous"]]["corpora"][corp]["metrics"].get(metric) or {}
+            if (d.get("jmh") or d)["halfWidth"] is None or min(s["n"], prev.get("n", s["n"])) < 2:
+                untested.append({"corpus": corp, "variant": c["variant"], "previous": x["previous"], "pct": d["pct"], "verdict": d["verdict"]})
+            elif d["verdict"] in ("better", "worse"):
+                out.append({"corpus": corp, "metric": metric, "variant": c["variant"], "sha": c["sha"], "subject": c["subject"],
+                            "index": c["index"], "previous": x["previous"], "mean": s["mean"],
+                            "previousMean": prev.get("mean"), "shown": s["shown"], "delta": d})
     out.sort(key=lambda c: -abs(c["delta"]["pct"] or 0))
     untested.sort(key=lambda c: -abs(c["pct"] or 0))
     return envelope("Changes", campaign=campaign, metric=metric, changes=out, untested=untested)
