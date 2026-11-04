@@ -1,0 +1,44 @@
+{
+  "benchmark": "BackendBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m5-backend-ceiling",
+  "description": [
+    "What is the most a stack map scheme could save? `readFrames`, `readMaxs` and `readNone` write the same nodes, read back from the classfiles, with ASM computing frames, given perfect frames, and given frames and maximums. `branchFreeFrames` and `branchFreeMaxs` do that for only the methods with no jump, switch or handler, so their difference is what frame computation costs methods that need no frames. `phase`, `codegen` and `write` put those in proportion.",
+    "",
+    "Oracle frames cost nothing to produce here, so this is a ceiling and not a design. Upstream `2.13.x` at `c84dea8aa7`, built with the release optimizer settings; patched JDK 26, 8G heap."
+  ],
+  "variantDescriptions": {
+    "base": "upstream `2.13.x` at `c84dea8aa7`"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unreachable-codegen-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": ""
+  },
+  "rounds": 2,
+  "profile": "none",
+  "corpora": {
+    "phase": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "codegen": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "write": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "readFrames": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "readMaxs": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "readNone": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "branchFreeFrames": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "branchFreeMaxs": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "benchmark": "BackendBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m5-backend-bound",
+  "description": [
+    "How much would codegen writing straight to a `ClassWriter` save, before changing the compiler? `decode`, `decodeTree` and `replay` read the classfiles into nothing, a new `ClassNode` and a `ClassWriter`, so with `readFrames` they separate decoding, building the tree, walking it and the writer's own work. `replayBlocks` clears the reader's debug-only flag, so every label starts a basic block as codegen's do. `nestedClasses` is the walk behind `setInnerClasses`, which a direct path would have to replace. `phase`, `codegen` and `write` put those in proportion.",
+    "",
+    "On [retronym/scala#200](https://github.com/retronym/scala/pull/200) at `b8c499db39`, which direct emission builds on, with the release optimizer settings; patched JDK 26, 8G heap."
+  ],
+  "variantDescriptions": {
+    "pr200": "[retronym/scala#200](https://github.com/retronym/scala/pull/200) at `b8c499db39`"
+  },
+  "builds": {
+    "pr200": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-asm-emit-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "pr200": ""
+  },
+  "rounds": 2,
+  "profile": "none",
+  "corpora": {
+    "phase": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "codegen": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "write": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "readFrames": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "decode": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "decodeTree": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "replay": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "replayBlocks": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "nestedClasses": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem"
+  }
+}

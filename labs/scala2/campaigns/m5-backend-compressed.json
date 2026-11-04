@@ -1,0 +1,39 @@
+{
+  "benchmark": "BackendBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m5-backend-compressed",
+  "description": [
+    "Frames in `m5-backend-ceiling` showed no allocation drop, and `m5-backend-readmaxs-prof` shows why: `MethodWriter.visitFrame` converts each internal name of an expanded frame to a descriptor and parses it back (87 MB/op), which the compressed path does not do. `readCompressedMaxs` gives the same frames compressed, for the real ceiling. `readFrames` and `readMaxs` repeat in this campaign so all three compare in one.",
+    "",
+    "Upstream `2.13.x` at `c84dea8aa7`, built with the release optimizer settings; patched JDK 26, 8G heap."
+  ],
+  "variantDescriptions": {
+    "base": "upstream `2.13.x` at `c84dea8aa7`"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unreachable-codegen-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": ""
+  },
+  "rounds": 2,
+  "profile": "none",
+  "corpora": {
+    "readFrames": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "readMaxs": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem",
+    "readCompressedMaxs": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem"
+  }
+}

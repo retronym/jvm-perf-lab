@@ -50,7 +50,7 @@ final class InMemoryCompiler(val corpus: Corpus, options: List[String] = Nil, re
     }
   }
 
-  private lazy val residentGlobal: Global = newGlobal(output)
+  lazy val residentGlobal: Global = newGlobal(output)
 
   /** One full compilation of the corpus. */
   def compile(): Unit = {

@@ -62,12 +62,7 @@ class CompileBenchmark {
   @Setup(Level.Trial)
   def setup(): Unit = {
     Announce.jvm(s"CompileBenchmark($corpus)")
-    if (jdkHome.nonEmpty) {
-      val home =
-        if (jdkHome.contains('/')) jdkHome
-        else s"${sys.env.getOrElse("SDKMAN_DIR", sys.props("user.home") + "/.sdkman")}/candidates/java/$jdkHome"
-      System.setProperty("compilerlab.jdkHome", home)
-    }
+    CompileBenchmark.useJdk(jdkHome)
     val common = CompileBenchmark.split(scalacOptions)
     val src = Corpus.load(corpus)
     val resident = compiler match {
@@ -118,6 +113,14 @@ class CompileBenchmark {
 object CompileBenchmark {
   private final val BuildOption = "@build="
   private[compilerlab] def split(options: String): List[String] = options.split(" ").toList.filter(_.nonEmpty)
+
+  private[compilerlab] def useJdk(jdkHome: String): Unit =
+    if (jdkHome.nonEmpty) {
+      val home =
+        if (jdkHome.contains('/')) jdkHome
+        else s"${sys.env.getOrElse("SDKMAN_DIR", sys.props("user.home") + "/.sdkman")}/candidates/java/$jdkHome"
+      System.setProperty("compilerlab.jdkHome", home)
+    }
 }
 
 /** Compiles a corpus repeatedly outside JMH, printing each run's time and the live heap after it (after a full GC),
