@@ -566,8 +566,10 @@ define("Job", "A job of the server's queue: a perflab command line", {
     "created": WHEN, "started": WHEN, "ended": WHEN, "rc": null(I("Exit status")), "note": null(S("Why it failed to start, etc.")),
     "position": null(I("Its place in the queue, from 1, while queued")), "url": URL, "transcript": null(S("Its transcript file")),
     "control": null(S("A pending control request: pause or cancel")), "envKeys": A(S("name"), "Its environment's names"),
-    "campaign": null(S("The campaign it runs: the name in the spec its argv names"))},
-    optional=("position", "url", "control", "envKeys", "transcript", "note", "campaign"), extra=True)
+    "campaign": null(S("The campaign it runs: the name in the spec its argv names")),
+    "session": null(S("The agent session that submitted it, sent as `session` or the X-Perflab-Session header; perflab's own clients send Claude Code's")),
+    "sessionUrl": null(S("A link that opens that session in the Claude desktop app (claude://), for a session of the app"))},
+    optional=("position", "url", "control", "envKeys", "transcript", "note", "campaign", "session", "sessionUrl"), extra=True)
 define("Jobs", "The server's queue: running and paused, then queued in order, then finished (newest first)", {
     "jobs": A(ref("Job"), "Jobs")}, top=True)
 define("JobResult", "A job", {"job": ref("Job")}, top=True)
@@ -2226,7 +2228,7 @@ def post(path, body, url=None):
     if not url:
         raise ApiError("no_server", "this action needs `perflab server` (start it with `perflab server start`); reads work without it")
     req = urllib.request.Request(url.rstrip("/") + path, data=json.dumps(body).encode(), method="POST",
-                                 headers={"Content-Type": "application/json", "X-Perflab-Token": srv.token(srv.home())})
+                                 headers=srv.client_headers())
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
             return json.loads(r.read())

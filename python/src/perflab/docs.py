@@ -152,11 +152,15 @@ def chrome(title, projects, body):
             + ui.footer() + ui.shortcuts() + "</body>")
 
 
+def names():
+    """Every doc as (name, title), the optimising guide first."""
+    return [(n, title_of(path(n), n)) for n in sorted((n[:-3] for n in os.listdir(DOC) if n.endswith(".md") and path(n[:-3])),
+                                                      key=lambda n: (n != "optimising", n))]
+
+
 def index(projects=()):
     """`/doc/`: every doc, the optimising guide first, and the perflab skill."""
-    names = sorted((n[:-3] for n in os.listdir(DOC) if n.endswith(".md") and path(n[:-3])),
-                   key=lambda n: (n != "optimising", n))
-    items = "".join(f'<li><a href="/doc/{n}">{html.escape(title_of(path(n), n))}</a> <code>doc/{n}.md</code></li>' for n in names)
+    items = "".join(f'<li><a href="/doc/{n}">{html.escape(t)}</a> <code>doc/{n}.md</code></li>' for n, t in names())
     return chrome("docs", projects, f'<h1>Docs</h1><ul>{items}<li><a href="/skill.md">The perflab skill</a> '
                                     f'<code>{SKILL_PATH}</code></li></ul>')
 

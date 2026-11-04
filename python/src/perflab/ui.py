@@ -9,6 +9,8 @@ A modified click (new tab, new window) is left to the browser.
 """
 import urllib.parse
 
+from . import palette
+
 HEAD = '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
 
 TOKENS = """
@@ -74,6 +76,7 @@ LIGHTBOX_CSS = """
 
 LIGHTBOX_JS = r"""
 const Lightbox = (() => {
+  const KEYS = ['Escape', '[', ']'];
   let box = null, items = [], cur = 0, title = '';
   function build() {
     box = document.createElement('div');
@@ -86,8 +89,10 @@ const Lightbox = (() => {
     box.addEventListener('click', e => { if (e.target === box) close(); });
     box.querySelector('.chips').addEventListener('click', e => { const c = e.target.closest('.chip'); if (c) show(+c.dataset.i); });
     const fr = box.querySelector('iframe');
-    // the graph takes the keys while it has the focus
+    // the graph takes the keys while it has the focus: by listening on it, or, as the server sandboxes it, as it tells
+    // us (FRAME_KEYS_JS)
     fr.addEventListener('load', () => { try { fr.contentWindow.addEventListener('keydown', key); } catch (e) {} });
+    addEventListener('message', e => { if (e.source === fr.contentWindow && e.data && KEYS.includes(e.data.perflabKey)) act(e.data.perflabKey); });
   }
   function open(list, i, name) {
     if (!box) build();
@@ -105,6 +110,7 @@ const Lightbox = (() => {
     box.querySelector('iframe').src = it.href;
     box.querySelector('.open').href = it.href;
     box.querySelector('.ttl').textContent = title;
+    if (window.perflabRecent) window.perflabRecent((title ? title + ' · ' : '') + it.label, it.href, 'graph');
     box.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', +c.dataset.i === cur));
   }
   function close() {
@@ -114,9 +120,11 @@ const Lightbox = (() => {
   }
   function key(e) {
     if (!box || box.hidden || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
-    if (e.key === 'Escape') { close(); e.preventDefault(); }
-    else if (e.key === ']') { show(cur + 1); e.preventDefault(); }
-    else if (e.key === '[') { show(cur - 1); e.preventDefault(); }
+    if (KEYS.includes(e.key)) { act(e.key); e.preventDefault(); }
+  }
+  function act(k) {
+    if (!box || box.hidden) return;
+    if (k === 'Escape') close(); else show(cur + (k === ']' ? 1 : -1));
   }
   const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]);
   document.addEventListener('keydown', key);
@@ -268,7 +276,8 @@ def masthead(title=None, home=None, slim=False, tagline=True):
     tag = f'<div class="tag">{TAGLINE}</div>' if tagline and not slim else ""
     return (f'<div class="band{" slim" if slim else ""}"><div class="in"><div class="brand">{MARK}<div><div class="name">{name}{proj}</div>{tag}</div>'
             f'<span class="links"><a href="/" class="srv" hidden>Home</a><a href="{DOCS}" data-srv="/doc/">Docs</a>'
-            f'<a href="{REPO}">{GITHUB} GitHub</a><button class="keys-btn" title="Keyboard shortcuts and where to read on (?)" hidden>?</button></span>'
+            f'<a href="{REPO}">{GITHUB} GitHub</a><button class="pal-btn" title="Search campaigns, runs, jobs and docs; recent pages (⌘K)" hidden>⌘K</button>'
+            f'<button class="keys-btn" title="Keyboard shortcuts and where to read on (?)" hidden>?</button></span>'
             f'</div></div></div><script>{MASTHEAD_JS}</script>' + (FRAMED_JS if slim else ""))
 
 
@@ -302,6 +311,25 @@ def home_from(page_dir):
 
 def style(*parts):
     return "<style>" + TOKENS + BRAND_CSS + "".join(parts) + "</style>"
+
+
+# what the server adds to a page it serves sandboxed. Its origin is opaque, so the page framing it can't listen for its keys:
+# it says which it got, up through any frames between. ⌘K (perflab.palette) needs the API, which it can't call: with no
+# frame to pass it to, it goes to the queue page, which opens the window.
+FRAME_KEYS_JS = r"""
+(() => {
+  const up = k => {
+    if (self !== top) parent.postMessage({perflabKey: k}, '*');
+    else if (k === 'k') location.href = '/?k=1';
+  };
+  addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') { e.preventDefault(); up('k'); return; }
+    if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+    if (e.key === 'Escape' || e.key === '[' || e.key === ']') up(e.key);
+  });
+  addEventListener('message', e => { if (e.source !== parent && e.data && typeof e.data.perflabKey === 'string') up(e.data.perflabKey); });
+})();
+"""
 
 
 def lightbox_script():
@@ -373,4 +401,4 @@ def shortcuts(*sections):
             'data-srv="/skill.md">the perflab skill</a>.</p>')
     return (f'<style>{SHORTCUTS_CSS}</style><div id="keys" hidden role="dialog" aria-label="Keyboard shortcuts"><div class="box">'
             f'<div class="hd"><h2>Keyboard shortcuts</h2><button class="x" title="Close (Esc)">✕</button></div>{body}{more}</div></div>'
-            f'<script>{SHORTCUTS_JS}</script>')
+            f'<script>{SHORTCUTS_JS}</script>' + palette.script(ON_SERVER))

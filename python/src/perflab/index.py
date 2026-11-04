@@ -1825,7 +1825,8 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
     const by = new Map();
     for (const j of JOBS) {{ if (!by.has(j.campaign)) by.set(j.campaign, []); by.get(j.campaign).push(j); }}
     for (const [name, js] of [...by].reverse()) {{
-      const links = '<span class="jobs">' + js.slice(0, 3).map(j => `<a class="btn" href="/#job-${{j.id}}" title="${{escH(j.state + ': perflab ' + j.argv.join(' '))}}">#${{j.id}} ${{escH(j.state)}}</a>`).join('') + '</span>';
+      const links = '<span class="jobs">' + js.slice(0, 3).map(j => `<a class="btn" href="/#job-${{j.id}}" title="${{escH(j.state + ': perflab ' + j.argv.join(' '))}}">#${{j.id}} ${{escH(j.state)}}</a>`).join('')
+        + (js.slice(0, 1).filter(j => j.sessionUrl).map(j => `<a class="btn" href="${{escH(j.sessionUrl)}}" title="the agent session that submitted job #${{j.id}}">Open in Claude</a>`).join('')) + '</span>';
       let card = document.getElementById('c-' + name);
       if (!card && js.some(j => j.state === 'queued' || j.state === 'running' || j.state === 'paused')) {{
         card = document.createElement('section');
@@ -1864,7 +1865,10 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
   }}
   function shareDialog(name) {{
     let d = document.getElementById('share-dlg');
-    if (!d) {{ d = document.createElement('div'); d.id = 'share-dlg'; document.body.appendChild(d); }}
+    if (!d) {{
+      d = document.createElement('div'); d.id = 'share-dlg'; document.body.appendChild(d);
+      document.addEventListener('keydown', e => {{ if (e.key === 'Escape' && !d.hidden) d.hidden = true; }});
+    }}
     d.hidden = false;
     d.innerHTML = `<div class="box"><div class="card-h"><h2>Share ${{escH(name)}}</h2></div>`
       + '<p class="k">A microsite of the campaign, public to anyone with its link (not indexed). Its results always go; raw recordings never.</p>'

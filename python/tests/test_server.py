@@ -1,9 +1,9 @@
-import json, os, re, shutil, socket, subprocess, sys, tempfile, threading, time, unittest, urllib.error, urllib.request
+import json, os, re, shutil, socket, subprocess, sys, tempfile, threading, time, unittest, unittest.mock, urllib.error, urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "..", "src")
 sys.path.insert(0, SRC)
-from perflab import control, docs, server, serverui, storage, ui  # noqa: E402
+from perflab import config, control, docs, server, serverui, storage, ui  # noqa: E402
 
 
 def project(toml='[build]\njmh = "x"\n'):
@@ -181,6 +181,54 @@ class ServerTest(unittest.TestCase):
         self.until(j["id"], "done")
         self.assertEqual(self.srv.worker.environment(self.srv.q.get(j["id"]))[server.HOME_ENV], self.home)
 
+    def test_a_job_keeps_the_session_that_submitted_it(self):
+        post = lambda body, **h: self.call("POST", "/api/jobs", {"argv": ["jobs"], "cwd": self.root, "env": self.env, **body}, headers=h)
+        code, j = post({"session": "local_abc-1"})
+        self.assertEqual((code, j["session"], j["sessionUrl"]), (201, "local_abc-1", "claude://code/continue?session=local_abc-1"))
+        # what perflab's own clients send, for every action that queues a job
+        code, j = post({}, **{server.SESSION_HEADER: "local_def"})
+        self.assertEqual((code, j["session"]), (201, "local_def"))
+        with unittest.mock.patch.dict(os.environ, {"PERFLAB_SERVER_HOME": self.home}):  # the API finds its projects through it
+            code, r = self.call("POST", "/api/v1/submit", {"argv": ["jobs"], "project": self.root}, headers={server.SESSION_HEADER: "local_ghi"})
+        self.assertEqual((code, r["job"]["sessionUrl"]), (200, "claude://code/continue?session=local_ghi"))
+        # a terminal session: its id, and nothing the app could open
+        code, j = post({"session": "463f911b-7221"})
+        self.assertEqual((code, j["session"], j["sessionUrl"]), (201, "463f911b-7221", None))
+        code, j = post({})
+        self.assertEqual((code, j["session"], j["sessionUrl"]), (201, None, None))
+        # the id goes into a link: nothing but an id
+        self.assertEqual(post({"session": 'x" onclick="y'})[0], 400)
+        self.assertEqual(post({}, **{server.SESSION_HEADER: "a/b"})[0], 400)
+
+    def test_clients_send_claude_codes_session(self):
+        with unittest.mock.patch.dict(os.environ, {"CLAUDE_CODE_HOST_SESSION_ID": "local_x", "CLAUDE_CODE_SESSION_ID": "uuid"}):
+            self.assertEqual(server.client_headers()[server.SESSION_HEADER], "local_x")
+        with unittest.mock.patch.dict(os.environ, {"CLAUDE_CODE_HOST_SESSION_ID": "", "CLAUDE_CODE_SESSION_ID": "uuid"}):
+            self.assertEqual(server.client_session(), "uuid")
+        with unittest.mock.patch.dict(os.environ, {"CLAUDE_CODE_HOST_SESSION_ID": "bad id", "CLAUDE_CODE_SESSION_ID": ""}):
+            self.assertNotIn(server.SESSION_HEADER, server.client_headers())
+
+    def test_search_lists_what_the_palette_finds(self):
+        j = self.submit("jobs")
+        camp = os.path.join(config.find(self.root).campaigns, "cc")
+        os.makedirs(camp)
+        json.dump({"name": "cc", "variants": {"a": "", "b": ""}, "corpora": {"x": ""}, "description": "Is b faster?"}, open(os.path.join(camp, "spec.json"), "w"))
+        run = os.path.join(config.find(self.root).runs, "2026-a-run")
+        os.makedirs(run)
+        code, r = self.call("GET", "/api/search")
+        self.assertEqual(code, 200)
+        by = {(i["kind"], i["title"]): i for i in r["items"]}
+        self.assertEqual(by[("page", "Queue")]["url"], "/")
+        self.assertIn(("doc", next(t for n, t in docs.names() if n == "optimising")), by)
+        p = self.srv.q.projects()[0]
+        self.assertEqual(by[("project", p["name"])]["url"], p["index"])
+        self.assertEqual(by[("campaign", "cc")]["url"], p["index"] + "#c-cc")
+        self.assertIn("a b", by[("campaign", "cc")]["text"])
+        self.assertEqual(by[("run", "2026-a-run")]["url"], p["index"] + "#2026-a-run")
+        job = next(i for i in r["items"] if i["kind"] == "job")
+        self.assertEqual(job["url"], f"/#job-{j['id']}")
+        self.assertIs(job["active"], job["state"] != "done")
+
     def test_a_job_names_its_campaign(self):
         json.dump({"name": "exp7", "rounds": 1}, open(os.path.join(self.root, "spec.json"), "w"))
         self.assertEqual(server.public({"argv": ["ab", "run", "spec.json"], "cwd": self.root})["campaign"], "exp7")
@@ -349,7 +397,9 @@ class ServerTest(unittest.TestCase):
             self.assertEqual(code, 200, rel)
             self.assertEqual(h["Content-Security-Policy"], server.SANDBOX, rel)
             self.assertNotIn("allow-same-origin", h["Content-Security-Policy"])
-        self.assertEqual(self.get(base + "runs/r1/report.html")[2], "<p>run")  # the runs: the index links them as ../runs/
+        # the runs: the index links them as ../runs/. A page tells the page framing it its keys, which it can't listen for
+        self.assertEqual(self.get(base + "runs/r1/report.html")[2], f"<p>run<script>{ui.FRAME_KEYS_JS}</script>")
+        self.assertEqual(self.get(base + "ab/running.json")[2], "{}")
         for rel in ("ab/c1/.build/v/a.jar", "ab/.serve.json", "ab/c1/%2ebuild/v/a.jar", "ab/./index.html", "secret.txt",
                     "ab/../secret.txt", "ab/c1/..%2f..%2fsecret.txt"):
             self.assertEqual(self.get(base + rel)[0], 404, rel)

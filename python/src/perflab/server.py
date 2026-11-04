@@ -40,11 +40,12 @@ HTTP (JSON unless noted):
   GET  /api/jobs[?all=1]                 jobs, queue order first
   GET  /api/jobs/<id>                    one job
   GET  /api/jobs/<id>/transcript[?tail=<lines>|offset=<bytes>][&file=output]   its transcript (text), or its output
-  POST /api/jobs                         {argv, cwd, env?, priority?}: a new job, `perflab <argv>`
+  POST /api/jobs                         {argv, cwd, env?, priority?, session?}: a new job, `perflab <argv>`
   POST /api/jobs/<id>/pause|resume|cancel
   POST /api/jobs/<id>/priority           {priority}
   POST /api/jobs/<id>/move               {by: -1 (earlier) or 1}
   GET  /api/projects; POST /api/projects {root}
+  GET  /api/search                       what ⌘K searches (perflab.palette): pages, projects, docs, campaigns, runs, jobs
   GET  /api/storage                      perflab.storage's entries of every project
   POST /api/storage/cleanup              {action: builds|graphs|profiles|delete, dry_run (default true), target?, days?}
   POST /api/storage/pin                  {project, kind, name, pinned}
@@ -53,15 +54,19 @@ HTTP (JSON unless noted):
   GET  /, /admin                         the queue page, the storage page
   GET  /p/<project>/...                  the project's campaigns and runs (its index), as `perflab serve` serves them
 
+The agent session that submits a job is recorded with it, from `session` or a POST's X-Perflab-Session header, which perflab's
+own clients send from Claude Code's environment; the queue and the index link a desktop session as "Open in Claude".
+
 Under /p/, only the campaigns and runs directories are served (at their paths below the two's common directory), never
 a path with a segment that starts with `.` (worktrees, build snapshots), and every page but the project's index, which
 carries the token, under a CSP sandbox: its scripts run in an opaque origin, so that a flame graph or a page a
-benchmark wrote cannot read the index (and its token) or call the API.
+benchmark wrote cannot read the index (and its token) or call the API. An HTML page gets ui.FRAME_KEYS_JS appended, for
+the page framing it to hear Esc.
 """
 import argparse, fcntl, functools, hashlib, json, os, re, secrets, signal, socket, sqlite3, subprocess, sys, threading, time, traceback
 import http.server, urllib.error, urllib.parse, urllib.request
 
-from . import config, control, httpd, mirror, storage, transcript
+from . import config, control, httpd, mirror, storage, transcript, ui
 
 DEFAULT_PORT = 8690
 HOME_ENV, PORT_ENV, GRACE_ENV = "PERFLAB_SERVER_HOME", "PERFLAB_SERVER_PORT", "PERFLAB_SERVER_GRACE"
@@ -177,11 +182,11 @@ class Queue:
               CREATE TABLE IF NOT EXISTS jobs(id INTEGER PRIMARY KEY AUTOINCREMENT, project TEXT, argv TEXT, cwd TEXT,
                 env TEXT, python TEXT, module TEXT, state TEXT, priority INTEGER DEFAULT 0, seq REAL, created REAL,
                 started REAL, ended REAL, rc INTEGER, pid INTEGER, cancel_requested REAL, dir TEXT, transcript TEXT, note TEXT,
-                pid_start TEXT, testbed TEXT, worker TEXT, lease REAL);
+                pid_start TEXT, testbed TEXT, worker TEXT, lease REAL, session TEXT);
               CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY, root TEXT UNIQUE, name TEXT, campaigns TEXT, runs TEXT,
                 registered REAL);""")
             have = {r[1] for r in db.execute("PRAGMA table_info(jobs)")}
-            for col, typ in (("pid_start", "TEXT"), ("testbed", "TEXT"), ("worker", "TEXT"), ("lease", "REAL")):
+            for col, typ in (("pid_start", "TEXT"), ("testbed", "TEXT"), ("worker", "TEXT"), ("lease", "REAL"), ("session", "TEXT")):
                 if col not in have:  # a queue from before it
                     db.execute(f"ALTER TABLE jobs ADD COLUMN {col} {typ}")
 
@@ -232,16 +237,17 @@ class Queue:
 
     # jobs
 
-    def submit(self, project, argv, cwd, env=None, priority=0, python=None, module="perflab", jobs_dir=None, testbed_=None):
-        """A new job; `testbed_` names the testbed whose worker runs it (None: this machine's)."""
+    def submit(self, project, argv, cwd, env=None, priority=0, python=None, module="perflab", jobs_dir=None, testbed_=None, session=None):
+        """A new job; `testbed_` names the testbed whose worker runs it (None: this machine's), `session` the agent session
+        that submitted it."""
         if not isinstance(argv, list) or not all(isinstance(a, str) for a in argv) or not argv:
             raise ValueError("argv must be a non-empty list of strings")
         now = time.time()
         with self.lock, self._db() as db:
-            cur = db.execute("INSERT INTO jobs(project, argv, cwd, env, python, module, state, priority, seq, created, testbed) "
-                             "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            cur = db.execute("INSERT INTO jobs(project, argv, cwd, env, python, module, state, priority, seq, created, testbed, session) "
+                             "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                              (project, json.dumps(argv), cwd, json.dumps(env or {}), python, module or "perflab", "queued",
-                              int(priority or 0), now, now, testbed_))
+                              int(priority or 0), now, now, testbed_, session))
             jid = cur.lastrowid
             d = os.path.join(jobs_dir or os.path.join(os.path.dirname(self.path), "jobs"), str(jid))
             db.execute("UPDATE jobs SET dir=?, transcript=? WHERE id=?", (d, os.path.join(d, "transcript.txt"), jid))
@@ -477,8 +483,66 @@ def _under(path, project):
 
 def public(job):
     """A job as the API shows it: without its environment, which may name more than anyone needs to see, and with the
-    campaign it runs (`campaign`), for the queue and the project's index to link each other."""
-    return {k: v for k, v in job.items() if k != "env"} | {"envKeys": sorted(job.get("env") or {}), "campaign": campaign_of(job)}
+    campaign it runs (`campaign`), for the queue and the project's index to link each other, and a link to the agent
+    session that submitted it (`sessionUrl`)."""
+    return {k: v for k, v in job.items() if k != "env"} | {"envKeys": sorted(job.get("env") or {}), "campaign": campaign_of(job),
+                                                            "sessionUrl": session_url(job.get("session"))}
+
+
+SESSION_HEADER = "X-Perflab-Session"
+SESSION = re.compile(r"[A-Za-z0-9_-]{1,100}")
+_request = threading.local()  # the POST this thread is handling: the session that sent it
+
+
+def session_url(session):
+    """The Claude desktop app's link to a session: its own ids start local_. A terminal session's has no link."""
+    return f"claude://code/continue?session={session}" if session and session.startswith("local_") else None
+
+
+def client_session():
+    """The Claude Code session this process runs in, if any: the desktop app's id, which it can link, else the session's."""
+    s = os.environ.get("CLAUDE_CODE_HOST_SESSION_ID") or os.environ.get("CLAUDE_CODE_SESSION_ID")
+    return s if s and SESSION.fullmatch(s) else None
+
+
+def client_headers():
+    """What this process's POSTs to the server carry."""
+    s = client_session()
+    return {"Content-Type": "application/json", "X-Perflab-Token": token(home()), **({SESSION_HEADER: s} if s else {})}
+
+
+def search_items(server):
+    """What ⌘K searches (perflab.palette), each {kind, title, sub, url, text?, when?, state?, active?}."""
+    from . import api, docs
+    items = [{"kind": "page", "title": t, "sub": sub, "url": u} for t, sub, u in (
+        ("Queue", "the server's jobs", "/"), ("Storage", "what the projects keep on disk", "/admin"), ("Docs", "the guides", "/doc/"),
+        ("API", "functions and schemas", "/api/v1/docs"), ("The perflab skill", "for agents", "/skill.md"))]
+    names = {}
+    for p in server.q.projects():
+        names[p["id"]] = p["name"]
+        items.append({"kind": "project", "title": p["name"], "sub": p["root"], "url": p["index"]})
+        try:
+            for c in api.call("campaigns", {"project": p["root"]})["campaigns"]:
+                items.append({"kind": "campaign", "title": c["name"], "sub": f"{p['name']} · {c.get('description') or c.get('kind') or ''}",
+                              "url": f"{p['index']}#c-{urllib.parse.quote(c['name'])}", "when": c.get("updated"),
+                              "text": " ".join([c.get("kind") or "", c.get("benchmark") or "", c.get("status") or "", c.get("testbed") or "",
+                                                *(c.get("corpora") or []), *(c.get("variants") or [])])})
+        except api.ApiError:  # a project that can't be read is no reason to search none
+            pass
+        try:
+            with os.scandir(p["runs"]) as it:
+                runs = sorted(((e.stat().st_mtime, e.name) for e in it if e.is_dir() and not e.name.startswith(".")), reverse=True)
+            items += [{"kind": "run", "title": name, "sub": p["name"], "url": f"{p['index']}#{urllib.parse.quote(name)}", "when": when}
+                      for when, name in runs[:200]]
+        except OSError:
+            pass
+    for name, title in docs.names():
+        items.append({"kind": "doc", "title": title, "sub": f"doc/{name}.md", "url": f"/doc/{name}"})
+    for j in server.q.jobs():
+        items.append({"kind": "job", "title": f"#{j['id']} {' '.join(j['argv'])}", "sub": names.get(j["project"], j["project"]),
+                      "url": f"/#job-{j['id']}", "state": j["state"], "active": j["state"] in ACTIVE or j["state"] == "queued",
+                      "when": j.get("ended") or j.get("started") or j.get("created"), "text": campaign_of(j) or ""})
+    return items
 
 
 def share_campaign(server, body):
@@ -1004,6 +1068,8 @@ class Server:
                         return self._send(200, [public(j) for j in server.q.jobs(include_final=qs.get("all") != "0")])
                     if p == "/api/projects":
                         return self._send(200, server.q.projects())
+                    if p == "/api/search":
+                        return self._send(200, {"items": search_items(server)})
                     if p == "/api/storage":
                         return self._send(200, {"entries": server.storage_entries(), "projects": server.q.projects()})
                     m = re.fullmatch(r"/api/jobs/(\d+)(/transcript|/card)?", p)
@@ -1073,8 +1139,11 @@ class Server:
                     meta = f'<meta name="perflab-token" content="{server.token}">'
                     at = page.index(">") + 1 if page[:9].lower() == "<!doctype" else 0
                     return self._send(200, page[:at] + meta + page[at:], "text/html; charset=utf-8")
-                self.path = "/" + urllib.parse.quote(rel) + (f"?{query}" if query else "")
                 self.sandbox = True
+                if local.lower().endswith((".html", ".htm")) and os.path.isfile(local):
+                    with open(local, "rb") as f:
+                        return self._send(200, f.read() + f"<script>{ui.FRAME_KEYS_JS}</script>".encode(), "text/html; charset=utf-8")
+                self.path = "/" + urllib.parse.quote(rel) + (f"?{query}" if query else "")
                 return super().do_GET() if self.command == "GET" else super().do_HEAD()
 
             def do_POST(self):
@@ -1094,6 +1163,7 @@ class Server:
                 except ValueError:
                     return self._error(400, "bad JSON")
                 p = urllib.parse.urlsplit(self.path).path
+                _request.session = self.headers.get(SESSION_HEADER)
                 if p.startswith("/api/v1/"):
                     return self._api(lambda api: api.http_post(p, body, server))
                 try:
@@ -1292,13 +1362,16 @@ def submit_local(server, body, python=None, module=None):
     env = body.get("env") or {}
     if not isinstance(env, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in env.items()):
         raise ValueError("env must map names to strings")
+    session = body["session"] if "session" in body else getattr(_request, "session", None)
+    if session is not None and not (isinstance(session, str) and SESSION.fullmatch(session)):
+        raise ValueError("session must be an id: letters, digits, _ and -")
     argv = body.get("argv")
     tb = job_testbed(argv, cwd) if isinstance(argv, list) else None
     if tb:
         from . import remote
         remote.check(argv, cwd, project)  # what a worker could not run fails now, not when one claims it
     j = server.q.submit(project["id"], argv, cwd, env, body.get("priority") or 0, python,
-                        module or "perflab", os.path.join(server.home, "jobs"), tb)
+                        module or "perflab", os.path.join(server.home, "jobs"), tb, session)
     server.worker.wake.set()
     j["position"] = next((i + 1 for i, q in enumerate(server.q.queued()) if q["id"] == j["id"]), None)
     j["index"] = project["index"]
@@ -1475,7 +1548,7 @@ def api(method, path, body=None, url=None):
         raise ConnectionError("no perflab server is running (perflab server start)")
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(url.rstrip("/") + path, data=data, method=method,
-                                 headers={"Content-Type": "application/json", "X-Perflab-Token": token(home())})
+                                 headers=client_headers())
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             text = r.read().decode()

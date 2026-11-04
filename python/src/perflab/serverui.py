@@ -82,7 +82,8 @@ function buttons(j) {
   const b = (op, text, cls, title, body) => `<button class="btn ${cls || ''}" data-op="${op}" data-id="${j.id}" ${body ? `data-body='${esc(JSON.stringify(body))}'` : ''} title="${esc(title || '')}">${text}</button>`;
   const p = projects[j.project];
   const idx = p ? `<a class="btn" href="${esc(p.index)}" title="${esc(p.name)}: its campaigns and runs">index</a>` : '';
-  const t = idx + `<a class="btn" href="/api/jobs/${j.id}/transcript" target="_blank" rel="noopener" title="the whole transcript, as text">transcript</a>`;
+  const claude = j.sessionUrl ? `<a class="btn" href="${esc(j.sessionUrl)}" title="the agent session that submitted this job">Open in Claude</a>` : '';
+  const t = idx + `<a class="btn" href="/api/jobs/${j.id}/transcript" target="_blank" rel="noopener" title="the whole transcript, as text">transcript</a>` + claude;
   if (j.state === 'running' || j.state === 'paused') {
     const pausing = j.control === 'pause';
     return (pausing ? b('resume', 'Resume', 'go', 'clear the pause; a paused job carries on') : b('pause', 'Pause', '', 'pause at the next cell boundary'))
@@ -91,7 +92,7 @@ function buttons(j) {
   if (j.state === 'queued')
     return b('move', '↑', '', 'run sooner', {by: -1}) + b('move', '↓', '', 'run later', {by: 1})
       + b('priority', 'priority ' + (j.priority > 0 ? '+' : '') + j.priority, '', 'raise its priority by one', {priority: j.priority + 1})
-      + b('cancel', 'Cancel', 'bad', 'take it off the queue') + idx;
+      + b('cancel', 'Cancel', 'bad', 'take it off the queue') + idx + claude;
   return t;
 }
 // where a job runs: a remote worker of its testbed, else this machine (whose queued jobs need no badge)
