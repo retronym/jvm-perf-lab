@@ -539,9 +539,10 @@ def search_items(server):
     for name, title in docs.names():
         items.append({"kind": "doc", "title": title, "sub": f"doc/{name}.md", "url": f"/doc/{name}"})
     for j in server.q.jobs():
-        items.append({"kind": "job", "title": f"#{j['id']} {' '.join(j['argv'])}", "sub": names.get(j["project"], j["project"]),
+        argv = " ".join(j["argv"])
+        items.append({"kind": "job", "title": f"#{j['id']} {campaign_of(j) or argv}", "sub": names.get(j["project"], j["project"]),
                       "url": f"/#job-{j['id']}", "state": j["state"], "active": j["state"] in ACTIVE or j["state"] == "queued",
-                      "when": j.get("ended") or j.get("started") or j.get("created"), "text": campaign_of(j) or ""})
+                      "when": j.get("ended") or j.get("started") or j.get("created"), "text": argv})
     return items
 
 

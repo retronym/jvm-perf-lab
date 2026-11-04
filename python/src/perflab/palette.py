@@ -93,7 +93,7 @@ JS = r"""
       const words = q.split(/\s+/), known = new Set(items.map(i => i.url));
       section('', [...items, ...recent().filter(r => !known.has(r.url))]
         .map(it => [score(it, words, q), it]).filter(x => x[0] > 0)
-        .sort((a, b) => b[0] - a[0] || stamp(b[1]) - stamp(a[1])).slice(0, 40).map(x => x[1]));
+        .sort((a, b) => b[0] - a[0] || (a[1].kind === 'job') - (b[1].kind === 'job') || stamp(b[1]) - stamp(a[1])).slice(0, 40).map(x => x[1]));
     } else {
       const at = location.pathname + location.search + location.hash;
       section('Recent', recent().filter(r => r.url !== at).slice(0, 8));
