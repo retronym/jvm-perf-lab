@@ -12,6 +12,7 @@ by that counter's units per op (its sum over the measurement iterations over the
 amounts of work per op compare: cycles/file, not cycles/op. Ratios (IPC, /kinst, % of cycles) stay as they are.
 """
 import functools, glob, json, math, os, plistlib, random, re, statistics
+from typing import NamedTuple
 
 # events counting cycles are shown as % of cycles, the others per 1,000 instructions: by the event's description in
 # macOS's PMU event database (kpep), else by its name, as XctraceProfiler does
@@ -363,11 +364,60 @@ def verdict(d, half=None, ok=True, up=False):
     return "na" if not ok else "flat" if half is None or abs(d) <= half or abs(d) < 0.005 else "worse" if (d > 0) != up else "better"
 
 
+# ---- what JMH reports for a benchmark run with several forks (1.37: RunResult.getAggregatedResult takes every fork's
+# iterations, ListStatistics their mean and, with N > 2, t(N - 1) * sd / sqrt(N)). A campaign forks once per cell, so its
+# result.json files have this only per fork. Shown first on a card, it is not what a verdict rests on: it takes iterations
+# as independent, while those of one fork share JIT decisions, code layout and GC state.
+
+class Jmh(NamedTuple):
+    score: float  # the mean of every iteration
+    error: float | None  # JMH's scoreError, the 99.9% half-width; None (its NaN) with N <= 2
+    n: int  # JMH's Cnt: forks x iterations
+    sd: float | None  # the iterations' sd; None with N <= 2, for which JMH gives no interval
+
+
+def jmh_score(forks):
+    """What JMH reports for `forks` ([[x, ...] per fork]) as one run: a `Jmh`, or None without any iterations."""
+    xs = [x for f in forks for x in f]
+    if not xs:
+        return None
+    score, sd = stats(xs)
+    n = len(xs)
+    return Jmh(score, t999(n - 1) * sd / n ** 0.5, n, sd) if n > 2 else Jmh(score, None, n, None)
+
+
+def jmh_delta(a, b, ok=True, up=False):
+    """`Jmh` b against a by Welch's t over the pooled iterations: (Δ%, half-width of its 99.9% CI or None, the `verdict`
+    such a test would give), None when a's score is zero. Far narrower than `compare`'s, and for that reason no verdict
+    a view colours by."""
+    d, half, _ = welch((a.score, a.sd, a.n, a.n - 1), (b.score, b.sd, b.n, b.n - 1))
+    return None if d is None else (d, half, verdict(d, half, ok, up))
+
+
+def of_jmh(key, forks):
+    """`jmh_score` of a metric `key`, None for one JMH does not average: a JIT total's score is the largest fork's."""
+    return None if key.startswith("jit:") else jmh_score(forks)
+
+
+class Summary(NamedTuple):
+    """A metric of a variant on a corpus, in `summarise`."""
+    mean: float  # over forks
+    ci: float | None  # half-width of its 99.9% CI
+    d: float | None  # Δ% against the baseline, Welch's t on the forks' means: what `verdict` goes by
+    half: float | None  # half-width of Δ's 99.9% CI
+    ok: bool  # a Δ means something (`delta_ok`)
+    n: int  # forks
+    df: float | None  # of the sd behind `ci`
+    pooled: bool  # that sd is `pooled_rel_sd`'s
+    jmh: Jmh | None  # `of_jmh`, None without per-iteration samples
+    jmh_d: tuple | None  # `jmh_delta` against the baseline
+
+
 def summarise(variants, per_unit=None):
     """{variant: [(JMH result, hw events) per round]}, the first variant the baseline -> (columns [(key, label, kind,
-    main)] in the order first seen, {variant: {key: (mean over forks, half-width of its 99.9% CI or None, Δ% or None,
-    half-width of Δ's 99.9% CI or None, Δ ok)}}), by `fork_stats` and `compare`."""
+    main)] in the order first seen, {variant: {key: `Summary`}}), by `fork_stats`, `compare`, `of_jmh` and `jmh_delta`."""
     per = {v: fork_units(rs, per_unit) for v, rs in variants.items()}
+    jm = {v: {k: of_jmh(k, f) for k, f in raw.items()} for v, (_, _, raw, _) in per.items()}
     cols = {}
     for _, _, _, cs in per.values():
         for c in cs:
@@ -382,13 +432,16 @@ def summarise(variants, per_unit=None):
             b = base.get(k)
             ok = delta_ok(b[0] if b else m[0], cols[k][2], per_unit)
             c = compare(b, m, ok) if b and v != names[0] else None
-            out[v][k] = (m[0], m[2], c and c[0], c and c[1], ok)
+            j, ja = jm[v].get(k), jm.get(names[0], {}).get(k)
+            up = higher_is_better(k, cols[k][1])
+            out[v][k] = Summary(m[0], m[2], c and c[0], c and c[1], ok, m[3], m[4], m[5], j,
+                                jmh_delta(ja, j, ok, up) if j and ja and v != names[0] else None)
     return list(cols.values()), out
 
 
 # ---- distributions: statistics of every measured iteration, pooled over a variant's forks
 
-STATS = ("mean", "median", "min")  # what a summary can show; mean is `fork_stats`'s (over forks), the rest `pooled`'s
+STATS = ("mean", "median", "min")  # what a summary can show; mean is JMH's beside `fork_stats`'s (over forks), the rest `pooled`'s
 BOOT = 200  # bootstrap resamples for the spread of a pooled statistic's Δ
 
 

@@ -506,7 +506,10 @@ def profile_corpora(pdir):
 
 def ci_shown(kind, ci, mean):
     """A CI's half-width as its mean is shown: a score to the score's decimals."""
-    return ui.num(ci, mean) if kind == "score" else metrics.fmt(kind, ci)
+    if kind != "score":
+        return metrics.fmt(kind, ci)
+    shown = ui.num(ci, mean)
+    return shown if ci == 0 or float(shown.replace(",", "")) else f"{ci:.2g}"  # below the score's decimals: not "0"
 
 
 def section(campaign_dir, rel_to, corpus_param="corpus"):

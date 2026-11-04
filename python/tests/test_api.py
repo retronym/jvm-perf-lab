@@ -263,6 +263,12 @@ class ReadTest(Fixture, unittest.TestCase):
         self.assertEqual((s["delta"]["against"], s["delta"]["verdict"]), ("base", "better"))
         self.assertAlmostEqual(s["delta"]["pct"], 100 * (s["mean"] / rows[("a", "base")]["metrics"]["score"]["mean"] - 1))
         self.assertLess(s["delta"]["pct"] + s["delta"]["halfWidth"], 0)
+        # beside them, what JMH reports with every iteration pooled; the existing fields keep their meaning
+        self.assertEqual(s["jmh"]["n"], s["n"] * 3)
+        self.assertAlmostEqual(s["jmh"]["score"], s["mean"])
+        self.assertIsNotNone(s["jmh"]["errorShown"])
+        self.assertLess(s["delta"]["jmh"]["halfWidth"], s["delta"]["halfWidth"])
+        self.assertIn(s["delta"]["jmh"]["verdict"], ("better", "worse", "flat", "na"))
         self.assertNotIn("card", tip)  # the card shows these very numbers
         self.assertEqual([v["name"] for v in c["variantInfo"]], ["base", "tip"])
         self.assertEqual(c["variantInfo"][1]["flags"], "-Dx=1")

@@ -20,7 +20,7 @@ Each summary row (corpus × variant) gets a disclosure ▸. Expanding it shows i
 
 A segmented control on the card: **mean · median · min** (perhaps **max** and **p90**). It applies to every value and Δ in the table, the pivot and the chart, and is remembered per viewer, like the view toggle.
 
-- **mean**: as today. Mean of fork means, Welch's 99.9% CI on Δ, the better/worse/flat verdict.
+- **mean**: two columns for each metric. First what JMH reports for these forks as one run: every iteration pooled, their mean ± t(N−1) × sd / √N at 99.9%, N (JMH's `Cnt`) = forks × iterations, no error with N ≤ 2. Beside it, *over forks*: the mean of fork means ± t(df) × sd / √n. Δ appears under each with its own ±. The better/worse/flat verdict, in both columns, is Welch's t over forks.
 - **median** and **min**: over every measured iteration of the variant's forks, pooled. Δ against the baseline's same statistic. Its interval comes from a bootstrap that resamples forks, then iterations within each fork, so the fork stays the unit of variation as it is for the mean. This is computed when the index is built (milliseconds per row), so the verdict works the same way for each statistic.
 
 ### The distribution on hover
@@ -47,5 +47,6 @@ The chart view becomes a box-and-strip plot per variant (per corpus) instead of 
 
 1. Median and min are over pooled iterations. The bootstrap resamples forks, then iterations within each fork, so their spread still treats the fork as the unit of variation. It is the bootstrap's sd of Δ, like the mean's spread over rounds, so the better/worse/flat verdict reads the same for every statistic. The bootstrap is seeded, so a refresh doesn't change it.
 2. The default statistic is the mean, so no verdict changes under anyone's feet.
+5. JMH's figure comes first because it is the number one recognises and can compare with a JMH run, and because with few forks the interval over forks is unreadable: t(1) = 637 turns a 5 s score into `± 1232%`. It is not what a verdict rests on. It takes iterations as independent, while those of one fork share JIT decisions, code layout and GC state, so it is usually far narrower and a test on it would call many more differences significant. So a Δ under JMH's figure can exclude zero and stay grey; the hover says why. `metrics.jmh_score` is checked against JMH 1.37's `RunResult.getAggregatedResult`, and the API has it as `Stat.jmh` and `Delta.jmh`, leaving `mean`, `ci`, `pct`, `halfWidth` and `verdict` as they were. The chart, the branch history and a paired campaign's table stay over forks.
 3. The pivot view is gone. The chart's second scale is the distribution (box p25–p75, whiskers min–max, median line, mean dot, every iteration beneath). A paired campaign, whose cells are forks shared by every variant, keeps its own summary and cells table and the chart's absolute scale.
 4. The API's Stat has `median` and `min` (pooled, as on the card) beside `mean`, in `campaign` and `compare`. Their Δ stays on the card for now.

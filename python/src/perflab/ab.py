@@ -73,7 +73,7 @@ compares the work, not the op. The index's summary toggles between per unit and 
 """
 import atexit, glob, json, os, re, shlex, shutil, subprocess, sys, time
 
-from . import branch, config, jmh, kperf, launch, loadgate, metrics, specs, testbed, timeline, transcript
+from . import branch, branchview, config, jmh, kperf, launch, loadgate, metrics, specs, testbed, timeline, transcript
 
 JMH_LOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "jmh.lock")
 MAX_ATTEMPTS = 10
@@ -715,12 +715,17 @@ def report_paired(spec):
 
 
 def report(spec, per_op=False):
-    """Per corpus, a row per metric (`metrics`) and a column per variant: the mean over forks ± its 99.9% CI and Δ
-    against the first variant ± its 99.9% CI (`metrics.summarise`); the score of each round and the GC time beneath."""
+    """Per corpus, a row per metric (`metrics`) and two columns per variant, as on the card: what JMH reports for its
+    forks as one run, and the mean over forks ± its 99.9% CI, each with Δ against the first variant ± its 99.9% CI
+    (`metrics.summarise`); the score of each round and the GC time beneath."""
     if spec.paired:
         return report_paired(spec)
     print(f"### {spec.name}\n")
     describe(spec)
+    print("Each value first as JMH reports its forks as one run: every iteration pooled, ± t(N − 1) × sd / √N at 99.9%, none with N ≤ 2. "
+          "It takes iterations as independent, though those of one fork share JIT decisions, code layout and GC state. "
+          "*over forks* takes the fork as the sample: the mean of forks' means, ± t(df) × sd / √n at 99.9%, Δ by Welch's t. "
+          "Only a Δ whose interval over forks excludes zero is significant.\n")
     if per_op:
         spec.per_unit = None
     jfrconv = jmh.jfrconv(jmh.async_lib(spec.lib)) if spec.kperf else None
@@ -745,23 +750,26 @@ def report(spec, per_op=False):
             print(f"Per {metrics.unit_name(spec.per_unit)}: per-op values divided by `{spec.per_unit}` per op ("
                   + ", ".join(f"{v} {per[v]:.4g}" for v in names if per[v]) + ")."
                   + (f" **No `{spec.per_unit}` counter in {', '.join(sorted(set(missing)))}.**" if missing else "") + "\n")
-        print("| metric | " + " | ".join(names) + " |\n|---|" + "---|" * len(names))
+        print("| metric | " + " | ".join(f"{v} | {v}, over forks" for v in names) + " |\n|---|" + "---|---|" * len(names))
         rounds = lambda v: " / ".join(f"{res['primaryMetric']['score']:.4g}" for res, _ in results[v])
-        print(f"| {results[names[0]][0][0]['primaryMetric'].get('scoreUnit', 'score')} per round | " + " | ".join(rounds(v) for v in names) + " |")
+        print(f"| {results[names[0]][0][0]['primaryMetric'].get('scoreUnit', 'score')} per round | " + " | ".join(f"{rounds(v)} | " for v in names) + " |")
         for k, label, kind, _ in cols:
             tds = []
             for v in names:
                 if k not in st[v]:
-                    tds.append("–"); continue
-                m, ci, d, half, ok = st[v][k]
-                text = metrics.fmt(kind, m) + (f" ± {100 * ci / abs(m):.1f}%" if ci is not None and m else "")
-                if d is not None:
-                    text += f" ({d:+.1f}%" + (f" ± {half:.1f}" if half is not None else "") + ")" if ok else " (–)"
-                tds.append(text)
+                    tds.append("– | –"); continue
+                s = st[v][k]
+                m, ci, d, half, ok = s[:5]
+                pct = lambda x, h: (f" ({x:+.1f}%" + (f" ± {h:.1f}" if h is not None else "") + ")" if ok else " (–)") if x is not None else ""
+                j = s.jmh
+                first = (metrics.fmt(kind, j.score) + (f" ± {branchview.ci_shown(kind, j.error, j.score)}" if j.error is not None else "") + pct(*(s.jmh_d[:2] if s.jmh_d else (None, None)))
+                         if j else metrics.fmt(kind, m) + pct(d, None))  # no per-iteration samples: the value over forks
+                text = metrics.fmt(kind, m) + (f" ± {100 * ci / abs(m):.1f}%" + ("†" if s.pooled else "") if ci is not None and m else "") + pct(d, half)
+                tds.append(f"{first} | {text}")
             print(f"| {label} | " + " | ".join(tds) + " |")
         gc = {v: mean(res["secondaryMetrics"].get("gc.time", {}).get("score") for res, _ in results[v]) for v in names}
         if any(gc.values()):
-            print("| GC time | " + " | ".join(f"{gc[v] / 1e3:.1f} s" if gc[v] is not None else "–" for v in names) + " |")
+            print("| GC time | " + " | ".join((f"{gc[v] / 1e3:.1f} s" if gc[v] is not None else "–") + " | " for v in names) + " |")
         print()
     if "async" in spec.profile:
         print(graphs(spec))

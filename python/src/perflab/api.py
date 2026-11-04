@@ -165,6 +165,18 @@ define("CampaignSummary", "One campaign, as campaigns lists it", {
 define("Campaigns", "The campaigns of a project, newest first", {
     "project": ref("Project"), "campaigns": A(ref("CampaignSummary"), "Newest first (by `updated`)")}, top=True)
 
+JMH_NOTE = ("It takes iterations as independent, though those of one fork share JIT decisions, code layout and GC state, so it "
+            "is usually far narrower than the same figure over forks")
+define("JmhDelta", "The same change as JMH's figures would have it: Welch's t over the pooled iterations. " + JMH_NOTE, {
+    "pct": N("Δ of the JMH scores, in percent"),
+    "halfWidth": null(N("Half-width of Δ's 99.9% confidence interval over the pooled iterations; null with N ≤ 2 on a side")),
+    "verdict": S("What this test alone would say; the delta's own verdict is the one to go by", enum=list(VERDICTS))})
+define("Jmh", "What JMH itself reports for these forks as one run: every measurement iteration pooled. " + JMH_NOTE, {
+    "score": N("The mean of every iteration"),
+    "error": null(N("JMH's scoreError: t(N − 1) × sd / √N at 99.9%, over the iterations; null with N ≤ 2, for which JMH reports none")),
+    "n": I("JMH's Cnt: forks × iterations"),
+    "shown": S("The score as the index shows it, with its unit"),
+    "errorShown": S("The error as the index shows it ('' without one)")})
 define("Delta", "A change against another variant or commit: Welch's t on the forks' means, at 99.9%", {
     "pct": N("Δ in percent of the other's mean: 100 × (this / other − 1)"),
     "halfWidth": null(N("Half-width of Δ's 99.9% confidence interval, in percentage points (Welch–Satterthwaite df); null "
@@ -173,7 +185,9 @@ define("Delta", "A change against another variant or commit: Welch's t on the fo
                  "the other way, significantly; flat: not significant, or no spread; na: the other's value is about "
                  "zero, so a percent change means nothing", enum=list(VERDICTS)),
     "against": S("The variant (or commit) this is against"),
-    "pooled": B("Whether either side has one fork and borrowed the campaign's pooled spread")})
+    "pooled": B("Whether either side has one fork and borrowed the campaign's pooled spread"),
+    "jmh": null({**ref("JmhDelta"), "description": "Over the pooled iterations (campaign, compare); null without per-iteration samples on either side"})},
+    optional=("jmh",))
 define("Stat", "One metric of one variant (or commit) on one corpus, over its forks. The unit of variation is the fork: "
        "each fork of each round counts once, as the mean of its measurement iterations", {
     "mean": null(N("Mean over the forks, in the metric's unit (see the metric's label: e.g. ms/op for the score, bytes per "
@@ -186,8 +200,10 @@ define("Stat", "One metric of one variant (or commit) on one corpus, over its fo
     "median": null(N("The median of every measurement iteration of the forks, pooled; null without per-iteration samples")),
     "min": null(N("The least measurement iteration of the forks, pooled; null without per-iteration samples")),
     "ciShown": S("The CI half-width as the index shows it ('' without one)"),
+    "jmh": null({**ref("Jmh"), "description": "What JMH reports over these forks, which the index shows first (campaign, compare); "
+                 "null without per-iteration samples, or for a JIT total"}),
     "delta": null({**ref("Delta"), "description": "Δ against the baseline (campaign, compare) or the previous measured commit (branch)"})},
-    optional=("delta", "median", "min"))
+    optional=("delta", "median", "min", "jmh"))
 define("MetricInfo", "A metric the cells recorded (perflab.metrics.of)", {
     "key": METRIC_KEY, "label": S("Its label, with its unit: e.g. ms/op, cycles/op, alloc/op (bytes), IPC, JIT % of cycles"),
     "kind": S("score: the benchmark's primary score (its unit in the label); count: events per op; alloc: bytes per op; "
@@ -453,7 +469,7 @@ define("Changes", "The commits whose Δ against the previous measured commit is 
                                                        "previous": S("The previous measured commit"), "pct": null(N("Its Δ%"))}),
                   "Steps with no spread on either side (one fork each and nothing to pool): no verdict either way, largest |Δ| first")}, top=True)
 SIDE = O("One side of a comparison", {"mean": null(N("Mean over forks")), "ci": null(N("99.9% CI half-width")), "n": I("Forks"),
-                                      "shown": S("Mean, shown")})
+                                      "shown": S("Mean, shown"), "jmh": null({**ref("Jmh"), "description": "What JMH reports over these forks"})})
 define("Compare", "Two variants (or commits) of a campaign: every metric's Δ of b against a, per corpus", {
     "campaign": S("The campaign"), "a": S("Variant a, the base"), "b": S("Variant b"),
     "corpora": A(O("One corpus", {"corpus": S("corpus"), "metrics": A(O("One metric", {
@@ -933,8 +949,15 @@ def _forks(rs, per_unit):
     return us, {c[0]: c for c in cols}, raw
 
 
+def _jmh(j, kind):
+    """A `metrics.Jmh` as the API's Jmh."""
+    f = branchview.fin
+    return None if j is None else {"score": f(j.score), "error": f(j.error), "n": j.n, "shown": metrics.fmt(kind, j.score),
+                                   "errorShown": "" if j.error is None else branchview.ci_shown(kind, j.error, j.score)}
+
+
 def _stats(per_v, per_unit):
-    """{variant: (forks' means by metric, cols, raw)} -> {variant: {metric: Stat}} (`metrics.fork_stats`)."""
+    """{variant: (forks' means by metric, cols, raw)} -> {variant: {metric: Stat}} (`metrics.fork_stats`, `metrics.of_jmh`)."""
     st = metrics.fork_stats({v: us for v, (us, *_) in per_v.items()})
     out = {}
     for v, (us, cols, raw) in per_v.items():
@@ -942,7 +965,8 @@ def _stats(per_v, per_unit):
         for k, (mean, sd, ci, n, df, pooled) in st[v].items():
             kind = cols[k][2]
             f = branchview.fin
-            out[v][k] = {"mean": f(mean), "sd": f(sd), "ci": f(ci), "n": n, "df": f(df),
+            j = metrics.of_jmh(k, raw.get(k, []))
+            out[v][k] = {"jmh": _jmh(j, kind), "_j": j, "mean": f(mean), "sd": f(sd), "ci": f(ci), "n": n, "df": f(df),
                          "pooled": pooled, "shown": metrics.fmt(kind, mean),
                          "ciShown": "" if ci is None else branchview.ci_shown(kind, ci, mean),
                          "median": f(metrics.pooled(raw.get(k, []), "median")), "min": f(metrics.pooled(raw.get(k, []), "min")),
@@ -955,7 +979,9 @@ def _delta(a, b, against):
     c = metrics.compare(a["_t"], b["_t"], a["_ok"], a["_up"])
     if c is None:
         return None
-    return {"pct": branchview.fin(c[0]), "halfWidth": branchview.fin(c[1]), "verdict": c[2], "against": against, "pooled": c[3]}
+    jd = metrics.jmh_delta(a["_j"], b["_j"], a["_ok"], a["_up"]) if a["_j"] and b["_j"] else None
+    return {"pct": branchview.fin(c[0]), "halfWidth": branchview.fin(c[1]), "verdict": c[2], "against": against, "pooled": c[3],
+            "jmh": jd and {"pct": branchview.fin(jd[0]), "halfWidth": branchview.fin(jd[1]), "verdict": jd[2]}}
 
 
 def _public_stat(s):
@@ -996,7 +1022,8 @@ def _variant_ref(d, spec, ref_):
 def campaign(campaign, project=None):
     """One campaign in full. `summary` has, per corpus and variant, every metric the cells recorded (score, cycles,
     instructions, IPC, alloc, PMU counters, thread groups' shares) as mean ± 99.9% CI over forks, with Δ against the
-    baseline (the first variant) by Welch's t and a verdict (better, worse, flat, na), as the index card shows them.
+    baseline (the first variant) by Welch's t and a verdict (better, worse, flat, na), as the index card shows them,
+    and beside each (`jmh`, which the card shows first) what JMH reports with every iteration pooled.
     `links` are the server's pages: the card, cell timelines, flame graphs, diffs."""
     p = resolve(project)
     with _config(p):
@@ -1716,7 +1743,7 @@ def changes(campaign, project=None, metric="score", corpus=None):
           b=S("The other: a variant (or a commit's sha prefix)"), corpus=S("Only this corpus"))
 def compare(campaign, a, b, project=None, corpus=None):
     """Variant (or commit) b against a: per corpus both have results on, every metric both recorded, each side's mean
-    ± 99.9% CI over forks and Δ of b against a by Welch's t, with its verdict. The pair's profile diffs, if any."""
+    ± 99.9% CI over forks and Δ of b against a by Welch's t, with its verdict, and JMH's pooled figures (`jmh`) beside them. The pair's profile diffs, if any."""
     p = resolve(project)
     with _config(p):
         d = _camp_dir(p, campaign)
@@ -1736,7 +1763,7 @@ def compare(campaign, a, b, project=None, corpus=None):
                 if k not in st[a] or k not in st[b]:
                     continue
                 sa, sb = st[a][k], st[b][k]
-                side = lambda s: {"mean": s["mean"], "ci": s["ci"], "n": s["n"], "shown": s["shown"]}
+                side = lambda s: {"mean": s["mean"], "ci": s["ci"], "n": s["n"], "shown": s["shown"], "jmh": s["jmh"]}
                 ms.append({"key": k, "label": label, "kind": kind, "a": side(sa), "b": side(sb), "delta": _delta(sa, sb, a)})
             out.append({"corpus": corp, "metrics": ms})
         diffs = [x for x in _all_diffs(p, d) if {x["a"], x["b"]} == {a, b}]
@@ -2264,7 +2291,10 @@ CONVENTIONS = {
     "units": "A metric's unit is in its label (MetricInfo.label): the score in the benchmark's unit (e.g. ms/op), alloc in "
              "bytes per op, counts in events per op (per unit of perUnit when the spec has one), ratios and percents as such.",
     "statistics": "The unit of variation is the fork: a variant's mean, sd and 99.9% CI are over its forks' means; Δ is by "
-                  "Welch's t, significant (better or worse) when |pct| > halfWidth.",
+                  "Welch's t, significant (better or worse) when |pct| > halfWidth. Every verdict is this test's. Beside them, `jmh` "
+                  "has what JMH reports for these forks as one run, which the index shows first: every iteration pooled, the "
+                  "score their mean, the error t(N − 1) × sd / √N at 99.9% (none with N ≤ 2). It takes iterations as independent "
+                  "though those of one fork share JIT decisions, code layout and GC state, so it is usually far narrower.",
 }
 
 

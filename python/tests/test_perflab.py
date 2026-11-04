@@ -768,6 +768,59 @@ class CampaignCardTest(unittest.TestCase):
         self.assertAlmostEqual(tip["m"]["median"][0][3], 100 * (9.75 / 11.5 - 1))
         self.assertEqual(data["cells"][tip["cells"][0]]["raw"]["score"], [[9.0, 9.5, 10.0, 10.5]])
 
+    def test_jmh_score_is_what_jmh_reports(self):
+        # JMH 1.37's own numbers: AverageTimeResults of these iterations in BenchmarkResults through RunResult.getAggregatedResult
+        j = metrics.jmh_score([[100.0, 101.5, 99.0, 102.0, 100.5], [110.0, 111.5, 109.0, 112.0, 110.5]])
+        self.assertAlmostEqual(j.score, 105.6)
+        self.assertAlmostEqual(j.error, 8.147837146778452, delta=0.01)
+        self.assertEqual(j.n, 10)
+        j = metrics.jmh_score([[5000.0, 5100.0], [5050.0]])
+        self.assertAlmostEqual(j.score, 5050.0)
+        self.assertAlmostEqual(j.error, 912.1861332923952, delta=0.1)
+        # its error is NaN with N <= 2, not only for one iteration
+        self.assertEqual(metrics.jmh_score([[7.0], [9.0]]), metrics.Jmh(8.0, None, 2, None))
+        self.assertEqual(metrics.jmh_score([[7.0]]), metrics.Jmh(7.0, None, 1, None))
+        self.assertIsNone(metrics.jmh_score([]))
+        self.assertIsNone(metrics.of_jmh("jit:compilations", [[900.0], [910.0], [920.0]]))  # JMH's score of a JIT total is the largest fork's
+
+    def test_summary_has_jmhs_figure_beside_the_fork_one(self):
+        forks = lambda *ms: [(self.rec("x", i, [[m - 1, m, m + 1]])["data"][8], {}) for i, m in enumerate(ms)]
+        _, st = metrics.summarise({"base": forks(100.0, 110.0, 105.0, 95.0), "tip": forks(99.0, 109.0, 104.0, 94.0)})
+        a, b = st["base"]["score"], st["tip"]["score"]
+        self.assertEqual((a.n, a.df, a.pooled, a.jmh.n), (4, 3, False, 12))
+        self.assertAlmostEqual(a.jmh.score, a.mean)
+        self.assertLess(a.jmh.error, a.ci)  # 12 iterations pooled against 4 forks
+        self.assertAlmostEqual(b.ci, metrics.t999(3) * metrics.stats([99.0, 109.0, 104.0, 94.0])[1] / 2)
+        self.assertLess(b.jmh_d[1], b.half)
+        self.assertEqual(b.jmh_d[2], "flat")
+        self.assertIsNone(a.jmh_d)
+
+    def test_jmhs_figure_is_first_the_fork_one_beside_it_and_only_that_test_colours(self):
+        # iterations steady within each fork, forks far apart, so that pooled a Δ excludes zero and over forks it does not
+        fork = lambda m: [[m - 0.1, m, m + 0.1] * 10]
+        recs = [self.rec(v, i, fork(m)) for v, ms in (("base", (100.0, 110.0, 120.0, 90.0)), ("tip", (90.0, 100.0, 110.0, 80.0))) for i, m in enumerate(ms)]
+        recs += [self.rec("slow", i, fork(m)) for i, m in enumerate((200.0, 201.0, 202.0, 203.0))]
+        html = index.card_summary(recs, ["base", "tip", "slow"], [])
+        self.assertEqual(re.findall(r'<th class="n ex[^"]*" title="[^"]*">([^<]*)</th>', html)[:2], ["ms/op", "over forks"])
+        self.assertIn("share JIT decisions, code layout and GC state", html.split('<th class="n ex fk"')[0])
+        self.assertIn("The fork as the sample", html)
+        rows = re.findall(r'<tr class="sr".*?</tr>', html)
+        tip, slow = rows[1], rows[2]
+        self.assertRegex(tip, r'<span class="st st-mean">95 <span class="pm">± \d+</span><br><span class="d flat" title="[^"]*excludes zero but the test over forks does not')
+        self.assertRegex(tip, r'<td class="n fk"[^>]*>95 <span class="pm" title="the 99\.9% CI over 4 forks: t\(3\) = 12\.9">± [\d.]+%</span><br><span class="d flat"')
+        self.assertRegex(slow, r'st-mean">201\.5 <span class="pm">[^<]*</span><br><span class="d worse"')  # significant by both
+        # a cell's own row keeps the column count, and JMH's error of its one fork
+        self.assertIn('</td><td></td></tr>', html)
+        self.assertRegex(html, r'data-cell="0"><span class="st st-mean">100 <span class="pm">± 0\.055</span>')
+
+    def test_few_iterations_leave_jmhs_error_blank(self):
+        recs = [self.rec("base", 1, [[10.0]]), self.rec("base", 2, [[11.0]]), self.rec("tip", 1, [[9.0, 9.5, 10.0]])]
+        html = index.card_summary(recs, ["base", "tip"], [])
+        rows = re.findall(r'<tr class="sr".*?</tr>', html)
+        self.assertRegex(rows[0], r'st-mean">10\.5</span>')  # N = 2, as JMH: no ±
+        self.assertRegex(rows[1], r'st-mean">9\.5 <span class="pm">± ')  # one fork, three iterations: JMH has an error
+        self.assertRegex(rows[1], r'<br><span class="d flat" title="± the 99\.9% CI over pooled iterations|st-mean">9\.5 <span class="pm">[^<]*</span><br><span class="d flat"')
+
     def test_a_pooled_statistic_and_its_bootstrap_spread(self):
         base, tip = [[10.0, 11.0, 12.0]] * 3, [[9.0, 10.0, 11.0]] * 3
         x, d, spread, ok = metrics.pooled_delta(base, tip, "median")
@@ -1085,12 +1138,13 @@ class MetricsTest(unittest.TestCase):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             ab.report(ab.Spec(spec))
-        self.assertIn("| cycles/file | 41.1M | 41.1M (+0.0%) |", out.getvalue())
-        self.assertIn("| LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS % of cycles | 16.4% | 27.5% (+67.7%) |", out.getvalue())
+        self.assertIn("| metric | shared | shared, over forks | independent | independent, over forks |", out.getvalue())
+        self.assertIn("| cycles/file | 41.1M | 41.1M | 41.1M (+0.0%) | 41.1M (+0.0%) |", out.getvalue())
+        self.assertIn("| LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS % of cycles | 16.4% | 16.4% | 27.5% (+67.7%) | 27.5% (+67.7%) |", out.getvalue())
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             ab.report(ab.Spec(spec), per_op=True)
-        self.assertIn("| cycles/op | 20G | 80G (+300.0%) |", out.getvalue())
+        self.assertIn("| cycles/op | 20G | 20G | 80G (+300.0%) | 80G (+300.0%) |", out.getvalue())
 
     def test_higher_is_better_for_ipc_and_throughput(self):
         self.assertTrue(all(metrics.higher_is_better(k) for k in ("ipc", "ipc:jit", "ipc:all")))
