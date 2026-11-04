@@ -284,8 +284,9 @@ def welch(a, b):
     return d, 100 * t999(df) * (va + vb) ** 0.5 / abs(ma), df
 
 
-# ---- comparing variants or commits: the one rule every view (an A/B card, the branch view, the API, `perflab ab
-# report`) gives a Δ. The fork is the unit: a metric's value per fork is the mean of its measurement iterations
+# ---- comparing variants or commits. The verdict of every view (an A/B card, the branch view, the API, `perflab ab
+# report`) is `jmh_delta`'s where a metric has per-iteration samples, these figures beside it otherwise and for the reader
+# to check it against. With the fork as the unit: a metric's value per fork is the mean of its measurement iterations
 # (`fork_units`); a variant's or commit's is the mean over its forks ± the 99.9% CI over them (`fork_stats`, with a pooled
 # sd for one of few forks); a Δ is Welch's t on the forks' means (`compare`), or for the median and min of every
 # iteration a bootstrap over forks and iterations (`pooled_delta`). Either way it is ± the half-width of its 99.9% CI,
@@ -388,8 +389,7 @@ def jmh_score(forks):
 
 def jmh_delta(a, b, ok=True, up=False):
     """`Jmh` b against a by Welch's t over the pooled iterations: (Δ%, half-width of its 99.9% CI or None, the `verdict`
-    such a test would give), None when a's score is zero. The verdict of a campaign's card and API; a branch's history stays on
-    `compare`'s."""
+    such a test would give), None when a's score is zero. The verdict, wherever a metric has per-iteration samples."""
     d, half, _ = welch((a.score, a.sd, a.n, a.n - 1), (b.score, b.sd, b.n, b.n - 1))
     return None if d is None else (d, half, verdict(d, half, ok, up))
 
@@ -441,9 +441,13 @@ def drift(forks):
     return (100 * d / abs(score), abs(d) / se) if se else None
 
 
+def is_jit(key):
+    return key.removeprefix("p:").startswith("jit:")  # p: a branch's profile pass
+
+
 def jmh_warnings(key, forks):
     """Why JMH's figure and test for `forks` may mislead: [`Warning_`], from `fork_excess` and `drift`."""
-    if key.startswith("jit:"):
+    if is_jit(key):
         return []
     out = []
     fe = fork_excess(forks)
@@ -458,7 +462,7 @@ def jmh_warnings(key, forks):
 
 def of_jmh(key, forks):
     """`jmh_score` of a metric `key`, None for one JMH does not average: a JIT total's score is the largest fork's."""
-    return None if key.startswith("jit:") else jmh_score(forks)
+    return None if is_jit(key) else jmh_score(forks)
 
 
 class Summary(NamedTuple):

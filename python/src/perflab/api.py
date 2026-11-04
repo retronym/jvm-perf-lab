@@ -187,12 +187,11 @@ define("Delta", "A change against another variant or commit: Welch's t on the fo
                         "without a spread on either side")),
     "verdict": S("better: lower (higher for a metric whose higherIsBetter), significantly; worse: the other way, significantly; "
                  "flat: not significant, or no spread; na: the other's value is about zero, so a percent change means nothing. "
-                 "In campaign and compare it is JMH's test (jmh.verdict; forkVerdict is the test on pct and halfWidth), without "
-                 "per-iteration samples and in a branch's history the test on pct and halfWidth", enum=list(VERDICTS)),
+                 "It is JMH's test (jmh.verdict) where both sides have per-iteration samples, else the test on pct and halfWidth (forkVerdict)", enum=list(VERDICTS)),
     "forkVerdict": S("The verdict of Welch's t over forks: pct against halfWidth", enum=list(VERDICTS)),
     "against": S("The variant (or commit) this is against"),
     "pooled": B("Whether either side has one fork and borrowed the campaign's pooled spread"),
-    "jmh": null({**ref("JmhDelta"), "description": "Over the pooled iterations (campaign, compare); null without per-iteration samples on either side"})},
+    "jmh": null({**ref("JmhDelta"), "description": "Over the pooled iterations; null without per-iteration samples on either side"})},
     optional=("jmh", "forkVerdict"))
 define("Stat", "One metric of one variant (or commit) on one corpus, over its forks. The unit of variation is the fork: "
        "each fork of each round counts once, as the mean of its measurement iterations", {
@@ -206,7 +205,7 @@ define("Stat", "One metric of one variant (or commit) on one corpus, over its fo
     "median": null(N("The median of every measurement iteration of the forks, pooled; null without per-iteration samples")),
     "min": null(N("The least measurement iteration of the forks, pooled; null without per-iteration samples")),
     "ciShown": S("The CI half-width as the index shows it ('' without one)"),
-    "jmh": null({**ref("Jmh"), "description": "What JMH reports over these forks, which the index shows first (campaign, compare); "
+    "jmh": null({**ref("Jmh"), "description": "What JMH reports over these forks, which the index shows first; "
                  "null without per-iteration samples, or for a JIT total"}),
     "delta": null({**ref("Delta"), "description": "Δ against the baseline (campaign, compare) or the previous measured commit (branch)"})},
     optional=("delta", "median", "min", "jmh"))
@@ -473,7 +472,7 @@ define("Changes", "The commits whose Δ against the previous measured commit is 
     "campaign": S("The campaign"), "metric": METRIC_KEY, "changes": A(ref("Change"), "Largest |Δ| first"),
     "untested": A(O("A step that could not be tested", {"corpus": S("corpus"), "variant": S("The commit's variant"),
                                                        "previous": S("The previous measured commit"), "pct": null(N("Its Δ%"))}),
-                  "Steps with no spread on either side (one fork each and nothing to pool): no verdict either way, largest |Δ| first")}, top=True)
+                  "Steps with no interval (N ≤ 2 iterations on a side, or no spread on either side without per-iteration samples): no verdict either way, largest |Δ| first")}, top=True)
 SIDE = O("One side of a comparison", {"mean": null(N("Mean over forks")), "ci": null(N("99.9% CI half-width")), "n": I("Forks"),
                                       "shown": S("Mean, shown"), "jmh": null({**ref("Jmh"), "description": "What JMH reports over these forks"})})
 define("Compare", "Two variants (or commits) of a campaign: every metric's Δ of b against a, per corpus", {
@@ -1674,8 +1673,8 @@ def _view(p, d):
 def branch(campaign, project=None, raw=False):
     """A branch campaign commit by commit, oldest first (the index's history view, perflab.branchview): per commit its
     sha, subject, the commits a merge brought in, whether it built, and per corpus each metric's mean ± 99.9% CI over
-    forks with Δ against the previous measured commit (Welch's t; verdict better, worse, flat or na). For the
-    significant steps alone, use changes."""
+    forks and JMH's pooled figure (`jmh`), with Δ against the previous measured commit (verdict better, worse, flat or
+    na, by JMH's test; a one-fork commit's says nothing of fork-to-fork variation). For the significant steps alone, use changes."""
     p = resolve(project)
     with _config(p):
         d = _branch_dir(p, campaign)
@@ -1701,8 +1700,14 @@ def branch(campaign, project=None, raw=False):
                 for k, m in (x.get("m") or {}).items():
                     s = {"mean": m[0], "sd": m[1], "ci": m[2], "n": m[4], "df": m[5], "pooled": bool(m[6]),
                          "shown": x["s"][k][0], "ciShown": x["s"][k][1]}
-                    dd = (x.get("d") or {}).get(k)
-                    s["delta"] = {"pct": dd[0], "halfWidth": dd[1], "verdict": dd[2], "against": x["prev"], "pooled": bool(dd[3])} if dd else None
+                    j = (x.get("j") or {}).get(k)
+                    s["jmh"] = None if not j else {"score": j[0], "error": j[2], "n": j[4], "shown": x["js"][k][0], "errorShown": x["js"][k][1],
+                                                   "warnings": (x.get("wn") or {}).get(k, [])}
+                    dd, fd = (x.get("d") or {}).get(k), (x.get("fd") or {}).get(k)
+                    vs = (v["cells"].get(corpus) or {}).get((x.get("pv") or {}).get(k) or x.get("prev")) or {}
+                    both = j and k in (vs.get("j") or {})
+                    s["delta"] = {"pct": fd[0], "halfWidth": fd[1], "verdict": dd[2], "forkVerdict": fd[2], "against": x["prev"], "pooled": bool(fd[3]),
+                                  "jmh": {"pct": dd[0], "halfWidth": dd[1], "verdict": dd[2]} if both else None} if dd else None
                     bc["metrics"][k] = s
                 if raw:
                     bc["raw"] = x.get("raw") or {}
@@ -1722,8 +1727,8 @@ def branch(campaign, project=None, raw=False):
           project=PROJECT_P, campaign=CAMPAIGN_P, metric=METRIC_KEY, corpus=S("Only this corpus"))
 def changes(campaign, project=None, metric="score", corpus=None):
     """The steps of a branch campaign: commits whose `metric` moved against the previous measured commit by more than
-    the 99.9% CI of the difference (verdict better or worse), on each corpus (or `corpus`), sorted by |Δ|, largest
-    first. A commit with one fork uses the pooled spread (delta.pooled)."""
+    the 99.9% CI of the difference by JMH's test (verdict better or worse; delta.forkVerdict is the test over forks), on
+    each corpus (or `corpus`), sorted by |Δ|, largest first. `untested` has the steps with no interval to test."""
     b = branch(campaign, project)
     out, untested = [], []
     for c in b["commits"]:
@@ -1731,7 +1736,7 @@ def changes(campaign, project=None, metric="score", corpus=None):
             if corpus and corp != corpus:
                 continue
             s = x["metrics"].get(metric)
-            if s and s.get("delta") and s["delta"]["halfWidth"] is None and s["delta"]["verdict"] != "na":
+            if s and s.get("delta") and (s["delta"].get("jmh") or s["delta"])["halfWidth"] is None and s["delta"]["verdict"] != "na":
                 untested.append({"corpus": corp, "variant": c["variant"], "previous": x["previous"], "pct": s["delta"]["pct"]})
             if not s or not s.get("delta") or s["delta"]["verdict"] not in ("better", "worse"):
                 continue
@@ -2298,7 +2303,7 @@ CONVENTIONS = {
              "bytes per op, counts in events per op (per unit of perUnit when the spec has one), ratios and percents as such.",
     "statistics": "The unit of variation is the fork: a variant's mean, sd and 99.9% CI are over its forks' means; Δ is by "
                   "Welch's t (`forkVerdict`), significant when |pct| > halfWidth. `jmh` has what JMH reports for these forks as one run, "
-                  "which the index shows first and `verdict` goes by in campaign and compare (a branch's history stays over forks): every iteration pooled, the "
+                  "which the index shows first and `verdict` goes by: every iteration pooled, the "
                   "score their mean, the error t(N − 1) × sd / √N at 99.9% (none with N ≤ 2). It takes iterations as independent "
                   "though those of one fork share JIT decisions, code layout and GC state, so it is usually far narrower; `jmh.warnings` says when forks differ far too much for it, or the iterations drift.",
 }

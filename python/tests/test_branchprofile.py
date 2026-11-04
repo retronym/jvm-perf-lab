@@ -263,8 +263,9 @@ class ProfileViewTest(unittest.TestCase):
         self.assertNotIn("pv", c4)
         self.assertAlmostEqual(c4["d"]["p:alloc"][0], 100 * (1.5 / 2.01 - 1))
         self.assertAlmostEqual(c4["d"]["p:cycles"][0], -20.0)
-        self.assertTrue(c4["d"]["p:alloc"][3])  # 4 has one fork: the pooled sd
-        self.assertEqual(c4["d"]["p:alloc"][2], "better")
+        self.assertTrue(c4["fd"]["p:alloc"][3])  # 4 has one fork: the pooled sd, over forks
+        self.assertEqual(c4["fd"]["p:alloc"][2], "better")
+        self.assertEqual(c4["d"]["p:alloc"][1:3], [None, "flat"])  # N = 2 on its side: JMH has no interval, so no verdict
         self.assertAlmostEqual(c4["d"]["score"][0], 100 * (8.15 / 10.1 - 1))  # the measurement's, unchanged
         if shutil.which("node"):
             from test_branchview import page_deltas

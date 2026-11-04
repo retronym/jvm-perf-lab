@@ -175,19 +175,38 @@ class BranchViewTest(unittest.TestCase):
         b = branchview.branch_view(self.camp)["cells"]["b"]
         self.assertEqual(b[self.v[0]]["m"]["score"][1:3], [None, None])
         self.assertEqual(b[self.v[0]]["s"]["score"][1], "")
-        d, half, verdict, _ = b[self.v[1]]["d"]["score"]
+        d, half, verdict, _ = b[self.v[1]]["fd"]["score"]
         self.assertAlmostEqual(d, 10.0)
-        self.assertEqual((half, verdict), (None, "flat"))  # uncoloured: no spread yet
+        self.assertEqual((half, verdict), (None, "flat"))  # over forks, no spread yet
 
-    def test_delta_is_welch_over_fork_means(self):
+    def test_a_value_and_its_delta_are_jmhs(self):
+        cells = branchview.branch_view(self.camp)["cells"]
+        a, b = cells["a"], cells["b"]
+        # one fork of three iterations has JMH's interval, wide at t(2), where over forks it has none
+        j = b[self.v[0]]["j"]["score"]
+        self.assertEqual((j[4], j[5], j[7]), (3, 2, 1))
+        self.assertAlmostEqual(j[2], 31.599 * 0.1 / 3 ** 0.5)
+        self.assertIsNotNone(b[self.v[1]]["d"]["score"][1])
+        self.assertIsNone(b[self.v[1]]["fd"]["score"][1])
+        # several forks: the iterations pooled
+        forks = a[self.v[4]]["raw"]["score"]
+        want = metrics.jmh_score(forks)
+        self.assertAlmostEqual(a[self.v[4]]["j"]["score"][0], want.score)
+        self.assertEqual((a[self.v[4]]["j"]["score"][4], a[self.v[4]]["j"]["score"][7]), (want.n, len(forks)))
+        got = a[self.v[4]]["d"]["score"]
+        jd = metrics.jmh_delta(metrics.jmh_score(a[self.v[3]]["raw"]["score"]), want)
+        self.assertAlmostEqual(got[0], jd[0], places=3)
+        self.assertLess(got[1], a[self.v[4]]["fd"]["score"][1])
+
+    def test_delta_over_forks_is_welch_over_fork_means(self):
         a = branchview.branch_view(self.camp)["cells"]["a"]
         self.assertIsNone(a[self.v[0]]["prev"])
-        self.assertEqual(a[self.v[0]]["d"], {})
+        self.assertEqual((a[self.v[0]]["d"], a[self.v[0]]["fd"]), ({}, {}))
         self.assertEqual(a[self.v[3]]["prev"], self.v[1])  # skipping the unmeasured commit
         # 4 against 3: forks 8.0, 8.2, 8.1, 8.3 against 10.0, 10.2, 10.0, 10.2
         va, vb = (0.04 / 3) / 4, (0.05 / 3) / 4
         df = (va + vb) ** 2 / (va ** 2 / 3 + vb ** 2 / 3)
-        d, half, verdict, pooled = a[self.v[4]]["d"]["score"]
+        d, half, verdict, pooled = a[self.v[4]]["fd"]["score"]
         self.assertAlmostEqual(d, 100 * (8.15 / 10.1 - 1))
         self.assertAlmostEqual(half, 100 * metrics.t999(df) * (va + vb) ** 0.5 / 10.1)
         self.assertAlmostEqual(df, 5.927, places=3)
@@ -196,7 +215,7 @@ class BranchViewTest(unittest.TestCase):
         sd1 = a[self.v[1]]["m"]["score"][1]
         va, vb = sd1 ** 2, (0.04 / 3) / 4
         df = (va + vb) ** 2 / (va ** 2 / 9 + vb ** 2 / 3)
-        d, half, verdict, pooled = a[self.v[3]]["d"]["score"]
+        d, half, verdict, pooled = a[self.v[3]]["fd"]["score"]
         self.assertAlmostEqual(d, 1.0)
         self.assertAlmostEqual(half, 100 * metrics.t999(df) * (va + vb) ** 0.5 / 10.0)
         self.assertEqual((verdict, pooled), ("flat", True))
@@ -214,7 +233,7 @@ def page_deltas(t, view):
     cells, up = view["cells"], {m["k"]: m["up"] for m in view["metrics"]}
     js = branchview.STATS_JS + (f"const cells = {json.dumps(cells)}, up = {json.dumps(up)};\nconst out = {{}};\n"
                                 "for (const [c, vs] of Object.entries(cells)) for (const [v, x] of Object.entries(vs))\n"
-                                "  for (const k of Object.keys(x.d || {})) out[c + '|' + v + '|' + k] = BH_STATS.welch(vs[(x.pv || {})[k] || x.prev].m[k], x.m[k], up[k]);\n"
+                                "  for (const k of Object.keys(x.d || {})) out[c + '|' + v + '|' + k] = (a => BH_STATS.welch(a.j && a.j[k] && x.j && x.j[k] ? a.j[k] : a.m[k], a.j && a.j[k] && x.j && x.j[k] ? x.j[k] : x.m[k], up[k]))(vs[(x.pv || {})[k] || x.prev]);\n"
                                 "console.log(JSON.stringify(out));")
     r = subprocess.run(["node", "-e", js], capture_output=True, text=True)
     t.assertEqual(r.returncode, 0, r.stderr)
@@ -269,8 +288,8 @@ class WithinForkTest(unittest.TestCase):
         self.assertIsNone(ratio)  # nothing between forks to compare with
         self.assertEqual(shown, "2")  # to the score's decimals, as its mean "5" is shown
         self.assertEqual(b0["wf"]["score"], [1.82])
-        # and it never colours a Δ: commit 1's against it stays uncoloured
-        self.assertEqual(self.d["cells"]["b"][self.v[1]]["d"]["score"][1:3], [None, "flat"])
+        # and it colours no Δ over forks: commit 1's against it stays uncoloured there
+        self.assertEqual(self.d["cells"]["b"][self.v[1]]["fd"]["score"][1:3], [None, "flat"])
 
     def test_between_within_ratio(self):
         c0 = self.d["cells"]["a"][self.v[0]]

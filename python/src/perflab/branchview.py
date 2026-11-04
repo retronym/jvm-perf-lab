@@ -9,9 +9,14 @@ commit's mean with its 99.9% CI over forks, its forks' means and every measureme
 selected rows. The view's state is in the page's URL (`?b.<campaign>=...`), so a view can be linked and survives the
 index's refresh.
 
-The unit of variation is the fork: fork-to-fork variance (JIT decisions, code layout) dominates, and a fork's
-iterations are autocorrelated, so pooling iterations would make the interval far too narrow. Per commit, corpus and
-metric, each fork of each round contributes the mean of its measurement iterations (`rawData` in result.json, the
+A commit's value and its Δ are JMH's where a metric has per-iteration samples: every iteration of its forks pooled, as
+JMH reports several forks (`metrics.jmh_score`), and a Δ by Welch's t over the pooled iterations (`metrics.jmh_delta`).
+That takes iterations as independent, which they are not, so `metrics.jmh_warnings` flags a value whose forks differ far
+too much or whose iterations drift. A fork of one commit says nothing about the fork-to-fork variance, so a one-fork
+commit's verdict has nothing to check it, and it can only be read with a commit of more forks.
+
+Beside them, the fork as the unit of variation: fork-to-fork variance (JIT decisions, code layout) dominates, and a fork's
+iterations are autocorrelated. Per commit, corpus and metric, each fork of each round contributes the mean of its measurement iterations (`rawData` in result.json, the
 score's and those secondary metrics that have one; a metric without it, its round's value). The commit's mean is
 theirs, and its 99.9% CI is t(df)·sd/√n over its n forks. Its sd is its own from four forks; with fewer, when the pool has more
 degrees of freedom (always for one fork; with two its own CI would be t(1) = 637 times its sd, with three t(2) = 32), the fork-to-fork
@@ -19,8 +24,9 @@ relative sd pooled over the campaign's commits with two forks or more (same corp
 with the pool's df), marked as pooled; with no such commit yet one fork has no interval.
 
 A Δ is against the previous measured commit, and the comparison of two rows uses the same test (`metrics.welch`, and
-`welch` in the page): Welch's t on the forks' means, Welch–Satterthwaite df, a pooled sd for a side of one fork. Δ% is
-shown ± the half-width of its 99.9% CI and coloured only when significant at 99.9%.
+`welch` in the page). Δ% is shown ± the half-width of its 99.9% CI and coloured only when significant at 99.9%. The Δ over
+forks, in its tooltip and ⚠ where it disagrees, is Welch's t on the forks' means, Welch–Satterthwaite df, a pooled sd for a
+side of one fork.
 
 Within a fork, its iterations give an interval of their own (`within`: t(n-1)·sd/√n, JMH's error for one fork). It is
 no interval for the commit, since it leaves out the fork-to-fork variance, so it is shown muted (±~) only where there is
@@ -94,10 +100,12 @@ PROFILED = "p:"  # a profile pass's metric is keyed apart from the measurement's
 def fork_units(rs, per_unit, prefix="", keep=lambda k, kind: True):
     """`metrics.fork_units` of a commit's cells `rs` ([(result, cell)], with an async kperf profile's events), and per
     metric each fork's `within`: ({key: [per fork]}, {key: kind}, {key: [[iteration, ...] per fork]} to `sig` digits,
-    [(key, label, kind)], {key: [`within` per fork]})."""
+    [(key, label, kind)], {key: [`within` per fork]}, {key: (`metrics.of_jmh`, `metrics.jmh_warnings`)}, of the iterations
+    as measured)."""
     us, kinds, raw, cols = metrics.fork_units([(r, metrics.cached_hw_events(cell)) for r, cell in rs], per_unit, prefix, keep)
     return (us, kinds, {k: [[sig(x) for x in f] for f in fs] for k, fs in raw.items()}, [c[:3] for c in cols],
-            {k: [within(f) for f in fs] for k, fs in raw.items()})
+            {k: [within(f) for f in fs] for k, fs in raw.items()},
+            {k: (metrics.of_jmh(k, fs), metrics.jmh_warnings(k, fs)) for k, fs in raw.items()})
 
 
 def within(xs):
@@ -278,7 +286,11 @@ def branch_view(campaign_dir, rel_to=None):
                                   "forks": n, "m": {k: [mean, sd of the forks' means, CI half-width, Δ against it
                                   means something, n forks, df, sd pooled]} (sd, CI and df None without a spread),
                                   "s": {k: [mean shown, CI shown]}, "raw": {k: [[x, ...] per fork, of every round]},
-                                  "d": {k: [Δ%, half-width of its CI, verdict, a side pooled]},
+                                  "j": {k: as "m" but JMH's, `metrics.jmh_score`: [score, sd of the iterations, error, Δ against it means
+                                  something, N iterations, df, false, n forks]}, of the metrics with per-iteration samples,
+                                  "js": {k: [score shown, error shown]}, "wn": {k: [{kind, value, text}]} (`metrics.jmh_warnings`),
+                                  "d": {k: [Δ%, half-width of its CI, verdict, a side pooled]}, the verdict's: JMH's where
+                                  both sides have "j", else over forks; "fd": the same over forks,
                                   "prev": variant of the previous measured commit,
                                   "ps": {stat: {k: [value, shown, Δ%, half-width of its 99.9% CI, verdict]}} per pooled
                                   statistic but the mean (`metrics.STATS`), of the metrics with per-iteration samples,
@@ -320,7 +332,7 @@ def branch_view(campaign_dir, rel_to=None):
     rel_to = rel_to or campaign_dir
     cols, pcols, cells = {}, {}, {}
     for corpus in corpora:
-        per_v, units = {}, {}
+        per_v, units, jmhs = {}, {}, {}
         prev = None  # the previous commit with a score
         for v in variants:
             rs, running, failed = results(os.path.join(campaign_dir, corpus, v))
@@ -339,14 +351,14 @@ def branch_view(campaign_dir, rel_to=None):
                 elif extra:  # only voided rounds: nothing to show but them
                     per_v[v] = {"state": "none", **extra}
                 continue
-            us, kinds, raw, cs, wf = fork_units(rs, per_unit)
-            pus, pkinds, praw, pcs, pwf = fork_units(prs, per_unit, PROFILED, lambda k, kind: kind != "score")
+            us, kinds, raw, cs, wf, jm = fork_units(rs, per_unit)
+            pus, pkinds, praw, pcs, pwf, pjm = fork_units(prs, per_unit, PROFILED, lambda k, kind: kind != "score")
             for c in cs:
                 cols.setdefault(c[0], c)
             for c in pcs:
                 pcols.setdefault(c[0], c)
             x = per_v[v] = {"state": "done", "rounds": len(rs), "forks": max((len(u) for u in us.values()), default=0),
-                            "m": {}, "s": {}, "ps": {}, "raw": {**raw, **praw}, "d": {}, "prev": prev, "w": {},
+                            "m": {}, "s": {}, "j": {}, "js": {}, "wn": {}, "ps": {}, "raw": {**raw, **praw}, "d": {}, "fd": {}, "prev": prev, "w": {},
                             "wf": {k: [None if h is None else sig(h, 3) for h, _ in fs] for k, fs in {**wf, **pwf}.items()}, **extra}
             if prs:
                 x["pr"] = len(prs)
@@ -358,6 +370,7 @@ def branch_view(campaign_dir, rel_to=None):
             if g:
                 x["graphs"] = g
             units[v] = ({**us, **pus}, {**kinds, **pkinds}, {**wf, **pwf})
+            jmhs[v] = {**jm, **pjm}
             if "score" in us:
                 prev = v
         # per metric, a commit's mean over its forks ± its 99.9% CI, the sd pooled over the commits for one of fewer than
@@ -375,12 +388,22 @@ def branch_view(campaign_dir, rel_to=None):
                 w = within_of(wfs.get(k), sd)
                 if w:
                     x["w"][k] = [fin(w[0]), fin(w[1]), "" if w[0] is None else ci_shown(kind, w[0], mean)]
+                j, warned = jmhs[v].get(k, (None, []))
+                if j:
+                    x["j"][k] = [fin(j.score), fin(j.sd), fin(j.error), x["m"][k][3], j.n, j.n - 1, False, n]
+                    x["js"][k] = [metrics.fmt(kind, j.score), "" if j.error is None else ci_shown(kind, j.error, j.score)]
+                    if warned:
+                        x["wn"][k] = [w._asdict() for w in warned]
             for k in x["m"]:
                 up = metrics.higher_is_better(k, (cols.get(k) or pcols.get(k) or (k, ""))[1])
                 if k in last:
                     c = metrics.compare(st[last[k]][k], st[v][k], per_v[last[k]]["m"][k][3], up)
                     if c:
-                        x["d"][k] = [fin(c[0]), fin(c[1]), c[2], c[3]]
+                        x["fd"][k] = x["d"][k] = [fin(c[0]), fin(c[1]), c[2], c[3]]
+                        ja, jb = jmhs[last[k]].get(k, (None,))[0], jmhs[v].get(k, (None,))[0]
+                        if ja and jb:
+                            jd = metrics.jmh_delta(ja, jb, per_v[last[k]]["m"][k][3], up)
+                            x["d"][k] = [fin(jd[0]), fin(jd[1]), jd[2], False]
                         if last[k] != x["prev"]:  # the commit before it lacks this metric: what its Δ is against
                             x.setdefault("pv", {})[k] = last[k]
                 forks = x["raw"].get(k)
@@ -530,14 +553,18 @@ def parts(campaign_dir, rel_to, corpus_param="corpus"):
     n = len(data["commits"])
     measured = len({v for cs in data["cells"].values() for v, c in cs.items() if "score" in c.get("m", {})})
     note = (f"{n} first-parent commits of <code>{esc(data['range'])}</code>, newest first; {measured} measured. "
-            "Mean over forks ± 99.9% CI over forks; Δ against the previous measured commit")
+            "Each value as JMH reports its forks, every iteration pooled; Δ against the previous measured commit")
     help_ = ui.help_popover(
         "<p style='margin-top:0'>A row per first-parent commit; a merge's <b>+n</b> lists the commits it brought in. Per corpus, the "
         "score, shaded by a bar on a scale shared down the column (the lighter band at its end is the CI), and a second metric "
         "beside it.</p>"
-        "<p>The unit is the <b>fork</b>: each fork of each round counts once, as the mean of its measurement iterations (they vary "
-        "far less within a fork than between forks, and are not independent). A value is the mean over forks ± a 99.9% confidence "
-        "interval over forks. † marks an interval from the fork-to-fork sd pooled over this corpus's commits with two forks or more, "
+        "<p>A value is what <b>JMH</b> reports for the commit's forks as one run: every measured iteration pooled, their mean ± "
+        "t(N − 1) × sd / √N at 99.9%, none with N ≤ 2. Its Δ is Welch's t over the pooled iterations, and that is the verdict. It takes "
+        "iterations as independent, but those of one fork share JIT decisions, code layout and GC state, so a <b>⚠</b> marks a value whose "
+        "forks differ far more than their iterations or whose iterations drift, and a Δ the test over forks does not agree with. With one "
+        "fork there is nothing to tell how far forks differ: such a verdict says only that these two runs differ, so confirm it with more forks.</p>"
+        "<p>In the tooltip, the <b>fork</b> as the unit: each fork of each round counts once, as the mean of its measurement iterations, "
+        "and the value is the mean over forks ± a 99.9% confidence interval over them; this is also the value of a metric without per-iteration samples. † marks an interval from the fork-to-fork sd pooled over this corpus's commits with two forks or more, "
         "for a commit of fewer than four forks (one fork has no spread of its own; with two, its own CI is 637 times its sd). Until there is a pool, a commit of one fork has none, and shows instead, muted, <b>±~</b> the 99.9% "
         "CI within its one fork, over its iterations (as JMH's error for one fork): it understates run-to-run uncertainty, and never "
         "colours a Δ. A value's tooltip has the ratio of the between-fork to the within-fork sd: about 1, the forks agree; far above, "
@@ -546,10 +573,10 @@ def parts(campaign_dir, rel_to, corpus_param="corpus"):
         "limit (in the chart, those iterations' dots). <b>Click a value</b> for its rounds: each fork's mean ± its CI within the fork, "
         "the load, the timeline and logs, and voided cells (<code>.void/</code>, which count for nothing); served by "
         "<code>perflab server</code>, <b>Void &amp; rerun</b> sets a round aside with a reason and queues the campaign's resume.</p>"
-        "<p>Δ is against the previous (older) measured commit, ± its 99.9% CI (Welch's t over the forks' means), coloured only when "
-        "significant at 99.9%. Comparing two rows uses the same test.</p>"
-        "<p><b>Chart</b>: commits oldest to newest, gaps where a commit is unmeasured; error bars are the 99.9% CI over forks "
-        "(lighter when pooled), dashes each fork's mean with a thin whisker for its CI over its own iterations, the faint cloud every "
+        "<p>Δ is against the previous (older) measured commit, ± its 99.9% CI, coloured only when significant at 99.9%. Comparing two rows "
+        "uses the same test.</p>"
+        "<p><b>Chart</b>: commits oldest to newest, gaps where a commit is unmeasured; error bars are the 99.9% CI of the value "
+        "(lighter when pooled over commits), dashes each fork's mean with a thin whisker for its CI over its own iterations, the faint cloud every "
         "iteration. Tick two rows (or one, against the commit "
         "before it) to compare them. The view is kept in the "
         "page's URL.</p><p style='margin-bottom:0'><b>Profiles</b> are runs of their own (a profiler perturbs the score), in the "
@@ -708,12 +735,22 @@ const BH = (() => {
   const key = n => 'b.' + n;
   const raw = el => el._d || (el._d = JSON.parse(el.querySelector('script').textContent));
   // the summary's statistic switch (SV.stat, the index's): mean, or a statistic pooled over every iteration
+  // the history as the page draws it: JMH's figures, where a metric has them, with those over forks kept for the tooltip
+  function byJmh(d) {
+    const cells = {};
+    for (const [c, per] of Object.entries(d.cells)) {
+      cells[c] = {};
+      for (const [v, x] of Object.entries(per))
+        cells[c][v] = x.j ? {...x, fm: x.m, fs: x.s, m: {...x.m, ...x.j}, s: {...x.s, ...x.js}} : x;
+    }
+    return {...d, cells};
+  }
   const statOf = () => (typeof SV !== 'undefined' && ['median', 'min'].includes(SV.stat)) ? SV.stat : 'mean';
   // the history as the statistic switch picks it: for median or min, the cells' metrics with per-iteration samples as
   // their "ps" has them (no CI over forks; a Δ ± the 99.9% CI of a bootstrap), the others left out
   function data(el) {
     const d = raw(el), s = statOf();
-    if (s === 'mean') return d;
+    if (s === 'mean') return el._dj || (el._dj = byJmh(d));
     el._ds = el._ds || {};
     return el._ds[s] || (el._ds[s] = byStat(d, s));
   }
@@ -779,20 +816,24 @@ const BH = (() => {
   }
   function step(span) { const p = Math.pow(10, Math.floor(Math.log10(span / 4))), r = span / 4 / p; return p * (r >= 5 ? 5 : r >= 2 ? 2 : 1); }
   const pct = (d, sp) => `${d >= 0 ? '+' : ''}${d.toFixed(1)}%` + (sp != null ? ` <span class="pm">± ${sp.toFixed(1)}</span>` : '');
-  const SIG = 'significant at 99.9% (Welch’s t over forks)';
+  const SIG = 'significant at 99.9%';
   const SIG_BOOT = 'significant at 99.9% (a bootstrap over forks and iterations, metrics.pooled_delta)';
   const POOLED = '† its spread is the fork-to-fork sd pooled over this corpus’s commits with two forks or more, which has more degrees of freedom than its own forks';
   // a Δ (`BH_STATS.welch`'s, or for a pooled statistic [Δ, half-width, verdict, false, 'boot' (a bootstrap's) | 'pair'
   // (none)]), `vs` what it is against
-  function delta(x, vs) {
+  function delta(x, vs, fork) {
     if (!x || x[0] == null) return '';
     const on = vs ? `against ${esc(vs)}: ` : '';
     if (x[2] === 'na') return `<span class="d na" title="${on}the values are about zero: no percent change">–</span>`;
     const sig = x[4] === 'boot' ? SIG_BOOT : SIG;
     const t = on + (x[4] === 'pair' ? 'no spread: the bootstrap is run against the commit measured before it only'
-      : x[1] == null ? '1 fork: no spread yet' : (x[2] === 'flat' ? 'inconclusive: not ' + sig : (x[0] > 0 ? 'higher, ' : 'lower, ') + sig) + '; ± the 99.9% CI of Δ' + (x[3] ? '. ' + POOLED : ''));
-    return `<span class="d ${x[2]}" title="${t}">${pct(x[0], x[1])}${x[1] != null && x[3] ? '†' : ''}</span>`;
+      : x[1] == null ? 'no spread yet' : (x[2] === 'flat' ? 'inconclusive: not ' + sig : (x[0] > 0 ? 'higher, ' : 'lower, ') + sig) + '; ± the 99.9% CI of Δ' + (x[3] ? '. ' + POOLED : ''));
+    const over = fork && fork !== x ? `. Over forks ${pct(fork[0], fork[1]).replace(/<[^>]*>/g, '')}: ${fork[2]}` : '';
+    const warn = over && fork[2] === 'flat' && x[2] !== 'flat' ? '<span class="warn"> ⚠</span>' : '';
+    return `<span class="d ${x[2]}" title="${t}${over}">${pct(x[0], x[1])}${x[1] != null && x[3] ? '†' : ''}</span>${warn}`;
   }
+  // the Δ over forks to show beside a cell's, when its own is JMH's
+  const forkDelta = (d, x, k) => !d.stat && x && x.fd && x.j && x.j[k] ? x.fd[k] : null;
   // what a cell's Δ of metric k is against: the commit and its value
   function vsOf(d, c, x, k) {
     const v = x && ((x.pv || {})[k] || x.prev), cm = v && d.commits.find(y => y.v === v), a = v && cellOf(d, c, v);
@@ -920,13 +961,18 @@ const BH = (() => {
       : ws ? ` <span class="pm wi" title="${WITHIN}">±~ ${esc(ws)}</span>` : ''}`;
     const hot = k === 'score' && disturbed(x).length ? `<span class="bh-hot" role="img" aria-label="disturbed by other load"></span>` : '';
     const g = st.form === 'num' || !exts[c + '|' + k] ? '' : bar(m, exts[c + '|' + k]);
-    const tip = d.stat ? `${esc(s[0])}${un}: the ${d.stat} of every measured iteration, its forks pooled; ${m[4]} fork${m[4] > 1 ? 's' : ''}, ${rounds} round${rounds > 1 ? 's' : ''}${fromProfile(d, k) ? ' of the profile pass' : ''}. Click for its rounds`
+    const warned = !d.stat && x.wn && x.wn[k] || [];
+    const fs = !d.stat && m[7] != null ? x.fs[k] : null, fm = fs && x.fm[k];
+    const tip = fs ? `${esc(s[0])}${un}${s[1] ? ' ± ' + esc(s[1]) + un : ''} as JMH reports it: ${m[4]} iterations pooled; ${m[7]} fork${m[7] > 1 ? 's' : ''}, ${rounds} round${rounds > 1 ? 's' : ''}${fromProfile(d, k) ? ' of the profile pass' : ''}. `
+        + (m[7] > 1 ? `Over forks ${esc(fs[0])}${fs[1] ? ' ± ' + esc(fs[1]) + (fm[6] ? '†' : '') : ''}` : '1 fork: nothing says how far forks differ')
+        + warned.map(w => '. ⚠ ' + esc(w.text)).join('') + (hot ? '. ' + esc(hotTip(x)) : '') + '. Click for its rounds'
+      : d.stat ? `${esc(s[0])}${un}: the ${d.stat} of every measured iteration, its forks pooled; ${m[4]} fork${m[4] > 1 ? 's' : ''}, ${rounds} round${rounds > 1 ? 's' : ''}${fromProfile(d, k) ? ' of the profile pass' : ''}. Click for its rounds`
       : `${esc(s[0])}${un}${s[1] ? ' ± ' + esc(s[1]) + un + dag + ' (99.9% CI over forks)' : ''}; ${m[4]} fork${m[4] > 1 ? 's' : ''}, ${rounds} round${rounds > 1 ? 's' : ''}${fromProfile(d, k) ? ' of the profile pass' : ''}`
       + (m[1] == null ? '; 1 fork: no spread yet' : m[6] ? `. ${POOLED}: ${(100 * m[1] / m[0]).toFixed(1)}%` : `, sd of the forks’ means ${(100 * m[1] / m[0]).toFixed(1)}%`)
       + (ws ? `. ±~ ${esc(ws)}${un} ${m[4] > 1 ? '(root mean square over its forks) ' : ''}is the 99.9% CI ${WITHIN}` : '')
       + (w && w[1] != null ? `. Between/within-fork sd ratio ${w[1].toFixed(1)}${m[6] ? ' (between: pooled)' : ''}: ≈1, forks agree; ≫1, forks land in different places, so more forks pay off` : '')
       + (hot ? '. ' + esc(hotTip(x)) : '') + '. Click for its rounds';
-    return cellBtn(c, v, `${g ? ' bar' : ''}${m[2] != null && m[6] ? ' pl' : ''}`, g, tip, hot + n);
+    return cellBtn(c, v, `${g ? ' bar' : ''}${m[2] != null && m[6] ? ' pl' : ''}`, g, tip, hot + n + (warned.length ? '<span class="warn"> ⚠</span>' : ''));
   }
   // the corpora the filter bar picked, all when it picked none of these
   function corpora(d) {
@@ -978,8 +1024,8 @@ const BH = (() => {
         + ownBadge(el, d, c) + profBadge(d, c) + '</span></span></div></td>';
       for (const cp of cs) {
         const x = cellOf(d, cp, c.v), dd = x && x.d || {};
-        h += `<td class="n gs">${value(d, st, cp, c.v, 'score', exts)}</td><td>${delta(dd.score, vsOf(d, cp, x, 'score'))}</td>`;
-        if (m2) h += `<td class="n">${x && x.state === 'done' ? value(d, st, cp, c.v, m2.k, exts) : ''}</td><td>${delta(dd[m2.k], vsOf(d, cp, x, m2.k))}</td>`;
+        h += `<td class="n gs">${value(d, st, cp, c.v, 'score', exts)}</td><td>${delta(dd.score, vsOf(d, cp, x, 'score'), forkDelta(d, x, 'score'))}</td>`;
+        if (m2) h += `<td class="n">${x && x.state === 'done' ? value(d, st, cp, c.v, m2.k, exts) : ''}</td><td>${delta(dd[m2.k], vsOf(d, cp, x, m2.k), forkDelta(d, x, m2.k))}</td>`;
       }
       h += '</tr>';
       if (opened)
@@ -1061,7 +1107,7 @@ const BH = (() => {
       + d.corpora.map(x => `<button class="chip" data-bc="${esc(x)}" aria-pressed="${x === c}">${esc(x)}</button>`).join('') + '</span></div>' : '';
     box.innerHTML = `<figure>${pick}<div class="bh-leg"><span><i></i>${esc(heading(d, 'score'))} (left)</span>`
       + (m2 ? `<span><i class="s2"></i>${esc(heading(d, m2.k))} (right)</span>` : '')
-      + '<span>oldest → newest · error bars: 99.9% CI over forks (lighter, †: a spread pooled over the corpus’s commits) · dashes: each fork’s mean, '
+      + '<span>oldest → newest · error bars: 99.9% CI of the value (lighter, †: a spread pooled over the corpus’s commits) · dashes: each fork’s mean, '
       + '<i class="wh" style="background:var(--link)"></i>its own 99.9% CI over its iterations · faint dots: every iteration</span>'
       + (hotSeen ? '<span><i class="hot"></i>an iteration while other load was over the gate’s limit</span>' : '') + '</div>'
       + `<svg class="bh-g" viewBox="0 0 ${W} ${H}">${bands}${ax}<path class="l1" d="${lines[0]}"/><path class="l2" d="${lines[1]}"/>${g}${xl}${empty}${hits}</svg>`

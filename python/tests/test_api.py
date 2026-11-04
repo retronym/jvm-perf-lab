@@ -292,7 +292,11 @@ class ReadTest(Fixture, unittest.TestCase):
                 for k, s in x["metrics"].items():
                     self.assertEqual([s["mean"], s["sd"], s["ci"], s["n"], s["df"]], [m["m"][k][i] for i in (0, 1, 2, 4, 5)])
                     if k in m["d"]:
-                        self.assertEqual([s["delta"]["pct"], s["delta"]["halfWidth"], s["delta"]["verdict"]], m["d"][k][:3])
+                        self.assertEqual([s["delta"]["pct"], s["delta"]["halfWidth"], s["delta"]["forkVerdict"]], m["fd"][k][:3])
+                        self.assertEqual(s["delta"]["verdict"], m["d"][k][2])
+                        if k in m["j"] and s["delta"]["jmh"]:
+                            self.assertEqual([s["delta"]["jmh"]["pct"], s["delta"]["jmh"]["halfWidth"]], m["d"][k][:2])
+                            self.assertEqual(s["jmh"]["n"], m["j"][k][4])
                         n += 1
         self.assertGreater(n, 3)
         # and the campaign's own summary (Δ against the base) agrees on the means and CIs, pool included
@@ -323,9 +327,12 @@ class ReadTest(Fixture, unittest.TestCase):
         self.assertIn(("a", V[4]), want)  # 20% faster than its predecessor, over 4 forks each
         pcts = [abs(c["delta"]["pct"]) for c in ch["changes"]]
         self.assertEqual(pcts, sorted(pcts, reverse=True))
-        # corpus b: one fork per commit and nothing to pool, so its step is untested, not flat
-        self.assertIn(("b", V[1]), {(u["corpus"], u["variant"]) for u in ch["untested"]})
+        # corpus b: one fork per commit: JMH's test has its three iterations to go on, so its step is tested, and flat at t(2)
+        self.assertNotIn(("b", V[1]), {(u["corpus"], u["variant"]) for u in ch["untested"]})
         self.assertEqual(api.changes("br", corpus="b")["changes"], [])
+        s = next(c for c in api.branch("br")["commits"] if c["variant"] == V[1])["corpora"]["b"]["metrics"]["score"]
+        self.assertIsNotNone(s["delta"]["jmh"]["halfWidth"])
+        self.assertIsNone(s["delta"]["halfWidth"])
 
     def test_compare_by_sha_prefix(self):
         c = api.compare("br", V[3], SHAS[4][:6])
