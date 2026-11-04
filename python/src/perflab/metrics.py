@@ -366,8 +366,8 @@ def verdict(d, half=None, ok=True, up=False):
 
 # ---- what JMH reports for a benchmark run with several forks (1.37: RunResult.getAggregatedResult takes every fork's
 # iterations, ListStatistics their mean and, with N > 2, t(N - 1) * sd / sqrt(N)). A campaign forks once per cell, so its
-# result.json files have this only per fork. Shown first on a card, it is not what a verdict rests on: it takes iterations
-# as independent, while those of one fork share JIT decisions, code layout and GC state.
+# result.json files have this only per fork. A card shows it first, and its test is the verdict. It takes iterations as independent,
+# while those of one fork share JIT decisions, code layout and GC state, so `jmh_warnings` says when that fails badly.
 
 class Jmh(NamedTuple):
     score: float  # the mean of every iteration
@@ -388,10 +388,72 @@ def jmh_score(forks):
 
 def jmh_delta(a, b, ok=True, up=False):
     """`Jmh` b against a by Welch's t over the pooled iterations: (Δ%, half-width of its 99.9% CI or None, the `verdict`
-    such a test would give), None when a's score is zero. Far narrower than `compare`'s, and for that reason no verdict
-    a view colours by."""
+    such a test would give), None when a's score is zero. The verdict of a campaign's card and API; a branch's history stays on
+    `compare`'s."""
     d, half, _ = welch((a.score, a.sd, a.n, a.n - 1), (b.score, b.sd, b.n, b.n - 1))
     return None if d is None else (d, half, verdict(d, half, ok, up))
+
+
+# When JMH's test can't be taken at its word. Across 88 rows of real campaigns with several forks the median F is 6, F > 4
+# in 61% of them and F > 10 in 43%, so forks differing at all is the norm and only a large effect is worth a warning.
+FORK_F = 10  # forks differ this much more than independent iterations would: JMH's ± understates by about sqrt(F)
+FORK_SD_PCT = 1.0  # and by this much of the score, below which it hardly matters what its ± says
+DRIFT_PCT = 2.0  # the later iterations of a fork against the earlier, in percent of the score
+DRIFT_T = 2.5  # and by this many standard errors of that difference, going by the iterations' sd
+
+
+class Warning_(NamedTuple):
+    kind: str  # forks, drift
+    value: float  # F, or the drift in percent
+    text: str
+
+
+def fork_excess(forks):
+    """(F, fork means' sd in percent, iterations' sd in percent): one-way ANOVA's F, k * var(fork means) / var(within a
+    fork), about 1 when iterations are as independent as JMH takes them to be. None without two forks and a spread."""
+    fs = [f for f in forks if f]
+    within = [statistics.variance(f) for f in fs if len(f) > 1]
+    if len(fs) < 2 or not within or not sum(within):
+        return None
+    means = [sum(f) / len(f) for f in fs]
+    score = sum(means) / len(means)
+    if not score:
+        return None
+    k, w = sum(map(len, fs)) / len(fs), sum(within) / len(within)
+    v = statistics.variance(means)
+    return k * v / w, 100 * v ** 0.5 / abs(score), 100 * w ** 0.5 / abs(score)
+
+
+def drift(forks):
+    """(the mean over forks of the later half of its iterations against the earlier, in percent of the score, that in
+    standard errors going by the iterations' sd), None with fewer than 4 iterations a fork or no spread."""
+    fs = [f for f in forks if len(f) >= 4]
+    xs = [x for f in fs for x in f]
+    if not fs or not sum(xs) or len(xs) < 2:
+        return None
+    score = sum(xs) / len(xs)
+    half = lambda f: len(f) // 2
+    ds = [sum(f[-half(f):]) / half(f) - sum(f[:half(f)]) / half(f) for f in fs]
+    d = sum(ds) / len(ds)
+    w = sum(statistics.variance(f) for f in fs) / len(fs)
+    k = sum(map(len, fs)) / len(fs)
+    se = 2 * w ** 0.5 / (k * len(fs)) ** 0.5
+    return (100 * d / abs(score), abs(d) / se) if se else None
+
+
+def jmh_warnings(key, forks):
+    """Why JMH's figure and test for `forks` may mislead: [`Warning_`], from `fork_excess` and `drift`."""
+    if key.startswith("jit:"):
+        return []
+    out = []
+    fe = fork_excess(forks)
+    if fe and fe[0] >= FORK_F and fe[1] >= FORK_SD_PCT:
+        out.append(Warning_("forks", fe[0], f"forks differ far more than their iterations (F = {fe[0]:.0f}; fork means' sd {fe[1]:.1f}%, "
+                                            f"iterations' {fe[2]:.1f}%), so JMH's ± understates the uncertainty by about {fe[0] ** 0.5:.1f}×: more forks pay off"))
+    dr = drift(forks)
+    if dr and abs(dr[0]) >= DRIFT_PCT and dr[1] >= DRIFT_T:
+        out.append(Warning_("drift", dr[0], f"iterations drift: the later half of a fork's are {dr[0]:+.1f}% against the earlier, so warmup may not be over"))
+    return out
 
 
 def of_jmh(key, forks):
@@ -403,7 +465,7 @@ class Summary(NamedTuple):
     """A metric of a variant on a corpus, in `summarise`."""
     mean: float  # over forks
     ci: float | None  # half-width of its 99.9% CI
-    d: float | None  # Δ% against the baseline, Welch's t on the forks' means: what `verdict` goes by
+    d: float | None  # Δ% against the baseline over forks, Welch's t on the forks' means
     half: float | None  # half-width of Δ's 99.9% CI
     ok: bool  # a Δ means something (`delta_ok`)
     n: int  # forks
@@ -411,6 +473,7 @@ class Summary(NamedTuple):
     pooled: bool  # that sd is `pooled_rel_sd`'s
     jmh: Jmh | None  # `of_jmh`, None without per-iteration samples
     jmh_d: tuple | None  # `jmh_delta` against the baseline
+    warnings: list  # `jmh_warnings`
 
 
 def summarise(variants, per_unit=None):
@@ -435,7 +498,8 @@ def summarise(variants, per_unit=None):
             j, ja = jm[v].get(k), jm.get(names[0], {}).get(k)
             up = higher_is_better(k, cols[k][1])
             out[v][k] = Summary(m[0], m[2], c and c[0], c and c[1], ok, m[3], m[4], m[5], j,
-                                jmh_delta(ja, j, ok, up) if j and ja and v != names[0] else None)
+                                jmh_delta(ja, j, ok, up) if j and ja and v != names[0] else None,
+                                jmh_warnings(k, per[v][2].get(k, [])))
     return list(cols.values()), out
 
 

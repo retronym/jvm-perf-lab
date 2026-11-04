@@ -170,24 +170,30 @@ JMH_NOTE = ("It takes iterations as independent, though those of one fork share 
 define("JmhDelta", "The same change as JMH's figures would have it: Welch's t over the pooled iterations. " + JMH_NOTE, {
     "pct": N("Δ of the JMH scores, in percent"),
     "halfWidth": null(N("Half-width of Δ's 99.9% confidence interval over the pooled iterations; null with N ≤ 2 on a side")),
-    "verdict": S("What this test alone would say; the delta's own verdict is the one to go by", enum=list(VERDICTS))})
+    "verdict": S("This test's verdict; the delta's verdict goes by it", enum=list(VERDICTS))})
 define("Jmh", "What JMH itself reports for these forks as one run: every measurement iteration pooled. " + JMH_NOTE, {
     "score": N("The mean of every iteration"),
     "error": null(N("JMH's scoreError: t(N − 1) × sd / √N at 99.9%, over the iterations; null with N ≤ 2, for which JMH reports none")),
     "n": I("JMH's Cnt: forks × iterations"),
     "shown": S("The score as the index shows it, with its unit"),
-    "errorShown": S("The error as the index shows it ('' without one)")})
+    "errorShown": S("The error as the index shows it ('' without one)"),
+    "warnings": A(O("A reason this figure and its test may mislead", {
+        "kind": S("forks: forks differ far more than their iterations, so error understates the uncertainty; drift: the iterations of a fork trend, so warmup may not be over", enum=["forks", "drift"]),
+        "value": N("forks: one-way ANOVA's F, about 1 for independent iterations, error understating by about √F; drift: later half of a fork's iterations against the earlier, percent"),
+        "text": S("As the index says it")}), "Empty when neither was detected")})
 define("Delta", "A change against another variant or commit: Welch's t on the forks' means, at 99.9%", {
     "pct": N("Δ in percent of the other's mean: 100 × (this / other − 1)"),
     "halfWidth": null(N("Half-width of Δ's 99.9% confidence interval, in percentage points (Welch–Satterthwaite df); null "
                         "without a spread on either side")),
-    "verdict": S("better: lower (higher for a metric whose higherIsBetter), significantly (|pct| > halfWidth); worse: "
-                 "the other way, significantly; flat: not significant, or no spread; na: the other's value is about "
-                 "zero, so a percent change means nothing", enum=list(VERDICTS)),
+    "verdict": S("better: lower (higher for a metric whose higherIsBetter), significantly; worse: the other way, significantly; "
+                 "flat: not significant, or no spread; na: the other's value is about zero, so a percent change means nothing. "
+                 "In campaign and compare it is JMH's test (jmh.verdict; forkVerdict is the test on pct and halfWidth), without "
+                 "per-iteration samples and in a branch's history the test on pct and halfWidth", enum=list(VERDICTS)),
+    "forkVerdict": S("The verdict of Welch's t over forks: pct against halfWidth", enum=list(VERDICTS)),
     "against": S("The variant (or commit) this is against"),
     "pooled": B("Whether either side has one fork and borrowed the campaign's pooled spread"),
     "jmh": null({**ref("JmhDelta"), "description": "Over the pooled iterations (campaign, compare); null without per-iteration samples on either side"})},
-    optional=("jmh",))
+    optional=("jmh", "forkVerdict"))
 define("Stat", "One metric of one variant (or commit) on one corpus, over its forks. The unit of variation is the fork: "
        "each fork of each round counts once, as the mean of its measurement iterations", {
     "mean": null(N("Mean over the forks, in the metric's unit (see the metric's label: e.g. ms/op for the score, bytes per "
@@ -949,11 +955,11 @@ def _forks(rs, per_unit):
     return us, {c[0]: c for c in cols}, raw
 
 
-def _jmh(j, kind):
+def _jmh(j, kind, warnings=()):
     """A `metrics.Jmh` as the API's Jmh."""
     f = branchview.fin
     return None if j is None else {"score": f(j.score), "error": f(j.error), "n": j.n, "shown": metrics.fmt(kind, j.score),
-                                   "errorShown": "" if j.error is None else branchview.ci_shown(kind, j.error, j.score)}
+                                   "errorShown": "" if j.error is None else branchview.ci_shown(kind, j.error, j.score), "warnings": warnings}
 
 
 def _stats(per_v, per_unit):
@@ -966,7 +972,7 @@ def _stats(per_v, per_unit):
             kind = cols[k][2]
             f = branchview.fin
             j = metrics.of_jmh(k, raw.get(k, []))
-            out[v][k] = {"jmh": _jmh(j, kind), "_j": j, "mean": f(mean), "sd": f(sd), "ci": f(ci), "n": n, "df": f(df),
+            out[v][k] = {"jmh": _jmh(j, kind, [w._asdict() for w in metrics.jmh_warnings(k, raw.get(k, []))]), "_j": j, "mean": f(mean), "sd": f(sd), "ci": f(ci), "n": n, "df": f(df),
                          "pooled": pooled, "shown": metrics.fmt(kind, mean),
                          "ciShown": "" if ci is None else branchview.ci_shown(kind, ci, mean),
                          "median": f(metrics.pooled(raw.get(k, []), "median")), "min": f(metrics.pooled(raw.get(k, []), "min")),
@@ -980,7 +986,7 @@ def _delta(a, b, against):
     if c is None:
         return None
     jd = metrics.jmh_delta(a["_j"], b["_j"], a["_ok"], a["_up"]) if a["_j"] and b["_j"] else None
-    return {"pct": branchview.fin(c[0]), "halfWidth": branchview.fin(c[1]), "verdict": c[2], "against": against, "pooled": c[3],
+    return {"pct": branchview.fin(c[0]), "halfWidth": branchview.fin(c[1]), "verdict": jd[2] if jd else c[2], "forkVerdict": c[2], "against": against, "pooled": c[3],
             "jmh": jd and {"pct": branchview.fin(jd[0]), "halfWidth": branchview.fin(jd[1]), "verdict": jd[2]}}
 
 
@@ -2291,10 +2297,10 @@ CONVENTIONS = {
     "units": "A metric's unit is in its label (MetricInfo.label): the score in the benchmark's unit (e.g. ms/op), alloc in "
              "bytes per op, counts in events per op (per unit of perUnit when the spec has one), ratios and percents as such.",
     "statistics": "The unit of variation is the fork: a variant's mean, sd and 99.9% CI are over its forks' means; Δ is by "
-                  "Welch's t, significant (better or worse) when |pct| > halfWidth. Every verdict is this test's. Beside them, `jmh` "
-                  "has what JMH reports for these forks as one run, which the index shows first: every iteration pooled, the "
+                  "Welch's t (`forkVerdict`), significant when |pct| > halfWidth. `jmh` has what JMH reports for these forks as one run, "
+                  "which the index shows first and `verdict` goes by in campaign and compare (a branch's history stays over forks): every iteration pooled, the "
                   "score their mean, the error t(N − 1) × sd / √N at 99.9% (none with N ≤ 2). It takes iterations as independent "
-                  "though those of one fork share JIT decisions, code layout and GC state, so it is usually far narrower.",
+                  "though those of one fork share JIT decisions, code layout and GC state, so it is usually far narrower; `jmh.warnings` says when forks differ far too much for it, or the iterations drift.",
 }
 
 

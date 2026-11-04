@@ -251,14 +251,15 @@ NO_RAW_TITLE = "no per-iteration samples: its value is the mean over forks"
 JMH_TITLE = ("What JMH reports for these forks as one run: every measured iteration pooled (Cnt = forks × iterations), their mean "
              "± t(Cnt − 1) × sd / √Cnt at 99.9%; no ± with Cnt ≤ 2, as in JMH. It takes the iterations as independent, but those of one "
              "fork share JIT decisions, code layout and GC state, so it is usually far narrower than the figure over forks beside it. "
-             "The colour of Δ is that figure's test, so a Δ here can exclude zero and stay grey.")
+             "Better and worse go by this interval, so a Δ can be coloured here and not over forks: then it has a ⚠. A value has a ⚠ when forks differ far more than "
+             "their iterations or the iterations drift, as then this ± can't be taken at its word.")
 FORK_TITLE = ("The fork as the sample: the mean of each fork's mean, ± t(df) × sd / √n over the n forks at 99.9%. Forks differ in what "
               "their iterations share (JIT decisions, code layout, GC state), so this is usually far wider than JMH's figure beside it, "
               "and very wide with few forks: t(1) = 637, t(2) = 32. With fewer than 4 forks the sd may be the fork-to-fork relative sd "
-              "pooled over the corpus's variants, marked †. Δ is Welch's t on the forks' means; better and worse, in both columns, "
-              "come from this test.")
+              "pooled over the corpus's variants, marked †. Δ is Welch's t on the forks' means, coloured when its interval excludes zero; "
+              "the verdict goes by JMH's figure beside it, and a ⚠ there marks where the two disagree.")
 STAT_TITLE = {"mean": "JMH's figure: the mean of every measured iteration, the forks pooled, ± its error; beside it the mean over forks' means, ± its 99.9% CI; "
-                      "Δ coloured by Welch's t over forks",
+                      "better and worse by JMH's interval",
               "median": "the median of every measured iteration, the forks pooled; Δ ± the 99.9% CI of a bootstrap over forks and iterations",
               "min": "the fastest measured iteration, the forks pooled; Δ ± the 99.9% CI of a bootstrap over forks and iterations"}
 
@@ -301,10 +302,10 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, l
         forks = lambda v, k: [f for r in done.get(v, []) for f in r["raw"].get(k, [])]
         for v in names:
             i = len(data_rows)
-            vals, ms = [], {s: [] for s in metrics.STATS}
+            vals, ms, row_warn = [], {s: [] for s in metrics.STATS}, {}
             for k, label, kind, is_main in cols:
                 cell_html, up = {}, metrics.higher_is_better(k, label)
-                fork_html, no_raw = "", False
+                fork_html, no_raw, warned = "", False, []
                 for stat in metrics.STATS:
                     if stat == "mean":
                         if k not in st.get(v, {}):
@@ -314,10 +315,16 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, l
                         if not timing:
                             d = None
                         shown = metrics.fmt(kind, mean)
-                        ms[stat].append(view_metric(shown, mean, ci, d, half, ok, up))
+                        j, jd = s_.jmh, s_.jmh_d if timing else None
+                        # the pivot and chart: the verdict's figures, JMH's where it has them
+                        if j and d is not None and jd:
+                            ms[stat].append(view_metric(metrics.fmt(kind, j.score), j.score, j.error, jd[0], jd[1], ok, up))
+                        else:
+                            ms[stat].append(view_metric(metrics.fmt(kind, j.score) if j else shown, j.score if j else mean, j.error if j else ci, d, None if j else half, ok, up))
+                        warned = warned or s_.warnings
                         fork_html = with_delta(f'{shown}{rel_ci(ci, mean, s_.n, s_.df, s_.pooled)}', "" if d is None else delta(d, half, ok, up))
                         no_raw = s_.jmh is None
-                        cell_html[stat] = with_delta(jmh_text(kind, s_.jmh) if s_.jmh else shown, "" if d is None else primary_delta(s_.jmh_d, d, half, ok, up))
+                        cell_html[stat] = with_delta((jmh_text(kind, s_.jmh) if s_.jmh else shown) + warn_mark(s_.warnings), "" if d is None else primary_delta(s_.jmh_d, d, half, ok, up))
                     else:
                         x, d, half, ok = metrics.pooled_delta(forks(base, k) if v != base and timing else None, forks(v, k), stat, kind, per_unit)
                         if x is None:
@@ -325,6 +332,8 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, l
                         shown = metrics.fmt(kind, x)
                         ms[stat].append(view_metric(shown, x, None, d, half, ok, up))
                         cell_html[stat] = with_delta(shown, "" if d is None else delta(d, half, ok, up))
+                if warned:
+                    row_warn[k] = [w.text for w in warned]
                 if is_main:
                     vals.append(f'<td class="n" data-k="{esc(k)}" data-row="{i}"{f" title={chr(34)}{NO_RAW_TITLE}{chr(34)}" if no_raw else ""}>' + "".join(
                         f'<span class="st st-{stat}">{cell_html[stat]}</span>' for stat in metrics.STATS) + "</td>"
@@ -366,7 +375,7 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, l
                     # the cell's links: the lightbox offers the graphs of the closest [data-lb-group], this cell's
                     group = re.search(r' data-lb-group="[^"]*"', r.get("attrs") or "")
                     rows.append(f'<tr class="sub sd" data-of="{i}" data-corpus="{esc(corpus)}"{group.group(0) if group else ""} hidden><td></td><td colspan="{2 + 2 * len(main)}">{extra}</td></tr>')
-            data_rows.append({"c": corpus, "v": v, "n": n, "base": base, "cells": cell_ids, "m": ms})
+            data_rows.append({"c": corpus, "v": v, "n": n, "base": base, "cells": cell_ids, "m": ms, "w": row_warn})
     units = {r["data"][7] for c in by.values() for rs in c.values() for r in rs if r["data"]}
     head = lambda k, label: (esc(unit(label)) if per_unit else score_head(units)) if k == "score" else esc(label)
     heads = ([f"<th>{esc(config.get().corpus_param)}</th>", "<th>variant</th>", "<th class=n>rounds</th>"]
@@ -396,20 +405,29 @@ def delta(d, half=None, ok=True, up=False):
 
 
 def primary_delta(jd, d, half, ok, up):
-    """The Δ under JMH's figure: JMH's scores' Δ ± its 99.9% CI over the pooled iterations (`metrics.jmh_delta`), coloured
-    by the test over forks (Δ `d` ± `half`), the only one a verdict comes from. Without per-iteration samples, `d`."""
-    cls = verdict(d, half, ok, up)
-    if cls == "na":
+    """The Δ under JMH's figure: JMH's scores' Δ ± its 99.9% CI over the pooled iterations, coloured by that interval
+    (`metrics.jmh_delta`), with the test over forks (Δ `d` ± `half`) in the tooltip, and said when it disagrees. Without
+    per-iteration samples, `d`, coloured by the test over forks."""
+    fork = verdict(d, half, ok, up)
+    if fork == "na":
         return '<span class="d na" title="the values are about zero: no percent change">–</span>'
     over = f"over forks {d:+.2f}%" + (f" ± {half:.2f}" if half is not None else ", no spread")
     if jd is None:
-        return f'<span class="d {cls}" title="{over}">{d:+.2f}%</span>'
-    pct, jhalf, jv = jd
-    why = {"better": "significant over forks", "worse": "significant over forks"}.get(cls, "not marked: the colour is the test over forks")
-    if jv in ("better", "worse") and cls == "flat":
-        why = "the pooled iterations' CI excludes zero but the test over forks does not, so it is not marked"
-    return (f'<span class="d {cls}" title="± the 99.9% CI over pooled iterations; {why} ({over})">{pct:+.2f}%'
-            + (f' <span class="pm">± {jhalf:.2f}</span>' if jhalf is not None else "") + "</span>")
+        return f'<span class="d {fork}" title="no per-iteration samples: {over}">{d:+.2f}%</span>'
+    pct, jhalf, cls = jd
+    title = (f'{"higher" if pct > 0 else "lower"}, significant at 99.9% over the pooled iterations' if cls in ("better", "worse")
+             else "inconclusive: not significant at 99.9% over the pooled iterations" if jhalf is not None else "no spread: too few iterations")
+    mark = ""
+    if cls != fork:
+        title += f'; the test over forks {"does not find it significant" if fork == "flat" else "calls it " + fork}'
+        mark = " ⚠" if cls in ("better", "worse") else ""
+    return (f'<span class="d {cls}" title="{title} ({over})">{pct:+.2f}%'
+            + (f' <span class="pm">± {jhalf:.2f}</span>' if jhalf is not None else "") + f'</span>{f"<span class={chr(34)}warn{chr(34)}>{mark}</span>" if mark else ""}')
+
+
+def warn_mark(warnings):
+    """A ⚠ with `metrics.jmh_warnings`' reasons, by a JMH figure."""
+    return f' <span class="warn" title="{esc("; ".join(w.text for w in warnings))}">⚠</span>' if warnings else ""
 
 
 def jmh_text(kind, j):
@@ -446,7 +464,7 @@ HISTORY_VIEW = ("history", "History: a row per commit, newest first, a column pe
                 '<path d="M8 4.5h5.5M8 11.5h5.5M8 8h3.5"/>')
 VIEWS = (("table", "Table: a row per corpus and variant, its cells beneath (▸)",
           '<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M2.5 6.5h11M2.5 9.75h11"/>'),
-         ("chart", "Chart: Δ against the first variant with its 99.9% CI over forks, or each variant's distribution",
+         ("chart", "Chart: Δ against the first variant with its 99.9% CI, or each variant's distribution",
           '<path d="M8 2v12"/><rect x="8" y="3.5" width="5.5" height="2.4" fill="currentColor" stroke="none"/>'
           '<rect x="3" y="6.8" width="5" height="2.4" fill="currentColor" stroke="none"/><rect x="8" y="10.1" width="3" height="2.4" fill="currentColor" stroke="none"/>'))
 def view_toggle(views):
@@ -1062,7 +1080,7 @@ h2.sec:first-child{margin-top:8px}
 details.specs ul{margin:2px 0 6px;padding-left:20px}
 .diffs{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin:4px 0 8px}
 table.summary td:nth-child(n+3),table.summary th:nth-child(n+3){text-align:right}
-table.card-t th.ex{text-decoration:underline dotted;text-underline-offset:3px;cursor:help} table.card-t .fk{color:var(--muted);font-size:12px;padding-left:4px} table.card-t th.fk{font-weight:normal}
+.warn{color:var(--warn)} table.card-t th.ex{text-decoration:underline dotted;text-underline-offset:3px;cursor:help} table.card-t .fk{color:var(--muted);font-size:12px;padding-left:4px} table.card-t th.fk{font-weight:normal}
 tr[data-running] td{color:var(--muted)} tr.sr.live td:first-child{box-shadow:inset 3px 0 var(--warn)} .single-ver .ver{display:none} p.specs{margin:0 0 4px}
 details.cells{margin:10px 0 0} details.cells>summary,details.metrics>summary{cursor:pointer;font-size:12.5px} .pv{display:block;white-space:nowrap} .pv b{font-weight:normal}
 details.metrics{margin:2px 0 6px} details.metrics>summary{color:var(--muted)} table.m th{font-weight:normal;color:var(--fg);border:0;padding:2px 14px 2px 0} table.m td{border:0;padding:2px 10px}
@@ -1193,7 +1211,7 @@ const svStep = span => { const p = Math.pow(10, Math.floor(Math.log10(span / 4))
 // Δ% against the first variant per corpus and variant, whiskers its 99.9% CI; coloured only when that excludes zero
 function svBars({vs, base, corpora, cell}, m) {
   const others = vs.filter(v => v !== base);
-  const cap = `<figcaption>${m.h} <span class="k">Δ against ${svEsc(base)}, ± its 99.9% CI over forks, ${m.up ? 'higher' : 'lower'} is better</span></figcaption>`;
+  const cap = `<figcaption>${m.h} <span class="k">Δ against ${svEsc(base)}, ${m.up ? 'higher' : 'lower'} is better</span></figcaption>`;
   if (!others.length) return `<figure>${cap}<p class="k">Only the baseline is shown.</p></figure>`;
   const xs = corpora.flatMap(c => others.map(v => cell(c, v)[m.i]).filter(x => x && x[3] != null && x[5] !== 'na'));
   // the axis spans the data and zero, so one-sided changes use the whole width
@@ -1334,6 +1352,7 @@ function svPanel(td) {
     + `<svg viewBox="0 0 ${W} ${H}" class="run">${run}</svg><div class="k">run order: a colour per fork${forks.some(f => f.warm.length) ? ', warmup faint (a triangle: beyond the axis)' : ''}; `
     + `line: its median${bd ? ', dashed: ' + svEsc(row.base) + "'s" : ''}</div>${cmp}<div class="nums">${svStats(d, metric.kind)}</div>`
     + (bd ? `<div class="nums k">${svEsc(row.base)}: ${svStats(bd, metric.kind)}</div>` : '')
+    + (td.dataset.row != null && row.w && row.w[k] ? row.w[k].map(w => `<div class="warn" style="margin-top:6px">⚠ ${svEsc(w)}</div>`).join('') : '')
     + (td.dataset.row != null && SV.stat === 'mean' ? `<div class="k" style="margin-top:6px">${svEsc(data.jmhNote)}</div>` : '');
 }
 document.addEventListener('mouseover', e => {
@@ -1345,7 +1364,7 @@ document.addEventListener('mouseover', e => {
   svTip.innerHTML = h; svTip._td = td; svTip.hidden = false;
   const r = td.getBoundingClientRect(), w = svTip.offsetWidth, ht = svTip.offsetHeight;
   svTip.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.right - w)) + 'px';
-  svTip.style.top = (r.bottom + ht + 8 > innerHeight ? r.top - ht - 6 : r.bottom + 6) + 'px';
+  svTip.style.top = (r.bottom + ht + 8 > innerHeight ? Math.max(8, r.top - ht - 6) : r.bottom + 6) + 'px';
 });
 addEventListener('scroll', () => { svTip.hidden = true; }, {passive: true});
 // + and − expand or collapse every row of the card under the pointer (else every card)

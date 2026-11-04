@@ -725,7 +725,7 @@ def report(spec, per_op=False):
     print("Each value first as JMH reports its forks as one run: every iteration pooled, ± t(N − 1) × sd / √N at 99.9%, none with N ≤ 2. "
           "It takes iterations as independent, though those of one fork share JIT decisions, code layout and GC state. "
           "*over forks* takes the fork as the sample: the mean of forks' means, ± t(df) × sd / √n at 99.9%, Δ by Welch's t. "
-          "Only a Δ whose interval over forks excludes zero is significant.\n")
+          "A Δ is significant by JMH's interval; ⚠ marks one the interval over forks does not agree with, and the warnings under a table say where JMH's ± can't be taken at its word.\n")
     if per_op:
         spec.per_unit = None
     jfrconv = jmh.jfrconv(jmh.async_lib(spec.lib)) if spec.kperf else None
@@ -753,6 +753,7 @@ def report(spec, per_op=False):
         print("| metric | " + " | ".join(f"{v} | {v}, over forks" for v in names) + " |\n|---|" + "---|---|" * len(names))
         rounds = lambda v: " / ".join(f"{res['primaryMetric']['score']:.4g}" for res, _ in results[v])
         print(f"| {results[names[0]][0][0]['primaryMetric'].get('scoreUnit', 'score')} per round | " + " | ".join(f"{rounds(v)} | " for v in names) + " |")
+        warned = []
         for k, label, kind, _ in cols:
             tds = []
             for v in names:
@@ -762,8 +763,10 @@ def report(spec, per_op=False):
                 m, ci, d, half, ok = s[:5]
                 pct = lambda x, h: (f" ({x:+.1f}%" + (f" ± {h:.1f}" if h is not None else "") + ")" if ok else " (–)") if x is not None else ""
                 j = s.jmh
+                warned += [f"- ⚠ {v}, {label}: {w.text}" for w in s.warnings]
+                disagrees = s.jmh_d and s.jmh_d[2] in ("better", "worse") and metrics.verdict(d, half, ok) == "flat"
                 first = (metrics.fmt(kind, j.score) + (f" ± {branchview.ci_shown(kind, j.error, j.score)}" if j.error is not None else "") + pct(*(s.jmh_d[:2] if s.jmh_d else (None, None)))
-                         if j else metrics.fmt(kind, m) + pct(d, None))  # no per-iteration samples: the value over forks
+                         if j else metrics.fmt(kind, m) + pct(d, None)) + (" ⚠" if disagrees else "")  # no per-iteration samples: the value over forks
                 text = metrics.fmt(kind, m) + (f" ± {100 * ci / abs(m):.1f}%" + ("†" if s.pooled else "") if ci is not None and m else "") + pct(d, half)
                 tds.append(f"{first} | {text}")
             print(f"| {label} | " + " | ".join(tds) + " |")
@@ -771,6 +774,8 @@ def report(spec, per_op=False):
         if any(gc.values()):
             print("| GC time | " + " | ".join((f"{gc[v] / 1e3:.1f} s" if gc[v] is not None else "–") + " | " for v in names) + " |")
         print()
+        if warned:
+            print("\n".join(warned) + "\n")
     if "async" in spec.profile:
         print(graphs(spec))
 

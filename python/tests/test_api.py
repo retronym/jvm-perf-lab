@@ -268,7 +268,9 @@ class ReadTest(Fixture, unittest.TestCase):
         self.assertAlmostEqual(s["jmh"]["score"], s["mean"])
         self.assertIsNotNone(s["jmh"]["errorShown"])
         self.assertLess(s["delta"]["jmh"]["halfWidth"], s["delta"]["halfWidth"])
-        self.assertIn(s["delta"]["jmh"]["verdict"], ("better", "worse", "flat", "na"))
+        self.assertEqual(s["delta"]["verdict"], s["delta"]["jmh"]["verdict"])
+        self.assertIn(s["delta"]["forkVerdict"], ("better", "worse", "flat", "na"))
+        self.assertIsInstance(s["jmh"]["warnings"], list)
         self.assertNotIn("card", tip)  # the card shows these very numbers
         self.assertEqual([v["name"] for v in c["variantInfo"]], ["base", "tip"])
         self.assertEqual(c["variantInfo"][1]["flags"], "-Dx=1")

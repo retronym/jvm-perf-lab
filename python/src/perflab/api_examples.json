@@ -12,7 +12,7 @@
    "project": "Every function on a project takes `project`: a project id (see projects) or its root directory; over HTTP only registered projects, and omitted only when there is one.",
    "urls": "Fields named url are paths on the server (http://127.0.0.1:8690 by default, or the name a local proxy gives it, such as https://perflab.localhost): the index, timelines, flame graphs.",
    "units": "A metric's unit is in its label (MetricInfo.label): the score in the benchmark's unit (e.g. ms/op), alloc in bytes per op, counts in events per op (per unit of perUnit when the spec has one), ratios and percents as such.",
-   "statistics": "The unit of variation is the fork: a variant's mean, sd and 99.9% CI are over its forks' means; Δ is by Welch's t, significant (better or worse) when |pct| > halfWidth. Every verdict is this test's. Beside them, `jmh` has what JMH reports for these forks as one run, which the index shows first: every iteration pooled, the score their mean, the error t(N − 1) × sd / √N at 99.9% (none with N ≤ 2). I"
+   "statistics": "The unit of variation is the fork: a variant's mean, sd and 99.9% CI are over its forks' means; Δ is by Welch's t (`forkVerdict`), significant when |pct| > halfWidth. `jmh` has what JMH reports for these forks as one run, which the index shows first and `verdict` goes by in campaign and compare (a branch's history stays over forks): every iteration pooled, the score their mean, the error t(N − 1) "
   },
   "functions": [
    {
@@ -1088,8 +1088,8 @@
     "planned": 8
    },
    "status": "partial",
-   "updated": 1793781235.2819455,
-   "updatedIso": "2026-11-04T18:33:55",
+   "updated": 1793782713.2826722,
+   "updatedIso": "2026-11-04T18:58:33",
    "bytes": null,
    "profileOf": null,
    "testbed": "m5-pro",
@@ -1175,7 +1175,8 @@
        "error": 0.17604825747475752,
        "n": 12,
        "shown": "10.17",
-       "errorShown": "0.18"
+       "errorShown": "0.18",
+       "warnings": []
       },
       "mean": 10.175,
       "sd": 0.11902380714238028,
@@ -1194,7 +1195,8 @@
        "error": 0.885091762797185,
        "n": 8,
        "shown": "1.0MB",
-       "errorShown": "1B"
+       "errorShown": "1B",
+       "warnings": []
       },
       "mean": 1000000.25,
       "sd": 0.28867513459481287,
@@ -1247,7 +1249,8 @@
        "error": 0.17604825747475752,
        "n": 12,
        "shown": "8.175",
-       "errorShown": "0.176"
+       "errorShown": "0.176",
+       "warnings": []
       },
       "mean": 8.175,
       "sd": 0.11902380714238028,
@@ -1263,6 +1266,7 @@
        "pct": -19.65601965601965,
        "halfWidth": 4.928988528067104,
        "verdict": "better",
+       "forkVerdict": "better",
        "against": "base",
        "pooled": false,
        "jmh": {
@@ -1278,7 +1282,8 @@
        "error": 0.885091762797185,
        "n": 8,
        "shown": "1.0MB",
-       "errorShown": "1B"
+       "errorShown": "1B",
+       "warnings": []
       },
       "mean": 1000000.25,
       "sd": 0.28867513459481287,
@@ -1294,6 +1299,7 @@
        "pct": 0.0,
        "halfWidth": 0.00012163754773432105,
        "verdict": "flat",
+       "forkVerdict": "flat",
        "against": "base",
        "pooled": false,
        "jmh": {
@@ -1319,6 +1325,7 @@
        "pct": -10.989010989010994,
        "halfWidth": 5.34670673159156,
        "verdict": "better",
+       "forkVerdict": "better",
        "against": "base",
        "pooled": false,
        "jmh": null
@@ -1340,6 +1347,7 @@
        "pct": 0.0,
        "halfWidth": 243.27515628741597,
        "verdict": "flat",
+       "forkVerdict": "flat",
        "against": "base",
        "pooled": false,
        "jmh": null
@@ -1437,8 +1445,8 @@
      "planned": 2
     },
     "status": "finished",
-    "updated": 1793781235.29535,
-    "updatedIso": "2026-11-04T18:33:55",
+    "updated": 1793782713.2987082,
+    "updatedIso": "2026-11-04T18:58:33",
     "bytes": null,
     "profileOf": null,
     "testbed": "m5-pro",
@@ -1472,8 +1480,8 @@
      "planned": 8
     },
     "status": "partial",
-    "updated": 1793781235.2819455,
-    "updatedIso": "2026-11-04T18:33:55",
+    "updated": 1793782713.2826722,
+    "updatedIso": "2026-11-04T18:58:33",
     "bytes": null,
     "profileOf": null,
     "testbed": "m5-pro",
@@ -1494,7 +1502,7 @@
    "score": 10.15,
    "error": 0.1,
    "unit": "ms/op",
-   "finished": 1793781235.277977,
+   "finished": 1793782713.2777128,
    "why": null,
    "voidId": null,
    "path": "/Users/me/lab/out/perflab/ab/plain/a/base/1",
@@ -1697,7 +1705,7 @@
     "score": 10.1,
     "error": 0.1,
     "unit": "ms/op",
-    "finished": 1793781235.2705865,
+    "finished": 1793782713.2699983,
     "why": null,
     "voidId": null,
     "path": "/Users/me/lab/out/perflab/ab/br/a/aaaaaaaaaa/1",
@@ -1712,7 +1720,7 @@
     "score": 10.0,
     "error": 0.1,
     "unit": "ms/op",
-    "finished": 1793781235.2711866,
+    "finished": 1793782713.2706172,
     "why": null,
     "voidId": null,
     "path": "/Users/me/lab/out/perflab/ab/br/a/bbbbbbbbbb/1",
@@ -1780,7 +1788,8 @@
         "error": 0.17604825747475752,
         "n": 12,
         "shown": "10.17",
-        "errorShown": "0.18"
+        "errorShown": "0.18",
+        "warnings": []
        }
       },
       "b": {
@@ -1793,13 +1802,15 @@
         "error": 0.17604825747475752,
         "n": 12,
         "shown": "8.175",
-        "errorShown": "0.176"
+        "errorShown": "0.176",
+        "warnings": []
        }
       },
       "delta": {
        "pct": -19.65601965601965,
        "halfWidth": 4.928988528067104,
        "verdict": "better",
+       "forkVerdict": "better",
        "against": "base",
        "pooled": false,
        "jmh": {
@@ -1823,7 +1834,8 @@
         "error": 0.885091762797185,
         "n": 8,
         "shown": "1.0MB",
-        "errorShown": "1B"
+        "errorShown": "1B",
+        "warnings": []
        }
       },
       "b": {
@@ -1836,13 +1848,15 @@
         "error": 0.885091762797185,
         "n": 8,
         "shown": "1.0MB",
-        "errorShown": "1B"
+        "errorShown": "1B",
+        "warnings": []
        }
       },
       "delta": {
        "pct": 0.0,
        "halfWidth": 0.00012163754773432105,
        "verdict": "flat",
+       "forkVerdict": "flat",
        "against": "base",
        "pooled": false,
        "jmh": {
@@ -2004,13 +2018,13 @@
   "schema": "Forgotten",
   "version": 1,
   "project": {
-   "id": "tmpl5d56wbg-3bce7e",
-   "name": "tmpl5d56wbg",
+   "id": "tmprejnq6on-186bcb",
+   "name": "tmprejnq6on",
    "root": "/tmp/perflab-server",
    "campaigns": "/tmp/perflab-server/out/perflab/ab",
    "runs": "/tmp/perflab-server/out/perflab/runs",
    "registered": true,
-   "index": "/p/tmpl5d56wbg-3bce7e/ab/index.html"
+   "index": "/p/tmprejnq6on-186bcb/ab/index.html"
   }
  },
  "Jit": {
@@ -2304,8 +2318,8 @@
    "module": "perflab_fakejob",
    "state": "queued",
    "priority": 0,
-   "seq": 1793781235.422164,
-   "created": 1793781235.422164,
+   "seq": 1793782713.433602,
+   "created": 1793782713.433602,
    "started": null,
    "ended": null,
    "rc": null,
@@ -2343,8 +2357,8 @@
     "module": "perflab_fakejob",
     "state": "queued",
     "priority": 0,
-    "seq": 1793781235.422164,
-    "created": 1793781235.422164,
+    "seq": 1793782713.433602,
+    "created": 1793782713.433602,
     "started": null,
     "ended": null,
     "rc": null,
@@ -2481,8 +2495,8 @@
    "module": "perflab_fakejob",
    "state": "queued",
    "priority": 0,
-   "seq": 1793781235.422164,
-   "created": 1793781235.422164,
+   "seq": 1793782713.433602,
+   "created": 1793782713.433602,
    "started": null,
    "ended": null,
    "rc": null,
@@ -2527,27 +2541,27 @@
    "score": 8.2,
    "error": 0.1,
    "unit": "ms/op",
-   "finished": 1793781235.2723866,
+   "finished": 1793782713.271936,
    "why": null,
    "voidId": null,
    "path": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2",
    "url": "/p/lab-3f2a1c/ab/br/a/eeeeeeeeee/2",
    "timeline": null
   },
-  "from": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261104-183355"
+  "from": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261104-185833"
  },
  "Voided": {
   "schema": "Voided",
   "version": 1,
   "campaign": "br",
   "void": {
-   "id": "a/eeeeeeeeee/2-20261104-183355",
+   "id": "a/eeeeeeeeee/2-20261104-185833",
    "corpus": "a",
    "variant": "eeeeeeeeee",
    "round": 2,
    "reason": "other load up to 2.1 cores over iterations 3, 4",
-   "voided": 1793781235.416836,
-   "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261104-183355",
+   "voided": 1793782713.428271,
+   "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261104-185833",
    "restorable": true
   },
   "from": "/Users/me/lab/out/perflab/ab/br/a/eeeeeeeeee/2"
@@ -2558,13 +2572,13 @@
   "campaign": "br",
   "voids": [
    {
-    "id": "a/eeeeeeeeee/2-20261104-183355",
+    "id": "a/eeeeeeeeee/2-20261104-185833",
     "corpus": "a",
     "variant": "eeeeeeeeee",
     "round": 2,
     "reason": "other load up to 2.1 cores over iterations 3, 4",
-    "voided": 1793781235.416836,
-    "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261104-183355",
+    "voided": 1793782713.428271,
+    "path": "/Users/me/lab/out/perflab/ab/br/.void/a/eeeeeeeeee/2-20261104-185833",
     "restorable": true
    }
   ]

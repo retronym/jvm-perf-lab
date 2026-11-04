@@ -795,7 +795,7 @@ class CampaignCardTest(unittest.TestCase):
         self.assertEqual(b.jmh_d[2], "flat")
         self.assertIsNone(a.jmh_d)
 
-    def test_jmhs_figure_is_first_the_fork_one_beside_it_and_only_that_test_colours(self):
+    def test_jmhs_figure_is_first_the_fork_one_beside_it_each_coloured_by_its_own_test(self):
         # iterations steady within each fork, forks far apart, so that pooled a Δ excludes zero and over forks it does not
         fork = lambda m: [[m - 0.1, m, m + 0.1] * 10]
         recs = [self.rec(v, i, fork(m)) for v, ms in (("base", (100.0, 110.0, 120.0, 90.0)), ("tip", (90.0, 100.0, 110.0, 80.0))) for i, m in enumerate(ms)]
@@ -806,12 +806,40 @@ class CampaignCardTest(unittest.TestCase):
         self.assertIn("The fork as the sample", html)
         rows = re.findall(r'<tr class="sr".*?</tr>', html)
         tip, slow = rows[1], rows[2]
-        self.assertRegex(tip, r'<span class="st st-mean">95 <span class="pm">± \d+</span><br><span class="d flat" title="[^"]*excludes zero but the test over forks does not')
+        self.assertRegex(tip, r'<span class="st st-mean">95 <span class="pm">± \d+</span> <span class="warn"[^>]*>⚠</span><br><span class="d better" title="lower, significant at 99\.9% over the pooled iterations; the test over forks does not find it significant')
         self.assertRegex(tip, r'<td class="n fk"[^>]*>95 <span class="pm" title="the 99\.9% CI over 4 forks: t\(3\) = 12\.9">± [\d.]+%</span><br><span class="d flat"')
         self.assertRegex(slow, r'st-mean">201\.5 <span class="pm">[^<]*</span><br><span class="d worse"')  # significant by both
         # a cell's own row keeps the column count, and JMH's error of its one fork
         self.assertIn('</td><td></td></tr>', html)
         self.assertRegex(html, r'data-cell="0"><span class="st st-mean">100 <span class="pm">± 0\.055</span>')
+
+    def test_warnings_when_forks_differ_or_iterations_drift(self):
+        steady = lambda m: [m - 1, m + 1, m - 1, m + 1]
+        self.assertEqual(metrics.jmh_warnings("score", [steady(100.0), steady(100.5), steady(99.5)]), [])  # forks agree
+        forks = metrics.jmh_warnings("score", [steady(100.0), steady(120.0), steady(90.0)])
+        self.assertEqual([w.kind for w in forks], ["forks"])
+        self.assertGreater(forks[0].value, metrics.FORK_F)
+        self.assertIn("understates the uncertainty by about", forks[0].text)
+        # far apart in F, but by too little of the score to matter
+        self.assertEqual(metrics.jmh_warnings("score", [[100.0, 100.01, 100.0, 100.01], [100.1, 100.11, 100.1, 100.11]]), [])
+        rising = lambda m: [m, m + 1, m + 5, m + 6]
+        d = metrics.jmh_warnings("score", [rising(100.0), rising(100.5), rising(99.5)])
+        self.assertEqual([w.kind for w in d], ["drift"])
+        self.assertAlmostEqual(d[0].value, 4.85, delta=0.01)
+        self.assertEqual(metrics.jmh_warnings("score", [[100.0, 90.0, 110.0, 100.0]]), [])  # noise, not a trend
+        self.assertEqual(metrics.jmh_warnings("score", [[100.0, 110.0]]), [])  # too few to tell
+        self.assertEqual(metrics.jmh_warnings("jit:compilations", [[100.0], [300.0]]), [])
+
+    def test_verdict_is_jmhs_and_a_warning_marks_the_card_and_panel_data(self):
+        fork = lambda m: [[m - 0.1, m, m + 0.1] * 10]
+        recs = [self.rec(v, i, fork(m)) for v, ms in (("base", (100.0, 110.0, 120.0, 90.0)), ("tip", (90.0, 100.0, 110.0, 80.0))) for i, m in enumerate(ms)]
+        html = index.card_summary(recs, ["base", "tip"], [])
+        tip = re.findall(r'<tr class="sr".*?</tr>', html)[1]
+        self.assertRegex(tip, r'st-mean">95 <span class="pm">[^<]*</span> <span class="warn" title="forks differ far more')  # by the value
+        self.assertRegex(tip, r'<span class="d better"[^>]*>-9\.\d+% <span class="pm">[^<]*</span></span><span class="warn"> ⚠</span>')  # JMH says better, forks do not
+        data = json.loads(re.search(r'<script type="application/json">(.*?)</script>', html).group(1))
+        self.assertIn("understates", data["rows"][1]["w"]["score"][0])
+        self.assertEqual(data["rows"][1]["m"]["mean"][0][5], "better")  # the chart's too
 
     def test_few_iterations_leave_jmhs_error_blank(self):
         recs = [self.rec("base", 1, [[10.0]]), self.rec("base", 2, [[11.0]]), self.rec("tip", 1, [[9.0, 9.5, 10.0]])]

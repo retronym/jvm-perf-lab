@@ -86,7 +86,7 @@ To explain why one build is slower than another (a campaign to establish the gap
 
 ## 7. Read results through the API, not the files
 
-To read a campaign's results, use perflab's API rather than parsing `result.json` or scraping the index: it computes the statistics the page shows (each metric's mean ± 99.9% CI over forks, Δ against the baseline or the previous commit by Welch's t, a verdict, and in `jmh` what JMH reports with every iteration pooled, which the card shows first but no verdict rests on) and says what every field means.
+To read a campaign's results, use perflab's API rather than parsing `result.json` or scraping the index: it computes the statistics the page shows (each metric's mean ± 99.9% CI over forks, Δ against the baseline or the previous commit by Welch's t, a verdict, and in `jmh` what JMH reports with every iteration pooled, which the card shows first and a campaign's `verdict` goes by; `forkVerdict` is the test over forks, `jmh.warnings` says when forks differ too much or iterations drift) and says what every field means.
 
 - **MCP** (preferred): `claude mcp add perflab -- perflab mcp`, run in the project (or `perflab mcp --root <project>`). Every function is a tool with input and output schemas.
 - **CLI**: `perflab api --list` (functions and conventions), `perflab api <function> --<param> <value>...` prints JSON, `perflab api --schema <Name>` a response's schema.
