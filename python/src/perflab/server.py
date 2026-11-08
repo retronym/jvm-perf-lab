@@ -63,7 +63,7 @@ carries the token, under a CSP sandbox: its scripts run in an opaque origin, so 
 benchmark wrote cannot read the index (and its token) or call the API. An HTML page gets ui.FRAME_KEYS_JS appended, for
 the page framing it to hear Esc.
 """
-import argparse, fcntl, functools, hashlib, json, os, re, secrets, signal, socket, sqlite3, subprocess, sys, threading, time, traceback
+import argparse, contextlib, fcntl, functools, hashlib, json, os, re, secrets, signal, socket, sqlite3, subprocess, sys, threading, time, traceback
 import http.server, urllib.error, urllib.parse, urllib.request
 
 from . import config, control, httpd, mirror, storage, transcript, ui
@@ -190,10 +190,19 @@ class Queue:
                 if col not in have:  # a queue from before it
                     db.execute(f"ALTER TABLE jobs ADD COLUMN {col} {typ}")
 
+    @contextlib.contextmanager
     def _db(self):
+        """A connection for one `with` block: committed (or rolled back) on exit, and closed. A bare sqlite3.Connection
+        as a context manager only ends the transaction; the connection, and its file descriptor, stay open until it is
+        collected, which under CPython's cycle collector may be never: the server once ran out of file descriptors on
+        250 open handles to jobs.sqlite."""
         db = sqlite3.connect(self.path, timeout=30)
         db.row_factory = sqlite3.Row
-        return db
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
 
     def _q(self, sql, args=()):
         with self.lock, self._db() as db:
