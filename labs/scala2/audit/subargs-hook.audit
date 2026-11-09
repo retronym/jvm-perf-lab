@@ -1,0 +1,3 @@
+# sample the argument lists reaching isSubArgs during the op (see SubArgsHook)
+hook subargs at=scala.reflect.internal.Types#isSubArgs call=scala.tools.nsc.compilerlab.SubArgsHook#isSubArgs
+count isSubArgs at=scala.reflect.internal.Types#isSubArgs onStack=op:scala.tools.nsc.compilerlab.SymbolOps

@@ -1,0 +1,40 @@
+{
+  "benchmark": "SymbolOpsBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "gcLog": true,
+  "corpora": {
+    "subtype": "-f 1 -wi 2 -w 3 -i 2 -r 3 -p jdkHome=25.0.4-tem"
+  },
+  "name": "m5-subtype-hk-audit",
+  "description": [
+    "Caller audit of the `subtype` path before and after f207 (`q5` \u2192 `p3`), the merge that takes the workload from 0.48 to 1.18 MB/op: calls per level of `isSubType` \u2192 `isSubArgs` \u2192 `isHKSubType` \u2192 `isPolySubType`, and base type sequence recomputation."
+  ],
+  "builds": {
+    "q5": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-q5",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p3": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-p3",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "q5": "",
+    "p3": ""
+  },
+  "variantDescriptions": {
+    "q5": "before f207",
+    "p3": "q5 + f207 (RefChecks' matched pairs reused in Erasure)"
+  },
+  "rounds": 1,
+  "profile": "audit:audit/subtype-hk-path.audit"
+}

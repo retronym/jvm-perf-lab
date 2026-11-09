@@ -1,0 +1,39 @@
+{
+  "benchmark": "SymbolOpsBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus -Dcompilerlab.subtype.dump=HashSet,BitSet,Queue,TreeSet,HashMap",
+  "gcLog": true,
+  "corpora": {
+    "subtype": "-f 1 -wi 0 -i 1 -r 1 -p jdkHome=25.0.4-tem"
+  },
+  "name": "m5-subtype-bts-dump",
+  "description": [
+    "Dumps the base type sequences of classes whose `*Like` comparisons dominate `isSubArgs` after f207, before (`q5`) and after (`p3`)."
+  ],
+  "builds": {
+    "q5": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-q5",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p3": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-p3",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "q5": "",
+    "p3": ""
+  },
+  "variantDescriptions": {
+    "q5": "before f207",
+    "p3": "q5 + f207 (RefChecks' matched pairs reused in Erasure)"
+  },
+  "rounds": 1
+}

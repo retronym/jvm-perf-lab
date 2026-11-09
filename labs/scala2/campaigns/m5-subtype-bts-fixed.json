@@ -1,0 +1,39 @@
+{
+  "benchmark": "SymbolOpsBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "gcLog": true,
+  "corpora": {
+    "subtype": "-f 1 -wi 2 -w 3 -i 2 -r 3 -p jdkHome=25.0.4-tem"
+  },
+  "name": "m5-subtype-bts-fixed",
+  "description": [
+    "Check of the `subtype` workload after it reads base types with `bts(i)` rather than `toList`: before (`q5`) and after (`p3`) f207 should now allocate the same."
+  ],
+  "builds": {
+    "q5": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-q5",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p3": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-p3",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "q5": "",
+    "p3": ""
+  },
+  "variantDescriptions": {
+    "q5": "before f207",
+    "p3": "after f207"
+  },
+  "rounds": 1
+}

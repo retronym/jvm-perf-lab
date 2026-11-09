@@ -1,0 +1,40 @@
+{
+  "benchmark": "SymbolOpsBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "gcLog": true,
+  "corpora": {
+    "subtype": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem"
+  },
+  "name": "m5-subtype-integ-alloc",
+  "description": [
+    "Allocation profile of the `subtype` workload: `origin/scala2-perf-integration` allocates 1.18 MB/op against #208's 0.48 MB/op on m4. One fork each, to find the site."
+  ],
+  "testbed": "m5-pro",
+  "builds": {
+    "pr208": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "integ": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-integ",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "pr208": "",
+    "integ": ""
+  },
+  "variantDescriptions": {
+    "pr208": "retronym/scala#208 rebased on `base`, `a0b9fd2010`: final `Symbol.typeParams`",
+    "integ": "`origin/scala2-perf-integration` at `fa5f57ca6e`: #208 plus 77 other perf commits on 2.13.x"
+  },
+  "rounds": 1,
+  "profile": "async:alloc"
+}

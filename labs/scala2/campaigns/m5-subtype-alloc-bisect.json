@@ -1,0 +1,66 @@
+{
+  "benchmark": "SymbolOpsBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "gcLog": true,
+  "corpora": {
+    "subtype": "-f 1 -wi 2 -w 3 -i 2 -r 3 -p jdkHome=25.0.4-tem"
+  },
+  "name": "m5-subtype-alloc-bisect",
+  "description": [
+    "Finer bisect, by allocation, of the `subtype` regression between p1 and p3 of `m4-subtype-integ-bisect`: B/op goes from 0.48 MB to 1.18 MB there. Each point is integration's first parent at that merge, with #208 merged. Short iterations: only B/op matters, and it's deterministic."
+  ],
+  "builds": {
+    "q1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-q1",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "q2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-q2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "q3": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-q3",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "q4": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-q4",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "q5": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-q5",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "q1": "",
+    "q2": "",
+    "q3": "",
+    "q4": "",
+    "q5": ""
+  },
+  "variantDescriptions": {
+    "q1": "p1 + u11367 (megamorphic analyzer calls)",
+    "q2": "q1 + u11307 (patmat)",
+    "q3": "q2 + u11312 (Erasure self-type casts)",
+    "q4": "q3 + u11376 (singleton class tests)",
+    "q5": "q4 + f148 (lazy typing-transformer contexts); p3 adds f207"
+  },
+  "rounds": 1
+}

@@ -1,0 +1,14 @@
+# where the subtype path diverges after f207: calls per level, and base type sequence recomputation
+count isSubType      at=scala.reflect.internal.tpe.TypeComparers#isSubType(Lscala/reflect/internal/Types$Type;Lscala/reflect/internal/Types$Type;I
+count isSubArgs      at=scala.reflect.internal.Types#isSubArgs
+count isHKSubType    at=scala.reflect.internal.tpe.TypeComparers#isHKSubType
+count isPolySubType  at=scala.reflect.internal.tpe.TypeComparers#isPolySubType
+count isNoArgStatic  at=scala.reflect.internal.tpe.TypeComparers#isNoArgStaticClassTypeRef
+count baseType       at=scala.reflect.internal.Types$TypeRef#baseType
+count btsImpl        at=scala.reflect.internal.Types$TypeRef#baseTypeSeqImpl
+count parentsImpl    at=scala.reflect.internal.Types$TypeRef#parentsImpl
+count asSeenFrom     at=scala.reflect.internal.Types$Type#asSeenFrom
+count adaptInfos     at=scala.reflect.internal.Symbols$Symbol#adaptInfos
+count typeHistory    at=scala.reflect.internal.Symbols$TypeHistory#<init> exit
+count cloneSymbols   at=scala.reflect.internal.Symbols#cloneSymbols(Lscala/collection/immutable/List;)
+sites hkFrom         at=scala.reflect.internal.tpe.TypeComparers#isHKSubType depth=4 sample=64

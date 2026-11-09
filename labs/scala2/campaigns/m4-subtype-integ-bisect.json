@@ -1,0 +1,79 @@
+{
+  "benchmark": "SymbolOpsBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "subtype": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem"
+  },
+  "name": "m4-subtype-integ-bisect",
+  "description": [
+    "Bisect of the `subtype` microbench regression: `origin/scala2-perf-integration` is 10.6% slower than #208 alone. Each point is a commit on integration's first-parent history with #208 merged in. One fork each, no profile, as a spike."
+  ],
+  "builds": {
+    "pr208": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p0": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-p0",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-p1",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p3": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-p3",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p5": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bisect-p5",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "integ": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-integ",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "pr208": "",
+    "p0": "",
+    "p1": "",
+    "p3": "",
+    "p5": "",
+    "integ": ""
+  },
+  "variantDescriptions": {
+    "pr208": "#208 alone on `1fd535a36b`",
+    "p0": "`c83afe6fdc` (integration's 2.13.x base) + #208",
+    "p1": "p0 + u11369 + u11375 (bind owner, typeOfThis, tpe_*, mapOver statically)",
+    "p3": "p1 + u11367, u11307, u11312, u11376 (singleton tests by class), f148, f207",
+    "p5": "p3 + f208, f210, f200, f205, f206: integration minus `Symbol.filter` and the check update",
+    "integ": "`fa5f57ca6e`, integration's head"
+  },
+  "rounds": 1
+}

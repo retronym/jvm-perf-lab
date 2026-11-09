@@ -1,0 +1,100 @@
+{
+  "name": "m4-subtype-micro",
+  "description": [
+    "`SymbolOpsBenchmark`'s new `subtype` workload: `<:<` and `=:=` of each class's type against its base types and against an unrelated class's type, over the classes of a scala corpus compile done in setup. Amplifies the subtype checker, where the `TypeComparer` class and the `SymbolTable` moves remove `invokespecial` receiver checks. kperf profile for the slow-path share."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `1fd535a36b`",
+    "tc": "+ #208 + `isHigherKinded` fast path + `TypeComparer` class, `58d0363519`",
+    "hot": "`tc` + `TypeApiImpl` as a trait + hot `Types` code and comparer forwarders in `SymbolTable`, `7fd6c38c5e`",
+    "pr208": "retronym/scala#208 rebased on `base`, `a0b9fd2010`: final `Symbol.typeParams`",
+    "hk": "`pr208` + final `TypeRef.isHigherKinded`, `65fe452a34`",
+    "aa": "`base` again, an A/A, run in a later job than `base` like `pr208` and `hk`",
+    "integ": "`origin/scala2-perf-integration` at `fa5f57ca6e`: #208 plus 77 other perf commits on 2.13.x",
+    "pr208b": "`pr208` again, in the same job as `integ`, to compare without drift between jobs"
+  },
+  "benchmark": "SymbolOpsBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-base-278cab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "tc": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-tc-class",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "hot": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-hot",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "pr208": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "hk": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-hk-fastpath",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-base-278cab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "integ": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-integ",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "pr208b": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "aa": "",
+    "pr208": "",
+    "hk": "",
+    "tc": "",
+    "hot": "",
+    "integ": "",
+    "pr208b": ""
+  },
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "subtype": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "jitRecording": false
+}

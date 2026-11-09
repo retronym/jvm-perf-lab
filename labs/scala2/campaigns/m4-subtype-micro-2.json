@@ -1,0 +1,55 @@
+{
+  "name": "m4-subtype-micro-2",
+  "description": [
+    "`SymbolOpsBenchmark`'s `subtype` workload, fixed to read base types with `bts(i)`: `toList` returned lazy intersection elements unresolved, so the pairs depended on what the setup compile had forced, and integration's f207 changed that (0.48 \u2192 1.18 MB/op). `<:<` both ways and `=:=` of each class's type against its base types and the next class's type. kperf profile."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `1fd535a36b`",
+    "pr208": "retronym/scala#208 rebased on `base`, `a0b9fd2010`: final `Symbol.typeParams`",
+    "integ": "`origin/scala2-perf-integration` at `fa5f57ca6e`: #208 plus 77 other perf commits on 2.13.x"
+  },
+  "benchmark": "SymbolOpsBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-base-278cab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "pr208": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "integ": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-integ",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "pr208": "",
+    "integ": ""
+  },
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "subtype": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "jitRecording": false
+}
