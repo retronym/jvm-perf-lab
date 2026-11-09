@@ -285,12 +285,15 @@ def load_check(spec, dest):
 VOID_DIR = ".void"  # in a campaign: voided cells, <corpus>/<variant>/<round>-<timestamp>/ (api.void, set_aside)
 VOID_NOTE = "void.txt"  # the reason, as text
 VOID_JSON = "void.json"  # {reason, voided, from}
+# what a cell holds before its run: written by jmh.prepare (spec.command), specs.tag and testbed.record
+CELL_SETUP = {"jmh.args", "profile.txt", jmh.JFRSYNC, specs.CELL_FILE, testbed.CELL_FILE}
 
 
 def set_aside(spec, corpus, variant, r, reason):
     """A cell's attempt that will be run again (other load disturbed it), voided: a copy in the campaign's .void with
-    `reason`, as `perflab api void` makes, and its result removed, so that until the rerun finishes the cell reads as
-    not done rather than as a result that counts."""
+    `reason`, as `perflab api void` makes, and the attempt's files removed from the cell (all but CELL_SETUP), so that
+    until the rerun finishes the cell reads as not done rather than as a result that counts, and the rerun's results
+    are its own alone."""
     dest = spec.cell_dir(corpus, variant, r)
     void = os.path.join(spec.out, VOID_DIR, corpus, variant, f"{r}-{time.strftime('%Y%m%d-%H%M%S')}")
     while os.path.exists(void):
@@ -300,9 +303,12 @@ def set_aside(spec, corpus, variant, r, reason):
         f.write(reason + "\n")
     with open(os.path.join(void, VOID_JSON), "w") as f:
         json.dump({"reason": reason, "voided": time.time(), "from": dest}, f)
-    for f in ("result.json", LOAD_CHECK):
-        if os.path.exists(os.path.join(dest, f)):
-            os.unlink(os.path.join(dest, f))
+    # the rerun starts from the cell as it was set up: the attempt's files go, since some (iterations.tsv, load.tsv)
+    # are appended to and others (jit-<pid>.jitrec, gc.log.N) are named per run, so the rerun would count them as its own
+    for f in os.listdir(dest):
+        if f not in CELL_SETUP:
+            p = os.path.join(dest, f)
+            shutil.rmtree(p) if os.path.isdir(p) and not os.path.islink(p) else os.unlink(p)
     return void
 
 

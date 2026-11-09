@@ -2,7 +2,8 @@ import json, os, sys, tempfile, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab server`
-from perflab import ab, api, loadgate  # noqa: E402
+from perflab import ab, api, jfrevents, jmh, loadgate  # noqa: E402
+from test_perflab import Project  # noqa: E402
 
 
 class OursTest(unittest.TestCase):
@@ -55,7 +56,10 @@ class LoadCheckTest(unittest.TestCase):
         open(os.path.join(cell, "jmh.args"), "w").write("-i 4")
         self.assertTrue(ab.load_check(spec, cell))
         void = ab.set_aside(spec, "dotc", "b", 1, "other load over 1.5 cores during measurement iterations 14, 15 (attempt 1, run again)")
-        self.assertEqual(sorted(os.listdir(cell)), ["iterations.tsv", "jmh.args", "load.tsv"])  # what the rerun needs
+        # the rerun starts from the cell as set up: iterations.tsv and load.tsv are appended to, so kept they would mix
+        # the voided attempt's rows into the rerun's (m4-hk-fastpath-typer-kperf-2 scala/hk/1: cycles/op halved)
+        self.assertEqual(sorted(os.listdir(cell)), ["jmh.args"])
+        self.assertTrue(os.path.exists(os.path.join(void, "iterations.tsv")))
         self.assertTrue(os.path.exists(os.path.join(void, "result.json")))
         self.assertEqual(json.load(open(os.path.join(void, ab.LOAD_CHECK)))["disturbed"], [14, 15])
         info = api._void_info(camp, void)
@@ -64,6 +68,76 @@ class LoadCheckTest(unittest.TestCase):
 
     def test_no_gate_no_check(self):
         self.assertEqual(ab.load_check(type("S", (), {"loadgate": None})(), self.d), [])
+
+
+HEAD = "index\tkind\tvariant\tstart_ms\tend_ms\tscore\tops\tgc_ms\tpid\tunit\talloc_bytes\n"
+
+
+def attempt_rows(pid, measured):
+    rows = [f"-1\tstartup\t\t0\t1\t\t\t\t{pid}\tms/op\t\n", f"0\twarmup\t\t1\t2\t5\t1\t\t{pid}\tms/op\t\n"]
+    rows += [f"{1 + i}\tmeasure\t\t2\t3\t5\t1\t\t{pid}\tms/op\t\n" for i in range(measured)]
+    return "".join(rows) + f"-1\texit\t\t3\t3\t\t\t\t{pid}\tms/op\t\n"
+
+
+def result(measured):
+    return [{"mode": "ss", "primaryMetric": {"score": 5.0, "scoreError": 0.1, "scoreUnit": "ms/op", "rawData": [[5.0] * measured]},
+             "secondaryMetrics": {}}]
+
+
+class VoidedRetryTest(unittest.TestCase):
+    """m4-hk-fastpath-typer-kperf-2 scala/hk/1: the loadgate voided attempt 1 and ran the cell again, which kept attempt
+    1's iterations.tsv rows, jit-<pid>.jitrec and gc.log.0; the summary divided attempt 2's cycles by both attempts' ops."""
+
+    def test_a_retried_cell_holds_only_its_last_attempt(self):
+        p = Project('[build]\njmh = "true {args}"\n[benchmark]\ncorpus = "c"\n')
+        os.chdir(p.dir)
+        spec_f = os.path.join(p.dir, "s.json")
+        json.dump({"name": "vr", "benchmark": "B", "rounds": 1, "corpora": {"x": ""}, "variants": {"a": ""},
+                   "loadgate": {"maxCores": 1.5}}, open(spec_f, "w"))
+        spec = ab.Spec(spec_f)
+        attempts = []
+
+        def run_build(cmd, log, *a, **k):  # what the agent and JMH leave in the cell: appended rows, per-run files
+            cell = os.path.dirname(log)
+            pid = 100 + len(attempts)
+            attempts.append(sorted(os.listdir(cell)))
+            tsv = os.path.join(cell, "iterations.tsv")
+            head = "" if os.path.exists(tsv) else HEAD
+            with open(tsv, "a") as f:
+                f.write(head + attempt_rows(pid, 8))
+            open(os.path.join(cell, f"jit-{pid}.jitrec"), "w").write("x")
+            open(os.path.join(cell, f"gc.log.{len(attempts) - 1}"), "w").write("x")
+            open(os.path.join(cell, "load.tsv"), "a").write(f"{pid}\t{2.0 if len(attempts) == 1 else 0.1}\n")
+            json.dump(result(8), open(os.path.join(cell, "result.json"), "w"))
+            return 0
+        loads = iter([2.0, 0.1])  # attempt 1 disturbed, attempt 2 quiet
+        for mod, name, value in [(jmh, "run_build", run_build), (ab, "check", lambda *a, **k: None),
+                                 (ab, "wait_until_quiet", lambda s: None), (ab, "start_load_sampler", lambda s, p: None),
+                                 (ab, "mean_load", lambda p: next(loads)), (ab, "load_check", lambda s, d: [])]:
+            self.addCleanup(setattr, mod, name, getattr(mod, name))
+            setattr(mod, name, value)
+        ab.run(spec, False)
+        self.assertEqual(len(attempts), 2)
+        self.assertEqual(attempts[0], attempts[1])  # the retry starts from the cell as the first attempt found it
+        cell = spec.cell_dir("x", "a", 1)
+        files = os.listdir(cell)
+        self.assertNotIn("jit-100.jitrec", files)
+        self.assertNotIn("gc.log.0", files)
+        pids = {l.split("\t")[8] for l in open(os.path.join(cell, "iterations.tsv")).read().splitlines()[1:]}
+        self.assertEqual(pids, {"101"})
+        self.assertEqual(jfrevents.measured_ops(cell), 8)  # the ops of result.json's 8 iterations
+        voids = os.path.join(spec.out, ab.VOID_DIR, "x", "a")
+        (void,) = os.listdir(voids)
+        self.assertIn("jit-100.jitrec", os.listdir(os.path.join(voids, void)))
+
+    def test_ops_count_only_the_measured_rows_of_the_result(self):
+        # a cell retried before set_aside cleared it: the voided attempt's rows come first
+        d = tempfile.mkdtemp()
+        open(os.path.join(d, "iterations.tsv"), "w").write(HEAD + attempt_rows(8895, 8) + attempt_rows(9295, 8))
+        json.dump(result(8), open(os.path.join(d, "result.json"), "w"))
+        self.assertEqual(jfrevents.measured_ops(d), 8)
+        json.dump(result(16), open(os.path.join(d, "result.json"), "w"))  # two forks' worth: all of them count
+        self.assertEqual(jfrevents.measured_ops(d), 16)
 
 
 if __name__ == "__main__":

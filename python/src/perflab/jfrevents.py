@@ -130,12 +130,25 @@ def measured_ops(cell):
     if "ops" not in head or "kind" not in head:
         return None
     k, o = head.index("kind"), head.index("ops")
+    measured = [cols for cols in (row.split("\t") for row in rows[1:]) if len(cols) > max(k, o) and cols[k] == "measure"]
+    # the agent appends to iterations.tsv: more measured rows than the result has iterations are another run's (an
+    # attempt the loadgate voided, before set_aside cleared the cell), which came first
+    its = result_iterations(cell)
+    if its is not None and len(measured) > its:
+        measured = measured[len(measured) - its:]
     n = 0
-    for row in rows[1:]:
-        cols = row.split("\t")
-        if len(cols) > max(k, o) and cols[k] == "measure":
-            try:
-                n += float(cols[o])
-            except ValueError:
-                pass
+    for cols in measured:
+        try:
+            n += float(cols[o])
+        except ValueError:
+            pass
     return n or None
+
+
+def result_iterations(cell):
+    """How many measured iterations the cell's result.json has, over its forks; None without one."""
+    try:
+        r = json.load(open(os.path.join(cell, "result.json")))[0]
+        return sum(len(fork) for fork in r["primaryMetric"]["rawData"])
+    except (OSError, ValueError, KeyError, IndexError, TypeError):
+        return None

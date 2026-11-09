@@ -219,7 +219,7 @@ def write_args(path, args):
 # what a run writes into its directory: cleared before the next run there, so nothing stale is merged into its results
 JFRSYNC = "jfrsync.json"  # <cell>/jfrsync.json: the jfrsync the run was given, and what its recording has of what it added
 OUTPUTS = ["jmh.log", JFRSYNC, JIT_RECORDING, "jit.json", "result.json", "report.md", "audit-*.json", "**/*.jfr", "**/*.html", "**/*.regraph", "*.trace", "*.trace.*",
-           "iterations.tsv", "timeline.tsv", "gc.log", "gc-*.log", "run.json"]
+           "iterations.tsv", "timeline.tsv", "gc.log", "gc.log.*", "gc-*.log", "run.json"]
 
 
 def java_feature(java):
