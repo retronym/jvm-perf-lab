@@ -83,6 +83,21 @@ public class SbtCompileBenchmark {
         System.out.printf("[zinc-lab] op %d: %.1f s%n", ++ops, (System.nanoTime() - t0) / 1e9);
     }
 
+    /** Under an `audit:` profile the agent writes its report in a shutdown hook, which sbt's own hooks and the forked
+     *  VM's exit can keep from finishing; write it here, while the JVM is still whole. */
+    @TearDown(Level.Trial)
+    public void flushAudit() {
+        try {
+            var m = Class.forName("io.github.retronym.perflab.audit.Audit").getDeclaredMethod("writeReport");
+            m.setAccessible(true);
+            m.invoke(null);
+        } catch (ClassNotFoundException e) {
+            // no audit agent
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     private static boolean tryRun(File dir, String... cmd) throws Exception {
         return new ProcessBuilder(List.of(cmd)).directory(dir).inheritIO().start().waitFor() == 0;
     }
