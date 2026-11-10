@@ -1,0 +1,27 @@
+{
+  "name": "m5-zd-typednil-k4-wa",
+  "benchmark": "ZincDirectBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms16G -Xmx16G -Xss4M -XX:ReservedCodeCacheSize=512m",
+  "rounds": 2,
+  "gcLog": true,
+  "corpora": {
+    "stream-typednil": "-wi 5 -i 5 -w 1 -r 1"
+  },
+  "variants": {
+    "tip-k4": ""
+  },
+  "variantJmhArgs": {
+    "tip-k4": "-p zincVersion=1.12.1 -p scalaVersion=2.13.19-bin-6101d22-SNAPSHOT -p copies=4"
+  },
+  "loadgate": {
+    "maxCores": 6,
+    "quietSecs": 30
+  },
+  "description": "Wall-clock and allocation profile (async-profiler, no kperf) of 4 concurrent compiles of Pekko 1.7.1's `stream` with typed-`Nil` templates (labs/zinc/typed-nil.patch) at the Scala tip: the same workload as `m5-zd-typednil-k4`, which has the cycles and instructions profile. Shows waiting (GC pauses, locks, the copies' idle time) as well as running, and who allocates.",
+  "variantDescriptions": {
+    "tip-k4": "Zinc 1.12.1, Scala at the tip (6101d22); 4 concurrent compiles"
+  },
+  "profile": "async:wall,alloc"
+}
