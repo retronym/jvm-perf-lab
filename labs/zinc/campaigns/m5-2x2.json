@@ -1,7 +1,7 @@
 {
   "name": "m5-2x2",
   "benchmark": "SbtCompileBenchmark",
-  "profile": "xctrace:ipc-coarse",
+  "profile": "xctrace:ipc",
   "testbed": "m5-pro",
   "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
   "jvmArgs": "-Xms8G -Xmx8G -Xss4M -XX:ReservedCodeCacheSize=512m",

@@ -36,7 +36,7 @@ import io.github.retronym.perflab.jmh.PairedProfiler;
  * and splits the samples by thread: the JMH worker threads are the benchmark; GC and JIT are reported beside them.
  *
  * Two kinds of template:
- *  - event sampling (a "counters-profile" table, e.g. JMH's bundled template, or one bundled here: {@code ipc}, {@code ipc-coarse} (ipc at 100 Hz, for long many-threaded runs),
+ *  - event sampling (a "counters-profile" table, e.g. JMH's bundled template, or one bundled here: {@code ipc},
  *    {@code frontend}, {@code mem-l1d}; {@code make_template.py} beside them makes others):
  *    per-op counts of each event, IPC, per-kinst ratios;
  *  - Instruments' stock "CPU Counters" template (CPU Bottlenecks mode, a "CounterMetricByThread" table):
