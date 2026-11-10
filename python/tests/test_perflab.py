@@ -57,9 +57,9 @@ class RegraphSpansTest(unittest.TestCase):
 class RegraphKindsTest(unittest.TestCase):
     def test_default_graphs_are_the_whole_jvm(self):
         Project("")
-        self.assertEqual(regraph.kinds(), ["jvm", "jvm-reverse", "classify", "threads"])
-        self.assertEqual(regraph.KINDS["jvm"], (["--threads"], False))  # all threads, each a frame to zoom into: no thread is dropped
-        self.assertEqual(regraph.KINDS["jvm-reverse"], (["--threads"], True))
+        self.assertEqual(regraph.kinds(), ["jvm", "jvm-reverse"])
+        self.assertEqual(regraph.KINDS["jvm"], (["--threads", "--classify"], False))  # all threads; the viewer merges the thread and category layers
+        self.assertEqual(regraph.KINDS["jvm-reverse"], (["--threads", "--classify"], True))
 
     def test_filtered_kinds_say_so(self):
         Project("")
