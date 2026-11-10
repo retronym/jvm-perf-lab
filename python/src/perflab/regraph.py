@@ -4,7 +4,8 @@ beside the async-profiler library). Multi-event kperf recordings need a jfrconv 
   perflab regraph [--jfrconv <jfrconv>] [-j <jobs>] <run-dir>...
 
 A run directory is one `perflab run` or a campaign cell wrote with an async profile. For each JFR under it, each event and
-each graph kind (KINDS below; `[async] graphs = [...]` in perflab.toml or --kinds picks some), writes
+each graph kind (KINDS below; `[async] graphs = [...]` in perflab.toml or --kinds picks some; by default the whole JVM, with its threads as frames the
+viewer zooms into (`jvm`, `jvm-reverse`), `classify` and `threads`; not a graph with the other threads already dropped), writes
 `<jfr stem>-<label>[-<kind>].html`.
 
 With `[async] spans = true` the `bench` graphs get the span panel (`jfrconv --spans`), for recordings with spans from the
@@ -13,9 +14,26 @@ program (async-profiler's Span API, the perflab-spans jar); `[async] span_config
 import argparse, concurrent.futures, glob, os, re, shutil, subprocess, sys
 
 
+# The benchmark's threads, for the kinds that keep only them (`bench`, `reverse`, `*-classify`, profdiff, `perflab analyze`):
+# JMH's workers, unless [async] threads in perflab.toml names others (a benchmark that does its work on threads of its own).
+THREADS = ".*jmh-worker.*"
+
+
+def bench_threads():
+    """The regex of the benchmark's threads: [async] threads in perflab.toml, else JMH's workers."""
+    from . import config
+    return config.get().get("async", "threads") or THREADS
+
+
+def bench_filter():
+    return ["--threads", "-I", bench_threads()]
+
+
 # per kind: jfrconv options (thread filter, classification), and whether to render bottom-up
-BENCH = ["--threads", "-I", ".*jmh-worker.*"]
+BENCH = ["--threads", "-I", THREADS]  # the default; kinds() and render_one() use bench_filter(), which honours [async] threads
 KINDS = {
+    "jvm": (["--threads"], False),
+    "jvm-reverse": (["--threads"], True),
     "bench": (BENCH, False),
     "reverse": (BENCH, True),
     "threads": (["--threads"], False),
@@ -26,11 +44,14 @@ KINDS = {
 
 
 # what each kind and event shows, for tooltips on the pages that link the graphs
+FILTERED = ("bench", "reverse", "bench-classify", "reverse-classify")
 KIND_HELP = {
-    "bench": "Benchmark threads (JMH workers) only. Root at the bottom, callees above: where the benchmark spends this event, by call path.",
-    "reverse": "Benchmark threads only, stacks reversed: the methods where the event lands (leaves) at the top level, their callers beneath. Self cost by method.",
-    "bench-classify": "Benchmark threads only, each sample put under a category frame at the root by what it was doing: [c2_comp], [c1_comp], [Interpreter], [native], [vm], [gc], [jit], [class_load], ...",
-    "reverse-classify": "Benchmark threads only, by category as in bench-classify, with stacks reversed (leaves at the top level).",
+    "jvm": "The whole JVM, every thread: one tower per thread (the benchmark's, the JIT compilers, GC, ...) under a common root. Click a thread's frame to zoom into just that thread; search and the viewer's controls filter further. Root at the bottom, callees above.",
+    "jvm-reverse": "The whole JVM, every thread (the thread is the outermost frame), stacks reversed: the methods where the event lands (leaves) at the top level, their callers beneath. Self cost by method.",
+    "bench": "DEPRECATED, drops every other thread: use jvm. Benchmark threads (JMH workers, or [async] threads) only. Root at the bottom, callees above: where the benchmark spends this event, by call path.",
+    "reverse": "DEPRECATED, drops every other thread: use jvm-reverse. Benchmark threads only (JMH workers, or [async] threads), stacks reversed: the methods where the event lands (leaves) at the top level, their callers beneath. Self cost by method.",
+    "bench-classify": "DEPRECATED, drops every other thread: use classify. Benchmark threads only, each sample put under a category frame at the root by what it was doing: [c2_comp], [c1_comp], [Interpreter], [native], [vm], [gc], [jit], [class_load], ...",
+    "reverse-classify": "DEPRECATED, drops every other thread. Benchmark threads only, by category as in bench-classify, with stacks reversed (leaves at the top level).",
     "threads": "Every thread of the JVM, one tower per thread: JIT compiler, GC, JMH and JFR threads beside the benchmark.",
     "classify": "Every thread of the JVM, by category: [gc], [jit], [vm], [c2_comp], [Interpreter], [class_load], ... Shows how much goes to the JVM's own work.",
 }
@@ -56,10 +77,23 @@ def span_args():
     return ["--spans", *(["--span-config", conf] if conf else [])]
 
 
+_warned = []
+
+
+def kind_label(kind):
+    """What a button says: the kind, and for those that drop all but the benchmark's threads, that they do."""
+    return f"{kind} (bench threads only)" if kind in FILTERED else kind
+
+
 def kinds(explicit=None):
     """The graph kinds to render: `explicit`, else [async] graphs in perflab.toml, else all of KINDS."""
     from . import config
-    ks = explicit or config.get().get("async", "graphs") or list(KINDS)
+    ks = explicit or config.get().get("async", "graphs") or ["jvm", "jvm-reverse", "classify", "threads"]
+    filtered = [k for k in ks if k in FILTERED]
+    if filtered and not _warned:
+        _warned.append(1)
+        print(f"perflab: graph kinds {filtered} keep only the benchmark threads ({bench_threads()}) and drop the rest of the JVM: "
+              "use jvm, jvm-reverse and classify, or name the threads with [async] threads", file=sys.stderr)
     unknown = [k for k in ks if k not in KINDS]
     if unknown:
         sys.exit(f"unknown graph kinds {unknown}; known: {', '.join(KINDS)}")
@@ -111,6 +145,8 @@ def graph_path(jfr, label, kind):
 
 def render_one(jfrconv, jfr, label, select, kind, title):
     extra, reverse = KINDS[kind]
+    if kind in FILTERED:
+        extra = bench_filter() + [e for e in extra if e not in BENCH]
     if kind == "bench":
         extra = extra + span_args()
     out = graph_path(jfr, label, kind)
@@ -156,7 +192,7 @@ def main(argv):
     ap.add_argument("--heap", default=HEAP, help="jfrconv heap for reverse graphs")
     ap.add_argument("--force", action="store_true", help="redo graphs that are already up to date")
     ap.add_argument("--minwidth", default=MINWIDTH, help="jfrconv --minwidth, in percent (default %(default)s)")
-    ap.add_argument("--kinds", help=f"comma-separated graph kinds (default: [async] graphs in perflab.toml, else all: {','.join(KINDS)})")
+    ap.add_argument("--kinds", help=f"comma-separated graph kinds (default: [async] graphs in perflab.toml, else jvm,jvm-reverse,classify,threads; all kinds: {','.join(KINDS)})")
     ap.add_argument("dirs", nargs="+")
     a = ap.parse_args(argv)
     FORCE, HEAP, MINWIDTH = a.force, a.heap, a.minwidth

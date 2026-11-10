@@ -66,10 +66,10 @@ def graph_link(path, kind, event):
     """A flame graph's button, with its total (samples, or event counts for PMU events) once it is rendered."""
     n = runinfo.graph_samples(path) if os.path.exists(path) else None
     if n is None:
-        return link(path, kind, f"{event}|{kind}", regraph.KIND_HELP.get(kind))
+        return link(path, regraph.kind_label(kind), f"{event}|{kind}", regraph.KIND_HELP.get(kind))
     title = f"{regraph.KIND_HELP.get(kind, kind)} Total: {n:,} (samples, or event counts for PMU events)."
     return (f'<a class="btn{" empty" if n == 0 else ""}" href="{rel(path)}" data-lb="{esc(event)}|{esc(kind)}" title="{esc(title)}">'
-            f'{esc(kind)} <span class="k">{si(n) if n else 0}</span></a>')
+            f'{esc(regraph.kind_label(kind))} <span class="k">{si(n) if n else 0}</span></a>')
 
 
 def timeline_link(d):

@@ -54,6 +54,27 @@ class RegraphSpansTest(unittest.TestCase):
         self.assertEqual(regraph.span_args(), ["--spans"])
 
 
+class RegraphKindsTest(unittest.TestCase):
+    def test_default_graphs_are_the_whole_jvm(self):
+        Project("")
+        self.assertEqual(regraph.kinds(), ["jvm", "jvm-reverse", "classify", "threads"])
+        self.assertEqual(regraph.KINDS["jvm"], (["--threads"], False))  # all threads, each a frame to zoom into: no thread is dropped
+        self.assertEqual(regraph.KINDS["jvm-reverse"], (["--threads"], True))
+
+    def test_filtered_kinds_say_so(self):
+        Project("")
+        for k in regraph.FILTERED:
+            self.assertIn("only", regraph.kind_label(k))
+            self.assertIn("DEPRECATED", regraph.KIND_HELP[k])
+        self.assertEqual(regraph.kind_label("jvm"), "jvm")
+
+    def test_benchmark_threads_are_configurable(self):
+        Project("")
+        self.assertEqual(regraph.bench_filter(), ["--threads", "-I", ".*jmh-worker.*"])
+        Project('[async]\nthreads = ".*(jmh-worker|zinc-copy).*"\n')
+        self.assertEqual(regraph.bench_filter(), ["--threads", "-I", ".*(jmh-worker|zinc-copy).*"])
+
+
 class RunTest(unittest.TestCase):
     def setUp(self):
         self.p = Project('[build]\njmh = "java -jar b.jar {args}"\n[agent]\njar = "agent.jar"\n')

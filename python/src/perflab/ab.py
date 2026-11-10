@@ -808,7 +808,7 @@ def graphs(spec):
             continue
         tds = []
         for label in events:
-            links = [f'<a href="{os.path.relpath(regraph.graph_path(jfr, label, k), spec.out)}">{k}</a>'
+            links = [f'<a href="{os.path.relpath(regraph.graph_path(jfr, label, k), spec.out)}">{regraph.kind_label(k)}</a>'
                      for k in regraph.KINDS if os.path.exists(regraph.graph_path(jfr, label, k))]
             tds.append("<td>" + " · ".join(links) + "</td>")
         s = summary(json.load(open(os.path.join(cell, "result.json")))[0])
