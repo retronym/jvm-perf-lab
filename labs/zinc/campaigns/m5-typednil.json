@@ -5,9 +5,9 @@
   "testbed": "m5-pro",
   "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
   "jvmArgs": "-Xms8G -Xmx8G -Xss4M -XX:ReservedCodeCacheSize=512m",
-  "rounds": 2,
+  "rounds": 1,
   "gcLog": true,
-  "corpora": {"typednil": "-wi 2 -i 6 -w 1 -r 1"},
+  "corpora": {"typednil": "-wi 1 -i 3 -w 1 -r 1"},
   "variants": {"old": "", "new": ""},
   "variantJmhArgs": {
     "old": "-p sbtVersion=1.12.15 -p scalaVersion=2.13.18",
