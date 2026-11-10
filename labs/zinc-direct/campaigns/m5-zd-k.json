@@ -11,44 +11,26 @@
   },
   "variants": {
     "old-k1": "",
-    "old-k2": "",
-    "old-k4": "",
     "old-k8": "",
-    "old-k16": "",
     "new-k1": "",
-    "new-k2": "",
-    "new-k4": "",
-    "new-k8": "",
-    "new-k16": ""
+    "new-k8": ""
   },
   "variantJmhArgs": {
     "old-k1": "-p zincVersion=1.12.1 -p scalaVersion=2.13.18 -p copies=1",
-    "old-k2": "-p zincVersion=1.12.1 -p scalaVersion=2.13.18 -p copies=2",
-    "old-k4": "-p zincVersion=1.12.1 -p scalaVersion=2.13.18 -p copies=4",
     "old-k8": "-p zincVersion=1.12.1 -p scalaVersion=2.13.18 -p copies=8",
-    "old-k16": "-p zincVersion=1.12.1 -p scalaVersion=2.13.18 -p copies=16",
     "new-k1": "-p zincVersion=1.13.0 -p scalaVersion=2.13.19-bin-6101d22-SNAPSHOT -p copies=1",
-    "new-k2": "-p zincVersion=1.13.0 -p scalaVersion=2.13.19-bin-6101d22-SNAPSHOT -p copies=2",
-    "new-k4": "-p zincVersion=1.13.0 -p scalaVersion=2.13.19-bin-6101d22-SNAPSHOT -p copies=4",
-    "new-k8": "-p zincVersion=1.13.0 -p scalaVersion=2.13.19-bin-6101d22-SNAPSHOT -p copies=8",
-    "new-k16": "-p zincVersion=1.13.0 -p scalaVersion=2.13.19-bin-6101d22-SNAPSHOT -p copies=16"
+    "new-k8": "-p zincVersion=1.13.0 -p scalaVersion=2.13.19-bin-6101d22-SNAPSHOT -p copies=8"
   },
   "loadgate": {
     "maxCores": 6,
     "quietSecs": 30
   },
-  "description": "Zinc's own time by phase and the effect of concurrent compiles: K copies of Pekko 1.7.1's `stream` compiled at the same time in one JVM through Zinc's API, K in {1, 2, 4, 8, 16}, at the two corners Zinc 1.12.1 + Scala 2.13.18 and Zinc 1.13.0 + the Scala tip. Approximate (3 warmup ops, 5 measured; the pilot's K=1 plateaus by op 3 and K=8 by op 4). See labs/zinc-direct/README.md.",
+  "description": "Zinc's own time by phase and the effect of concurrent compiles: K copies of Pekko 1.7.1's `stream` compiled at the same time in one JVM through Zinc's API, K in {1, 8}, at the two corners Zinc 1.12.1 + Scala 2.13.18 and Zinc 1.13.0 + the Scala tip. Approximate (3 warmup ops, 5 measured; the pilot's K=1 plateaus by op 3 and K=8 by op 4). See labs/zinc-direct/README.md.",
   "variantDescriptions": {
     "old-k1": "Zinc 1.12.1, Scala 2.13.18; 1 concurrent compile",
-    "old-k2": "Zinc 1.12.1, Scala 2.13.18; 2 concurrent compiles",
-    "old-k4": "Zinc 1.12.1, Scala 2.13.18; 4 concurrent compiles",
     "old-k8": "Zinc 1.12.1, Scala 2.13.18; 8 concurrent compiles",
-    "old-k16": "Zinc 1.12.1, Scala 2.13.18; 16 concurrent compiles",
     "new-k1": "Zinc 1.13.0, Scala at the tip ([retronym/scala#231](https://github.com/retronym/scala/pull/231), 6101d22); 1 concurrent compile",
-    "new-k2": "Zinc 1.13.0, Scala at the tip ([retronym/scala#231](https://github.com/retronym/scala/pull/231), 6101d22); 2 concurrent compiles",
-    "new-k4": "Zinc 1.13.0, Scala at the tip ([retronym/scala#231](https://github.com/retronym/scala/pull/231), 6101d22); 4 concurrent compiles",
-    "new-k8": "Zinc 1.13.0, Scala at the tip ([retronym/scala#231](https://github.com/retronym/scala/pull/231), 6101d22); 8 concurrent compiles",
-    "new-k16": "Zinc 1.13.0, Scala at the tip ([retronym/scala#231](https://github.com/retronym/scala/pull/231), 6101d22); 16 concurrent compiles"
+    "new-k8": "Zinc 1.13.0, Scala at the tip ([retronym/scala#231](https://github.com/retronym/scala/pull/231), 6101d22); 8 concurrent compiles"
   },
   "profile": "async:cycles@15000000+instructions@50000000",
   "kperf": "/tmp/asprof-kperf.sock"
