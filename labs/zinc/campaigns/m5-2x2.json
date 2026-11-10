@@ -1,0 +1,25 @@
+{
+  "name": "m5-2x2",
+  "benchmark": "SbtCompileBenchmark",
+  "profile": "none",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss4M -XX:ReservedCodeCacheSize=512m",
+  "rounds": 2,
+  "corpora": {"stock": "-wi 4 -i 6 -w 1 -r 1"},
+  "variants": {"old": "", "scala-tip": "", "zinc-1.13": "", "new": ""},
+  "variantJmhArgs": {
+    "old": "-p sbtVersion=1.12.15 -p scalaVersion=2.13.18",
+    "scala-tip": "-p sbtVersion=1.12.15 -p scalaVersion=2.13.19-bin-6101d22-SNAPSHOT",
+    "zinc-1.13": "-p sbtVersion=1.13.1 -p scalaVersion=2.13.18",
+    "new": "-p sbtVersion=1.13.1 -p scalaVersion=2.13.19-bin-6101d22-SNAPSHOT"
+  },
+  "loadgate": {"maxCores": 3, "quietSecs": 30},
+  "description": "Whole-build `clean; compile` of Apache Pekko 1.7.1 in one warm, in-process sbt with default task parallelism: Scala {2.13.18, tip of [retronym/scala#231](https://github.com/retronym/scala/pull/231) (6101d22)} x Zinc {1.12.1 (sbt 1.12.15), 1.13.0 (sbt 1.13.1)}. See labs/zinc/README.md.",
+  "variantDescriptions": {
+    "old": "Scala 2.13.18, Zinc 1.12.1 (sbt 1.12.15): the releases current on 1 October 2026",
+    "scala-tip": "Scala at the tip, Zinc 1.12.1",
+    "zinc-1.13": "Scala 2.13.18, Zinc 1.13.0 (sbt 1.13.1)",
+    "new": "Scala at the tip, Zinc 1.13.0 (sbt 1.13.1)"
+  }
+}
