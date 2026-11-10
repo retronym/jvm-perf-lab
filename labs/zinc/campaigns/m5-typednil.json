@@ -1,7 +1,7 @@
 {
   "name": "m5-typednil",
   "benchmark": "SbtCompileBenchmark",
-  "profile": "async:cycles@15000000,instructions@50000000",
+  "profile": "async:cycles@15000000+instructions@50000000",
   "kperf": "/tmp/asprof-kperf.sock",
   "testbed": "m5-pro",
   "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
