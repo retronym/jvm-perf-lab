@@ -1,0 +1,10 @@
+/Users/jzaugg-virtus/.ivy2/local/org.scala-lang/scala-compiler/2.13.19-bin-6101d22-SNAPSHOT/jars/scala-compiler.jar
+/Users/jzaugg-virtus/.ivy2/local/org.scala-lang/scala-library/2.13.19-bin-6101d22-SNAPSHOT/jars/scala-library.jar
+/Users/jzaugg-virtus/.ivy2/local/org.scala-lang/scala-reflect/2.13.19-bin-6101d22-SNAPSHOT/jars/scala-reflect.jar
+/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/io/github/java-diff-utils/java-diff-utils/4.18/java-diff-utils-4.18.jar
+/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/jline/jline-terminal/3.30.17/jline-terminal-3.30.17.jar
+/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/jline/jline-terminal-jni/3.30.17/jline-terminal-jni-3.30.17.jar
+/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/jline/jline-reader/3.30.17/jline-reader-3.30.17.jar
+/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/jline/jline-builtins/3.30.17/jline-builtins-3.30.17.jar
+/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/jline/jline-native/3.30.17/jline-native-3.30.17.jar
+/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/jline/jline-style/3.30.17/jline-style-3.30.17.jar

@@ -1,0 +1,25 @@
+# perflab runs this lab's benchmark (README.md)
+[build]
+jmh = "sbt --client 'lab/Jmh/run {args}'"
+server = "sbt"
+
+[benchmark]
+default = "ZincDirectBenchmark"
+# the project under test, a directory of out/inputs
+corpus = "project"
+jvmArgs = "-Xms16G -Xmx16G -Xss4M -XX:ReservedCodeCacheSize=512m"
+
+[paths]
+runs = "out/runs"
+campaigns = "out/ab"
+
+[index]
+flags = "^-D|^-XX"
+
+[agent]
+jar = "~/.m2/repository/io/github/retronym/perflab/perflab-agent/0.1.0-SNAPSHOT/perflab-agent-0.1.0-SNAPSHOT.jar"
+
+[async]
+graphs = ["bench", "reverse"]
+# scalac's recursion exceeds async-profiler's default of 2048 frames
+stackdepth = 8192
