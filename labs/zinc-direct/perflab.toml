@@ -20,8 +20,9 @@ flags = "^-D|^-XX"
 jar = "~/.m2/repository/io/github/retronym/perflab/perflab-agent/0.1.0-SNAPSHOT/perflab-agent-0.1.0-SNAPSHOT.jar"
 
 [async]
-# the benchmark's work runs on the copies' own threads (zinc-copy-N), not on JMH's worker: `bench` and `reverse` keep only
-# the worker and show nothing of it. `threads` (a tower per thread) and `classify` (the whole JVM by category) cover every thread.
-graphs = ["threads", "classify"]
+# the whole JVM: the work is on the copies' own threads (zinc-copy-N), not JMH's worker; zoom into a thread in the viewer
+graphs = ["jvm", "jvm-reverse", "classify"]
+# the benchmark's threads, for profdiff and the per-benchmark-thread counters
+threads = ".*(jmh-worker|zinc-copy).*"
 # scalac's recursion exceeds async-profiler's default of 2048 frames
 stackdepth = 8192
