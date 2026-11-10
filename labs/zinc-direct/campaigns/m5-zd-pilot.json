@@ -1,0 +1,30 @@
+{
+  "name": "m5-zd-pilot",
+  "benchmark": "ZincDirectBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms16G -Xmx16G -Xss4M -XX:ReservedCodeCacheSize=512m",
+  "rounds": 1,
+  "gcLog": true,
+  "corpora": {
+    "stream": "-wi 10 -i 3 -w 1 -r 1"
+  },
+  "variants": {
+    "old-k1": "",
+    "old-k8": ""
+  },
+  "variantJmhArgs": {
+    "old-k1": "-p zincVersion=1.12.1 -p scalaVersion=2.13.18 -p copies=1",
+    "old-k8": "-p zincVersion=1.12.1 -p scalaVersion=2.13.18 -p copies=8"
+  },
+  "loadgate": {
+    "maxCores": 6,
+    "quietSecs": 30
+  },
+  "description": "Pilot for the zinc-direct lab: one fork each of K=1 and K=8 concurrent clean compiles of Pekko 1.7.1's `stream` through Zinc's API (no sbt), to size warmup. See labs/zinc-direct/README.md.",
+  "variantDescriptions": {
+    "old-k1": "Zinc 1.12.1, Scala 2.13.18; 1 concurrent compile",
+    "old-k8": "Zinc 1.12.1, Scala 2.13.18; 8 concurrent compiles"
+  },
+  "profile": "none"
+}
