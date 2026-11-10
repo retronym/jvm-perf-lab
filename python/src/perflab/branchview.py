@@ -42,6 +42,19 @@ from . import loadgate, metrics, ui
 BRANCH_NAME = "branch.json"
 esc = html.escape
 
+
+def variant_order(campaign_dir, spec):
+    """The campaign's variants in the order its summaries list them and measure Δ from (the first is the baseline): a
+    branch campaign's commits in branch order, the base first (branch.json; its spec has no "variants"), else the
+    spec's variants in its order."""
+    try:
+        cs = json.load(open(os.path.join(campaign_dir, BRANCH_NAME))).get("commits") or []
+    except (OSError, ValueError):
+        cs = []
+    if cs:
+        return [c.get("variant") or c["short"] for c in sorted(cs, key=lambda c: c.get("index", 0))]
+    return list((spec or {}).get("variants") or {})
+
 raw_source, raw_of = metrics.raw_source, metrics.raw_of
 
 

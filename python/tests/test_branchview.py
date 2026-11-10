@@ -551,5 +551,46 @@ class BranchIndexTest(unittest.TestCase):
             self.assertEqual(r.returncode, 0, r.stderr)
 
 
+class BranchOrderTest(unittest.TestCase):
+    """A branch campaign's spec has no variants: its summaries follow branch.json (the base first), not the commits'
+    alphabetical order, and measure Δ against the base."""
+    IDS = ["6157e2edf7", "602de737b6", "1f7da6f721", "5e2a4abc23"]  # branch order; sorted() would reverse it
+
+    def setUp(self):
+        Project()
+        self.camps = config.get().campaigns
+        camp = os.path.join(self.camps, "ord")
+        os.makedirs(camp)
+        commits = [{"sha": v + "0" * 30, "short": v, "variant": v, "tree": "t" + v, "parents": [], "subject": f"Commit {i}",
+                    "author": "x", "date": f"2026-10-2{i}T10:00:00+02:00", "index": i, "merged": []} for i, v in enumerate(self.IDS)]
+        json.dump({"checkout": "/repo", "range": "base..tip", "firstParent": True, "base": commits[0]["sha"], "tip": commits[-1]["sha"],
+                   "commits": commits, "order": self.IDS}, open(os.path.join(camp, "branch.json"), "w"))
+        json.dump({"name": "ord", "rounds": 1, "corpora": ["a"], "branch": {"checkout": "/repo", "range": "base..tip"}},
+                  open(os.path.join(camp, "spec.json"), "w"))
+        for i, v in enumerate(self.IDS):
+            d = os.path.join(camp, "a", v, "1")
+            os.makedirs(d)
+            json.dump([result("a", [[10.0 + i, 10.1 + i]] * 2, [[1e6, 1e6]] * 2)], open(os.path.join(d, "result.json"), "w"))
+
+    def test_variant_order_is_the_branch_order(self):
+        self.assertEqual(branchview.variant_order(os.path.join(self.camps, "ord"), {}), self.IDS)
+        self.assertEqual(branchview.variant_order(self.camps, {"variants": {"z": "", "y": ""}}), ["z", "y"])
+
+    def test_card_summary_rows_follow_the_branch_and_the_base_is_the_baseline(self):
+        page = open(index.build(self.camps)).read()
+        card = page[page.index('id="c-ord"'):]
+        table = card[card.index('class="summ'):]
+        seen = [m for m in re.findall(r"\b(" + "|".join(self.IDS) + r")\b", table)]
+        firsts = list(dict.fromkeys(seen))
+        self.assertEqual(firsts, self.IDS)
+
+    def test_index_summary_orders_by_branch_and_the_first_is_the_baseline(self):
+        index.CAMPAIGNS = self.camps
+        cells = {"a": {v: [(0, 0, 0, 0, 0, 0, 0, 0, json.load(open(os.path.join(self.camps, "ord", "a", v, "1", "result.json")))[0], os.path.join(self.camps, "ord", "a", v, "1"))] for v in sorted(self.IDS)}}
+        html_ = index.summary("ord", cells)
+        pos = [html_.index(v) for v in self.IDS]
+        self.assertEqual(pos, sorted(pos))
+
+
 if __name__ == "__main__":
     unittest.main()
