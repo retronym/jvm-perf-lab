@@ -1,0 +1,31 @@
+{
+  "name": "m5-zd-control",
+  "benchmark": "ZincDirectBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms16G -Xmx16G -Xss4M -XX:ReservedCodeCacheSize=512m",
+  "rounds": 3,
+  "gcLog": true,
+  "corpora": {
+    "stream": "-wi 8 -i 5 -w 1 -r 1"
+  },
+  "variants": {
+    "stock": "",
+    "tip": ""
+  },
+  "variantJmhArgs": {
+    "stock": "-p zincVersion=1.12.1 -p scalaVersion=2.13.18 -p copies=1",
+    "tip": "-p zincVersion=1.12.1 -p scalaVersion=2.13.19-bin-6101d22-SNAPSHOT -p copies=1"
+  },
+  "loadgate": {
+    "maxCores": 6,
+    "quietSecs": 30
+  },
+  "description": "Control for the zinc-direct lab: only the Scala differs (Zinc 1.12.1, one compile of Pekko 1.7.1's `stream`, profiled with kperf cycles/instructions). [scala/scala#11367](https://github.com/scala/scala/pull/11367) should show as the itable stub share of cycles falling (10.5% to 1.3% in the PR's measurement, where `@specialized` makes a third analyzer class) and a lower time per compile. If it does not, the harness or this corpus cannot see it.",
+  "variantDescriptions": {
+    "stock": "Zinc 1.12.1, Scala 2.13.18 (no AbstractAnalyzer)",
+    "tip": "Zinc 1.12.1, Scala at the tip (6101d22), which has [scala/scala#11367](https://github.com/scala/scala/pull/11367): the typechecker's calls to its analyzer are invokevirtual, not invokeinterface"
+  },
+  "profile": "async:cycles@15000000+instructions@50000000",
+  "kperf": "/tmp/asprof-kperf.sock"
+}
