@@ -119,7 +119,8 @@ def events_of(profile, kperf=False):
 
 
 FORCE = False
-MINWIDTH = "0.01"  # percent of samples below which jfrconv drops a frame; small enough to zoom into details
+MINWIDTH = "0.001"  # percent of samples below which jfrconv drops a frame: finer than the page shows (below), so the viewer's Collapse merges thin pieces of work into boxes that are wide enough to see
+DISPLAY_MINWIDTH = "0.01"  # percent of the graph below which the viewer hides a frame (jfrconv --display-minwidth), after merging frames
 HEAP = "24g"
 
 
@@ -129,7 +130,7 @@ def stamp(jfrconv):
     path = shutil.which(jfrconv) or jfrconv
     spans = span_args()
     conf = f" {os.path.getmtime(spans[-1]):.0f}" if len(spans) > 1 and os.path.exists(spans[-1]) else ""
-    return f"{os.path.realpath(path)} {os.path.getmtime(path):.0f} minwidth={MINWIDTH}" + (f" {' '.join(spans)}{conf}" if spans else "")
+    return f"{os.path.realpath(path)} {os.path.getmtime(path):.0f} minwidth={MINWIDTH}/{DISPLAY_MINWIDTH}" + (f" {' '.join(spans)}{conf}" if spans else "")
 
 
 def stamp_of(jfr):
@@ -153,7 +154,7 @@ def render_one(jfrconv, jfr, label, select, kind, title):
     if not FORCE and os.path.exists(out) and stamp_of(jfr) == stamp(jfrconv) and os.path.getmtime(out) > os.path.getmtime(jfr):
         return None
     # reverse graphs of deep Scala stacks need a lot of heap (over 8 GB for a 1 GB kperf JFR)
-    cmd = [jfrconv, f"-J-Xmx{HEAP if reverse else '4g'}", *select, *extra, *(["--reverse"] if reverse else []), "--minwidth", MINWIDTH, "--title", title, jfr, out]
+    cmd = [jfrconv, f"-J-Xmx{HEAP if reverse else '4g'}", *select, *extra, *(["--reverse"] if reverse else []), "--minwidth", MINWIDTH, "--display-minwidth", DISPLAY_MINWIDTH, "--title", title, jfr, out]
     r = subprocess.run(cmd, capture_output=True, text=True)
     return f"{out}: jfrconv failed: {r.stderr.strip()[:300]}" if r.returncode else None
 
@@ -185,17 +186,18 @@ def regraph(dirs, jfrconv=None, jobs=4, title_of=None, kinds_=None):
 
 
 def main(argv):
-    global FORCE, HEAP, MINWIDTH
+    global FORCE, HEAP, MINWIDTH, DISPLAY_MINWIDTH
     ap = argparse.ArgumentParser(prog="perflab regraph", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--jfrconv")
     ap.add_argument("-j", "--jobs", type=int, default=4)
     ap.add_argument("--heap", default=HEAP, help="jfrconv heap for reverse graphs")
     ap.add_argument("--force", action="store_true", help="redo graphs that are already up to date")
     ap.add_argument("--minwidth", default=MINWIDTH, help="jfrconv --minwidth, in percent (default %(default)s)")
+    ap.add_argument("--display-minwidth", default=DISPLAY_MINWIDTH, help="jfrconv --display-minwidth, in percent: what the viewer hides after merging frames (default %(default)s)")
     ap.add_argument("--kinds", help=f"comma-separated graph kinds (default: [async] graphs in perflab.toml, else jvm,jvm-reverse; all kinds: {','.join(KINDS)})")
     ap.add_argument("dirs", nargs="+")
     a = ap.parse_args(argv)
-    FORCE, HEAP, MINWIDTH = a.force, a.heap, a.minwidth
+    FORCE, HEAP, MINWIDTH, DISPLAY_MINWIDTH = a.force, a.heap, a.minwidth, a.display_minwidth
     ok, problems = regraph(a.dirs, a.jfrconv, a.jobs, kinds_=a.kinds.split(",") if a.kinds else None)
     print(f"{ok} graphs written, {len(problems)} problems")
     return 1 if problems else 0
