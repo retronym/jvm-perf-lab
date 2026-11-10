@@ -1,0 +1,26 @@
+diff --git a/stream/src/main/boilerplate/org/apache/pekko/stream/FanInShapeN.scala.template b/stream/src/main/boilerplate/org/apache/pekko/stream/FanInShapeN.scala.template
+index ccee4d7..1607af4 100644
+--- a/stream/src/main/boilerplate/org/apache/pekko/stream/FanInShapeN.scala.template
++++ b/stream/src/main/boilerplate/org/apache/pekko/stream/FanInShapeN.scala.template
+@@ -17,7 +17,7 @@ import scala.annotation.unchecked.uncheckedVariance
+ 
+ [2..#class FanInShape1[[#-T0#], +O](_init: FanInShape.Init[O]) extends FanInShape[O](_init) {
+   def this(name: String) = this(FanInShape.Name[O](name))
+-  def this([#in0: Inlet[T0]#], out: Outlet[O]) = this(FanInShape.Ports(out, [#in0# :: ] :: Nil))
++  def this([#in0: Inlet[T0]#], out: Outlet[O]) = this(FanInShape.Ports(out, [#in0# :: ] :: (Nil: List[Inlet[_]])))
+   override protected def construct(init: FanInShape.Init[O @uncheckedVariance]): FanInShape[O] = new FanInShape1(init)
+   override def deepCopy(): FanInShape1[[#T0#], O] = super.deepCopy().asInstanceOf[FanInShape1[[#T0#], O]]
+ 
+diff --git a/stream/src/main/boilerplate/org/apache/pekko/stream/FanOutShapeN.scala.template b/stream/src/main/boilerplate/org/apache/pekko/stream/FanOutShapeN.scala.template
+index d7e1098..6502c70 100644
+--- a/stream/src/main/boilerplate/org/apache/pekko/stream/FanOutShapeN.scala.template
++++ b/stream/src/main/boilerplate/org/apache/pekko/stream/FanOutShapeN.scala.template
+@@ -17,7 +17,7 @@ import scala.annotation.unchecked.uncheckedVariance
+ 
+ [2..#class FanOutShape1[-I, [#+O0#]](_init: FanOutShape.Init[I @uncheckedVariance]) extends FanOutShape[I](_init) {
+   def this(name: String) = this(FanOutShape.Name[I](name))
+-  def this(in: Inlet[I], [#out0: Outlet[O0]#]) = this(FanOutShape.Ports(in, [#out0# :: ] :: Nil))
++  def this(in: Inlet[I], [#out0: Outlet[O0]#]) = this(FanOutShape.Ports(in, [#out0# :: ] :: (Nil: List[Outlet[_]])))
+   override protected def construct(init: FanOutShape.Init[I @uncheckedVariance]): FanOutShape[I] = new FanOutShape1(init)
+   override def deepCopy(): FanOutShape1[I, [#O0#]] = super.deepCopy().asInstanceOf[FanOutShape1[I, [#O0#]]]
+   
