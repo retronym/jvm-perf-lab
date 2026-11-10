@@ -20,6 +20,6 @@ flags = "^-D|^-XX"
 jar = "~/.m2/repository/io/github/retronym/perflab/perflab-agent/0.1.0-SNAPSHOT/perflab-agent-0.1.0-SNAPSHOT.jar"
 
 [async]
-graphs = ["bench", "reverse"]
+graphs = ["bench", "reverse", "threads", "classify"]
 # scalac's recursion exceeds async-profiler's default of 2048 frames
 stackdepth = 8192
