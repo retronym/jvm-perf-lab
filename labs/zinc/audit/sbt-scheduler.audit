@@ -1,0 +1,10 @@
+# sbt 1.12.15's task scheduler: how often the tag bookkeeping (ConcurrentRestrictions.update) runs per op, and what drives it.
+# $$anon$4 is the CompletionService of ConcurrentRestrictions.completionService, $$anon$3 the `tagged` restrictions.
+# Exact counts are cheap; only `update-sites` walks stacks, one hit in 10000.
+count submits     at=sbt.ConcurrentRestrictions$$anon$4#submit
+count completions at=sbt.ConcurrentRestrictions$$anon$4#cleanup
+count pending-scans at=sbt.ConcurrentRestrictions$$anon$4#submitValid(Ljava/util/Queue;
+count tags-add    at=sbt.ConcurrentRestrictions$$anon$3#add
+count tags-remove at=sbt.ConcurrentRestrictions$$anon$3#remove
+count update      at=sbt.ConcurrentRestrictions$#update
+sites update-sites at=sbt.ConcurrentRestrictions$#update  depth=6  sample=10000
