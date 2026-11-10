@@ -8,14 +8,14 @@ set -euo pipefail
 here=$(cd "$(dirname "$0")/.." && pwd)
 proj=$1
 src=${PEKKO_CHECKOUT:-$here/../zinc/out/pekko}
-ws=$here/out/pekko
+ws=$here/out/${WORKSPACE:-pekko}
 if [ ! -d "$ws" ]; then /bin/cp -cR "$src" "$ws" 2>/dev/null || cp -R "$src" "$ws"; cp -R "$here/../zinc/overlay/." "$ws"; fi
 log=$here/out/extract-$proj.log
 cmds=('set every targetSystemJdk := true' '++2.13.18!')
 [ "${2:-}" = compile ] && cmds+=("$proj/compile")
 cmds+=("export $proj/Compile/fullClasspath" "show $proj/Compile/scalacOptions" "show $proj/Compile/javacOptions" "show $proj/Compile/sources")
 [ -n "${REUSE_LOG:-}" ] || (cd "$ws" && nice -n 19 sbt -batch -J-XX:ActiveProcessorCount=${EXTRACT_CPUS:-18} -Dsbt.color=false -Dsbt.supershell=false "${cmds[@]}" > "$log" 2>&1)
-out=$here/out/inputs/$proj
+out=$here/out/inputs/${INPUTS_AS:-$proj}
 mkdir -p "$out"
 python3 -I - "$log" "$out" "$ws/$proj" <<'PY'
 import sys, re
