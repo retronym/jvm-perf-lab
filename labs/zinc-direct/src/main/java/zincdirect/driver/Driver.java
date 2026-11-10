@@ -49,7 +49,6 @@ public final class Driver {
     private final VirtualFile[] classpath;
     private final String[] scalacOptions;
     private final String[] javacOptions;
-    private final TimedJavac javac;
     private final PlainVirtualFileConverter converter = PlainVirtualFileConverter.converter();
     private final Copy[] copy;
 
@@ -65,11 +64,7 @@ public final class Driver {
         scalaInstance = new Instance(scalaV, scalaJars);
         Path bridge = bridge(zincV, scalaV, cpDir, scalaJars);
         AnalyzingCompilerHolder holder = new AnalyzingCompilerHolder(scalaInstance, bridge);
-        javac = new TimedJavac(JavaTools$.MODULE$.directOrFork(scalaInstance, ClasspathOptions.of(false, false, false, false, false), scala.Option.empty()).javac());
-        JavaTools tools = new JavaTools() {
-            public JavaCompiler javac() { return javac; }
-            public Javadoc javadoc() { return JavaTools$.MODULE$.directOrFork(scalaInstance, ClasspathOptions.of(false, false, false, false, false), scala.Option.empty()).javadoc(); }
-        };
+        JavaTools tools = JavaTools$.MODULE$.directOrFork(scalaInstance, ClasspathOptions.of(false, false, false, false, false), scala.Option.empty());
         compilers = Compilers.of(holder.compiler, tools);
 
         sources = readPaths(inputs.resolve("sources.txt")).stream().map(p -> converter.toVirtualFile(p)).toArray(VirtualFile[]::new);
@@ -146,8 +141,11 @@ public final class Driver {
         void compile() throws Exception {
             Progress progress = new Progress();
             Counting reporter = new Counting();
-            TimedJavac.Slot jslot = javac.slot();
-            CompileOptions options = CompileOptions.of(classpath, sources, classes, scalacOptions, javacOptions, 100, p -> p, CompileOrder.Mixed);
+            // like sbt, the classpath starts with the output directory, which javac needs to see scalac's classes
+            VirtualFile[] cp = new VirtualFile[classpath.length + 1];
+            cp[0] = converter.toVirtualFile(classes);
+            System.arraycopy(classpath, 0, cp, 1, classpath.length);
+            CompileOptions options = CompileOptions.of(cp, sources, classes, scalacOptions, javacOptions, 100, p -> p, CompileOrder.Mixed);
             Setup setup = Setup.of(new Lookup(), false, analysisFile, CompilerCache.fresh(), IncOptions.of(), reporter,
                 Optional.of(progress), new xsbti.T2[0]);
             Inputs inputs = Inputs.of(compilers, options, setup, PreviousResult.of(Optional.empty(), Optional.empty()));
@@ -161,14 +159,10 @@ public final class Driver {
             long t2 = System.nanoTime();
             totalMs = (t2 - t0) / 1e6;
             ms.clear();
-            double javacMs = jslot.ms();
-            double scalac = 0;
             for (Map.Entry<String, Double> e : progress.phase.entrySet()) { ms.put("phase:" + e.getKey(), e.getValue()); }
             ms.put("pre", progress.pre);
-            ms.put("scalac", progress.scalacMs());
-            ms.put("javac", javacMs);
-            // after the last phase: invalidation, analysis merge, anything else Zinc does; javac runs there too
-            ms.put("post", Math.max(0, progress.post - javacMs));
+            // after the last phase: invalidation, analysis merge, anything else Zinc does
+            ms.put("post", progress.post);
             ms.put("persist", (t2 - t1) / 1e6);
             errors = reporter.errors;
             warnings = reporter.warnings;
@@ -231,21 +225,6 @@ public final class Driver {
         public void trace(Supplier<Throwable> t) { }
     }
 
-    /** Times the javac Zinc runs for the mixed sources. One slot per compile (a copy runs on one thread). */
-    private static final class TimedJavac implements JavaCompiler {
-        private final JavaCompiler delegate;
-        private final ThreadLocal<Slot> slots = new ThreadLocal<>();
-        TimedJavac(JavaCompiler delegate) { this.delegate = delegate; }
-        static final class Slot { long nanos; double ms() { return nanos / 1e6; } }
-        Slot slot() { Slot s = new Slot(); slots.set(s); return s; }
-        public boolean supportsDirectToJar() { return delegate.supportsDirectToJar(); }
-        public boolean run(VirtualFile[] sources, String[] options, Output output, IncToolOptions in, Reporter reporter, Logger log) {
-            long t = System.nanoTime();
-            try { return delegate.run(sources, options, output, in, reporter, log); }
-            finally { Slot s = slots.get(); if (s != null) s.nanos += System.nanoTime() - t; }
-        }
-    }
-
     // --- Scala instance and compiler bridge -------------------------------------------------------------------------
 
     private static final class Instance implements ScalaInstance {
@@ -295,6 +274,12 @@ public final class Driver {
             try (ZipFile z = new ZipFile(sj.toFile())) {
                 for (Enumeration<? extends ZipEntry> en = z.entries(); en.hasMoreElements();) {
                     ZipEntry e = en.nextElement();
+                    if (!e.isDirectory() && e.getName().startsWith("META-INF/services/")) { // the bridge is found through ServiceLoader
+                        Path r = out.resolve(e.getName());
+                        Files.createDirectories(r.getParent());
+                        try (InputStream in = z.getInputStream(e)) { Files.copy(in, r); }
+                        continue;
+                    }
                     if (e.isDirectory() || !(e.getName().endsWith(".scala") || e.getName().endsWith(".java"))) continue;
                     Path p = src.resolve(e.getName());
                     Files.createDirectories(p.getParent());

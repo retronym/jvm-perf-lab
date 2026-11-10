@@ -46,7 +46,7 @@ public class ZincDirectBenchmark {
     private Method clean, round;
     private int ops;
 
-    /** Per-copy means over the round, ms: a copy's total is pre + scalac + javac + post + persist. */
+    /** Per-copy means over the round, ms: a copy's total is pre + the phases + post + persist. */
     @AuxCounters(AuxCounters.Type.EVENTS)
     @State(Scope.Thread)
     public static class Where {
@@ -59,7 +59,7 @@ public class ZincDirectBenchmark {
         public double backendMs;
         /** Zinc's `xsbt-api` (API extraction, name hashing) and `xsbt-dependency` phases */
         public double apiMs;
-        /** Zinc's `xsbt-analyzer` phase (class file and product callbacks) */
+        /** Zinc's `xsbt-analyzer` phase (class file and product callbacks) and its analysis of javac's output */
         public double analyzerMs;
         public double javacMs;
         /** after the last phase: invalidation and the analysis merge */
@@ -119,7 +119,6 @@ public class ZincDirectBenchmark {
         w.copyMeanMs += m.get("total");
         w.copyMaxMs += m.get("copyMax");
         w.preMs += m.get("pre");
-        w.javacMs += m.get("javac");
         w.postMs += m.get("post");
         w.persistMs += m.get("persist");
         w.errors += m.get("errors");
@@ -130,7 +129,8 @@ public class ZincDirectBenchmark {
             switch (p) {
                 case "jvm": w.backendMs += e.getValue(); break;
                 case "xsbt-api": case "xsbt-dependency": w.apiMs += e.getValue(); break;
-                case "xsbt-analyzer": w.analyzerMs += e.getValue(); break;
+                case "Java compilation": w.javacMs += e.getValue(); break;
+                case "xsbt-analyzer": case "Java analysis": w.analyzerMs += e.getValue(); break;
                 default: w.frontMs += e.getValue();
             }
         }
