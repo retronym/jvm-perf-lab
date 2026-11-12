@@ -1,0 +1,41 @@
+{
+  "name": "m5-zd-clean-tip-ab",
+  "rounds": 3,
+  "description": [
+    "Does the Scala 2.13.x tip built with the release optimiser remove the indirect cost that Zinc's default mode adds to scalac's own phases? In `m5-zd-clean-prof`, `actor`'s typer and transform were 122 ms/op slower in default mode, led by the `itable stub` of the typer's self-type dispatch, which [scala/scala#11367](https://github.com/scala/scala/pull/11367) (merged into 2.13.x) devirtualises.",
+    "Zinc is sbt/zinc develop with the clean build mode ([retronym/zinc#100](https://github.com/retronym/zinc/pull/100), `dev-cb`). Scala is 2.13.18 from Maven (built with the release optimiser) or the 2.13.x tip 762d80f, built locally with `enableOptimizer` and published to ~/.ivy2/local. One compile at a time of Pekko 1.7.1 `actor` and `stream`.",
+    "The tip's compiler bridge is compiled from develop's bridge sources against the tip: the published `compiler-bridge_2.13` (compiled against 2.13.16) fails on the tip with `NoSuchMethodError: StdAttachments$MacroExpansionAttachment.$outer()` returning `Analyzer`, from `xsbt.GlobalHelpers.processMacroExpansion`, since #11367 changed the attachment's outer type.",
+    "Timing: no profiler, 3 forks per variant and project."
+  ],
+  "benchmark": "ZincDirectBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms16G -Xmx16G -Xss4M -XX:ReservedCodeCacheSize=512m",
+  "gcLog": true,
+  "corpora": {
+    "actor": "-wi 6 -i 6 -w 1 -r 1",
+    "stream": "-wi 6 -i 6 -w 1 -r 1"
+  },
+  "variants": {
+    "r18-default": "",
+    "r18-clean": "",
+    "tip-default": "",
+    "tip-clean": ""
+  },
+  "variantJmhArgs": {
+    "r18-default": "-p zincVersion=dev-cb -p scalaVersion=2.13.18 -p copies=1 -p mode=default",
+    "r18-clean": "-p zincVersion=dev-cb -p scalaVersion=2.13.18 -p copies=1 -p mode=clean",
+    "tip-default": "-p zincVersion=dev-cb -p scalaVersion=2.13.19-bin-762d80f-SNAPSHOT -p copies=1 -p mode=default",
+    "tip-clean": "-p zincVersion=dev-cb -p scalaVersion=2.13.19-bin-762d80f-SNAPSHOT -p copies=1 -p mode=clean"
+  },
+  "loadgate": {
+    "maxCores": 6,
+    "quietSecs": 30
+  },
+  "variantDescriptions": {
+    "r18-default": "Scala 2.13.18 (Maven); Zinc default mode, analysis built and written",
+    "r18-clean": "Scala 2.13.18 (Maven); Zinc clean build mode, no analysis",
+    "tip-default": "Scala 2.13.x tip 762d80f, release optimiser; Zinc default mode, analysis built and written",
+    "tip-clean": "Scala 2.13.x tip 762d80f, release optimiser; Zinc clean build mode, no analysis"
+  }
+}
