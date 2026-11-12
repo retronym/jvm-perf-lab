@@ -1346,7 +1346,8 @@ def audit(campaign, project=None, corpus=None, round=None, top=10):
         if not reports:
             raise ApiError("not_found", f"{campaign}: no audit reports (audit-<pid>.json)" + (f" for corpus {corpus}" if corpus else "")
                            + (f" in round {round}" if round else ""), {"profile": spec.get("profile")})
-        order = [v for v in (spec.get("variants") or {}) if v in reports] + sorted(v for v in reports if v not in (spec.get("variants") or {}))
+        known = branchview.variant_order(d, spec)
+        order = [v for v in known if v in reports] + sorted(v for v in reports if v not in known)
         out = []
         for v in order:
             forks, counters, probes = [], {}, {}

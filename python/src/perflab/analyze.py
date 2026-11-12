@@ -63,7 +63,7 @@ class Phases:
 
 def collapsed(jfr, kind):
     args = ["--hw", kind[3:]] if kind.startswith("hw:") else [f"--{kind}"]
-    out = subprocess.run([jmh.jfrconv(jmh.async_lib()), *args, "--threads", "-I", ".*jmh-worker.*", "-o", "collapsed", jfr, "/dev/stdout"],
+    out = subprocess.run([jmh.jfrconv(jmh.async_lib()), *args, *regraph.bench_filter(), "-o", "collapsed", jfr, "/dev/stdout"],
                          capture_output=True, text=True).stdout
     from . import profdiff
     for stack, n in profdiff.stacks(out.splitlines()):

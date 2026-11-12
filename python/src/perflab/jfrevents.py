@@ -111,7 +111,7 @@ def precise(cell):
             return json.load(open(f))
         except ValueError:
             pass
-    c = run(java_for(cell), "precise", jfr, "jmh-worker", heap="8g")["events"]  # a kperf recording's constant pools are large
+    c = run(java_for(cell), "precise", jfr, regraph.bench_threads(), heap="8g")["events"]  # a kperf recording's constant pools are large
     with open(f + ".tmp", "w") as out:
         json.dump(c, out)
     os.replace(f + ".tmp", f)

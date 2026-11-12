@@ -40,6 +40,7 @@ def page(template, title, frames, script="", h1=None, inverted=False):
     left and width integers on one scale, the root first at level 0. `h1`: the heading's HTML, if not the title;
     `inverted`: the roots at the top, as the viewer's invert (I) shows them."""
     head, tail = split(template)
+    head = re.sub(r"const layers = \[[^\]]*\];", "const layers = [];", head, count=1)  # the template's thread and category layers are not these frames
     if inverted:
         head = re.sub(r"let inverted = false;", "let inverted = true;", head, count=1)
     depth = max(level for _, level, _, _ in frames) + 1

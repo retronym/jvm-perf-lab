@@ -66,10 +66,10 @@ def graph_link(path, kind, event):
     """A flame graph's button, with its total (samples, or event counts for PMU events) once it is rendered."""
     n = runinfo.graph_samples(path) if os.path.exists(path) else None
     if n is None:
-        return link(path, kind, f"{event}|{kind}", regraph.KIND_HELP.get(kind))
+        return link(path, regraph.kind_label(kind), f"{event}|{kind}", regraph.KIND_HELP.get(kind))
     title = f"{regraph.KIND_HELP.get(kind, kind)} Total: {n:,} (samples, or event counts for PMU events)."
     return (f'<a class="btn{" empty" if n == 0 else ""}" href="{rel(path)}" data-lb="{esc(event)}|{esc(kind)}" title="{esc(title)}">'
-            f'{esc(kind)} <span class="k">{si(n) if n else 0}</span></a>')
+            f'{esc(regraph.kind_label(kind))} <span class="k">{si(n) if n else 0}</span></a>')
 
 
 def timeline_link(d):
@@ -162,14 +162,14 @@ def score_head(units, suffix=""):
 def summary(name, cells):
     """Per corpus and variant: the means over forks of the cells' `metrics` (score, the benchmark threads' cycles,
     instructions and IPC, allocation, every PMU counter recorded, the thread groups' share of cycles), each against the
-    spec's first variant (in the order of the campaign's spec.json, else alphabetical); per unit of work with the spec's
+    first variant (a branch campaign's base, in branch.json's order; else the spec's order, else alphabetical); per unit of work with the spec's
     "perUnit", toggled with per op on the card. The table shows the main metrics, the pivot and chart all of them. For a paired campaign, each variant's
     own metrics and the paired differences within forks (`paired_summary`)."""
     spec_f = os.path.join(CAMPAIGNS, name, "spec.json")
     spec = json.load(open(spec_f)) if os.path.exists(spec_f) else {}
     if spec.get("paired"):
         return paired_summary(list(spec["paired"]), cells)
-    order, per_unit = list(spec.get("variants", {})), spec.get("perUnit")
+    order, per_unit = branchview.variant_order(os.path.join(CAMPAIGNS, name), spec), spec.get("perUnit")
     if not per_unit:
         return metric_summary(cells, order, None)
     # per unit and per op, the page showing the one picked on the card's toggle (`norm_toggle`)
@@ -1512,7 +1512,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
       if paired:
           summ = summary(name, cells)
       else:
-          order = list(spec_json.get("variants") or {})
+          order = branchview.variant_order(spec_dir, spec_json)
           try:
               planned = [(c, v, r) for c in spec_json["corpora"] for v in order for r in range(1, spec_json.get("rounds", 2) + 1)]
           except (KeyError, TypeError):

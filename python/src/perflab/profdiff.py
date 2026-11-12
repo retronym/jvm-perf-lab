@@ -68,7 +68,7 @@ def load(run, event, jfrconv, out_dir, name, keep=True, sink=None, extra=()):
     collapsed = os.path.join(out_dir, f"{name}-{event}.collapsed") if keep else None
     select = [s for label, s in regraph.events_of(d) if label.removeprefix("hw-") == event][0]
     err = tempfile.TemporaryFile("w+")  # not a pipe: unread, a full one would stop jfrconv
-    p = subprocess.Popen([jfrconv, "-J-Xmx8g", *select, "--threads", "-I", ".*jmh-worker.*", *extra, "-o", "collapsed", jfr, "/dev/stdout"],
+    p = subprocess.Popen([jfrconv, "-J-Xmx8g", *select, *regraph.bench_filter(), *extra, "-o", "collapsed", jfr, "/dev/stdout"],
                          stdout=subprocess.PIPE, stderr=err, text=True, errors="replace")
     self_, total, skipped = collections.Counter(), 0, 0
     out = open(collapsed, "w") if keep else None
