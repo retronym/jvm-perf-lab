@@ -2,6 +2,10 @@
 [build]
 jmh = "sbt --client 'lab/Jmh/run {args}'"
 server = "sbt"
+# launch mode: a batch sbt builds once per run or campaign, perflab snapshots the build and starts JMH itself; a remote
+# worker (testbed m4) has no sbt server, so the lab uses it everywhere
+launch = "sbt -batch 'lab/perflabLaunch {out}'"
+mode = "launch"
 
 [benchmark]
 default = "ZincDirectBenchmark"

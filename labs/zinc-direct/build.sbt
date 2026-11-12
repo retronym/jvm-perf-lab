@@ -22,4 +22,33 @@ lazy val lab = project.in(file("."))
       if (!scala.util.Properties.isJavaAtLeast("21")) sys.error("the lab needs Java 21 or later")
       Seq("-Xss4M")
     },
+    // perflab's launch mode (doc/direct-launch.md in jvm-perf-lab): compiles the benchmark and writes <dir>/launch.json,
+    // what `Jmh/run` would run, for perflab to snapshot and start itself; a remote worker has no sbt server to call
+    perflabLaunch := {
+      val out = file(complete.DefaultParsers.spaceDelimited("<dir>").parsed.headOption.getOrElse(sys.error("perflabLaunch <dir>")))
+      val cp = (Jmh / fullClasspath).value.files.map(_.getCanonicalPath)
+      val opts = (Jmh / run / javaOptions).value
+      val main = (Jmh / run / mainClass).value.getOrElse(sys.error("no Jmh / run / mainClass"))
+      val java = (Jmh / run / javaHome).value.getOrElse(file(sys.props("java.home"))) / "bin" / "java"
+      val lab = baseDirectory.value
+      def git(args: String*) = scala.util.Try(scala.sys.process.Process("git" +: "-C" +: lab.getPath +: args).!!.trim).getOrElse("")
+      def str(s: String) = "\"" + s.flatMap {
+        case '"' => "\\\""; case '\\' => "\\\\"; case '\n' => "\\n"; case c if c < ' ' => f"\\u${c.toInt}%04x"; case c => c.toString
+      } + "\""
+      def arr(xs: Seq[String]) = xs.map(str).mkString("[", ", ", "]")
+      val json = Seq(
+        "\"mainClass\": " + str(main),
+        "\"java\": " + str(java.getCanonicalPath),
+        "\"classpath\": " + arr(cp),
+        "\"javaOptions\": " + arr(opts),
+        // only the build's own output is snapshotted: out/ (inputs, bundles) is read where it is
+        "\"roots\": " + arr(Seq(target.value.getCanonicalPath)),
+        "\"build\": {\"checkout\": " + str(lab.getCanonicalPath) + ", \"commit\": " + str(git("rev-parse", "HEAD"))
+          + ", \"dirty\": " + git("status", "--porcelain", "--untracked-files=no").nonEmpty + "}",
+      ).mkString("{\n  ", ",\n  ", "\n}\n")
+      IO.write(out / "launch.json", json)
+      streams.value.log.info(s"perflabLaunch: ${out / "launch.json"}")
+    },
   )
+
+lazy val perflabLaunch = inputKey[Unit]("compiles the benchmark and writes <dir>/launch.json for perflab's launch mode")
