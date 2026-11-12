@@ -1,7 +1,6 @@
 package zincdirect.driver;
 
 import sbt.internal.inc.PlainVirtualFileConverter;
-import sbt.internal.inc.RawCompiler;
 import sbt.internal.inc.ZincUtil;
 import sbt.internal.inc.javac.JavaTools$;
 import xsbti.Logger;
@@ -12,7 +11,6 @@ import xsbti.compile.*;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintStream;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -21,12 +19,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CyclicBarrier;
 import java.util.function.Supplier;
-import java.util.jar.JarEntry;
-import java.util.jar.JarOutputStream;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 /**
  * Compiles K copies of one project through Zinc's API at the same time, in this JVM. Loaded by the benchmark in a class
@@ -37,10 +31,14 @@ import java.util.zip.ZipFile;
  * scalac phase (CompileProgress marks the phase of each unit; the bridge's `xsbt-api`, `xsbt-dependency` and
  * `xsbt-analyzer` phases are Zinc's own), javac, after the last phase (invalidation, analysis merge), and the analysis
  * store write.
+ *
+ * With `mode` = `clean`, IncOptions.enabled is false: from Zinc 2.x (sbt/zinc develop with the clean build mode) a
+ * non-incremental compile with no analysis, which this driver then does not store.
  */
 public final class Driver {
     private final Map<String, String> cfg;
     private final int copies;
+    private final boolean clean;
     private final Path work;
     private final ScalaInstance scalaInstance;
     private final Compilers compilers;
@@ -55,6 +53,7 @@ public final class Driver {
     public Driver(Map<String, String> cfg) throws Exception {
         this.cfg = cfg;
         this.copies = Integer.parseInt(cfg.get("copies"));
+        this.clean = cfg.getOrDefault("mode", "default").equals("clean");
         this.work = Paths.get(cfg.get("work")).toAbsolutePath();
         Path cpDir = Paths.get(cfg.get("cpDir"));
         Path inputs = Paths.get(cfg.get("inputs"));
@@ -76,7 +75,7 @@ public final class Driver {
         javacOptions = readLines(inputs.resolve("javac.txt")).toArray(new String[0]);
         copy = new Copy[copies];
         for (int i = 0; i < copies; i++) copy[i] = new Copy(i);
-        log("zinc " + zincV + ", scala " + scalaV + ": " + sources.length + " sources, " + classpath.length + " classpath entries, " + copies + " copies, bridge " + bridge);
+        log("zinc " + zincV + ", scala " + scalaV + ": " + sources.length + " sources, " + classpath.length + " classpath entries, " + copies + " copies, mode " + (clean ? "clean" : "default") + ", bridge " + bridge);
     }
 
     /** Deletes every copy's output and analysis store: the next round is a clean compile. */
@@ -146,7 +145,7 @@ public final class Driver {
             cp[0] = converter.toVirtualFile(classes);
             System.arraycopy(classpath, 0, cp, 1, classpath.length);
             CompileOptions options = CompileOptions.of(cp, sources, classes, scalacOptions, javacOptions, 100, p -> p, CompileOrder.Mixed);
-            Setup setup = Setup.of(new Lookup(), false, analysisFile, CompilerCache.fresh(), IncOptions.of(), reporter,
+            Setup setup = Setup.of(new Lookup(), false, analysisFile, CompilerCache.fresh(), IncOptions.of().withEnabled(!clean), reporter,
                 Optional.of(progress), new xsbti.T2[0]);
             Inputs inputs = Inputs.of(compilers, options, setup, PreviousResult.of(Optional.empty(), Optional.empty()));
             long t0 = System.nanoTime();
@@ -154,8 +153,11 @@ public final class Driver {
             CompileResult result = zinc.compile(inputs, new Quiet());
             long t1 = System.nanoTime();
             progress.finish(t1);
-            AnalysisStore store = FileAnalysisStore.getDefault(analysisFile.toFile());
-            store.set(AnalysisContents.create(result.analysis(), result.setup()));
+            // a clean build (IncOptions.enabled = false, Zinc 2.x) returns an empty analysis and stores none
+            if (!clean) {
+                AnalysisStore store = FileAnalysisStore.getDefault(analysisFile.toFile());
+                store.set(AnalysisContents.create(result.analysis(), result.setup()));
+            }
             long t2 = System.nanoTime();
             totalMs = (t2 - t0) / 1e6;
             ms.clear();
@@ -227,7 +229,7 @@ public final class Driver {
 
     // --- Scala instance and compiler bridge -------------------------------------------------------------------------
 
-    private static final class Instance implements ScalaInstance {
+    static final class Instance implements ScalaInstance {
         private final String version;
         private final File[] all, lib, compiler;
         private final ClassLoader libLoader, compilerLoader, loader;
@@ -261,71 +263,28 @@ public final class Driver {
     private static synchronized Path bridge(String zinc, String scalaV, Path cpDir, List<Path> scalaJars) throws Exception {
         Path jar = cpDir.resolveSibling("bridge").resolve("bridge-" + zinc + "-" + scalaV + ".jar");
         if (Files.exists(jar)) return jar;
-        Files.createDirectories(jar.getParent());
-        List<Path> zincJars = readPaths(cpDir.resolve("zinc-" + zinc + ".txt"));
-        List<Path> bridgeSrc = readPaths(cpDir.resolve("bridge-src-" + zinc + ".txt"));
-        Path tmp = Files.createTempDirectory(jar.getParent(), "bridge-build");
-        Path src = tmp.resolve("src"), out = tmp.resolve("classes");
-        Files.createDirectories(src);
-        Files.createDirectories(out);
-        List<Path> srcs = new ArrayList<>();
-        for (Path sj : bridgeSrc) {
-            if (!sj.getFileName().toString().startsWith("compiler-bridge_2.13")) continue;
-            try (ZipFile z = new ZipFile(sj.toFile())) {
-                for (Enumeration<? extends ZipEntry> en = z.entries(); en.hasMoreElements();) {
-                    ZipEntry e = en.nextElement();
-                    if (!e.isDirectory() && e.getName().startsWith("META-INF/services/")) { // the bridge is found through ServiceLoader
-                        Path r = out.resolve(e.getName());
-                        Files.createDirectories(r.getParent());
-                        try (InputStream in = z.getInputStream(e)) { Files.copy(in, r); }
-                        continue;
-                    }
-                    if (e.isDirectory() || !(e.getName().endsWith(".scala") || e.getName().endsWith(".java"))) continue;
-                    Path p = src.resolve(e.getName());
-                    Files.createDirectories(p.getParent());
-                    try (InputStream in = z.getInputStream(e)) { Files.copy(in, p); }
-                    srcs.add(p);
-                }
-            }
-        }
-        if (srcs.isEmpty()) throw new IllegalStateException("no compiler-bridge_2.13 sources in " + bridgeSrc);
-        List<Path> cp = new ArrayList<>(scalaJars);
-        for (Path z : zincJars) {
-            String n = z.getFileName().toString();
-            if (n.startsWith("compiler-interface") || n.startsWith("util-interface")) cp.add(z);
-        }
-        Instance si = new Instance(scalaV, scalaJars);
-        RawCompiler raw = new RawCompiler(si, ClasspathOptions.of(false, false, false, false, false), sbt.util.Logger.Null());
-        scala.collection.Seq<String> noOptions = scala.collection.JavaConverters.asScalaBuffer(new ArrayList<String>());
-        raw.apply(scala.collection.JavaConverters.asScalaBuffer(srcs), scala.collection.JavaConverters.asScalaBuffer(cp), out, noOptions);
-        Path tmpJar = tmp.resolve("bridge.jar");
-        try (JarOutputStream jo = new JarOutputStream(Files.newOutputStream(tmpJar)); Stream<Path> w = Files.walk(out)) {
-            for (Path p : w.filter(Files::isRegularFile).sorted().collect(Collectors.toList())) {
-                jo.putNextEntry(new JarEntry(out.relativize(p).toString().replace(File.separatorChar, '/')));
-                Files.copy(p, jo);
-                jo.closeEntry();
-            }
-        }
-        Files.move(tmpJar, jar, StandardCopyOption.ATOMIC_MOVE);
-        deleteTree(tmp);
+        // compiling the bridge needs Zinc 1.x's RawCompiler and Scala 2.12 collections; a Zinc 2.x driver is compiled
+        // without BridgeBuilder and needs its bridge prepared beforehand (scripts/prepare-zinc-dev.sh)
+        Class<?> builder = Class.forName("zincdirect.driver.BridgeBuilder");
+        builder.getMethod("build", Path.class, Path.class, String.class, String.class, List.class).invoke(null, jar, cpDir, zinc, scalaV, scalaJars);
         return jar;
     }
 
     // --- helpers ------------------------------------------------------------------------------------------------------
 
-    private static URL[] urls(File[] files) {
+    static URL[] urls(File[] files) {
         return Arrays.stream(files).map(f -> { try { return f.toURI().toURL(); } catch (Exception e) { throw new RuntimeException(e); } }).toArray(URL[]::new);
     }
 
-    private static List<String> readLines(Path p) throws IOException {
+    static List<String> readLines(Path p) throws IOException {
         return Files.readAllLines(p).stream().map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
     }
 
-    private static List<Path> readPaths(Path p) throws IOException {
+    static List<Path> readPaths(Path p) throws IOException {
         return readLines(p).stream().map(Paths::get).collect(Collectors.toList());
     }
 
-    private static void deleteTree(Path dir) throws IOException {
+    static void deleteTree(Path dir) throws IOException {
         if (!Files.exists(dir)) return;
         try (Stream<Path> w = Files.walk(dir)) {
             for (Path p : w.sorted(Comparator.reverseOrder()).collect(Collectors.toList())) Files.deleteIfExists(p);

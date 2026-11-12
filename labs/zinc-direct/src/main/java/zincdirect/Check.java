@@ -1,6 +1,6 @@
 package zincdirect;
 
-/** Runs the benchmark's setup and two rounds without JMH, to check the harness: {@code Check <zinc> <scala> <K> [project]}. */
+/** Runs the benchmark's setup and two rounds without JMH, to check the harness: {@code Check <zinc> <scala> <K> [project] [mode]}. */
 public final class Check {
     public static void main(String[] a) throws Exception {
         ZincDirectBenchmark b = new ZincDirectBenchmark();
@@ -8,6 +8,7 @@ public final class Check {
         b.scalaVersion = a[1];
         b.copies = Integer.parseInt(a[2]);
         b.project = a.length > 3 ? a[3] : "actor";
+        b.mode = a.length > 4 ? a[4] : "default";
         b.setup();
         for (int i = 0; i < 2; i++) {
             b.cleanOutputs();

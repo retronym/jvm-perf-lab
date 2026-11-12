@@ -38,6 +38,10 @@ public class ZincDirectBenchmark {
     @Param({"2.13.18"})
     public String scalaVersion;
 
+    /** `default`, or `clean`: IncOptions.enabled = false, a compile with no analysis (Zinc 2.x with the clean build mode). */
+    @Param({"default"})
+    public String mode;
+
     /** K: copies compiled at the same time. */
     @Param({"1"})
     public int copies;
@@ -71,7 +75,7 @@ public class ZincDirectBenchmark {
 
     @Setup(Level.Trial)
     public void setup() throws Exception {
-        Announce.jvm("ZincDirectBenchmark(" + project + ", zinc " + zincVersion + ", scala " + scalaVersion + ", K=" + copies + ")");
+        Announce.jvm("ZincDirectBenchmark(" + project + ", zinc " + zincVersion + ", scala " + scalaVersion + ", " + mode + ", K=" + copies + ")");
         Path out = Paths.get(System.getProperty("zincdirect.out", System.getenv().getOrDefault("ZINCDIRECT_OUT", "out"))).toAbsolutePath();
         Path work = out.resolve("work").resolve("fork-" + ProcessHandle.current().pid());
         Files.createDirectories(work);
@@ -80,7 +84,9 @@ public class ZincDirectBenchmark {
         Path cpDir = out.resolve("cp");
         URL self = ZincDirectBenchmark.class.getProtectionDomain().getCodeSource().getLocation();
         java.util.List<URL> urls = new java.util.ArrayList<>();
-        urls.add(self);
+        // a Zinc without 1.12.1's API (2.x) brings its own build of the driver (scripts/prepare-zinc-dev.sh)
+        Path driverDir = cpDir.resolve("driver-" + zincVersion);
+        urls.add(Files.isDirectory(driverDir) ? driverDir.toUri().toURL() : self);
         for (String line : Files.readAllLines(cpDir.resolve("zinc-" + zincVersion + ".txt"))) if (!line.isBlank()) urls.add(Paths.get(line.trim()).toUri().toURL());
         // the platform loader as parent: nothing of the benchmark's own classpath is visible to the Zinc under test
         URLClassLoader loader = new URLClassLoader(urls.toArray(new URL[0]), ClassLoader.getPlatformClassLoader());
@@ -89,6 +95,7 @@ public class ZincDirectBenchmark {
         cfg.put("zinc", zincVersion);
         cfg.put("scala", scalaVersion);
         cfg.put("copies", Integer.toString(copies));
+        cfg.put("mode", mode);
         cfg.put("cpDir", cpDir.toString());
         cfg.put("inputs", out.resolve("inputs").resolve(project).toString());
         cfg.put("work", work.toString());
