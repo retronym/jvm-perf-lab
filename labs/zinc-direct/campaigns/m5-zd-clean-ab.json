@@ -1,0 +1,34 @@
+{
+  "name": "m5-zd-clean-ab",
+  "rounds": 3,
+  "description": [
+    "Zinc's clean build mode ([retronym/zinc#100](https://github.com/retronym/zinc/pull/100)): `IncOptions.enabled = false` compiles every source with no analysis (no `xsbt-api`/`xsbt-dependency` phases, no stamping, no javac classfile analysis, no store write), against the default from-scratch compile that builds and writes the analysis.",
+    "One compile at a time (K = 1) of Pekko 1.7.1 `actor` (214 Scala, 30 Java sources) and `stream` (209 Scala, 3 Java), Scala 2.13.18, through Zinc's API (labs/zinc-direct). Zinc is sbt/zinc develop with the change (`dev-cb`, 51d1e13), loaded from `scripts/prepare-zinc-dev.sh`.",
+    "Timing: no profiler, 3 forks per variant and project."
+  ],
+  "benchmark": "ZincDirectBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms16G -Xmx16G -Xss4M -XX:ReservedCodeCacheSize=512m",
+  "gcLog": true,
+  "corpora": {
+    "actor": "-wi 6 -i 6 -w 1 -r 1",
+    "stream": "-wi 6 -i 6 -w 1 -r 1"
+  },
+  "variants": {
+    "default": "",
+    "clean": ""
+  },
+  "variantJmhArgs": {
+    "default": "-p zincVersion=dev-cb -p scalaVersion=2.13.18 -p copies=1 -p mode=default",
+    "clean": "-p zincVersion=dev-cb -p scalaVersion=2.13.18 -p copies=1 -p mode=clean"
+  },
+  "loadgate": {
+    "maxCores": 6,
+    "quietSecs": 30
+  },
+  "variantDescriptions": {
+    "default": "`IncOptions.enabled = true`: the analysis is built and written with `FileAnalysisStore`",
+    "clean": "`IncOptions.enabled = false`: the clean build mode, no analysis built or written"
+  }
+}
