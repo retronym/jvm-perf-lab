@@ -9,7 +9,7 @@ for the worker to map. `bundle` makes a git bundle of a commit for a worker that
 campaign's finished cells (their results only) for it to resume from, and `receive` puts a unit the worker uploads (a
 cell, a voided attempt, the campaign's top-level files) in place.
 """
-import io, json, os, re, shutil, subprocess, tarfile, tempfile, time
+import glob, io, json, os, re, shutil, subprocess, tarfile, tempfile, time
 
 from . import ab, branch, config, specs, testbed
 
@@ -275,6 +275,18 @@ def input_tar(job, path):
 
 def unit_ok(unit):
     return unit == "." or bool(CELL_UNIT.fullmatch(unit) or VOID_UNIT.fullmatch(unit))
+
+
+def wants_graphs(cell):
+    """An uploaded cell the coordinator renders the flame graphs of (`regraph`, a job beside the measuring one): one of an
+    async profile, with a recording. Its worker does not render them (worker.py: regraph.SKIP_ENV)."""
+    try:
+        with open(os.path.join(cell, "profile.txt")) as f:
+            if not f.read().startswith("async"):
+                return False
+    except OSError:
+        return False
+    return bool(glob.glob(os.path.join(cell, "**", "*.jfr"), recursive=True))
 
 
 def receive(job, project, unit, stream, length):

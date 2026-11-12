@@ -32,7 +32,7 @@ jobs/<id>/. Settings in <home>/worker.toml, every one optional, the command line
 import argparse, glob, io, json, os, re, shutil, signal, socket, subprocess, sys, tarfile, tempfile, threading, time, tomllib
 import urllib.error, urllib.parse, urllib.request
 
-from . import ab, branch, config, control, mirror, remote, testbed, transcript
+from . import ab, branch, config, control, mirror, regraph, remote, testbed, transcript
 
 HOME_ENV = "PERFLAB_WORKER_HOME"
 BEAT = float(os.environ.get("PERFLAB_WORKER_BEAT") or 10)  # seconds between heartbeats (the coordinator's lease is server.LEASE, 90 s)
@@ -578,7 +578,7 @@ class Job:
         if os.path.isdir(os.path.join(src, "perflab")):  # the coordinator's perflab, as its harness has it
             env["PYTHONPATH"] = os.pathsep.join(filter(None, [src, os.environ.get("PYTHONPATH")]))
         env.update({"PERFLAB_LOCAL": "1", control.ENV: self.ctl, "PERFLAB_SPEC_VERSION": self.p["specVersion"],
-                    testbed.ENV: self.w.testbed, "PYTHONUNBUFFERED": "1",
+                    testbed.ENV: self.w.testbed, "PYTHONUNBUFFERED": "1", regraph.SKIP_ENV: "1",
                     # a perflab server of this machine's own is not the coordinator: the job never registers with it
                     "PERFLAB_SERVER_HOME": os.path.join(self.w.home, "server")})
         env.update({k: os.path.expanduser(str(v)) for k, v in (self.w.cfg.get("env") or {}).items()})

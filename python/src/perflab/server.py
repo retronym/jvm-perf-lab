@@ -78,9 +78,9 @@ ACTIVE = ("running", "paused")
 
 
 def concurrent(argv):
-    """A job that only renders recordings already made (`branch diff`, `ab diff`, `profdiff`): it starts as soon as it
-    is queued, beside the job that measures, which a diff would neither disturb much nor need to wait for."""
-    return argv[:1] == ["profdiff"] or argv[:2] in (["branch", "diff"], ["ab", "diff"])
+    """A job that only renders recordings already made (`branch diff`, `ab diff`, `profdiff`, `regraph`): it starts as
+    soon as it is queued, beside the job that measures, which a diff would neither disturb much nor need to wait for."""
+    return argv[:1] in (["profdiff"], ["regraph"]) or argv[:2] in (["branch", "diff"], ["ab", "diff"])
 FINAL = ("done", "failed", "cancelled")
 TRANSITIONS = {"queued": {"running", "cancelled"},
                "running": {"paused", "done", "failed", "cancelled"},
@@ -775,6 +775,8 @@ class Worker(threading.Thread):
         self.q.transition(jid, state, rc=rc)
         for f in ("control", "control.ack"):
             control.write(os.path.join(job["dir"], f), None)
+        if job["argv"][:1] == ["regraph"] and self.q.project(job["project"]):  # an uploaded cell's graphs: the index links them
+            _reindex(self.q.project(job["project"]))
 
     @staticmethod
     def _signal_job(job, sig):
@@ -1234,7 +1236,9 @@ class Server:
                         server.q.update(j["id"], lease=time.time() + LEASE)
                         from . import remote
                         project = server.q.project(j["project"])
-                        remote.receive(j, project, qs.get("unit") or "", self.rfile, n)
+                        for cell in remote.receive(j, project, qs.get("unit") or "", self.rfile, n):
+                            if remote.wants_graphs(cell):
+                                submit_local(server, {"argv": ["regraph", cell], "cwd": project["root"], "env": job_env()})
                         server.reindex_soon(project)
                         return self._send(200, {"ok": True})
                     body = json.loads(self.rfile.read(n) or b"{}") if n <= 1 << 26 else None

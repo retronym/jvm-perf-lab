@@ -119,6 +119,9 @@ def events_of(profile, kperf=False):
 
 
 FORCE = False
+# set by a remote worker for its job: a cell's graphs are rendered by the coordinator once it is uploaded
+# (remote.wants_graphs), so the measuring machine spends nothing on them between cells
+SKIP_ENV = "PERFLAB_NO_GRAPHS"
 MINWIDTH = "0.001"  # percent of samples below which jfrconv drops a frame: finer than the page shows (below), so the viewer's Collapse merges thin pieces of work into boxes that are wide enough to see
 DISPLAY_MINWIDTH = "0.01"  # percent of the graph below which the viewer hides a frame (jfrconv --display-minwidth), after merging frames
 HEAP = "24g"

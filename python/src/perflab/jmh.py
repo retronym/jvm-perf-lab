@@ -285,7 +285,8 @@ def finish(out, profile, lib=None):
         timeline.write(out)
     if kind == "async":
         from . import regraph
-        regraph.regraph([out], jfrconv(async_lib(lib)))
+        if not os.environ.get(regraph.SKIP_ENV):
+            regraph.regraph([out], jfrconv(async_lib(lib)))
     elif kind == "audit":
         reports = sorted(glob.glob(os.path.join(out, "audit-*.json")))
         if reports:

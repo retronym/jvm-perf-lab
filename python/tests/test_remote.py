@@ -1,4 +1,4 @@
-import json, os, shutil, subprocess, sys, tempfile, time, unittest
+import json, os, shutil, subprocess, sys, tarfile, tempfile, time, unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.realpath(os.path.join(HERE, "..", "src"))
@@ -130,6 +130,66 @@ class MappingTest(unittest.TestCase):
         with self.assertRaises(RuntimeError) as e:
             self.job().jdk(want, "/nowhere/bin/java")
         self.assertIn("sdk install java 99-acme", str(e.exception))
+
+
+FAKE_JFRCONV = "#!/bin/sh\nfor a; do out=$a; done\necho graph > \"$out\"\n"  # writes its last argument, the graph
+
+
+class CellGraphsTest(unittest.TestCase):
+    """An uploaded async cell's flame graphs are rendered on the coordinator, by its own jfrconv, in a job beside the
+    measuring one; the worker renders none."""
+
+    def setUp(self):
+        t = os.path.realpath(tempfile.mkdtemp())
+        self.t = t
+        jfrconv = os.path.join(t, "jfrconv")
+        with open(jfrconv, "w") as f:
+            f.write(FAKE_JFRCONV)
+        os.chmod(jfrconv, 0o755)
+        self.root = project(f'[build]\njmh = "x"\n[paths]\ncampaigns = "out/ab"\n[async]\njfrconv = "{jfrconv}"\ngraphs = ["jvm"]\n')
+        self.srv = server.Server(home_dir=os.path.join(t, "coord"), port=free_port()).start()
+        p = self.srv.q.register(self.root)
+        self.job = self.srv.q.submit(p["id"], ["ab", "run", "campaigns/x.json"], self.root, testbed_="far")
+        self.srv.q.claim_remote("w1", "far")
+        with open(os.path.join(self.job["dir"], remote.PAYLOAD), "w") as f:
+            json.dump({"campaign": "x"}, f)
+
+    def tearDown(self):
+        self.srv.stop()
+
+    def upload(self, unit, profile, jfr):
+        src = os.path.join(self.t, "src", unit)
+        os.makedirs(os.path.join(src, "fork"))
+        open(os.path.join(src, "profile.txt"), "w").write(profile + "\n")
+        open(os.path.join(src, "result.json"), "w").write("[]")
+        if jfr:
+            open(os.path.join(src, "fork", "jfr-cpu.jfr"), "wb").write(b"jfr")
+        with tempfile.TemporaryFile() as tf:
+            with tarfile.open(fileobj=tf, mode="w:gz") as tar:
+                tar.add(src, ".")
+            tf.seek(0)
+            worker.Client(self.srv.url, self.srv.token, "w1").post(f"/api/workers/jobs/{self.job['id']}/upload", data=tf,
+                                                                  query={"worker": "w1", "unit": unit})
+        return os.path.join(self.root, "out", "ab", "x", unit)
+
+    def test_the_coordinator_renders_an_uploaded_async_cells_graphs(self):
+        cell = self.upload("c/v/1", "async:cpu", jfr=True)
+        self.upload("c/v/2", "none", jfr=False)
+        graph = os.path.join(cell, "fork", "jfr-cpu-cpu-jvm.html")
+        wait_for(lambda: os.path.exists(os.path.join(cell, "fork", "jfr-cpu.regraph")), what="the cell's graphs")
+        self.assertEqual(open(graph).read(), "graph\n")
+        jobs = [j for j in self.srv.q.jobs() if j["argv"][:1] == ["regraph"]]
+        self.assertEqual([j["argv"] for j in jobs], [["regraph", cell]])  # none for the cell without a recording
+        self.assertTrue(server.concurrent(jobs[0]["argv"]))
+        self.assertIsNone(jobs[0]["testbed"])  # the coordinator's, not the measuring worker's
+
+    def test_a_worker_renders_no_graphs(self):
+        from unittest import mock
+        from perflab import jmh, regraph
+        d = tempfile.mkdtemp()
+        with mock.patch.object(regraph, "regraph") as r, mock.patch.dict(os.environ, {regraph.SKIP_ENV: "1"}):
+            jmh.finish(d, "async:cpu")
+        r.assert_not_called()
 
 
 @unittest.skipUnless(shutil.which("git"), "needs git")
