@@ -56,6 +56,7 @@ public final class Driver {
         this.clean = cfg.getOrDefault("mode", "default").equals("clean");
         this.work = Paths.get(cfg.get("work")).toAbsolutePath();
         Path cpDir = Paths.get(cfg.get("cpDir"));
+        root = cpDir.toAbsolutePath().getParent();
         Path inputs = Paths.get(cfg.get("inputs"));
         String zincV = cfg.get("zinc"), scalaV = cfg.get("scala");
 
@@ -280,8 +281,11 @@ public final class Driver {
         return Files.readAllLines(p).stream().map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
     }
 
+    /** The directory relative paths in the list files resolve against: the lab's `out`, or a bundle copied to a worker. */
+    static volatile Path root = Paths.get("").toAbsolutePath();
+
     static List<Path> readPaths(Path p) throws IOException {
-        return readLines(p).stream().map(Paths::get).collect(Collectors.toList());
+        return readLines(p).stream().map(Paths::get).map(q -> q.isAbsolute() ? q : root.resolve(q)).collect(Collectors.toList());
     }
 
     static void deleteTree(Path dir) throws IOException {

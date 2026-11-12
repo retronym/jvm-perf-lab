@@ -87,7 +87,7 @@ public class ZincDirectBenchmark {
         // a Zinc without 1.12.1's API (2.x) brings its own build of the driver (scripts/prepare-zinc-dev.sh)
         Path driverDir = cpDir.resolve("driver-" + zincVersion);
         urls.add(Files.isDirectory(driverDir) ? driverDir.toUri().toURL() : self);
-        for (String line : Files.readAllLines(cpDir.resolve("zinc-" + zincVersion + ".txt"))) if (!line.isBlank()) urls.add(Paths.get(line.trim()).toUri().toURL());
+        for (String line : Files.readAllLines(cpDir.resolve("zinc-" + zincVersion + ".txt"))) if (!line.isBlank()) urls.add(out.resolve(line.trim()).toUri().toURL()); // relative: within out (a bundle)
         // the platform loader as parent: nothing of the benchmark's own classpath is visible to the Zinc under test
         URLClassLoader loader = new URLClassLoader(urls.toArray(new URL[0]), ClassLoader.getPlatformClassLoader());
         Class<?> c = loader.loadClass("zincdirect.driver.Driver");
