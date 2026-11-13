@@ -511,9 +511,9 @@ class ProfiledCampaignTest(unittest.TestCase):
             open(os.path.join(cell, "profile.txt"), "w").write("async:cpu,alloc\n")
             open(os.path.join(cell, "rec.jfr"), "w").write("jfr")
             for ev in ("cpu", "alloc"):
-                open(os.path.join(cell, f"rec-{ev}.html"), "w").write("<html>")
+                open(os.path.join(cell, f"rec-{ev}-jvm.html"), "w").write("<html>")
         g = branchview.branch_view(self.camp, self.camps)["cells"]["a"][self.v[4]]["graphs"]
-        self.assertEqual(g[0], ["cpu #1", "bench", f"br/a/{self.v[4]}/1/rec-cpu.html"])
+        self.assertEqual(g[0], ["cpu #1", "jvm", f"br/a/{self.v[4]}/1/rec-cpu-jvm.html"])
         self.assertEqual([x[0] for x in g], ["cpu #1", "alloc #1", "cpu #2", "alloc #2"])
 
 

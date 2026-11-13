@@ -19,7 +19,7 @@ def fake_profile_cell(d, corpus="a", scores=((10.0, 10.1),), allocs=((1e6, 1e6),
     open(os.path.join(d, "profile.txt"), "w").write("async:cpu,alloc\n")
     open(os.path.join(d, "rec.jfr"), "w").write("jfr")
     for ev in ("cpu", "alloc"):
-        open(os.path.join(d, f"rec-{ev}.html"), "w").write("<html>")
+        open(os.path.join(d, f"rec-{ev}-jvm.html"), "w").write("<html>")
 
 
 def stub_profdiff(calls):
@@ -209,8 +209,8 @@ class ProfileViewTest(unittest.TestCase):
         self.assertEqual((p["campaign"], p["corpora"]), ("br.profile", ["a"]))
         cells = p["cells"]["a"]
         self.assertNotIn(self.v[1], cells)  # an empty result.json and no running.json: an interrupted run's
-        self.assertEqual(cells[self.v[3]]["graphs"], [["cpu", "bench", f"br.profile/a/{self.v[3]}/1/rec-cpu.html"],
-                                                      ["alloc", "bench", f"br.profile/a/{self.v[3]}/1/rec-alloc.html"]])
+        self.assertEqual(cells[self.v[3]]["graphs"], [["cpu", "jvm", f"br.profile/a/{self.v[3]}/1/rec-cpu-jvm.html"],
+                                                      ["alloc", "jvm", f"br.profile/a/{self.v[3]}/1/rec-alloc-jvm.html"]])
         [d] = p["diffs"]
         self.assertEqual((d["a"], d["b"], d["corpus"], d["href"]), (self.v[3], self.v[4], "a", f"br.profile/diff-a-{self.v[3]}-{self.v[4]}/compare.html"))
         self.assertEqual([s[0] for s in d["events"][0]["slots"]], ["a", "diff", "inverse", "b"])
@@ -271,7 +271,7 @@ class ProfileViewTest(unittest.TestCase):
             from test_branchview import page_deltas
             self.assertIn(f"a|{self.v[3]}|p:alloc", page_deltas(self, d))
         # the profile's graphs still link from its rows
-        self.assertEqual(d["profile"]["cells"]["a"][self.v[2]]["graphs"][0][2], f"br.profile/a/{self.v[2]}/1/rec-cpu.html")
+        self.assertEqual(d["profile"]["cells"]["a"][self.v[2]]["graphs"][0][2], f"br.profile/a/{self.v[2]}/1/rec-cpu-jvm.html")
 
     def test_a_corpus_only_profiled_has_columns(self):
         fake_profile_cell(os.path.join(self.prof, "z", self.v[0], "1"), "z", hw={"cycles": 1e9, "instructions": 1e9})

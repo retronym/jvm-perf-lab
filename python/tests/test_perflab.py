@@ -1366,7 +1366,7 @@ class ServeTest(unittest.TestCase):
             with open(os.path.join(camp, "report.md"), "w", encoding="utf-8") as f:
                 f.write("| Δ |\n")
             r = urllib.request.urlopen(f"http://127.0.0.1:{port}/ab/report.md")
-            self.assertEqual(r.headers["Content-Type"], "text/markdown; charset=utf-8")
+            self.assertEqual(r.headers["Content-Type"], "text/plain; charset=utf-8")  # Markdown as plain text, which browsers show rather than download
             self.assertEqual(r.read().decode("utf-8"), "| Δ |\n")
         finally:
             old.kill()
