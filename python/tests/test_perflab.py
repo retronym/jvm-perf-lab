@@ -1250,6 +1250,26 @@ class PairedSpecTest(unittest.TestCase):
         args = open(os.path.join(dest, "jmh.args")).read().split("\n")
         self.assertIn("variants=base=-Ya -Yb|new=", args)
 
+    def test_a_paired_campaign_shares_one_build(self):
+        p = Project('[build]\njmh = "x {args}"\n[benchmark]\ndefault = "B"\n')
+        path = os.path.join(p.dir, "s.json")
+        build = {"checkout": p.dir, "env": {"X": "{checkout}"}}
+        json.dump({"name": "c", "corpora": {"k": ""}, "paired": {"base": "-Ya", "new": ""}, "builds": {"b": build}},
+                  open(path, "w"))
+        spec = ab.Spec(path)
+        self.assertEqual(["paired"], list(spec.builds))  # keyed by the one variant of a paired campaign's cells
+        self.assertEqual({"paired": ""}, spec.variants)
+
+    def test_a_paired_campaign_has_at_most_one_build(self):
+        p = Project('[build]\njmh = "x {args}"\n[benchmark]\ndefault = "B"\n')
+        path = os.path.join(p.dir, "s.json")
+        b = {"checkout": p.dir}
+        json.dump({"name": "c", "corpora": {"k": ""}, "paired": {"base": "-Ya", "new": ""}, "builds": {"a": b, "b": b}},
+                  open(path, "w"))
+        with self.assertRaises(SystemExit) as e:
+            ab.Spec(path)
+        self.assertIn("one build", str(e.exception))
+
 
 class RunIndexTest(unittest.TestCase):
     def run_dir(self, name, args, result=None, state=None):

@@ -42,7 +42,8 @@ A spec:
     "builds": {"base": {"checkout": "../scala3-base", "env": {"SCALA3_CHECKOUT": "{checkout}"}}, "pr": {...}},
                                                          # optional: a build per variant (launch mode: [build] launch
                                                          # with env set, snapshotted in <campaign>/.build/<variant>);
-                                                         # "variants" defaults to their names
+                                                         # "variants" defaults to their names; with "paired", one build
+                                                         # that the paired variants share
     "historical": "<why>",                               # optional: kept for its results; `run` refuses it
     "testbed": "m4",                                     # optional: the machine it runs on (perflab.testbed): its
                                                          # cells count only from there; queued, a worker of that
@@ -160,8 +161,13 @@ class Spec:
             self.builds = {v: {"checkout": self.branch["checkout"], "commit": commits[v]} for v in s.get("variants") or {}}
         self.only = None  # the variants to run, of the spec's (`perflab branch profile <sha>...`)
         self.variants = {"paired": ""} if self.paired else s.get("variants") or {v: "" for v in self.builds}
-        if self.builds and (self.paired or set(self.builds) != set(self.variants)):
-            sys.exit(f"{path}: \"builds\" needs a build for each variant, and cannot be paired")
+        if self.builds and self.paired:
+            # a paired campaign's variants alternate within each fork of one build: "builds" has that one build
+            if len(self.builds) != 1:
+                sys.exit(f"{path}: a paired campaign has one build, shared by its variants: \"builds\": {{\"paired\": {{...}}}}")
+            self.builds = {"paired": next(iter(self.builds.values()))}
+        elif self.builds and set(self.builds) != set(self.variants):
+            sys.exit(f"{path}: \"builds\" needs a build for each variant")
         self.variant_jmh_args = s.get("variantJmhArgs", {})
         if self.paired:
             spec = "|".join(f"{n}={o}" for n, o in self.paired.items())
