@@ -336,6 +336,54 @@ def lightbox_script():
     return f"<script>{LIGHTBOX_JS}</script>"
 
 
+# A live page's panels (the fork timeline, a build, the load gate) come and go and grow above what the reader is looking at,
+# and its sections are re-rendered under them: keep in place whatever is at the top of the viewport (under the sticky nav),
+# so nothing the page does on its own moves it. The browser's scroll anchoring would do some of this, but not in Safari, and
+# not across a section's innerHTML being replaced; so it is off, and this does it everywhere. At the very top of the page
+# nothing is held: a panel that appears there is meant to be seen. `holdView()` is for a page that swaps content without
+# changing any size (a ResizeObserver on <main>'s children catches the rest).
+HOLD_VIEW_JS = r"""
+(() => {
+  document.documentElement.style.overflowAnchor = 'none';
+  const main = document.querySelector('main');
+  if (!main) return;
+  let place = null;
+  const line = () => { const n = document.querySelector('.nav'); return Math.max(0, n ? n.getBoundingClientRect().bottom : 0) + 2; };
+  function mark() {
+    const y = line(), r = main.getBoundingClientRect();
+    let e = document.elementFromPoint(r.left + Math.min(40, r.width / 2), y);
+    if (!e || e === main || !main.contains(e)) e =[...main.children].find(c => { const b = c.getBoundingClientRect(); return b.height && b.bottom > y; });
+    if (!e) { place = null; return; }
+    let idd = e; while (idd && idd !== main && !idd.id) idd = idd.parentElement;
+    if (idd === main) idd = null;
+    place = {e, top: e.getBoundingClientRect().top, id: idd && idd.id, idTop: idd && idd.getBoundingClientRect().top, y: scrollY};
+  }
+  function hold() {
+    // someone scrolled since the last mark (its scroll event not handled yet): that is where they want to be
+    if (!place || scrollY !== place.y) return mark();
+    if (place.y > 0) {
+      const byId = !place.e.isConnected && place.id && document.getElementById(place.id);
+      const top = place.e.isConnected ? place.e.getBoundingClientRect().top - place.top : byId ? byId.getBoundingClientRect().top - place.idTop : 0;
+      if (Math.abs(top) >= 1) scrollTo(scrollX, scrollY + top);
+    }
+    mark();
+  }
+  window.holdView = hold;
+  addEventListener('scroll', mark, {passive: true});
+  addEventListener('resize', hold);
+  const ro = new ResizeObserver(hold);
+  const watch = () => { for (const c of main.children) ro.observe(c); };
+  watch();
+  new MutationObserver(watch).observe(main, {childList: true});
+  if (document.readyState === 'complete') mark(); else addEventListener('load', mark);
+})();
+"""
+
+
+def hold_view_script():
+    return f"<script>{HOLD_VIEW_JS}</script>"
+
+
 def help_popover(html_body, right=False):
     """A `?` that opens a short explanation."""
     return f'<details class="help{" right" if right else ""}"><summary title="What is this?">?</summary><div>{html_body}</div></details>'

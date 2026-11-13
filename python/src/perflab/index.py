@@ -1618,7 +1618,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
   {'' if not live and not run_sections else f'<h2 class="sec" id="runs">Runs <span class="k">one benchmark under one profile, newest first</span></h2>'}
   {newest(run_sections) or ('<p class="k">No runs yet: <code>perflab run</code>.</p>' if live else '')}
   </div></main>{f'<footer>{footer}</footer>' if footer else ''}<div id="srv-foot" hidden>{ui.footer()}</div>
-  <script>{timeline.script()}</script>{ui.lightbox_script()}{ui.shortcuts('card', 'lightbox', 'void', 'timeline')}
+  <script>{timeline.script()}</script>{ui.lightbox_script()}{ui.hold_view_script()}{ui.shortcuts('card', 'lightbox', 'void', 'timeline')}
   <script>{SUMMARY_JS}</script>
   <script>{branchview.JS}</script>
   <script>
@@ -1787,7 +1787,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
       sel.innerHTML = doc.getElementById('tl-cell').innerHTML;
       if (keep && ![...sel.options].some(o => o.value === keep)) sel.add(new Option((runs.find(r => r.dir === keep) || {{name: keep}}).name, keep), 0);
       sel.value = keep;
-      apply(); jobsOnCards(); shareButtons();
+      apply(); jobsOnCards(); shareButtons(); holdView();
     }} catch (e) {{}}
   }}
   // served by `perflab server` (under /p/<project>/): its tabs before this page's, and each campaign's jobs, #<id> linking

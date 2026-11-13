@@ -389,7 +389,7 @@ def _page(server, title, tab, body, script, css="", head_script="", keys=()):
 <main>{reload_banner(server)}{body}</main>{ui.footer()}<div id="toast" hidden></div>
 {f"<script>{head_script}</script>" if head_script else ""}<script>const TOKEN = {json.dumps(server.token)}, HOME = {json.dumps(os.path.expanduser("~"))};
 {COMMON_JS}
-{script}</script>{ui.shortcuts(*keys)}"""
+{script}</script>{ui.hold_view_script()}{ui.shortcuts(*keys)}"""
 
 
 def queue_page(server):
