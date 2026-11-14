@@ -42,7 +42,7 @@ final class IsolatedBuild(val root: Path) {
     val module = corpusModule.getField("MODULE$").get(null)
     val loaded = corpusModule.getMethod("load", classOf[String]).invoke(module, corpus)
     val cls = loader.loadClass("scala.tools.nsc.compilerlab.InMemoryCompiler")
-    val target = cls.getConstructors.head.newInstance(loaded, options, Boolean.box(resident))
+    val target = cls.getConstructors.head.newInstance(loaded, options, Boolean.box(resident), Boolean.box(InMemoryCompiler.keepOutputByDefault))
     val compileMethod = cls.getMethod("compile")
     val outputCountMethod = cls.getMethod("outputCount")
     new Compiling {
