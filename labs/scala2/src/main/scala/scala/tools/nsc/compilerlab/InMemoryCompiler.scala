@@ -8,8 +8,10 @@ import scala.tools.nsc.reporters.StoreReporter
 /** Compiles one corpus, again and again, with no file I/O after construction.
  *
  *  Sources are in-memory files read up front, the classpath is an `InMemoryClasspath` snapshot installed as the
- *  platform's classpath (bypassing `PathResolver`), and output goes to an in-memory directory: class files are
- *  generated and serialized, just not written.
+ *  platform's classpath (bypassing `PathResolver`), and class files are generated and serialized into an output
+ *  directory that keeps no bytes, as one on `/dev/null` would (`DiscardingDirectory`), so a compilation's output is
+ *  not live while the next one runs. With `keepOutput` (`-Dcompilerlab.output=keep`) the output is an in-memory
+ *  directory that holds every class file until the next compilation.
  *
  *  By default each compilation starts from scratch, with a new `Global`: it pays for everything a cold compile does
  *  (definitions, classpath indexing, symbol loading) except reading files and JIT warmup, and nothing survives from
@@ -19,7 +21,8 @@ import scala.tools.nsc.reporters.StoreReporter
  *  `--defs:<file>` and `--defs-listener:<class>` among the options turn on the cost per definition (`CostHooks`), with
  *  perflab-agent weaving its hooks.
  */
-final class InMemoryCompiler(val corpus: Corpus, options: List[String] = Nil, resident: Boolean = false) extends Compiling {
+final class InMemoryCompiler(val corpus: Corpus, options: List[String] = Nil, resident: Boolean = false,
+                             keepOutput: Boolean = InMemoryCompiler.keepOutputByDefault) extends Compiling {
   // the lab's options for the cost per definition (CostHooks), which scalac does not see
   private val (costOptions, extraOptions) = options.partition(_.startsWith("--defs"))
   private val (defsTable, defsListener) = {
@@ -34,7 +37,9 @@ final class InMemoryCompiler(val corpus: Corpus, options: List[String] = Nil, re
   /** The output of the latest compilation. */
   var output: VirtualDirectory = newOutput()
 
-  private def newOutput() = new VirtualDirectory("compiler-lab-output", None)
+  private def newOutput(): VirtualDirectory =
+    if (keepOutput) new VirtualDirectory("compiler-lab-output", None)
+    else new DiscardingDirectory("compiler-lab-output", None)
 
   private def newGlobal(out: VirtualDirectory): Global = {
     val args = corpus.options ::: extraOptions
@@ -82,4 +87,45 @@ final class InMemoryCompiler(val corpus: Corpus, options: List[String] = Nil, re
     def count(f: scala.reflect.io.AbstractFile): Int = if (f.isDirectory) f.iterator.map(count).sum else 1
     count(output)
   }
+}
+
+object InMemoryCompiler {
+  /** `-Dcompilerlab.output=keep` keeps every class file of the latest compilation in memory. By default output is
+   *  discarded as written: an 8-compile census found the kept class files were most of the `byte[]` that young
+   *  collections copied and promoted, about 90 MB per compile, a cost a build writing to disk does not pay.
+   */
+  val keepOutputByDefault: Boolean = sys.props.get("compilerlab.output").contains("keep")
+}
+
+/** An in-memory output directory whose files keep no content: what is written to them is counted and dropped. The file
+ *  entries are kept, so `outputCount` still checks that the backend ran. */
+final class DiscardingDirectory(name: String, maybeContainer: Option[VirtualDirectory])
+    extends scala.reflect.io.VirtualDirectory(name, maybeContainer) {
+  private[this] val entries = scala.collection.mutable.Map.empty[String, scala.reflect.io.AbstractFile]
+  /** Bytes written to this directory's files, not counting subdirectories. */
+  @volatile var bytesWritten: Long = 0L
+
+  override def iterator = entries.values.toList.iterator
+  override def lookupName(name: String, directory: Boolean): scala.reflect.io.AbstractFile =
+    entries.get(name).filter(_.isDirectory == directory).orNull
+  override def fileNamed(name: String): scala.reflect.io.AbstractFile = synchronized {
+    Option(lookupName(name, directory = false)).getOrElse {
+      val f = new scala.reflect.io.VirtualFile(name, path + '/' + name) {
+        override def output: java.io.OutputStream = new java.io.OutputStream {
+          override def write(b: Int): Unit = bytesWritten += 1
+          override def write(b: Array[Byte], off: Int, len: Int): Unit = bytesWritten += len
+        }
+      }
+      entries(name) = f
+      f
+    }
+  }
+  override def subdirectoryNamed(name: String): scala.reflect.io.AbstractFile = synchronized {
+    Option(lookupName(name, directory = true)).getOrElse {
+      val d = new DiscardingDirectory(name, Some(this))
+      entries(name) = d
+      d
+    }
+  }
+  override def clear(): Unit = entries.clear()
 }

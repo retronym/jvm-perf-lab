@@ -83,7 +83,7 @@ class BackendBenchmark {
 object BackendOps {
   /** Compiles `sources` and prepares the ops over what the compile left. */
   def compile(sources: String): BackendOps = {
-    val compiler = new InMemoryCompiler(Corpus.load(sources), resident = true)
+    val compiler = new InMemoryCompiler(Corpus.load(sources), resident = true, keepOutput = true) // checkRerun compares the class files
     val ops = new BackendOps(compiler)
     println(s"\n[compiler-lab] $sources: ${ops.summary}")
     ops
