@@ -5,7 +5,8 @@
 //                   (the last iteration to JVM exit) give each fork's lifetime
 //   timeline.tsv    per 50 ms: cycles and instructions of the benchmark thread, JIT, GC, other threads of the fork and
 //                   other processes (from xctrace, so only once the fork has finished)
-//   gc.log          -Xlog:gc with wall-clock `time` decorations: pauses (a run's forks' logs concatenated)
+//   gc.log          -Xlog:gc,gc+heap with wall-clock `time` decorations: pauses (a run's forks' logs concatenated); the
+//                   gc+heap region lines carry no "Pause" and are skipped
 //   load.tsv        the load gate's samples of other processes' CPU, in cores (each over its window: 5 s unless it says)
 //   profile.txt     the run's profile (e.g. xctrace:ipc), to name the gaps a profiler leaves between iterations
 //   jvm-events.tsv  the JDK's events in an async run's .jfr (jvmevents.py): kind (vmop, c1, c2, deopt), start_ms, end_ms, what

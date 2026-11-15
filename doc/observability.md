@@ -8,7 +8,24 @@ Every campaign cell records, besides its results, a few cheap things about the f
 | `os.json` | the same over the measured iterations, and per iteration | `osprobe.summary`, when the cell finishes |
 | `safepoint.log` | every safepoint, with time to reach it and time in it | `-Xlog:safepoint` |
 | `jit-events-<pid>.tsv` | every compilation and deoptimization of the fork | `JitProfiler` (it streams them anyway) |
-| `gc.log`, `load.tsv`, `iterations.tsv` | as before | |
+| `gc.log` | every GC: the pause, and the eden, survivor, old and humongous regions before and after it, with eden's target size | `-Xlog:gc,gc+heap` |
+| `load.tsv`, `iterations.tsv` | as before | |
+
+## The GC log
+
+Every cell has one now, whatever the spec says (`"gcLog"` is ignored), and a `perflab run` has one per fork (`gc-<pid>.log`). With `gc+heap` each young GC adds four lines to its pause line:
+
+```
+GC(2) Eden regions: 71->0(741)
+GC(2) Survivor regions: 2->27(96)
+GC(2) Old regions: 1->1
+GC(2) Humongous regions: 0->0
+GC(2) Pause Young (Prepare Mixed) (Metadata GC Threshold) 287M->108M(8192M) 26.279ms
+```
+
+The number in brackets after eden is G1's target for the next young generation, in regions, so the log shows a fork's young-generation trajectory, and where its GCs fell, for comparison with its siblings'. With the compiler labs' fixed young generation ([variance.md](variance.md)) the target stays put; without it, it moves with the measured pause times. On a scala-corpus compile (8 GB heap, `-Xmn3g`, 18 GCs in 19 s) the log was 83 lines and 6.6 KB. `gc+ergo*=debug` would add G1's reasons for its sizing, but it wrote 198 lines and 20.5 KB for the same compile, mostly worker counts and refinement targets, so it is left out; add it with `-jvmArgsPrepend` or a variant when you need it. The JFR equivalent is `jdk.G1HeapSummary`, which needs a recording.
+
+The timeline reads only the pause lines, as before.
 
 ## What osprobe records
 

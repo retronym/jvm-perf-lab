@@ -31,6 +31,10 @@ svg.timeline .grid { stroke:var(--line); } svg.timeline .axis { stroke:var(--mut
 """
 
 
+# what every fork's GC log has: each pause, and with gc+heap the eden, survivor, old and humongous regions before and after
+# each GC (and eden's target size), so a fork's young-generation trajectory compares with its siblings'; about 5 lines a young
+# GC. gc+ergo*=debug would explain G1's sizing decisions but writes 2.4 times as much, mostly worker counts
+GC_XLOG = "gc,gc+heap"
 GC_LOGS = 10  # a cell's forks' GC logs: gc.log, and the earlier forks' moved aside as gc.log.0 .. gc.log.<GC_LOGS - 1>
 
 

@@ -432,7 +432,8 @@ def main(argv):
     name = x.profile.replace(":", "-").replace("/", "_").replace(",", "-")
     out = os.path.abspath(x.out or os.path.join(config.get().runs, f"{time.strftime('%Y%m%d-%H%M%S')}-{name}"))
     # every fork appends its iterations to <out>/iterations.tsv (PairedProfiler) and logs GC to <out>/gc-<pid>.log: the timeline
-    timeline_args = f"-Dperflab.cell={out} -Xlog:gc:file={out}/gc-%p.log:time,uptime -Xlog:safepoint:file={out}/safepoint-%p.log:uptime"
+    from . import timeline
+    timeline_args = f"-Dperflab.cell={out} -Xlog:{timeline.GC_XLOG}:file={out}/gc-%p.log:time,uptime -Xlog:safepoint:file={out}/safepoint-%p.log:uptime"
     jvm_args = " ".join(a for a in [config.get().get("benchmark", "jvmArgs"), timeline_args] if a)
     cmd = prepare(out, x.profile, jmh_args, x.kperf, x.lib, jvm_args)
     if launch.enabled() and not x.dry_run:

@@ -37,7 +37,6 @@ A spec:
     "paired": {"base": "-Yx", "fast": ""},               # instead of variants: options per variant, alternating by
                                                          # iteration within each fork (doc/paired-ab.md)
     "loadgate": {"maxCores": 1.5, "quietSecs": 30},      # optional: wait for a quiet machine, rerun noisy cells
-    "gcLog": true,                                       # optional: gc.log per cell, for its timeline
     "perUnit": "files",                                  # optional: an aux counter of the benchmark; the summary and
                                                          # report divide every count by its units per op (cycles/file)
     "builds": {"base": {"checkout": "../scala3-base", "env": {"SCALA3_CHECKOUT": "{checkout}"}}, "pr": {...}},
@@ -207,7 +206,6 @@ class Spec:
             # quoted: a variant's options may be several words, and this string is split as a command line
             self.variant_jmh_args = {"paired": "-p " + shlex.quote(f"{cfg.get('benchmark', 'variants')}={spec}")}
         self.loadgate = s.get("loadgate")
-        self.gc_log = s.get("gcLog", False)
         self.per_unit = s.get("perUnit")
         self.historical = s.get("historical")
         self.aot = s.get("aot")  # AOT cache options, for variants with `{aot}` (perflab.aot)
@@ -231,9 +229,9 @@ class Spec:
     def command(self, corpus, iters, variant, flags, dest, built=None):
         """Writes the cell's arguments file and returns the build command that runs it."""
         extra = []
-        if self.gc_log:
-            # each fork's JVM moves the last one's log aside (gc.log.0, .1, ...), up to GC_LOGS of them
-            extra.append(f"-Xlog:gc:file={dest}/gc.log:time,uptime:filecount={timeline.GC_LOGS}")
+        # always (a spec's old "gcLog" is ignored): pauses and region counts per GC (timeline.GC_XLOG); each fork's JVM moves
+        # the last one's log aside (gc.log.0, .1, ...), up to GC_LOGS of them
+        extra.append(f"-Xlog:{timeline.GC_XLOG}:file={dest}/gc.log:time,uptime:filecount={timeline.GC_LOGS}")
         # the fork appends its iterations to <dest>/iterations.tsv as they finish (PairedProfiler)
         extra.append(f"-Dperflab.cell={dest}")
         # every safepoint, with how long threads took to reach it: cheap, and it explains a pause the GC log doesn't
