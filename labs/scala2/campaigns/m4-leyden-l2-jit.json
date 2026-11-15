@@ -11,7 +11,7 @@
   "variants": {
     "cold": "",
     "aot": "{aot}",
-    "aot-noreplay": "{aot} -XX:-AOTReplayTraining"
+    "aot-noreplay": "{aot} -XX:+UnlockDiagnosticVMOptions -XX:-AOTReplayTraining"
   },
   "profile": "xctrace:ipc",
   "loadgate": {
