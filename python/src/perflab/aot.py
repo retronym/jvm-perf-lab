@@ -8,11 +8,14 @@ that cannot use its cache fails instead of quietly running cold.
     "aot": {"train": "-f 1 -wi 8 -i 5",  # JMH arguments for the training fork, in place of the corpus's (default: the
                                          # corpus's; JMH refuses an option given twice, so they replace, not add)
             "caches": 3,                 # caches per build and corpus (default 1); round r uses cache (r-1) % caches + 1
-            "variants": {"aot-short": {"train": "-f 1 -wi 2 -i 1"}}}  # a variant's own training, and so its own caches
+            "variants": {"aot-short": {"train": "-f 1 -wi 2 -i 1"},  # a variant's own training, and so its own caches
+                         "aot-nolink": {"jvmArgs": "-XX:-AOTClassLinking"}}}  # JVM flags of its training fork only
 
 Caches live in <campaign>/.aot/<build>/<training>/<corpus>/<k>/, <training> being "default" or the name of a variant
 with its own "train". Each training directory keeps the training fork's jmh.log and result.json (its score labels the cache) and aot.json
 (the cache's size and sha256, the load during training). Each cell that used a cache gets an aot.json naming it.
+A variant's "jvmArgs" go to its training fork only (e.g. -XX:-AOTClassLinking, which the cache keeps): the check then
+expects the fork to report no AOT-linked classes.
 
 The cache needs the fork's class path to be JARs (the JVM refuses directories): a campaign with `{aot}` runs in launch
 mode, with the snapshot's class path directories jarred (launch.jar_dirs). It is valid only for the JDK, class path
@@ -55,6 +58,17 @@ def training(spec, variant):
     return "default", options(spec).get("train")
 
 
+def train_jvm_args(spec, variant):
+    """JVM flags a variant's training fork gets beside -XX:AOTCacheOutput ("" for the default training)."""
+    own = (options(spec).get("variants") or {}).get(variant)
+    return (own or {}).get("jvmArgs") or ""
+
+
+def linked(info):
+    """Whether a cache was created with AOT class linking (JEP 483's pre-linked classes and resolved call sites)."""
+    return "-XX:-AOTClassLinking" not in (info.get("trainJvmArgs") or "").split()
+
+
 def train_dir(spec, variant, corpus, r):
     return os.path.join(spec.out, DIR, build_key(spec, variant), training(spec, variant)[0], corpus, str(index(spec, r)))
 
@@ -89,8 +103,9 @@ def train(spec, corpus, iters, variant, r, built, run_fork, log):
         if os.path.exists(f):
             os.unlink(f)
     train_iters = training(spec, variant)[1] or iters
-    cmd = spec.command(corpus, train_iters, None, f"-XX:AOTCacheOutput={cache}", tdir, built)
-    log(f"training AOT cache {os.path.relpath(tdir, spec.out)} ({train_iters})")
+    jvm_args = train_jvm_args(spec, variant)
+    cmd = spec.command(corpus, train_iters, None, " ".join(filter(None, [jvm_args, f"-XX:AOTCacheOutput={cache}"])), tdir, built)
+    log(f"training AOT cache {os.path.relpath(tdir, spec.out)} ({train_iters}" + (f"; {jvm_args}" if jvm_args else "") + ")")
     started = time.time()
     rc, load = run_fork(cmd, tdir)
     if rc or not os.path.exists(cache):
@@ -103,7 +118,7 @@ def train(spec, corpus, iters, variant, r, built, run_fork, log):
     except (OSError, ValueError, LookupError):
         pass
     info = {"cache": cache, "size": os.path.getsize(cache), "sha256": sha256(cache), "index": index(spec, r),
-            "build": build_key(spec, variant), "training": training(spec, variant)[0], "corpus": corpus, "trainArgs": train_iters, "jvm": spec.jvm,
+            "build": build_key(spec, variant), "training": training(spec, variant)[0], "corpus": corpus, "trainArgs": train_iters, "trainJvmArgs": jvm_args, "jvm": spec.jvm,
             "started": started, "seconds": time.time() - started, "otherLoad": load, "trainingFork": score}
     with open(os.path.join(tdir, INFO), "w") as f:
         json.dump(info, f, indent=2)
@@ -117,9 +132,13 @@ def check(tdir, dest):
         text = open(os.path.join(dest, "aot.log"), errors="replace").read()
     except OSError:
         return "no aot.log: the fork was not given -Xlog:aot"
-    if "Using AOT-linked classes: true" not in text:
-        return "the fork did not use its AOT cache (see aot.log)"
     info = json.load(open(os.path.join(tdir, INFO)))
+    if "Opened AOT cache" not in text:
+        return "the fork did not open its AOT cache (see aot.log)"
+    want = linked(info)
+    if f"Using AOT-linked classes: {str(want).lower()}" not in text:
+        return f"the fork's AOT cache {'lacks' if want else 'has'} AOT-linked classes (see aot.log)"
     with open(os.path.join(dest, INFO), "w") as f:
-        json.dump({k: info[k] for k in ("cache", "sha256", "index", "build", "training", "corpus", "trainArgs", "trainingFork") if k in info}, f, indent=2)
+        json.dump({**{k: info[k] for k in ("cache", "sha256", "index", "build", "training", "corpus", "trainArgs", "trainJvmArgs", "trainingFork") if k in info},
+                   "linked": want}, f, indent=2)
     return None

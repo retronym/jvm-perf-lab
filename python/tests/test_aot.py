@@ -39,11 +39,26 @@ class AotTest(unittest.TestCase):
             json.dump({"cache": "c", "sha256": "s", "index": 1, "build": "default", "corpus": "x"}, f)
         self.assertIn("no aot.log", aot.check(tdir, dest))
         log = os.path.join(dest, "aot.log")
-        open(log, "w").write("[info][aot] Using AOT-linked classes: false\n")
-        self.assertIn("did not use", aot.check(tdir, dest))
-        open(log, "w").write("[info][aot] Using AOT-linked classes: true (static archive: has aot-linked classes)\n")
+        open(log, "w").write("[info][aot] Using AOT-linked classes: true\n")
+        self.assertIn("did not open", aot.check(tdir, dest))
+        open(log, "w").write("[info][aot] Opened AOT cache c.\n[info][aot] Using AOT-linked classes: false\n")
+        self.assertIn("lacks", aot.check(tdir, dest))
+        open(log, "w").write("[info][aot] Opened AOT cache c.\n[info][aot] Using AOT-linked classes: true (static archive: has aot-linked classes)\n")
         self.assertIsNone(aot.check(tdir, dest))
         self.assertEqual(json.load(open(os.path.join(dest, aot.INFO)))["sha256"], "s")
+        self.assertTrue(json.load(open(os.path.join(dest, aot.INFO)))["linked"])
+        with open(os.path.join(tdir, aot.INFO), "w") as f:
+            json.dump({"cache": "c", "sha256": "s", "trainJvmArgs": "-XX:-AOTClassLinking"}, f)
+        self.assertIn("has AOT-linked", aot.check(tdir, dest))
+        open(log, "w").write("[info][aot] Opened AOT cache c.\n[info][aot] Using AOT-linked classes: false (static archive: no aot-linked classes)\n")
+        self.assertIsNone(aot.check(tdir, dest))
+
+    def test_train_jvm_args(self):
+        s = FakeSpec(self.tmp)
+        s.aot["variants"] = {"nolink": {"jvmArgs": "-XX:-AOTClassLinking"}}
+        self.assertEqual(aot.train_jvm_args(s, "nolink"), "-XX:-AOTClassLinking")
+        self.assertEqual(aot.train_jvm_args(s, "aot"), "")
+        self.assertEqual(aot.training(s, "nolink"), ("nolink", None))
 
     def test_jar_dirs(self):
         snap = os.path.join(self.tmp, "snapshot")
