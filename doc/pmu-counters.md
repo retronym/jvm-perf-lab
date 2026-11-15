@@ -36,6 +36,29 @@ The profiler starts `xctrace record --attach` on its own fork before the first m
 
 Results go into JMH's secondary results (`xctrace.<event>` per op, `xctrace.IPC.<group>`, ratios), so they appear in `result.json`, campaign reports and the index.
 
+### How counts are charged to threads
+
+In xctrace's counters-profile table each sample's counts are the deltas since the previous sample on the same core, not on the same thread. Besides the timer samples (one per busy core per period, all cores at one phase) the table has context-switch samples, and their labels are unreliable: a sample labelled with the kernel's idle thread often carries the work of the thread that ran before it. Crediting each delta to its sample's label therefore loses work to "idle". Measured on scala2-lab cells, the labelled attribution's benchmark instructions per op were low by:
+
+| cell | benchmark threads | low by |
+|---|---|---|
+| m4, scala and re2s corpora | 1 | 0.6–1.5% |
+| m5-pro, scala corpus | 1 | 6% |
+| m5-pro, scala corpus | 6 | 36% (108G reported, 168G done) |
+| m5-pro, scala corpus | 8 | 29% (121G reported, 169G done) |
+
+JIT, GC and other threads were under-counted more (7–200%).
+
+So the profiler charges counts by time on core × rate, separately for each core class:
+
+- time on core: a thread's timer samples × the sampling period;
+- rate: the counts of intervals whose two ends, on one core, name the same thread, over the intervals' length;
+- core class: Apple's cores run the same code at different rates (Super vs Performance on an M5 Pro, P vs E on an M4), and a thread's mix of them differs by fork, so each class's time is multiplied by that class's rate.
+
+This applies to the per-op results, the per-iteration (paired) results, `threads.txt` and the timeline. `methods.txt` still splits the labelled samples by their leaf method, which is fine for shares within the benchmark thread. `xctrace.labelled.INST_ALL` keeps the old attribution's instructions per op, for comparing with earlier campaigns. To re-attribute an older trace: export its table (`xctrace export --input <trace> --xpath '/trace-toc/run[@number="1"]/data/table[@schema="counters-profile"]' > t.xml`), then run `io.github.retronym.perflab.xctrace.Reattribute t.xml <pid> <measured ops>` from perflab-jmh's test classes.
+
+Where the benchmark ran: `xctrace.bench.share.<class>` is its share of time on each core class (`S`, `P`, `E`), and `xctrace.bench.GHz.<class>` the clock while it ran there. `threads.txt` shows the same per thread. With more benchmark threads than top-tier cores, the share on the slower class moves the score (see `labs/scala2` campaign `m5-forkvar-t8-contention`).
+
 ## async-profiler kperf events
 
 ```bash
