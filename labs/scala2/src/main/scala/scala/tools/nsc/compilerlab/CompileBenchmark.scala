@@ -63,6 +63,7 @@ class CompileBenchmark {
   def setup(): Unit = {
     Announce.jvm(s"CompileBenchmark($corpus)")
     CompileBenchmark.useJdk(jdkHome)
+    if (sys.props.contains("compilerlab.touchRuntimeReflection")) CompileBenchmark.touchRuntimeReflection()
     val common = CompileBenchmark.split(scalacOptions)
     val src = Corpus.load(corpus)
     val resident = compiler match {
@@ -111,6 +112,15 @@ class CompileBenchmark {
 }
 
 object CompileBenchmark {
+  /** -Dcompilerlab.touchRuntimeReflection: initialises runtime reflection's universe and completes a class through it, as
+   *  a macro or plugin that uses `scala.reflect.runtime` would. This loads and links `SynchronizedSymbols`' symbol classes,
+   *  whose overrides of `Symbol.getFlag` and `validTo` C2's class hierarchy analysis then has to allow for. */
+  def touchRuntimeReflection(): Unit = {
+    val u = scala.reflect.runtime.universe
+    val n = u.rootMirror.staticClass("scala.collection.immutable.List").info.decls.size
+    println(s"[compiler-lab] runtime reflection touched: List has $n decls (${u.getClass.getName})")
+  }
+
   private final val BuildOption = "@build="
   private[compilerlab] def split(options: String): List[String] = options.split(" ").toList.filter(_.nonEmpty)
 
