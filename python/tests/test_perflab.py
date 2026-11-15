@@ -595,6 +595,41 @@ class JfrsyncTest(unittest.TestCase):
         self.assertEqual(jfrevents.promotion(cell), c)  # from the cache
 
 
+class LabJvmArgsTest(unittest.TestCase):
+    """A campaign without "jvmArgs" keeps the lab's [benchmark] jvmArgs it started with when the lab's default changes."""
+
+    def project(self, args):
+        return Project(f'[build]\njmh = "x {{args}}"\n[benchmark]\njvmArgs = "{args}"\n')
+
+    def spec(self, d, **kw):
+        f = os.path.join(d, "s.json")
+        json.dump({"name": "s", "benchmark": "B", "corpora": {"c": ""}, "variants": {"a": ""}, **kw}, open(f, "w"))
+        return f
+
+    def test_a_new_campaign_takes_the_default(self):
+        p = self.project("-Xmx4G -Xmn1536m")
+        sp = ab.Spec(self.spec(p.dir))
+        self.assertEqual((sp.jvm_args, sp.jvm_args_note), ("-Xmx4G -Xmn1536m", None))
+        self.assertEqual(ab.Spec(self.spec(p.dir, jvmArgs="-Xmx8G")).jvm_args, "-Xmx8G")  # the spec's own replace it
+
+    def test_a_campaign_from_before_the_change_keeps_the_old_default(self):
+        p = self.project("-Xms4G -Xmx4G -Xmn1536m -XX:-G1UseAdaptiveIHOP")
+        sp = ab.Spec(self.spec(p.dir))
+        cell = sp.cell_dir("c", "a", 1)
+        os.makedirs(cell)
+        json.dump([{"jvmArgs": ["-Xms4G", "-Xmx4G", "-Dperflab.cell=x"]}], open(os.path.join(cell, "result.json"), "w"))
+        sp = ab.Spec(sp.path)
+        self.assertEqual(sp.jvm_args, "-Xms4G -Xmx4G")
+        self.assertIn("-Xmn1536m -XX:-G1UseAdaptiveIHOP", sp.jvm_args_note)
+
+    def test_the_recorded_default_wins(self):
+        p = self.project("-Xmx4G -Xmn1536m")
+        sp = ab.Spec(self.spec(p.dir))
+        os.makedirs(sp.out)
+        open(os.path.join(sp.out, ab.LAB_JVM_ARGS), "w").write("-Xmx4G\n")
+        self.assertEqual(ab.Spec(sp.path).jvm_args, "-Xmx4G")
+
+
 class JitRecordingTest(unittest.TestCase):
     """A spec's "jitRecording": the JIT over a whole fork, and jfrevents' summary of it."""
 

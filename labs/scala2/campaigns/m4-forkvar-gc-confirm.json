@@ -1,0 +1,62 @@
+{
+  "name": "m4-forkvar-gc-confirm",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-6101d2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "fixyoung": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-6101d2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "fixyounghc3": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-6101d2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "xbatchfix": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-6101d2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "fixyoung": "-Xmn3g -XX:-G1UseAdaptiveIHOP",
+    "fixyounghc3": "-Xmn3g -XX:-G1UseAdaptiveIHOP -XX:+UnlockExperimentalVMOptions -XX:hashCode=3",
+    "xbatchfix": "-Xbatch -Xmn3g -XX:-G1UseAdaptiveIHOP"
+  },
+  "variantDescriptions": {
+    "base": "`scala2-perf-integration` `6101d220ca`, default G1 (adaptive young sizing)",
+    "fixyoung": "base with `-Xmn3g -XX:-G1UseAdaptiveIHOP`, the compiler labs' default from doc/variance.md, scaled to this campaign's 8 GB heap",
+    "fixyounghc3": "fixyoung with `-XX:hashCode=3`: identity hashes from a global counter, for campaigns judged on instructions per op",
+    "xbatchfix": "fixyoung with `-Xbatch`: compiles block the requesting thread, so allocation is nearly deterministic"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "rounds": 6,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 6 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Confirms m4-forkvar-gc (stopped after 3 forks a variant) and m4-forkvar-hash with 6 forks a variant: does a fixed young generation cut fork-to-fork CV of time per op, and do `-XX:hashCode=3` or `-Xbatch` on top of it cut the CV of instructions per op? Compare each variant's CV across forks (an F-test of variances, or Levene's), not their means: `-Xbatch` and `hashCode=3` change the work done."
+  ]
+}

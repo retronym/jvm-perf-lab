@@ -28,7 +28,8 @@ A spec:
                                               # `perflab api jit` and `jitDiff`; any profile. Large: for a pilot of one fork
     "lib": "<libasyncProfiler>",              # optional, for async
     "jvm": "<java>",                          # optional: JMH -jvm for every run (checked against result.json)
-    "jvmArgs": "-Xms4G -Xmx4G -Xss2M",        # given to every variant; default: [benchmark] jvmArgs
+    "jvmArgs": "-Xms4G -Xmx4G -Xss2M",        # given to every variant; default: [benchmark] jvmArgs, as the campaign first ran
+                                              # (<campaign>/lab-jvmArgs). Compiler labs: keep -Xmn, -XX:-G1UseAdaptiveIHOP (doc/variance.md)
     "rounds": 2,
     "corpora": {"scalaz": "-wi 10 -i 10 -w 10 -r 10"},   # corpus -> JMH arguments; set as the [benchmark] corpus param
     "variants": {"base": "", "U": "-Dfoo.bar"},          # JVM flags per variant; the first is the report's baseline
@@ -88,6 +89,7 @@ def log(msg):
 
 
 SOURCE = "spec.source"  # in a campaign: the path of the spec its spec.json was copied from
+LAB_JVM_ARGS = "lab-jvmArgs"  # in a campaign whose spec has no "jvmArgs": the lab's [benchmark] jvmArgs it started with
 
 
 def is_copy(path, out):
@@ -106,6 +108,29 @@ def spec_dir(path, out):
         if src:
             return os.path.dirname(src)
     return os.path.dirname(os.path.abspath(path))
+
+
+def pinned_lab_jvm_args(out, default):
+    """The lab's [benchmark] jvmArgs for a campaign that takes them, as it started: a change to the lab's default (a
+    fixed young generation, say) must not reach a resumed campaign's later cells only. The campaign records them
+    (LAB_JVM_ARGS) when it first runs; one that ran before that record existed keeps the default's arguments its first
+    cell ran with. Returns the arguments and, when they differ from the default, a note saying so."""
+    try:
+        return open(os.path.join(out, LAB_JVM_ARGS)).read().strip(), None
+    except OSError:
+        pass
+    for res in sorted(glob.glob(os.path.join(out, "*", "*", "*", "result.json"))):
+        try:
+            ran = json.load(open(res))[0]["jvmArgs"]
+        except (OSError, ValueError, LookupError, TypeError):
+            continue
+        kept = [a for a in default.split() if a in ran]
+        dropped = [a for a in default.split() if a not in ran]
+        if dropped:
+            return " ".join(kept), (f"the lab's jvmArgs gained {' '.join(dropped)} after this campaign's first cells ran; "
+                                    f"it keeps {' '.join(kept)} (add \"jvmArgs\" to its spec to change that)")
+        return default, None
+    return default, None
 
 
 class Spec:
@@ -127,7 +152,10 @@ class Spec:
         self.jit_recording = bool(s.get("jitRecording"))
         # "asm": methods whose compilations the forks print (perflab.asm); "asmOf": the campaign it explains
         self.asm, self.asm_of = list(s.get("asm") or []), s.get("asmOf")
-        self.jvm_args = s.get("jvmArgs", cfg.get("benchmark", "jvmArgs") or "")
+        self.lab_jvm_args = "jvmArgs" not in s
+        self.jvm_args, self.jvm_args_note = (
+            pinned_lab_jvm_args(os.path.join(cfg.campaigns, self.name), cfg.get("benchmark", "jvmArgs") or "")
+            if self.lab_jvm_args else (s["jvmArgs"], None))
         self.jvm = s.get("jvm")
         self.rounds = s.get("rounds", 2)
         self.corpora = s["corpora"]
@@ -442,6 +470,11 @@ def run(spec, dry, retry_unbuildable=False):
         shutil.copy(spec.path, os.path.join(spec.out, "spec.json"))
         with open(os.path.join(spec.out, SOURCE), "w") as f:  # what its relative paths are relative to
             f.write(os.path.abspath(spec.path) + "\n")
+    if spec.jvm_args_note:
+        log(f"{spec.name}: {spec.jvm_args_note}")
+    if spec.lab_jvm_args and not dry and not os.path.exists(os.path.join(spec.out, LAB_JVM_ARGS)):
+        with open(os.path.join(spec.out, LAB_JVM_ARGS), "w") as f:
+            f.write(spec.jvm_args + "\n")
     # the spec version cells are tagged with; `perflab trees` records the user's spec once and passes its id down
     version = os.environ.get(specs.ENV) or specs.record(spec.out, spec.path)
     todo = [c for c in cells if not done(spec.cell_dir(c[1], c[3], c[0]))]

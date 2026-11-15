@@ -11,7 +11,9 @@ launch = "sbt -batch -J-Xmx8g 'lab/perflabLaunch {out}'"
 default = "CompileBenchmark"
 corpus = "corpus"
 variants = "variants"
-jvmArgs = "-Xms4G -Xmx4G -Xss2M"
+# a fixed young generation, 3/8 of the heap, and no adaptive IHOP: G1 sizes the young generation from measured pause times,
+# so GC points move from fork to fork; fixed, they fall at the same allocation points (doc/variance.md)
+jvmArgs = "-Xms4G -Xmx4G -Xss2M -Xmn1536m -XX:-G1UseAdaptiveIHOP"
 
 [paths]
 runs = "out/runs"

@@ -39,10 +39,11 @@ This prints the build command and the `jmh.args` file perflab will hand to JMH, 
 
 ## 3. JVM arguments: perflab owns `-jvmArgsAppend`
 
-perflab writes exactly one `-jvmArgsAppend`: `[benchmark] jvmArgs` from `perflab.toml` (the heap settings, e.g. `-Xms4G -Xmx4G -Xss2M`) plus its own timeline flags (`-Dperflab.cell=...`, `-Xlog:gc:...`). It replaces the benchmark's `@Fork(jvmArgsAppend)`.
+perflab writes exactly one `-jvmArgsAppend`: `[benchmark] jvmArgs` from `perflab.toml` (the heap settings; the compiler labs': `-Xms4G -Xmx4G -Xss2M -Xmn1536m -XX:-G1UseAdaptiveIHOP`) plus its own timeline flags (`-Dperflab.cell=...`, `-Xlog:gc:...`). It replaces the benchmark's `@Fork(jvmArgsAppend)`.
 
 - **Never pass `-jvmArgsAppend` or `-jvmArgs` yourself**, and never repeat the heap flags: perflab already adds them.
 - In a campaign, put flags in the spec: `"jvmArgs"` (every variant; replaces `[benchmark] jvmArgs`, so include the heap settings) or `"variants"` (per variant, added to `jvmArgs`).
+- **Compiler labs: keep the young generation fixed.** G1's adaptive young sizing moves GC points between forks; `-Xmn` at 3/8 of `-Xmx` plus `-XX:-G1UseAdaptiveIHOP` cut time CV from 0.70% to 0.22% at no cost over 3 forks a variant (`doc/variance.md`). A spec that sets `"jvmArgs"` loses the lab's, so add them there, sized to its heap (`-Xms8G -Xmx8G -Xss2M -Xmn3g -XX:-G1UseAdaptiveIHOP`). Leave them out for a campaign about GC or heap sizing. For a campaign judged on instructions per op, also add `-XX:+UnlockExperimentalVMOptions -XX:hashCode=3` (or `-Xbatch`) to every variant.
 - For a one-off `perflab run`, use `-jvmArgsPrepend "<flags>"`, as the labs' READMEs do for `-javaagent:`. The async profile with `--kperf` prepends its own flags; check the dry run.
 - Values in `jmh.args` are not shell-quoted: `-jvmArgsPrepend` and its value are two lines, the value space-separated flags. Don't add quotes inside it.
 

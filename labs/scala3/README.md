@@ -75,6 +75,7 @@ What makes a difference between variants stand out from the noise, with the evid
 - **Exact counts of work.** A probe that counts operations (see `doc/caller-audit.md`) has no noise at all, and measures the work removed rather than its cost.
 - **Robust statistics.** Median or trimmed mean, and the per-fork values, not only a mean with an error bar.
 - **A fixed, pre-touched heap** (`-Xms` = `-Xmx`, `-XX:+AlwaysPreTouch`).
+- **A fixed young generation.** G1's adaptive young sizing moves GC points from fork to fork; the lab's default `jvmArgs` fix it (`-Xmn`, `-XX:-G1UseAdaptiveIHOP`), which cut time CV from 0.70% to 0.22% on the Scala 2 scala corpus ([doc/variance.md](../../doc/variance.md)).
 - **Apple Silicon.** Performance-core residency, Low Power Mode and thermals. Cycles normalise away the clock frequency; time does not.
 - **No I/O in the measured region** (above), and an isolated machine where possible.
 
