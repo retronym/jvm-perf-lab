@@ -1,0 +1,56 @@
+{
+  "name": "m4-leyden-l2-jit",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 2,
+  "corpora": {
+    "scala": "-f 1 -wi 8 -i 5 -p jdkHome=25.0.4-tem"
+  },
+  "variants": {
+    "cold": "",
+    "aot": "{aot}",
+    "aot-noreplay": "{aot} -XX:-AOTReplayTraining"
+  },
+  "profile": "xctrace:ipc",
+  "loadgate": {
+    "maxCores": 2.0,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Pilot after L2 (`m4-leyden-l2-scala`, scala `LEYDEN.md`): where do the cached forks' extra 8% instructions come from? JIT recorded over each whole fork, for `jit_diff`.",
+    "",
+    "`aot-noreplay` runs from a cache trained like `aot`'s but ignores its training profiles (`-XX:-AOTReplayTraining`): AOT-linked classes only. If it matches cold, the archived profiles cause the gap; if it matches `aot`, the classes or their init state do. Build `1e85ab8eba`, stock JDK 26 integration build, m4."
+  ],
+  "variantDescriptions": {
+    "cold": "no cache",
+    "aot": "cache trained by a `-wi 8 -i 5` fork, profiles replayed",
+    "aot-noreplay": "cache trained the same way, `-XX:-AOTReplayTraining`"
+  },
+  "builds": {
+    "cold": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-kwu-1e85ab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aot": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-kwu-1e85ab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aot-noreplay": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-kwu-1e85ab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "jitRecording": true
+}
