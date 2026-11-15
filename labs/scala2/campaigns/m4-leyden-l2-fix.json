@@ -1,0 +1,64 @@
+{
+  "name": "m4-leyden-l2-fix",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 6,
+  "corpora": {
+    "scala": "-f 1 -wi 8 -i 5 -p jdkHome=25.0.4-tem"
+  },
+  "variants": {
+    "cold": "",
+    "aot": "{aot}",
+    "aot-short": "{aot}"
+  },
+  "aot": {
+    "variants": {
+      "aot-short": {
+        "train": "-f 1 -wi 2 -i 1 -p jdkHome=25.0.4-tem"
+      }
+    }
+  },
+  "profile": "xctrace:ipc",
+  "loadgate": {
+    "maxCores": 2.0,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "L2 of the Leyden evaluation rerun with the compiler fix that keeps `scala.reflect.runtime` out of the AOT cache (retronym/scala#250: no `TypeTag` in the `f` interpolator, so `JavaMirror` is never loaded and the cache never links `SynchronizedSymbol`).",
+    "",
+    "In `m4-leyden-l2-scala` (build 1e85ab8eba) cached forks ran +2.9\u20133.7% slower than cold with +8% instructions, because `SynchronizedSymbol`'s overrides of `Symbol.getFlag`/`validTo` stopped C2 inlining them by CHA. Question: with the fix, do cached forks match cold at steady state?",
+    "",
+    "Build: branch `claude/perf-integration-no-typetag` (scala2-perf-integration, which includes retronym/scala#249, plus #250's two commits), stock JDK 26 integration build, m4. Arms as in `m4-leyden-l2-scala`."
+  ],
+  "variantDescriptions": {
+    "cold": "no cache",
+    "aot": "one cache, trained by a fork with the same JMH arguments (`-wi 8 -i 5`)",
+    "aot-short": "one cache, trained by a 3-iteration fork (`-wi 2 -i 1`)"
+  },
+  "builds": {
+    "cold": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-int-no-typetag",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aot": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-int-no-typetag",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aot-short": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-int-no-typetag",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  }
+}
