@@ -19,9 +19,13 @@ class AotTest(unittest.TestCase):
         s = FakeSpec(self.tmp, caches=3)
         self.assertTrue(aot.uses(s))
         self.assertEqual([aot.index(s, r) for r in range(1, 8)], [1, 2, 3, 1, 2, 3, 1])
-        self.assertEqual(aot.train_dir(s, "aot", "scala", 5), os.path.join(self.tmp, ".aot", "default", "scala", "2"))
+        self.assertEqual(aot.train_dir(s, "aot", "scala", 5), os.path.join(self.tmp, ".aot", "default", "default", "scala", "2"))
         s.builds = {"aot": {"checkout": "/x"}}
-        self.assertTrue(aot.train_dir(s, "aot", "scala", 1).endswith(os.path.join(".aot", "aot", "scala", "1")))
+        self.assertTrue(aot.train_dir(s, "aot", "scala", 1).endswith(os.path.join(".aot", "aot", "default", "scala", "1")))
+        s.aot["variants"] = {"short": {"train": "-wi 2"}}
+        self.assertEqual(aot.training(s, "short"), ("short", "-wi 2"))
+        self.assertEqual(aot.training(s, "aot"), ("default", None))
+        self.assertTrue(aot.train_dir(s, "short", "scala", 1).endswith(os.path.join(".aot", "default", "short", "scala", "1")))
         self.assertFalse(aot.uses(type("S", (), {"variants": {"a": ""}})()))
 
     def test_expand(self):

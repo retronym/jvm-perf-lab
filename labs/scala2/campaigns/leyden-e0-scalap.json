@@ -1,0 +1,13 @@
+{
+  "name": "leyden-e0-scalap",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 1,
+  "corpora": {"scalap": "-f 1 -wi 5 -i 3"},
+  "variants": {"cold": "", "aot": "{aot}"},
+  "aot": {"train": ""},
+  "profile": "none",
+  "description": "E0 for perflab's `{aot}` variants (claude/leyden-aot): a JMH training fork creates an AOT cache, and a measuring fork uses it with `-XX:AOTMode=on`. Plumbing check only, not a timing result.",
+  "variantDescriptions": {"cold": "no cache", "aot": "AOT cache trained by a fork with the same JMH arguments"}
+}
