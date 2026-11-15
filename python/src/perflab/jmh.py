@@ -219,7 +219,8 @@ def write_args(path, args):
 # what a run writes into its directory: cleared before the next run there, so nothing stale is merged into its results
 JFRSYNC = "jfrsync.json"  # <cell>/jfrsync.json: the jfrsync the run was given, and what its recording has of what it added
 OUTPUTS = ["jmh.log", JFRSYNC, JIT_RECORDING, "jit.json", "result.json", "report.md", "audit-*.json", "**/*.jfr", "**/*.html", "**/*.regraph", "*.trace", "*.trace.*",
-           "iterations.tsv", "timeline.tsv", "gc.log", "gc.log.*", "gc-*.log", "run.json"]
+           "iterations.tsv", "timeline.tsv", "gc.log", "gc.log.*", "gc-*.log", "run.json",
+           "safepoint.log", "safepoint.log.*", "safepoint-*.log", "os.jsonl", "os.json", "jit-events-*.tsv"]
 
 
 def java_feature(java):
@@ -431,7 +432,7 @@ def main(argv):
     name = x.profile.replace(":", "-").replace("/", "_").replace(",", "-")
     out = os.path.abspath(x.out or os.path.join(config.get().runs, f"{time.strftime('%Y%m%d-%H%M%S')}-{name}"))
     # every fork appends its iterations to <out>/iterations.tsv (PairedProfiler) and logs GC to <out>/gc-<pid>.log: the timeline
-    timeline_args = f"-Dperflab.cell={out} -Xlog:gc:file={out}/gc-%p.log:time,uptime"
+    timeline_args = f"-Dperflab.cell={out} -Xlog:gc:file={out}/gc-%p.log:time,uptime -Xlog:safepoint:file={out}/safepoint-%p.log:uptime"
     jvm_args = " ".join(a for a in [config.get().get("benchmark", "jvmArgs"), timeline_args] if a)
     cmd = prepare(out, x.profile, jmh_args, x.kperf, x.lib, jvm_args)
     if launch.enabled() and not x.dry_run:

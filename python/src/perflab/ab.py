@@ -77,7 +77,7 @@ compares the work, not the op. The index's summary toggles between per unit and 
 """
 import atexit, glob, json, os, re, shlex, shutil, subprocess, sys, time
 
-from . import aot, branch, branchview, config, jmh, kperf, launch, loadgate, metrics, specs, testbed, timeline, transcript
+from . import aot, branch, branchview, config, jmh, kperf, launch, loadgate, metrics, osprobe, specs, testbed, timeline, transcript
 
 JMH_LOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "jmh.lock")
 MAX_ATTEMPTS = 10
@@ -208,6 +208,8 @@ class Spec:
             extra.append(f"-Xlog:gc:file={dest}/gc.log:time,uptime:filecount={timeline.GC_LOGS}")
         # the fork appends its iterations to <dest>/iterations.tsv as they finish (PairedProfiler)
         extra.append(f"-Dperflab.cell={dest}")
+        # every safepoint, with how long threads took to reach it: cheap, and it explains a pause the GC log doesn't
+        extra.append(f"-Xlog:safepoint:file={dest}/safepoint.log:uptime:filecount={timeline.GC_LOGS}")
         if self.jit_recording:
             extra.append(jmh.jit_recording(dest))
         if self.asm:
@@ -265,6 +267,7 @@ def wait_until_quiet(spec):
         loadgate.wait(loadgate.server_pid(), g.get("maxCores", 1.5), g.get("quietSecs", 30))
 
 
+OS_PROBE_SECS = 0.5  # osprobe's sampling period: one sample costs well under a millisecond of one core
 LOAD_SECS = 2  # a load sample's window: shorter than a measurement iteration, to say which ones a burst hit
 LOAD_CHECK = "load.json"  # in a cell: each measurement iteration's competing load, and the gate's verdict
 
@@ -276,6 +279,25 @@ def start_load_sampler(spec, path):
     if not spec.loadgate:
         return None
     return subprocess.Popen([sys.executable, "-m", "perflab", "loadgate", "sample", str(loadgate.server_pid()), path, str(LOAD_SECS)])
+
+
+def start_os_probe(dest):
+    """The fork as the OS sees it (osprobe) every half second while a cell runs, into <cell>/os.jsonl; macOS only."""
+    if sys.platform != "darwin":
+        return None
+    path = os.path.join(dest, osprobe.OS_JSONL)
+    if os.path.exists(path):
+        os.unlink(path)
+    return subprocess.Popen([sys.executable, "-m", "perflab", "osprobe", "sample", str(os.getpid()), path, str(OS_PROBE_SECS)],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def os_summary(dest):
+    """<cell>/os.json from the probe's samples; a failure is logged, never fatal."""
+    try:
+        osprobe.summary(dest)
+    except Exception as e:
+        log(f"  warning: os probe summary failed: {e}")
 
 
 def load_check(spec, dest):
@@ -518,12 +540,14 @@ def run(spec, dry, retry_unbuildable=False):
             started = time.time()
             load_tsv = os.path.join(dest, "load.tsv")
             sampler = start_load_sampler(spec, load_tsv)
+            probe = start_os_probe(dest)
             try:
                 rc = jmh.run_build(cmd, os.path.join(dest, "build.log"))
             finally:
-                if sampler:
-                    sampler.terminate()
-                    sampler.wait()
+                for p in (sampler, probe):
+                    if p:
+                        p.terminate()
+                        p.wait()
             # another JMH run took the lock between wait_until_quiet and our JMH starting: JMH exits before logging
             jmh_log = os.path.join(dest, "jmh.log")
             if rc and jmh_lock_held() and (not os.path.exists(jmh_log) or os.path.getsize(jmh_log) == 0):
@@ -546,6 +570,8 @@ def run(spec, dry, retry_unbuildable=False):
             break
         else:
             sys.exit(f"{dest}: no clean run in {MAX_ATTEMPTS} attempts")
+        if not rc:
+            os_summary(dest)
         problem = f"build exited with {rc} (see {dest}/build.log)" if rc else check(spec, dest, started, flags, variant, built.get(variant))
         if not problem and tdir:
             problem = aot.check(tdir, dest)

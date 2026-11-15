@@ -129,9 +129,10 @@ def cached_hw_events(cell):
     return per_op_events(cell, c["totals"])
 
 
-def of(r, per_unit=None, hw=None):
+def of(r, per_unit=None, hw=None, osm=None):
     """A JMH result's metrics: [(key, label, kind, main, value)]. `kind` picks the format and Δ floor (score, count,
-    alloc, ratio, pct, total); `main` ones are the summary table's columns. `hw` is an async kperf profile's events per op."""
+    alloc, ratio, pct, total); `main` ones are the summary table's columns. `hw` is an async kperf profile's events per op;
+    `osm` the cell's os.json (osprobe: the fork as the OS saw it over the measured iterations)."""
     m = r.get("secondaryMetrics", {})
     get = lambda k: m[k]["score"] if k in m else None
     u, per = 1.0, "op"
@@ -187,7 +188,35 @@ def of(r, per_unit=None, hw=None):
             # JMH's score of these is the largest fork's (AggregationPolicy.MAX), so take the mean of the forks' own
             forks = [f[0] for f in jm.get("rawData") or [] if f and isinstance(f[0], (int, float))]
             out.append((f"jit:{name}", label, "total", False, sum(forks) / len(forks) if forks else jm["score"]))
+    out += os_metrics(osm or {})
     return [x for x in out if x[4] is not None]
+
+
+OS_NAME = "os.json"
+
+
+def cached_os(cell):
+    """A cell's os.json (osprobe.summary), {} without one."""
+    try:
+        return json.load(open(os.path.join(cell, OS_NAME)))
+    except (OSError, ValueError):
+        return {}
+
+
+def os_metrics(o):
+    """osprobe's figures for a fork, as metrics: where its threads ran and what held them up."""
+    if not o:
+        return []
+    out = [("os:topTier%", "CPU time on the top core tier %", "pct", False, o.get("top_tier_time_pct")),
+           ("os:runnable%", "runnable, waiting for a core, % of CPU time", "pct", False, o.get("runnable_pct")),
+           ("os:GHz", "clock, all threads (GHz)", "ratio", False, o.get("ghz")),
+           ("os:energy", "energy J/op", "ratio", False, (o.get("per_op") or {}).get("energy_j")),
+           ("os:pageWait", "page-fault wait ms", "total", False, o.get("page_wait_ms"))]
+    for c, v in (o.get("class_busy_pct") or {}).items():
+        out.append((f"os:busy:{c}", f"{c} cores busy % (machine)", "pct", False, v))
+    for g, v in (o.get("threads_cores") or {}).items():
+        out.append((f"os:cores:{g}", f"{g} threads, cores used", "ratio", False, v))
+    return out
 
 
 def fmt(kind, x):

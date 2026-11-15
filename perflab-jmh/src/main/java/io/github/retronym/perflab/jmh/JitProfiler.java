@@ -124,6 +124,7 @@ public class JitProfiler implements InternalProfiler {
             System.err.println("[jit] could not write report: " + e);
         }
 
+        writeEvents(all);
         long[] m = count(all, measured);
         long[] w = lastWarmup == null ? new long[3] : count(all, List.of(lastWarmup));
         return List.of(
@@ -132,6 +133,24 @@ public class JitProfiler implements InternalProfiler {
                 new ScalarResult("jit.deopts", m[2], "#", POLICY),
                 new ScalarResult("jit.lastWarmup.compilations", w[0], "#", POLICY),
                 new ScalarResult("jit.lastWarmup.deopts", w[2], "#", POLICY));
+    }
+
+    /** Every compilation and deoptimization of the fork, to `<cell>/jit-events-<pid>.tsv` when perflab names the cell
+     *  (`-Dperflab.cell`): epoch ms, kind, tier, OSR, compile ms, method. A fork's compile trajectory, for comparing
+     *  a slow fork with a fast one, at none of the cost of a full JIT recording (no inlining decisions). */
+    private static void writeEvents(List<Event> all) {
+        String cell = System.getProperty("perflab.cell");
+        if (cell == null) return;
+        StringBuilder sb = new StringBuilder("epoch_ms\tkind\ttier\tosr\tcompile_ms\tmethod\n");
+        for (Event e : all)
+            sb.append(e.time.toEpochMilli()).append('\t').append(e.deopt ? "deopt" : "compile").append('\t').append(e.level)
+              .append('\t').append(e.osr ? 1 : 0).append('\t').append(String.format(Locale.ROOT, "%.3f", e.durationNs / 1e6))
+              .append('\t').append(e.method.replace('\t', ' ')).append('\n');
+        try {
+            java.nio.file.Files.writeString(java.nio.file.Path.of(cell, "jit-events-" + ProcessHandle.current().pid() + ".tsv"), sb);
+        } catch (Exception ex) {
+            System.err.println("[jit] could not write events: " + ex);
+        }
     }
 
     private static boolean in(Event e, List<Window> ws) {
