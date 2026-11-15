@@ -1,0 +1,62 @@
+{
+  "name": "m4-leyden-l2-scala",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 6,
+  "corpora": {
+    "scala": "-f 1 -wi 8 -i 5 -p jdkHome=25.0.4-tem"
+  },
+  "variants": {
+    "cold": "",
+    "aot": "{aot}",
+    "aot-short": "{aot}"
+  },
+  "aot": {
+    "variants": {
+      "aot-short": {
+        "train": "-f 1 -wi 2 -i 1 -p jdkHome=25.0.4-tem"
+      }
+    }
+  },
+  "profile": "xctrace:ipc",
+  "loadgate": {
+    "maxCores": 2.0,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "L2 of the Leyden evaluation (scala `LEYDEN.md`, branch claude/leyden-bench-eval): does a fork started from an AOT cache (JEP 483/515: cached classes plus the training fork's method profiles) measure the same steady state as a cold fork?",
+    "",
+    "The smoke test showed cached forks with ~8,000 methods held at tier 2 (the training policy's lukewarm hold: methods trained at tier ≤3 stay at tier 2 until their counts exceed the training run's) and ~800 fewer C2 methods. `aot-short` trains on 3 iterations, so the measured fork's counts pass the training counts early and the hold releases. Build `1e85ab8eba`, stock JDK 26 integration build, m4. Copy of `leyden-l2-scala`, which the laptop's load stopped in round 1. Each variant names the same checkout, so each gets its own snapshot and its own caches."
+  ],
+  "variantDescriptions": {
+    "cold": "no cache",
+    "aot": "one cache, trained by a fork with the same JMH arguments (`-wi 8 -i 5`)",
+    "aot-short": "one cache, trained by a 3-iteration fork (`-wi 2 -i 1`)"
+  },
+  "builds": {
+    "cold": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-kwu-1e85ab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aot": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-kwu-1e85ab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aot-short": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-kwu-1e85ab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  }
+}
