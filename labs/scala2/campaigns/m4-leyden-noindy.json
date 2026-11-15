@@ -1,0 +1,53 @@
+{
+  "name": "m4-leyden-noindy",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 2,
+  "corpora": {
+    "scala": "-f 1 -wi 8 -i 5 -p jdkHome=25.0.4-tem"
+  },
+  "variants": {
+    "cold": "",
+    "aot-noindy": "{aot} -XX:+UnlockDiagnosticVMOptions -XX:-AOTReplayTraining"
+  },
+  "profile": "xctrace:ipc",
+  "loadgate": {
+    "maxCores": 2.0,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Follows `m4-leyden-nolink` (scala `LEYDEN.md`): a cache without class linking matches cold; with linking (no profiles) it costs +6.4% instructions. Is it the class linking or the pre-resolved `invokedynamic` call sites?",
+    "",
+    "`aot-noindy`'s cache is created with `-XX:-AOTInvokeDynamicLinking`: classes AOT-linked, `invokedynamic` left to resolve at run time. Its forks ignore the training profiles (`-XX:-AOTReplayTraining`), so it compares with `aot-noreplay` in `m4-leyden-l2-jit`. Build `1e85ab8eba`, stock JDK 26 integration build, m4."
+  ],
+  "variantDescriptions": {
+    "cold": "no cache",
+    "aot-noindy": "cache trained by a `-wi 8 -i 5` fork with `-XX:-AOTInvokeDynamicLinking`; profiles not replayed"
+  },
+  "builds": {
+    "cold": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-kwu-1e85ab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aot-noindy": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-kwu-1e85ab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "aot": {
+    "variants": {
+      "aot-noindy": {
+        "jvmArgs": "-XX:+UnlockDiagnosticVMOptions -XX:-AOTInvokeDynamicLinking"
+      }
+    }
+  }
+}
