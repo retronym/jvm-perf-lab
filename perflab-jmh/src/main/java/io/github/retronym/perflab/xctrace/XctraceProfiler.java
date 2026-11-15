@@ -248,70 +248,89 @@ public class XctraceProfiler implements InternalProfiler {
         return "other";
     }
 
-    /** Event sampling: each row is one timer sample on one core, with each event's count since that core's previous sample. */
+    /** Event sampling: each row is a sample on one core, with each event's count since that core's previous sample.
+     *  Counts are charged to threads by time on core × per-core-class rate ({@link TickAttribution}), not by the
+     *  row's label, which context-switch samples get wrong. */
     private void eventResults(Path table, List<String> events, List<Result> out) throws Exception {
-        Map<String, long[]> sums = new TreeMap<>();
-        Map<String, Integer> samples = new TreeMap<>();
         Map<String, long[]> byLeaf = new HashMap<>();
-        Map<String, long[]> byThread = new HashMap<>();
         List<IterationLog.Entry> measured = IterationLog.paired() && traceStartMillis > 0
             ? IterationLog.entries().stream().filter(IterationLog.Entry::measured).toList() : List.of();
-        Map<Integer, long[]> byIteration = new HashMap<>();
         int cycIdx = events.indexOf("CORE_ACTIVE_CYCLE"), insIdx = events.indexOf("INST_ALL");
-        TreeMap<Long, long[]> timeline = new TreeMap<>();  // bin start (wall ms) -> cycles, instructions per lane
+        TickAttribution ta = new TickAttribution(events.size(), sampleUs * 1000);
+        Set<String> groups = new TreeSet<>(), threadNames = new TreeSet<>(), bins = new TreeSet<>();
         rows(table, row -> {
             String[] t = row.get("thread");
             String[] m = row.get("pmc-events");
+            String[] core = row.get("core");
+            String[] st = row.get("sample-time");
             String[] bt = row.containsKey("tagged-backtrace") ? row.get("tagged-backtrace") : row.get("backtrace");
-            if (t == null || m == null || m[1] == null || t[0] == null) return;
+            if (t == null || m == null || m[1] == null || t[0] == null || core == null || st == null || st[1] == null) return;
             String[] xs = m[1].trim().split("\\s+");
             if (xs.length != events.size()) return;
+            long[] deltas = new long[xs.length];
+            for (int i = 0; i < xs.length; i++) deltas[i] = Long.parseLong(xs[i]);
+            long ns = Long.parseLong(st[1].trim());
             boolean ours = t[0].contains(SELF);
-            String[] st = row.get("sample-time");
-            if (traceStartMillis > 0 && cycIdx >= 0 && st != null && st[1] != null) {
-                long wall = traceStartMillis + Long.parseLong(st[1].trim()) / 1_000_000;
-                int lane = ours ? LANES.indexOf(group(t[0])) : LANES.size() - 1;
-                long[] b = timeline.computeIfAbsent(wall / BIN_MS * BIN_MS, k -> new long[2 * LANES.size()]);
-                b[2 * lane] += Long.parseLong(xs[cycIdx]);
-                if (insIdx >= 0) b[2 * lane + 1] += Long.parseLong(xs[insIdx]);
+            List<String> buckets = new ArrayList<>(4);
+            String g = ours ? group(t[0]) : null;
+            if (traceStartMillis > 0 && cycIdx >= 0) {
+                long wall = traceStartMillis + ns / 1_000_000;
+                String bin = "B:" + (wall / BIN_MS * BIN_MS) + ":" + (ours ? g : "processes");
+                buckets.add(bin);
+                bins.add(bin);
             }
-            if (!ours) return;
-            String g = group(t[0]);
-            long[] s = sums.computeIfAbsent(g, k -> new long[events.size()]);
-            for (int i = 0; i < xs.length; i++) s[i] += Long.parseLong(xs[i]);
-            samples.merge(g, 1, Integer::sum);
-            if (!measured.isEmpty() && g.equals("bench")) {
-                IterationLog.Entry it = st == null || st[1] == null ? null : iterationAt(measured, traceStartMillis + Long.parseLong(st[1].trim()) / 1_000_000);
-                if (it != null) {
-                    long[] c = byIteration.computeIfAbsent(it.index(), k -> new long[events.size()]);
-                    for (int i = 0; i < xs.length; i++) c[i] += Long.parseLong(xs[i]);
+            if (ours) {
+                buckets.add("G:" + g);
+                groups.add(g);
+                String name = threadName(t[0]);
+                buckets.add("T:" + name);
+                threadNames.add(name);
+                if (!measured.isEmpty() && g.equals("bench")) {
+                    IterationLog.Entry it = iterationAt(measured, traceStartMillis + ns / 1_000_000);
+                    if (it != null) buckets.add("I:" + it.index());
+                }
+                if (perfMap != null && g.equals("bench") && bt != null) {
+                    String leaf = perfMap.name(bt[2], bt[3]);
+                    long[] l = byLeaf.computeIfAbsent(leaf, k -> new long[events.size() + 1]);
+                    for (int i = 0; i < xs.length; i++) l[i] += deltas[i];
+                    l[events.size()]++;
                 }
             }
-            long[] th = byThread.computeIfAbsent(threadName(t[0]), k -> new long[events.size()]);
-            for (int i = 0; i < xs.length; i++) th[i] += Long.parseLong(xs[i]);
-            if (perfMap != null && g.equals("bench") && bt != null) {
-                String leaf = perfMap.name(bt[2], bt[3]);
-                long[] l = byLeaf.computeIfAbsent(leaf, k -> new long[events.size() + 1]);
-                for (int i = 0; i < xs.length; i++) l[i] += Long.parseLong(xs[i]);
-                l[events.size()]++;
-            }
+            ta.sample(ns, core[1] == null ? core[0] : core[1].trim(), core[0], t[0], deltas, buckets);
         });
+        ta.finish();
         if (perfMap != null) attribution(byLeaf, events);
-        threads(byThread, events);
-        writeTimeline(timeline);
-        if (!measured.isEmpty()) out.addAll(perVariant(measured, byIteration, events));
+        threads(ta, threadNames, events);
+        writeTimeline(ta, bins, cycIdx, insIdx);
+        if (!measured.isEmpty()) {
+            Map<Integer, long[]> byIteration = new HashMap<>();
+            for (IterationLog.Entry e : measured) if (ta.buckets().contains("I:" + e.index())) byIteration.put(e.index(), ta.estimate("I:" + e.index()));
+            out.addAll(perVariant(measured, byIteration, events));
+        }
+        Map<String, long[]> sums = new TreeMap<>();
+        for (String g : groups) sums.put(g, ta.estimate("G:" + g));
         long[] bench = sums.getOrDefault("bench", new long[events.size()]);
-        out.add(new ScalarResult("xctrace.bench.oncpu", samples.getOrDefault("bench", 0) * sampleUs / 1e6, "s", POLICY));
-        int cyc = events.indexOf("CORE_ACTIVE_CYCLE"), ins = events.indexOf("INST_ALL");
+        out.add(new ScalarResult("xctrace.bench.oncpu", ta.onCpuNs("G:bench") / 1e9, "s", POLICY));
+        int cyc = cycIdx, ins = insIdx;
         for (int i = 0; i < events.size(); i++)
             out.add(new ScalarResult("xctrace." + events.get(i), bench[i] / (double) ops, "#/op", POLICY));
+        long[] benchLabelled = ta.labelled("G:bench");
+        if (ins >= 0) out.add(new ScalarResult("xctrace.labelled.INST_ALL", benchLabelled[ins] / (double) ops, "#/op", POLICY));
+        // where the benchmark ran: share of its time on each core class, and each class's clock while it ran there
+        long benchTicks = ta.classes("G:bench").values().stream().mapToLong(a -> a.ticks).sum();
+        for (Map.Entry<String, TickAttribution.Acc> e : ta.classes("G:bench").entrySet()) {
+            if (benchTicks > 0) out.add(new ScalarResult("xctrace.bench.share." + e.getKey(), 100.0 * e.getValue().ticks / benchTicks, "%", POLICY));
+            if (cyc >= 0 && e.getValue().uniNs > 0)
+                out.add(new ScalarResult("xctrace.bench.GHz." + e.getKey(), e.getValue().uni[cyc] / (double) e.getValue().uniNs, "GHz", POLICY));
+        }
         if (cyc >= 0 && ins >= 0) {
             for (Map.Entry<String, long[]> e : sums.entrySet())
                 if (e.getValue()[cyc] > 0)
                     out.add(new ScalarResult("xctrace.IPC." + e.getKey(), e.getValue()[ins] / (double) e.getValue()[cyc], "insts/clk", POLICY));
             long allCycles = sums.values().stream().mapToLong(s -> s[cyc]).sum();
-            for (Map.Entry<String, long[]> e : sums.entrySet())
-                out.add(new ScalarResult("xctrace.cycles%." + e.getKey(), 100.0 * e.getValue()[cyc] / allCycles, "%", POLICY));
+            if (allCycles > 0)
+                for (Map.Entry<String, long[]> e : sums.entrySet())
+                    out.add(new ScalarResult("xctrace.cycles%." + e.getKey(), 100.0 * e.getValue()[cyc] / allCycles, "%", POLICY));
         }
         for (int i = 0; i < events.size(); i++) {
             if (i == cyc || i == ins) continue;
@@ -333,9 +352,19 @@ public class XctraceProfiler implements InternalProfiler {
     /** `<trace>.iterations.tsv` (every iteration: index, kind, variant, start and end by the wall clock in ms, score,
      *  ops, GC pause ms) and `<trace>.timeline.tsv` (per 50 ms bin by the wall clock: cycles and instructions of each
      *  lane), for scripts/timeline.py. */
-    private void writeTimeline(TreeMap<Long, long[]> timeline) throws IOException {
+    private void writeTimeline(TickAttribution ta, Set<String> bins, int cyc, int ins) throws IOException {
         Files.writeString(dir.resolve(trace.getFileName() + ".iterations.tsv"),
             "index\tkind\tvariant\tstart_ms\tend_ms\tscore\tops\tgc_ms\n" + String.join("\n", iterationRows) + "\n");
+        TreeMap<Long, long[]> timeline = new TreeMap<>();  // bin start (wall ms) -> cycles, instructions per lane
+        for (String b : bins) {
+            String[] parts = b.split(":", 3);
+            int lane = LANES.indexOf(parts[2]);
+            if (lane < 0) continue;
+            long[] est = ta.estimate(b);
+            long[] row = timeline.computeIfAbsent(Long.parseLong(parts[1]), k -> new long[2 * LANES.size()]);
+            if (cyc >= 0) row[2 * lane] += est[cyc];
+            if (ins >= 0) row[2 * lane + 1] += est[ins];
+        }
         StringBuilder sb = new StringBuilder("bin_ms");
         for (String l : LANES) sb.append('\t').append(l).append("_cycles\t").append(l).append("_inst");
         sb.append('\n');
@@ -384,16 +413,29 @@ public class XctraceProfiler implements InternalProfiler {
     }
 
     /** `<trace>.threads.txt`: each thread's share of the process's cycles and its instructions per op, with its
-     *  group. The groups' totals are in the results; this says what is in them, e.g. which threads are "other". */
-    private void threads(Map<String, long[]> byThread, List<String> events) throws IOException {
+     *  group, and where it ran: its share of time on each core class (e.g. S/P on an M5 Pro, P/E on an M4) and its
+     *  clock there. The groups' totals are in the results; this says what is in them, e.g. which threads are "other". */
+    private void threads(TickAttribution ta, Set<String> names, List<String> events) throws IOException {
         int cyc = events.indexOf("CORE_ACTIVE_CYCLE"), ins = events.indexOf("INST_ALL");
         if (cyc < 0) return;
-        long all = byThread.values().stream().mapToLong(t -> t[cyc]).sum();
+        Map<String, long[]> est = new HashMap<>();
+        for (String n : names) est.put(n, ta.estimate("T:" + n));
+        long all = est.values().stream().mapToLong(t -> t[cyc]).sum();
         if (all == 0) return;
-        StringBuilder sb = new StringBuilder("cycles%  instructions/op  group  thread\n");
-        byThread.entrySet().stream().sorted((a, b) -> Long.compare(b.getValue()[cyc], a.getValue()[cyc])).limit(25)
-            .forEach(e -> sb.append(String.format("%6.2f%%  %14s  %-5s  %s%n", 100.0 * e.getValue()[cyc] / all,
-                ins < 0 ? "" : String.format("%.3fG", e.getValue()[ins] / (double) ops / 1e9), group(e.getKey()), e.getKey())));
+        StringBuilder sb = new StringBuilder("cycles%  instructions/op  group  core classes (time share, GHz)  thread\n");
+        est.entrySet().stream().sorted((a, b) -> Long.compare(b.getValue()[cyc], a.getValue()[cyc])).limit(25).forEach(e -> {
+            Map<String, TickAttribution.Acc> cls = ta.classes("T:" + e.getKey());
+            long ticks = cls.values().stream().mapToLong(a -> a.ticks).sum();
+            StringBuilder where = new StringBuilder();
+            for (Map.Entry<String, TickAttribution.Acc> c : cls.entrySet()) {
+                if (ticks == 0 || c.getValue().ticks == 0) continue;
+                where.append(String.format("%s %3.0f%%", c.getKey(), 100.0 * c.getValue().ticks / ticks));
+                if (c.getValue().uniNs > 0) where.append(String.format(" %.2f", c.getValue().uni[cyc] / (double) c.getValue().uniNs));
+                where.append("  ");
+            }
+            sb.append(String.format("%6.2f%%  %14s  %-5s  %-30s  %s%n", 100.0 * e.getValue()[cyc] / all,
+                ins < 0 ? "" : String.format("%.3fG", e.getValue()[ins] / (double) ops / 1e9), group(e.getKey()), where.toString().trim(), e.getKey()));
+        });
         Files.writeString(dir.resolve(trace.getFileName() + ".threads.txt"), sb);
     }
 

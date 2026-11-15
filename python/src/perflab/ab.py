@@ -28,7 +28,8 @@ A spec:
                                               # `perflab api jit` and `jitDiff`; any profile. Large: for a pilot of one fork
     "lib": "<libasyncProfiler>",              # optional, for async
     "jvm": "<java>",                          # optional: JMH -jvm for every run (checked against result.json)
-    "jvmArgs": "-Xms4G -Xmx4G -Xss2M",        # given to every variant; default: [benchmark] jvmArgs
+    "jvmArgs": "-Xms4G -Xmx4G -Xss2M",        # given to every variant; default: [benchmark] jvmArgs, as the campaign first ran
+                                              # (<campaign>/lab-jvmArgs). Compiler labs: keep -Xmn, -XX:-G1UseAdaptiveIHOP (doc/variance.md)
     "rounds": 2,
     "corpora": {"scalaz": "-wi 10 -i 10 -w 10 -r 10"},   # corpus -> JMH arguments; set as the [benchmark] corpus param
     "variants": {"base": "", "U": "-Dfoo.bar"},          # JVM flags per variant; the first is the report's baseline
@@ -36,7 +37,6 @@ A spec:
     "paired": {"base": "-Yx", "fast": ""},               # instead of variants: options per variant, alternating by
                                                          # iteration within each fork (doc/paired-ab.md)
     "loadgate": {"maxCores": 1.5, "quietSecs": 30},      # optional: wait for a quiet machine, rerun noisy cells
-    "gcLog": true,                                       # optional: gc.log per cell, for its timeline
     "perUnit": "files",                                  # optional: an aux counter of the benchmark; the summary and
                                                          # report divide every count by its units per op (cycles/file)
     "builds": {"base": {"checkout": "../scala3-base", "env": {"SCALA3_CHECKOUT": "{checkout}"}}, "pr": {...}},
@@ -77,7 +77,7 @@ compares the work, not the op. The index's summary toggles between per unit and 
 """
 import atexit, glob, json, os, re, shlex, shutil, subprocess, sys, time
 
-from . import aot, branch, branchview, config, jmh, kperf, launch, loadgate, metrics, specs, testbed, timeline, transcript
+from . import aot, branch, branchview, config, jmh, kperf, launch, loadgate, metrics, osprobe, specs, testbed, timeline, transcript
 
 JMH_LOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "jmh.lock")
 MAX_ATTEMPTS = 10
@@ -88,6 +88,7 @@ def log(msg):
 
 
 SOURCE = "spec.source"  # in a campaign: the path of the spec its spec.json was copied from
+LAB_JVM_ARGS = "lab-jvmArgs"  # in a campaign whose spec has no "jvmArgs": the lab's [benchmark] jvmArgs it started with
 
 
 def is_copy(path, out):
@@ -106,6 +107,29 @@ def spec_dir(path, out):
         if src:
             return os.path.dirname(src)
     return os.path.dirname(os.path.abspath(path))
+
+
+def pinned_lab_jvm_args(out, default):
+    """The lab's [benchmark] jvmArgs for a campaign that takes them, as it started: a change to the lab's default (a
+    fixed young generation, say) must not reach a resumed campaign's later cells only. The campaign records them
+    (LAB_JVM_ARGS) when it first runs; one that ran before that record existed keeps the default's arguments its first
+    cell ran with. Returns the arguments and, when they differ from the default, a note saying so."""
+    try:
+        return open(os.path.join(out, LAB_JVM_ARGS)).read().strip(), None
+    except OSError:
+        pass
+    for res in sorted(glob.glob(os.path.join(out, "*", "*", "*", "result.json"))):
+        try:
+            ran = json.load(open(res))[0]["jvmArgs"]
+        except (OSError, ValueError, LookupError, TypeError):
+            continue
+        kept = [a for a in default.split() if a in ran]
+        dropped = [a for a in default.split() if a not in ran]
+        if dropped:
+            return " ".join(kept), (f"the lab's jvmArgs gained {' '.join(dropped)} after this campaign's first cells ran; "
+                                    f"it keeps {' '.join(kept)} (add \"jvmArgs\" to its spec to change that)")
+        return default, None
+    return default, None
 
 
 class Spec:
@@ -127,7 +151,10 @@ class Spec:
         self.jit_recording = bool(s.get("jitRecording"))
         # "asm": methods whose compilations the forks print (perflab.asm); "asmOf": the campaign it explains
         self.asm, self.asm_of = list(s.get("asm") or []), s.get("asmOf")
-        self.jvm_args = s.get("jvmArgs", cfg.get("benchmark", "jvmArgs") or "")
+        self.lab_jvm_args = "jvmArgs" not in s
+        self.jvm_args, self.jvm_args_note = (
+            pinned_lab_jvm_args(os.path.join(cfg.campaigns, self.name), cfg.get("benchmark", "jvmArgs") or "")
+            if self.lab_jvm_args else (s["jvmArgs"], None))
         self.jvm = s.get("jvm")
         self.rounds = s.get("rounds", 2)
         self.corpora = s["corpora"]
@@ -179,7 +206,6 @@ class Spec:
             # quoted: a variant's options may be several words, and this string is split as a command line
             self.variant_jmh_args = {"paired": "-p " + shlex.quote(f"{cfg.get('benchmark', 'variants')}={spec}")}
         self.loadgate = s.get("loadgate")
-        self.gc_log = s.get("gcLog", False)
         self.per_unit = s.get("perUnit")
         self.historical = s.get("historical")
         self.aot = s.get("aot")  # AOT cache options, for variants with `{aot}` (perflab.aot)
@@ -203,11 +229,13 @@ class Spec:
     def command(self, corpus, iters, variant, flags, dest, built=None):
         """Writes the cell's arguments file and returns the build command that runs it."""
         extra = []
-        if self.gc_log:
-            # each fork's JVM moves the last one's log aside (gc.log.0, .1, ...), up to GC_LOGS of them
-            extra.append(f"-Xlog:gc:file={dest}/gc.log:time,uptime:filecount={timeline.GC_LOGS}")
+        # always (a spec's old "gcLog" is ignored): pauses and region counts per GC (timeline.GC_XLOG); each fork's JVM moves
+        # the last one's log aside (gc.log.0, .1, ...), up to GC_LOGS of them
+        extra.append(f"-Xlog:{timeline.GC_XLOG}:file={dest}/gc.log:time,uptime:filecount={timeline.GC_LOGS}")
         # the fork appends its iterations to <dest>/iterations.tsv as they finish (PairedProfiler)
         extra.append(f"-Dperflab.cell={dest}")
+        # every safepoint, with how long threads took to reach it: cheap, and it explains a pause the GC log doesn't
+        extra.append(f"-Xlog:safepoint:file={dest}/safepoint.log:uptime:filecount={timeline.GC_LOGS}")
         if self.jit_recording:
             extra.append(jmh.jit_recording(dest))
         if self.asm:
@@ -265,6 +293,7 @@ def wait_until_quiet(spec):
         loadgate.wait(loadgate.server_pid(), g.get("maxCores", 1.5), g.get("quietSecs", 30))
 
 
+OS_PROBE_SECS = 0.5  # osprobe's sampling period: one sample costs well under a millisecond of one core
 LOAD_SECS = 2  # a load sample's window: shorter than a measurement iteration, to say which ones a burst hit
 LOAD_CHECK = "load.json"  # in a cell: each measurement iteration's competing load, and the gate's verdict
 
@@ -276,6 +305,25 @@ def start_load_sampler(spec, path):
     if not spec.loadgate:
         return None
     return subprocess.Popen([sys.executable, "-m", "perflab", "loadgate", "sample", str(loadgate.server_pid()), path, str(LOAD_SECS)])
+
+
+def start_os_probe(dest):
+    """The fork as the OS sees it (osprobe) every half second while a cell runs, into <cell>/os.jsonl; macOS only."""
+    if sys.platform != "darwin":
+        return None
+    path = os.path.join(dest, osprobe.OS_JSONL)
+    if os.path.exists(path):
+        os.unlink(path)
+    return subprocess.Popen([sys.executable, "-m", "perflab", "osprobe", "sample", str(os.getpid()), path, str(OS_PROBE_SECS)],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def os_summary(dest):
+    """<cell>/os.json from the probe's samples; a failure is logged, never fatal."""
+    try:
+        osprobe.summary(dest)
+    except Exception as e:
+        log(f"  warning: os probe summary failed: {e}")
 
 
 def load_check(spec, dest):
@@ -420,6 +468,11 @@ def run(spec, dry, retry_unbuildable=False):
         shutil.copy(spec.path, os.path.join(spec.out, "spec.json"))
         with open(os.path.join(spec.out, SOURCE), "w") as f:  # what its relative paths are relative to
             f.write(os.path.abspath(spec.path) + "\n")
+    if spec.jvm_args_note:
+        log(f"{spec.name}: {spec.jvm_args_note}")
+    if spec.lab_jvm_args and not dry and not os.path.exists(os.path.join(spec.out, LAB_JVM_ARGS)):
+        with open(os.path.join(spec.out, LAB_JVM_ARGS), "w") as f:
+            f.write(spec.jvm_args + "\n")
     # the spec version cells are tagged with; `perflab trees` records the user's spec once and passes its id down
     version = os.environ.get(specs.ENV) or specs.record(spec.out, spec.path)
     todo = [c for c in cells if not done(spec.cell_dir(c[1], c[3], c[0]))]
@@ -518,12 +571,14 @@ def run(spec, dry, retry_unbuildable=False):
             started = time.time()
             load_tsv = os.path.join(dest, "load.tsv")
             sampler = start_load_sampler(spec, load_tsv)
+            probe = start_os_probe(dest)
             try:
                 rc = jmh.run_build(cmd, os.path.join(dest, "build.log"))
             finally:
-                if sampler:
-                    sampler.terminate()
-                    sampler.wait()
+                for p in (sampler, probe):
+                    if p:
+                        p.terminate()
+                        p.wait()
             # another JMH run took the lock between wait_until_quiet and our JMH starting: JMH exits before logging
             jmh_log = os.path.join(dest, "jmh.log")
             if rc and jmh_lock_held() and (not os.path.exists(jmh_log) or os.path.getsize(jmh_log) == 0):
@@ -546,6 +601,8 @@ def run(spec, dry, retry_unbuildable=False):
             break
         else:
             sys.exit(f"{dest}: no clean run in {MAX_ATTEMPTS} attempts")
+        if not rc:
+            os_summary(dest)
         problem = f"build exited with {rc} (see {dest}/build.log)" if rc else check(spec, dest, started, flags, variant, built.get(variant))
         if not problem and tdir:
             problem = aot.check(tdir, dest)

@@ -1276,7 +1276,7 @@ def cell(campaign, corpus, variant, round, project=None, tail=0):
                    "warmupIterations": r.get("warmupIterations"), "warmupTime": r.get("warmupTime"),
                    "measurementIterations": r.get("measurementIterations"), "measurementTime": r.get("measurementTime")}
             hw = metrics.cached_hw_events(c)
-            for k, label, kind, _, x in metrics.of(r, per_unit, hw):
+            for k, label, kind, _, x in metrics.of(r, per_unit, hw, metrics.cached_os(c)):
                 if branchview.fin(x) is not None:
                     ms.append({"key": k, "label": label, "kind": kind, "value": x})
                 forks = branchview.raw_of(r, k, metrics.units_per_op(r, per_unit) if per_unit else 1.0)

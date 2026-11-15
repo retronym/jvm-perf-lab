@@ -1,0 +1,12 @@
+{
+  "name": "o11y-smoke-scalap",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 2,
+  "corpora": {"scalap": "-f 1 -wi 5 -i 5"},
+  "variants": {"base": ""},
+  "gcLog": true,
+  "profile": "none",
+  "description": "Smoke test of always-on observability (claude/perflab-o11y): osprobe's os.jsonl / os.json, the safepoint log, and JitProfiler's jit-events tsv in one cell. Not a timing result."
+}

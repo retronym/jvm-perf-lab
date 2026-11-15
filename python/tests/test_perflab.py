@@ -595,6 +595,87 @@ class JfrsyncTest(unittest.TestCase):
         self.assertEqual(jfrevents.promotion(cell), c)  # from the cache
 
 
+class LabJvmArgsTest(unittest.TestCase):
+    """A campaign without "jvmArgs" keeps the lab's [benchmark] jvmArgs it started with when the lab's default changes."""
+
+    def project(self, args):
+        return Project(f'[build]\njmh = "x {{args}}"\n[benchmark]\njvmArgs = "{args}"\n')
+
+    def spec(self, d, **kw):
+        f = os.path.join(d, "s.json")
+        json.dump({"name": "s", "benchmark": "B", "corpora": {"c": ""}, "variants": {"a": ""}, **kw}, open(f, "w"))
+        return f
+
+    def test_a_new_campaign_takes_the_default(self):
+        p = self.project("-Xmx4G -Xmn1536m")
+        sp = ab.Spec(self.spec(p.dir))
+        self.assertEqual((sp.jvm_args, sp.jvm_args_note), ("-Xmx4G -Xmn1536m", None))
+        self.assertEqual(ab.Spec(self.spec(p.dir, jvmArgs="-Xmx8G")).jvm_args, "-Xmx8G")  # the spec's own replace it
+
+    def test_a_campaign_from_before_the_change_keeps_the_old_default(self):
+        p = self.project("-Xms4G -Xmx4G -Xmn1536m -XX:-G1UseAdaptiveIHOP")
+        sp = ab.Spec(self.spec(p.dir))
+        cell = sp.cell_dir("c", "a", 1)
+        os.makedirs(cell)
+        json.dump([{"jvmArgs": ["-Xms4G", "-Xmx4G", "-Dperflab.cell=x"]}], open(os.path.join(cell, "result.json"), "w"))
+        sp = ab.Spec(sp.path)
+        self.assertEqual(sp.jvm_args, "-Xms4G -Xmx4G")
+        self.assertIn("-Xmn1536m -XX:-G1UseAdaptiveIHOP", sp.jvm_args_note)
+
+    def test_the_recorded_default_wins(self):
+        p = self.project("-Xmx4G -Xmn1536m")
+        sp = ab.Spec(self.spec(p.dir))
+        os.makedirs(sp.out)
+        open(os.path.join(sp.out, ab.LAB_JVM_ARGS), "w").write("-Xmx4G\n")
+        self.assertEqual(ab.Spec(sp.path).jvm_args, "-Xmx4G")
+
+
+# a scala-corpus fork's -Xlog:gc,gc+heap (scalac 2.13.18, -Xmx8G -Xmn3g): region lines between the pauses
+GC_HEAP_LOG = """[2026-11-15T20:51:04.477+1000][0.005s] Using G1
+[2026-11-15T20:51:04.780+1000][0.308s] GC(0) Eden regions: 20->0(766)
+[2026-11-15T20:51:04.780+1000][0.308s] GC(0) Survivor regions: 0->2(96)
+[2026-11-15T20:51:04.780+1000][0.308s] GC(0) Old regions: 1->1
+[2026-11-15T20:51:04.780+1000][0.308s] GC(0) Humongous regions: 0->0
+[2026-11-15T20:51:04.780+1000][0.308s] GC(0) Pause Young (Concurrent Start) (Metadata GC Threshold) 81M->5M(8192M) 1.493ms
+[2026-11-15T20:51:04.780+1000][0.308s] GC(1) Concurrent Mark Cycle
+[2026-11-15T20:51:04.783+1000][0.311s] GC(1) Pause Remark 7M->7M(8192M) 1.089ms
+[2026-11-15T20:51:04.783+1000][0.311s] GC(1) Pause Cleanup 7M->7M(8192M) 0.115ms
+[2026-11-15T20:51:04.789+1000][0.317s] GC(1) Concurrent Mark Cycle 9.022ms
+[2026-11-15T20:51:06.048+1000][1.576s] GC(2) Eden regions: 71->0(741)
+[2026-11-15T20:51:06.048+1000][1.576s] GC(2) Survivor regions: 2->27(96)
+[2026-11-15T20:51:06.048+1000][1.576s] GC(2) Old regions: 1->1
+[2026-11-15T20:51:06.048+1000][1.576s] GC(2) Humongous regions: 0->0
+[2026-11-15T20:51:06.048+1000][1.576s] GC(2) Pause Young (Prepare Mixed) (Metadata GC Threshold) 287M->108M(8192M) 26.279ms
+"""
+
+
+class GcLogTest(unittest.TestCase):
+    """Every cell logs GC with region counts (timeline.GC_XLOG), and the timeline still reads only the pauses."""
+
+    def test_every_cell_logs_gc_and_heap(self):
+        p = Project('[build]\njmh = "x {args}"\n')
+        f = os.path.join(p.dir, "s.json")
+        json.dump({"name": "s", "benchmark": "B", "corpora": {"c": ""}, "variants": {"a": ""}}, open(f, "w"))  # no "gcLog"
+        sp = ab.Spec(f)
+        dest = sp.cell_dir("c", "a", 1)
+        sp.command("c", "", "a", "", dest)
+        args = open(os.path.join(dest, "jmh.args")).read()
+        self.assertIn(f"-Xlog:gc,gc+heap:file={dest}/gc.log:time,uptime:filecount={timeline.GC_LOGS}", args)
+
+    @unittest.skipUnless(shutil.which("node"), "needs node")
+    def test_the_timeline_reads_only_the_pauses(self):
+        d = tempfile.mkdtemp()
+        js = os.path.join(d, "t.js")
+        open(js, "w").write(timeline.script() + "\nconst fs = require('fs');\n"
+                            "console.log(JSON.stringify(BenchTimeline.parse({gc: fs.readFileSync(0, 'utf8')}).pauses));")
+        parse = lambda log: json.loads(subprocess.run(["node", js], input=log, capture_output=True, text=True, check=True).stdout)
+        pauses = parse(GC_HEAP_LOG)
+        self.assertEqual(len(pauses), 4)  # Young, Remark, Cleanup, Young
+        self.assertAlmostEqual(pauses[3]["e"] - pauses[3]["s"], 26.279, places=3)
+        # the same as from the -Xlog:gc lines alone
+        self.assertEqual(pauses, parse("".join(l for l in GC_HEAP_LOG.splitlines(True) if "regions:" not in l)))
+
+
 class JitRecordingTest(unittest.TestCase):
     """A spec's "jitRecording": the JIT over a whole fork, and jfrevents' summary of it."""
 

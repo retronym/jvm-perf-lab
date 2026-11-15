@@ -284,7 +284,7 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, l
             for r in by[c][v]:
                 if r["data"]:
                     hw = r["hw"] = metrics.cached_hw_events(r["cell"])
-                    r["of"] = metrics.of(r["data"][8], per_unit, hw)
+                    r["of"] = metrics.of(r["data"][8], per_unit, hw, metrics.cached_os(r["cell"]))
                     u = metrics.units_per_op(r["data"][8], per_unit) if per_unit else 1.0
                     r["raw"] = {k: f for k, *_ in r["of"] if (f := [x for x in branchview.raw_of(r["data"][8], k, u) if x])}
                     r["warm"], r["dist"] = iteration_log(r["cell"], u or 1.0)
