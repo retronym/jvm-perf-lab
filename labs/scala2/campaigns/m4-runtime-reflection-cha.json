@@ -51,5 +51,6 @@
         "SCALA_RELEASE_OPT": "1"
       }
     }
-  }
+  },
+  "jitRecording": true
 }
