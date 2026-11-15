@@ -45,6 +45,9 @@ A spec:
                                                          # "variants" defaults to their names; with "paired", one build
                                                          # that the paired variants share
     "historical": "<why>",                               # optional: kept for its results; `run` refuses it
+    "aot": {"train": "-wi 8", "caches": 1},              # optional: AOT caches for the variants whose flags contain
+                                                         # `{aot}` (perflab.aot): trained per build, corpus and cache
+                                                         # index in <campaign>/.aot; launch mode, class path jarred
     "testbed": "m4",                                     # optional: the machine it runs on (perflab.testbed): its
                                                          # cells count only from there; queued, a worker of that
                                                          # testbed runs it (doc/remote-workers.md)
@@ -74,7 +77,7 @@ compares the work, not the op. The index's summary toggles between per unit and 
 """
 import atexit, glob, json, os, re, shlex, shutil, subprocess, sys, time
 
-from . import branch, branchview, config, jmh, kperf, launch, loadgate, metrics, specs, testbed, timeline, transcript
+from . import aot, branch, branchview, config, jmh, kperf, launch, loadgate, metrics, specs, testbed, timeline, transcript
 
 JMH_LOCK = os.path.join(os.environ.get("TMPDIR", "/tmp"), "jmh.lock")
 MAX_ATTEMPTS = 10
@@ -179,6 +182,7 @@ class Spec:
         self.gc_log = s.get("gcLog", False)
         self.per_unit = s.get("perUnit")
         self.historical = s.get("historical")
+        self.aot = s.get("aot")  # AOT cache options, for variants with `{aot}` (perflab.aot)
         self.testbed = s.get("testbed")  # the machine its cells run on (perflab.testbed); default this one
         self.description, self.variant_descriptions = s.get("description"), s.get("variantDescriptions") or {}
 
@@ -393,6 +397,19 @@ def check_samples(spec, dest):
     return None
 
 
+def run_fork(spec, cmd, dest):
+    """Runs a JMH command outside the cells' attempt loop (an AOT training fork): its exit code and mean other load."""
+    load_tsv = os.path.join(dest, "load.tsv")
+    sampler = start_load_sampler(spec, load_tsv)
+    try:
+        rc = jmh.run_build(cmd, os.path.join(dest, "build.log"))
+    finally:
+        if sampler:
+            sampler.terminate()
+            sampler.wait()
+    return rc, mean_load(load_tsv)
+
+
 def run(spec, dry, retry_unbuildable=False):
     if spec.historical:
         sys.exit(f"{spec.name} is historical, kept for its results; not running it: {spec.historical}")
@@ -427,7 +444,10 @@ def run(spec, dry, retry_unbuildable=False):
         if problem:
             sys.exit(f"{spec.name}: {problem}")
     built = {}
-    if spec.builds:  # builds are snapshots: launch mode, for this campaign (and a dry run shows it)
+    uses_aot = aot.uses(spec)
+    if uses_aot and spec.branch_info:
+        sys.exit(f"{spec.name}: {aot.PLACEHOLDER} is not supported in a branch campaign")
+    if spec.builds or uses_aot:  # builds are snapshots: launch mode, for this campaign (and a dry run shows it)
         os.environ["PERFLAB_BUILD_MODE"] = "launch"
     if spec.branch_info and not dry and not spec.profile_of:
         branch.save(spec.out, spec.branch_info)
@@ -447,6 +467,12 @@ def run(spec, dry, retry_unbuildable=False):
                         bdir = theirs
                 built[v] = launch.build(bdir, env,
                                         label=f"{spec.name}: {v} ({b['checkout'] or ''})")
+        if uses_aot:  # an AOT cache needs a class path of JARs
+            jarred = {}
+            for v, l in built.items():
+                d = os.path.dirname(l["snapshot"])
+                jarred[d] = jarred.get(d) or launch.jar_dirs(d)
+                built[v] = jarred[d]
     # a branch's commits that did not build: their cells are skipped (until a run with --retry-unbuildable)
     unbuildable = branch.unbuildable(spec.build_out) if spec.branch_info and not retry_unbuildable else {}
     skipped, failed = {}, []
@@ -466,6 +492,13 @@ def run(spec, dry, retry_unbuildable=False):
                 unbuildable[variant] = branch.unbuildable(spec.build_out)[variant]
                 skipped[variant] = unbuildable[variant]["reason"]
                 continue
+        tdir = None
+        if aot.PLACEHOLDER in flags:
+            tdir = aot.train_dir(spec, variant, corpus, r)
+            if not dry:
+                wait_until_quiet(spec)
+                tdir = aot.train(spec, corpus, iters, variant, r, built.get(variant), lambda c, d: run_fork(spec, c, d), log)
+            flags = aot.expand(flags, tdir, dest)
         cmd = spec.command(corpus, iters, variant, flags, dest, built.get(variant))
         if not dry:
             other = testbed.foreign(dest)
@@ -514,6 +547,8 @@ def run(spec, dry, retry_unbuildable=False):
         else:
             sys.exit(f"{dest}: no clean run in {MAX_ATTEMPTS} attempts")
         problem = f"build exited with {rc} (see {dest}/build.log)" if rc else check(spec, dest, started, flags, variant, built.get(variant))
+        if not problem and tdir:
+            problem = aot.check(tdir, dest)
         if not problem and spec.kperf and spec.profile.startswith("async:cycles"):
             try:
                 problem = check_samples(spec, dest)

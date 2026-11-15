@@ -82,6 +82,39 @@ def snapshot(built, dir):
     return {**built, "classpath": cp, "javaOptions": opts, "snapshot": snap, "external": external, "built": built}
 
 
+def jar_dirs(dir):
+    """The snapshot in `dir` with every class path directory replaced by a JAR of it (<entry>.jar beside it, stored, its
+    entries' times fixed), as an AOT cache needs (perflab.aot); its launch.json is rewritten. Idempotent."""
+    import zipfile
+    path = os.path.join(dir, LAUNCH)
+    launch = read(path)
+    if launch.get("jarred"):
+        return launch
+    cp = []
+    for p in launch["classpath"]:
+        if os.path.isdir(p):
+            jar = p.rstrip(os.sep) + ".jar"
+            tmp = jar + ".tmp"
+            with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED) as z:
+                for root, dirs, files in os.walk(p):
+                    dirs.sort()
+                    for name in sorted(files):
+                        f = os.path.join(root, name)
+                        info = zipfile.ZipInfo(os.path.relpath(f, p), (2000, 1, 1, 0, 0, 0))
+                        with open(f, "rb") as src:
+                            z.writestr(info, src.read())
+            os.replace(tmp, jar)
+            p = jar
+        cp.append(p)
+    launch = {**launch, "classpath": cp, "jarred": True}
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(launch, f, indent=2)
+    os.replace(tmp, path)
+    transcript.say(f"[perflab] build: class path directories of {dir} jarred, for AOT caches")
+    return launch
+
+
 def reusable(dir):
     """`dir` holds a snapshot, which `build` reuses."""
     try:
