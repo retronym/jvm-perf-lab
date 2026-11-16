@@ -32,7 +32,7 @@
     }
   },
   "loadgate": {
-    "maxCores": 1.5,
+    "maxCores": 2.5,
     "quietSecs": 30
   },
   "gcLog": true

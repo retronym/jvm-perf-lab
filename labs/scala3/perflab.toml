@@ -5,7 +5,7 @@ jmh = "sbt --client 'lab/Jmh/run {args}'"
 server = "sbt"
 # launch mode (`mode = "launch"`, or PERFLAB_BUILD_MODE=launch): a batch sbt builds once per run or campaign, perflab
 # snapshots the build and starts JMH itself; SCALA3_CHECKOUT (and SCALA3_BENCHMARKS) come from perflab's environment
-launch = "sbt -batch -J-Xmx8g 'lab/perflabLaunch {out}'"
+launch = "env SBT_OPTS=-Xmx12g sbt -batch 'lab/perflabLaunch {out}'"
 
 [benchmark]
 default = "CompileBenchmark"
@@ -39,4 +39,4 @@ phases = "perflab-phases.toml"
 [diff]
 # frames #84's tip has where base does the same work inline (a field load): transparent, their events their caller's
 # (java/lang/invoke/VarHandle is transparent by default)
-transparent = ["^dotty/tools/sharing/", '[.$]inline\$', '^dotty/tools/dotc/Reader\.(recursiveOperations|recursiveDepth)', '^dotty/tools/dotc/core/Contexts\$ContextState\.initialReader$']
+transparent = ["^dotty/tools/sharing/", '[.$]inline\$', '^dotty/tools/dotc/(Reader|ReaderHotFields)\.(recursiveOperations|recursiveDepth)', '^dotty/tools/dotc/core/Contexts\$ContextState\.initialReader$']
