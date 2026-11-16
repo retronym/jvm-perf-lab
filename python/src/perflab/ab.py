@@ -842,20 +842,20 @@ def report(spec, per_op=False):
                     res = json.load(open(os.path.join(cell, "result.json")))[0]
                 except (OSError, ValueError, IndexError):
                     continue  # not run, or still running: JMH writes result.json when the fork ends
-                results.setdefault(variant, []).append((res, metrics.hw_events(cell, spec.profile, jfrconv) if jfrconv else {}))
+                results.setdefault(variant, []).append((res, metrics.hw_events(cell, spec.profile, jfrconv) if jfrconv else {}, metrics.cached_os(cell)))
         if not results:
             continue
         cols, st = metrics.summarise(results, spec.per_unit)
         names = list(results)
-        missing = [v for v, rs in results.items() for res, _ in rs if spec.per_unit and metrics.units_per_op(res, spec.per_unit) is None]
+        missing = [v for v, rs in results.items() for res, *_ in rs if spec.per_unit and metrics.units_per_op(res, spec.per_unit) is None]
         print(f"#### {spec.corpus_param} {corpus}\n")
         if spec.per_unit:
-            per = {v: mean(metrics.units_per_op(res, spec.per_unit) for res, _ in rs) for v, rs in results.items()}
+            per = {v: mean(metrics.units_per_op(res, spec.per_unit) for res, *_ in rs) for v, rs in results.items()}
             print(f"Per {metrics.unit_name(spec.per_unit)}: per-op values divided by `{spec.per_unit}` per op ("
                   + ", ".join(f"{v} {per[v]:.4g}" for v in names if per[v]) + ")."
                   + (f" **No `{spec.per_unit}` counter in {', '.join(sorted(set(missing)))}.**" if missing else "") + "\n")
         print("| metric | " + " | ".join(f"{v} | {v}, over forks" for v in names) + " |\n|---|" + "---|---|" * len(names))
-        rounds = lambda v: " / ".join(f"{res['primaryMetric']['score']:.4g}" for res, _ in results[v])
+        rounds = lambda v: " / ".join(f"{res['primaryMetric']['score']:.4g}" for res, *_ in results[v])
         print(f"| {results[names[0]][0][0]['primaryMetric'].get('scoreUnit', 'score')} per round | " + " | ".join(f"{rounds(v)} | " for v in names) + " |")
         warned = []
         for k, label, kind, _ in cols:
@@ -874,9 +874,6 @@ def report(spec, per_op=False):
                 text = metrics.fmt(kind, m) + (f" ± {100 * ci / abs(m):.1f}%" + ("†" if s.pooled else "") if ci is not None and m else "") + pct(d, half)
                 tds.append(f"{first} | {text}")
             print(f"| {label} | " + " | ".join(tds) + " |")
-        gc = {v: mean(res["secondaryMetrics"].get("gc.time", {}).get("score") for res, _ in results[v]) for v in names}
-        if any(gc.values()):
-            print("| GC time | " + " | ".join((f"{gc[v] / 1e3:.1f} s" if gc[v] is not None else "–") + " | " for v in names) + " |")
         print()
         if warned:
             print("\n".join(warned) + "\n")

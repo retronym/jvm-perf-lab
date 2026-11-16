@@ -194,7 +194,7 @@ def metric_summary(cells, order, per_unit, norm=None):
     for corpus in sorted(cells):
         vs = cells[corpus]
         names = [v for v in order if v in vs] + sorted(v for v in vs if v not in order)
-        cs, st = metrics.summarise({v: [(c[8], metrics.cached_hw_events(c[9])) for c in vs[v]] for v in names}, per_unit)
+        cs, st = metrics.summarise({v: [(c[8], metrics.cached_hw_events(c[9]), metrics.cached_os(c[9])) for c in vs[v]] for v in names}, per_unit)
         for c in cs:
             cols.setdefault(c[0], c)
         rows.append((corpus, vs, names, st))
@@ -296,7 +296,8 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, l
             for r in by[c][v]:
                 if r["data"]:
                     hw = r["hw"] = metrics.cached_hw_events(r["cell"])
-                    r["of"] = metrics.of(r["data"][8], per_unit, hw, metrics.cached_os(r["cell"]))
+                    r["os"] = metrics.cached_os(r["cell"])
+                    r["of"] = metrics.of(r["data"][8], per_unit, hw, r["os"])
                     u = metrics.units_per_op(r["data"][8], per_unit) if per_unit else 1.0
                     r["raw"] = {k: f for k, *_ in r["of"] if (f := [x for x in branchview.raw_of(r["data"][8], k, u) if x])}
                     r["warm"], r["dist"] = iteration_log(r["cell"], u or 1.0)
@@ -309,7 +310,7 @@ def card_summary(recs, order, planned, per_unit=None, norm=None, running=None, l
         vs = by[corpus]
         names = [v for v in order if v in vs] + sorted(v for v in vs if v not in order)
         done = {v: sorted((r for r in vs[v] if r["data"]), key=lambda r: r["round"]) for v in names}
-        _, st = metrics.summarise({v: [(r["data"][8], r["hw"]) for r in done[v]] for v in names if done[v]}, per_unit)
+        _, st = metrics.summarise({v: [(r["data"][8], r["hw"], r["os"]) for r in done[v]] for v in names if done[v]}, per_unit)
         base = next((v for v in names if done[v]), None)
         forks = lambda v, k: [f for r in done.get(v, []) for f in r["raw"].get(k, [])]
         for v in names:

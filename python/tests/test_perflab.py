@@ -1226,6 +1226,43 @@ class MetricsTest(unittest.TestCase):
         self.assertEqual(per_file["score"], ("ms/file", 4000.0 / 487))
         self.assertEqual(per_file["ipc"], per_op["ipc"])  # ratios stay
 
+    def test_gc_pause_and_thread_group_cpu_per_op(self):
+        # a single-shot cell of uniques-direct-spike (weak/1): 6 ops, JMH's GC profiler's per-iteration totals, osprobe
+        s = lambda x, raw, u: {"score": x, "scoreUnit": u, "rawData": [raw]}
+        r = {"mode": "ss", "measurementIterations": 6, "measurementBatchSize": 1, "measurementTime": "single-shot", "jvmArgs": [],
+             "primaryMetric": {"score": 8924.0, "scoreError": 1.0, "scoreUnit": "ms/op", "rawData": [[8924.0] * 6]},
+             "secondaryMetrics": {"gc.time": s(1355.0, [212.0, 239.0, 234.0, 223.0, 221.0, 226.0], "ms"),
+                                  "gc.count": s(16.0, [3.0, 2.0, 2.0, 2.0, 2.0, 5.0], "counts"), "files": s(600.0, [100.0] * 6, "#")}}
+        osm = {"ops": 6, "wall_s": 53.546, "threads_cores": {"bench": 0.97018, "gc": 0.34642, "jit": 0.04907, "other": 0.00749}}
+        got = {k: (label, kind, main, x) for k, label, kind, main, x in metrics.of(r, osm=osm)}
+        self.assertEqual(got["gc:pause"][:3], ("GC pause ms/op", "score", True))
+        self.assertAlmostEqual(got["gc:pause"][3], 1355 / 6)
+        self.assertEqual(got["gc:count"][:3], ("GCs/op", "ratio", False))
+        self.assertAlmostEqual(got["gc:count"][3], 16 / 6)
+        self.assertEqual(got["cpu:bench"][:3], ("bench-thread (mutator) CPU ms/op", "score", True))
+        self.assertAlmostEqual(got["cpu:bench"][3], 0.97018 * 53.546 / 6 * 1000)
+        self.assertEqual(got["cpu:gc"][:3], ("GC CPU ms/op", "score", True))
+        self.assertEqual([got[f"cpu:{g}"][2] for g in ("jit", "other")], [False, False])
+        self.assertIn("os:cores:gc", got)  # the ratios stay
+        self.assertEqual(metrics.raw_of(r, "gc:pause", 1.0), [[212.0, 239.0, 234.0, 223.0, 221.0, 226.0]])
+        per_file = {k: (label, x) for k, label, _, _, x in metrics.of(r, "files", osm=osm)}
+        self.assertEqual(per_file["gc:pause"][0], "GC pause ms/file")
+        self.assertAlmostEqual(per_file["gc:pause"][1], 1355 / 600)
+        self.assertEqual(per_file["cpu:gc"][0], "GC CPU ms/file")
+        self.assertAlmostEqual(per_file["cpu:gc"][1], 0.34642 * 53.546 / 600 * 1000)
+        self.assertEqual(metrics.raw_of(r, "gc:pause", 100.0), [[2.12, 2.39, 2.34, 2.23, 2.21, 2.26]])
+        # the summary sees os.json when given it
+        cols, st = metrics.summarise({"weak": [(r, {}, osm)]})
+        self.assertTrue({"gc:pause", "gc:count", "cpu:bench", "cpu:gc"} <= set(st["weak"]))
+        self.assertAlmostEqual(st["weak"]["gc:pause"].jmh.score, 1355 / 6)
+
+    def test_avgt_gc_time_per_op_by_each_iterations_ops(self):
+        r = {"mode": "avgt", "measurementTime": "1 s", "measurementIterations": 2,
+             "primaryMetric": {"score": 375.0, "scoreUnit": "ms/op", "rawData": [[250.0, 500.0]]},
+             "secondaryMetrics": {"gc.time": {"score": 60.0, "scoreUnit": "ms", "rawData": [[40.0, 20.0]]}}}
+        self.assertEqual(metrics.raw_of(r, "gc:pause", 1.0), [[10.0, 10.0]])  # 4 ops, then 2
+        self.assertEqual(dict((k, x) for k, *_, x in metrics.of(r))["gc:pause"], 10.0)
+
     def test_ops_by_iteration_time(self):
         r = self.cell(2922, 20e9, 66e9, 16.4, 7.5)[0]
         self.assertEqual(metrics.ops({**r, "measurementTime": "1 min"}), 6 * 15)
@@ -1271,6 +1308,8 @@ class MetricsTest(unittest.TestCase):
         self.assertIn("| metric | shared | shared, over forks | independent | independent, over forks |", out.getvalue())
         self.assertIn("| cycles/file | 41.1M | 41.1M | 41.1M (+0.0%) | 41.1M (+0.0%) |", out.getvalue())
         self.assertIn("| LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS % of cycles | 16.4% | 16.4% | 27.5% (+67.7%) | 27.5% (+67.7%) |", out.getvalue())
+        self.assertIn("| GC pause ms/file |", out.getvalue())  # gc.time once, as a metric
+        self.assertNotIn("| GC time |", out.getvalue())
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             ab.report(ab.Spec(spec), per_op=True)

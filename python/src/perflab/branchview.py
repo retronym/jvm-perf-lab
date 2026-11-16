@@ -115,7 +115,7 @@ def fork_units(rs, per_unit, prefix="", keep=lambda k, kind: True):
     metric each fork's `within`: ({key: [per fork]}, {key: kind}, {key: [[iteration, ...] per fork]} to `sig` digits,
     [(key, label, kind)], {key: [`within` per fork]}, {key: (`metrics.of_jmh`, `metrics.jmh_warnings`)}, of the iterations
     as measured)."""
-    us, kinds, raw, cols = metrics.fork_units([(r, metrics.cached_hw_events(cell)) for r, cell in rs], per_unit, prefix, keep)
+    us, kinds, raw, cols = metrics.fork_units([(r, metrics.cached_hw_events(cell), metrics.cached_os(cell)) for r, cell in rs], per_unit, prefix, keep)
     return (us, kinds, {k: [[sig(x) for x in f] for f in fs] for k, fs in raw.items()}, [c[:3] for c in cols],
             {k: [within(f) for f in fs] for k, fs in raw.items()},
             {k: (metrics.of_jmh(k, fs), metrics.jmh_warnings(k, fs)) for k, fs in raw.items()})

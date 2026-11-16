@@ -954,7 +954,7 @@ def _results(d, corpus, variant):
 def _forks(rs, per_unit):
     """Per metric, the forks' means (a metric without rawData: each round's value), the metrics' (label, kind, main),
     and per metric the forks' measurement iterations (none without rawData)."""
-    us, _, raw, cols = metrics.fork_units([(r, metrics.cached_hw_events(c)) for r, c in rs], per_unit)
+    us, _, raw, cols = metrics.fork_units([(r, metrics.cached_hw_events(c), metrics.cached_os(c)) for r, c in rs], per_unit)
     return us, {c[0]: c for c in cols}, raw
 
 

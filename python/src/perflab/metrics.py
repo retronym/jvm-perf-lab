@@ -43,6 +43,14 @@ def ops(r):
     return sum(math.ceil(iteration_ms / t) for fork in raw for t in fork) / len(raw)
 
 
+def measured_ops(r):
+    """`ops`, None for a result that doesn't say how long its iterations ran."""
+    try:
+        return ops(r)
+    except (KeyError, ValueError):
+        return None
+
+
 @functools.cache
 def kpep_descriptions():
     """{event: description} from every CPU's kpep database (an event's description is the same across them)."""
@@ -188,7 +196,13 @@ def of(r, per_unit=None, hw=None, osm=None):
             # JMH's score of these is the largest fork's (AggregationPolicy.MAX), so take the mean of the forks' own
             forks = [f[0] for f in jm.get("rawData") or [] if f and isinstance(f[0], (int, float))]
             out.append((f"jit:{name}", label, "total", False, sum(forks) / len(forks) if forks else jm["score"]))
-    out += os_metrics(osm or {})
+    # JMH's GC profiler: the collectors' pause time and count, totals over the measured iterations (gc.time is the
+    # sum of the stop-the-world pauses in gc.log over the measured window)
+    n = measured_ops(r) if "gc.time" in m or "gc.count" in m else None
+    out += [("gc:pause", f"GC pause ms/{per}", "score", True, norm(get("gc.time") / n) if n and get("gc.time") is not None else None),
+            ("gc:count", f"GCs/{per}", "ratio", False, norm(get("gc.count") / n) if n and get("gc.count") is not None else None)]
+    out += [(k, label.replace("/op", f"/{per}"), kind, main, norm(x) if k.startswith("cpu:") else x)
+            for k, label, kind, main, x in os_metrics(osm or {})]
     return [x for x in out if x[4] is not None]
 
 
@@ -214,9 +228,18 @@ def os_metrics(o):
            ("os:pageWait", "page-fault wait ms", "total", False, o.get("page_wait_ms"))]
     for c, v in (o.get("class_busy_pct") or {}).items():
         out.append((f"os:busy:{c}", f"{c} cores busy % (machine)", "pct", False, v))
-    for g, v in (o.get("threads_cores") or {}).items():
+    tc = o.get("threads_cores") or {}
+    if tc and o.get("wall_s") and o.get("ops"):
+        # CPU time per op by thread group: cores used over the measured window × its wall time, over its ops
+        for g in tc:
+            out.append((f"cpu:{g}", f"{CPU_LABEL.get(g, g + ' threads')} CPU ms/op", "score", g in ("bench", "gc"),
+                        tc[g] * o["wall_s"] / o["ops"] * 1000))
+    for g, v in tc.items():
         out.append((f"os:cores:{g}", f"{g} threads, cores used", "ratio", False, v))
     return out
+
+
+CPU_LABEL = {"bench": "bench-thread (mutator)", "gc": "GC", "jit": "JIT", "other": "other threads"}
 
 
 def fmt(kind, x):
@@ -322,13 +345,25 @@ def welch(a, b):
 # and better or worse (`verdict`) only when that excludes zero.
 
 # where a metric of `of` has per-iteration samples: the primary metric, or a secondary metric of result.json
-RAW_SOURCE = {"score": None, "alloc": "gc.alloc.rate.norm", "cycles": "xctrace.CORE_ACTIVE_CYCLE", "instructions": "xctrace.INST_ALL"}
+RAW_SOURCE = {"score": None, "alloc": "gc.alloc.rate.norm", "cycles": "xctrace.CORE_ACTIVE_CYCLE", "instructions": "xctrace.INST_ALL",
+              "gc:pause": "gc.time", "gc:count": "gc.count"}
+PER_ITERATION_TOTAL = {"gc:pause", "gc:count"}  # their rawData is each iteration's total, not per op
 
 
 def raw_source(k):
     if k.startswith("jit:"):
         return f"jit.{k[4:]}"  # one sample per fork
     return RAW_SOURCE.get(k, f"xctrace.{k[3:]}" if k.startswith("ev:") and "/" not in k else False)
+
+
+def iteration_ops(r):
+    """Each fork's measured ops per iteration, [[n, ...] per fork], as `ops` counts them."""
+    raw = r["primaryMetric"].get("rawData") or []
+    if r.get("mode") != "avgt":
+        return [[r.get("measurementBatchSize", 1)] * len(fork) for fork in raw]
+    n, unit = r["measurementTime"].split()
+    iteration_ms = float(n) * JMH_TIME_MS[unit]
+    return [[math.ceil(iteration_ms / t) for t in fork] for fork in raw]
 
 
 def raw_of(r, k, u):
@@ -340,15 +375,26 @@ def raw_of(r, k, u):
     if k.startswith("jit:"):
         u = 1.0  # a fork's total, not per op
     raw = (m or {}).get("rawData") or []
-    return [[x / u for x in fork if isinstance(x, (int, float)) and math.isfinite(x)] for fork in raw] if u else []
+    if not u:
+        return []
+    if k in PER_ITERATION_TOTAL:  # an iteration's total: per op by that iteration's ops
+        try:
+            ns = iteration_ops(r)
+        except (KeyError, ValueError):
+            return []
+        if [len(f) for f in ns] != [len(f) for f in raw]:
+            return []
+        return [[x / n / u for x, n in zip(fork, fn) if isinstance(x, (int, float)) and math.isfinite(x) and n]
+                for fork, fn in zip(raw, ns)]
+    return [[x / u for x in fork if isinstance(x, (int, float)) and math.isfinite(x)] for fork in raw]
 
 
 def fork_units(rs, per_unit=None, prefix="", keep=lambda k, kind: True):
-    """The metrics (`of`) of rounds `rs` ([(JMH result, hw events)]), those `keep` takes, keyed `prefix` + key:
+    """The metrics (`of`) of rounds `rs` ([(JMH result, hw events[, os.json])]), those `keep` takes, keyed `prefix` + key:
     ({key: [per fork, the mean of its measurement iterations]}, {key: kind}, {key: [[iteration, ...] per fork]},
     [(key, label, kind, main)] in the order first seen). A metric without per-iteration samples has a value per round
     (JMH's mean over the round's forks)."""
-    of_ = [of(r, per_unit, hw) for r, hw in rs]
+    of_ = [of(r, per_unit, *x) for r, *x in rs]
     kinds, raw, us, cols = {}, {}, {}, []
     for ms in of_:
         for k, label, kind, main, _ in ms:
@@ -357,7 +403,7 @@ def fork_units(rs, per_unit=None, prefix="", keep=lambda k, kind: True):
                 cols.append((prefix + k, label, kind, main))
     for pk in kinds:
         k = pk[len(prefix):]
-        forks = [f for r, _ in rs for f in raw_of(r, k, units_per_op(r, per_unit) if per_unit else 1.0) if f]
+        forks = [f for r, *_ in rs for f in raw_of(r, k, units_per_op(r, per_unit) if per_unit else 1.0) if f]
         if forks:
             raw[pk] = forks
         us[pk] = [sum(f) / len(f) for f in forks] or [x for ms in of_ for kk, _, _, _, x in ms if kk == k and x is not None and math.isfinite(x)]
@@ -510,7 +556,7 @@ class Summary(NamedTuple):
 
 
 def summarise(variants, per_unit=None):
-    """{variant: [(JMH result, hw events) per round]}, the first variant the baseline -> (columns [(key, label, kind,
+    """{variant: [(JMH result, hw events[, os.json]) per round]}, the first variant the baseline -> (columns [(key, label, kind,
     main)] in the order first seen, {variant: {key: `Summary`}}), by `fork_stats`, `compare`, `of_jmh` and `jmh_delta`."""
     per = {v: fork_units(rs, per_unit) for v, rs in variants.items()}
     jm = {v: {k: of_jmh(k, f) for k, f in raw.items()} for v, (_, _, raw, _) in per.items()}
