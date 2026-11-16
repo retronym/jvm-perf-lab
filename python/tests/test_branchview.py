@@ -179,6 +179,20 @@ class BranchViewTest(unittest.TestCase):
         self.assertAlmostEqual(d, 10.0)
         self.assertEqual((half, verdict), (None, "flat"))  # over forks, no spread yet
 
+    def test_delta_against_the_base(self):
+        a = branchview.branch_view(self.camp)["cells"]["a"]
+        self.assertNotIn("b", a[self.v[0]])  # the base itself
+        x = a[self.v[4]]
+        self.assertEqual(x["bv"]["score"], self.v[0])
+        jd = metrics.jmh_delta(metrics.jmh_score(a[self.v[0]]["raw"]["score"]), metrics.jmh_score(x["raw"]["score"]))
+        self.assertAlmostEqual(x["b"]["score"][0], jd[0], places=3)
+        self.assertEqual(x["b"]["score"][2], "better")
+        self.assertAlmostEqual(x["fb"]["score"][0], 100 * (8.15 / 10.15 - 1), places=3)
+        self.assertLess(x["pb"]["median"]["score"][0], -15)
+        self.assertLess(x["b"]["alloc"][0], -9)
+        # its "d" is against commit 3, not the base
+        self.assertGreater(x["d"]["score"][0], x["b"]["score"][0])
+
     def test_a_value_and_its_delta_are_jmhs(self):
         cells = branchview.branch_view(self.camp)["cells"]
         a, b = cells["a"], cells["b"]

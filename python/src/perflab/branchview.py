@@ -4,7 +4,7 @@ directory has the branch.json the runner writes (doc/branch-explore-PLAN.md has 
 commits' short shas, its cells where every campaign's are, <campaign>/<corpus>/<variant>/<round>/result.json.
 
 `branch_view` gathers what the page draws, `section` puts it on the campaign's card, and BRANCH_JS draws it: the
-history table (numbers, shaded by a bar on a scale shared down the column), the chart (score left, a second metric right, each
+history table (numbers, shaded by a bar on a scale shared down the column), the chart (score left, the first other metric right, each
 commit's mean with its 99.9% CI over forks, its forks' means and every measurement iteration), and the comparison of two
 selected rows. The view's state is in the page's URL (`?b.<campaign>=...`), so a view can be linked and survives the
 index's refresh.
@@ -310,6 +310,9 @@ def branch_view(campaign_dir, rel_to=None):
                                   the Δ against the commit "d"'s is against, by `metrics.pooled_delta`'s bootstrap,
                                   "w": {k: [within-fork CI (`within_of`), between/within-fork sd ratio, the CI shown]},
                                   "wf": {k: [each fork's within-fork CI, as "raw" has the forks]},
+                                  "b": {k: [Δ%, half-width, verdict, a side pooled]} as "d" but against the base, "bv":
+                                  {k: variant}, the oldest commit with k (the base itself, once measured), "fb" the same
+                                  over forks, "pb": {stat: {k: [Δ%, half-width, verdict]}} as "ps"'s Δ but against it,
                                   "rd": [its rounds, `rounds_of`], "hot": [[fork, j] of "raw"'s iterations other load
                                   disturbed], "void": [its voided cells, `voided`]}}},
      a cell's "state" is "none" when it has only voided rounds,
@@ -428,6 +431,33 @@ def branch_view(campaign_dir, rel_to=None):
                     x["ps"].setdefault(ps, {})[k] = [fin(y), metrics.fmt(kinds[k], y)] + (
                         [] if d is None else [fin(d), fin(half), metrics.verdict(d, half, ok, up)])
                 last[k] = v
+        # per metric, the Δ against the branch's base: the oldest commit with it (the base itself, once measured), as
+        # "d" is against the commit before, and for the pooled statistics `metrics.pooled_delta`'s
+        first = {}
+        for v, (us, kinds, _) in units.items():
+            x = per_v[v]
+            for k in x["m"]:
+                if k not in first:
+                    first[k] = v
+                    continue
+                b = first[k]
+                up = metrics.higher_is_better(k, (cols.get(k) or pcols.get(k) or (k, ""))[1])
+                ok = per_v[b]["m"][k][3]
+                c = metrics.compare(st[b][k], st[v][k], ok, up)
+                x.setdefault("bv", {})[k] = b
+                if c:
+                    x.setdefault("fb", {})[k] = x.setdefault("b", {})[k] = [fin(c[0]), fin(c[1]), c[2], c[3]]
+                    ja, jb = jmhs[b].get(k, (None,))[0], jmhs[v].get(k, (None,))[0]
+                    if ja and jb:
+                        jd = metrics.jmh_delta(ja, jb, ok, up)
+                        x["b"][k] = [fin(jd[0]), fin(jd[1]), jd[2], False]
+                forks, base = x["raw"].get(k), per_v[b]["raw"].get(k)
+                for ps in metrics.STATS[1:]:
+                    if not forks or not base:
+                        continue
+                    _, d, half, dok = metrics.pooled_delta(base, forks, ps, kinds[k], per_unit)
+                    if d is not None:
+                        x.setdefault("pb", {}).setdefault(ps, {})[k] = [fin(d), fin(half), metrics.verdict(d, half, dok, up)]
         if per_v:
             cells[corpus] = per_v
     corpora = [c for c in corpora if c in cells] + [c for c in named if c not in cells]
@@ -566,11 +596,11 @@ def parts(campaign_dir, rel_to, corpus_param="corpus"):
     n = len(data["commits"])
     measured = len({v for cs in data["cells"].values() for v, c in cs.items() if "score" in c.get("m", {})})
     note = (f"{n} first-parent commits of <code>{esc(data['range'])}</code>, newest first; {measured} measured. "
-            "Each value as JMH reports its forks, every iteration pooled; Δ against the previous measured commit")
+            "Each value as JMH reports its forks, every iteration pooled; Δ against the previous measured commit and the base")
     help_ = ui.help_popover(
         "<p style='margin-top:0'>A row per first-parent commit; a merge's <b>+n</b> lists the commits it brought in. Per corpus, the "
-        "score, shaded by a bar on a scale shared down the column (the lighter band at its end is the CI), and a second metric "
-        "beside it.</p>"
+        "score, shaded by a bar on a scale shared down the column (the lighter band at its end is the CI), and beside it the other metrics <b>metrics</b> picks: allocation, GC pause and "
+        "count per op, CPU per op by thread group (osprobe), and whatever else the cells recorded.</p>"
         "<p>A value is what <b>JMH</b> reports for the commit's forks as one run: every measured iteration pooled, their mean ± "
         "t(N − 1) × sd / √N at 99.9%, none with N ≤ 2. Its Δ is Welch's t over the pooled iterations, and that is the verdict. It takes "
         "iterations as independent, but those of one fork share JIT decisions, code layout and GC state, so a <b>⚠</b> marks a value whose "
@@ -586,7 +616,8 @@ def parts(campaign_dir, rel_to, corpus_param="corpus"):
         "limit (in the chart, those iterations' dots). <b>Click a value</b> for its rounds: each fork's mean ± its CI within the fork, "
         "the load, the timeline and logs, and voided cells (<code>.void/</code>, which count for nothing); served by "
         "<code>perflab server</code>, <b>Void &amp; rerun</b> sets a round aside with a reason and queues the campaign's resume.</p>"
-        "<p>Δ is against the previous (older) measured commit, ± its 99.9% CI, coloured only when significant at 99.9%. Comparing two rows "
+        "<p>Δ is against the previous (older) measured commit, <b>Δ base</b> against the branch's base (the oldest commit measured), "
+        "each ± its 99.9% CI, coloured only when significant at 99.9%; <b>Δ against</b> picks which to show. Comparing two rows "
         "uses the same test.</p>"
         "<p><b>Chart</b>: commits oldest to newest, gaps where a commit is unmeasured; error bars are the 99.9% CI of the value "
         "(lighter when pooled over commits), dashes each fork's mean with a thin whisker for its CI over its own iterations, the faint cloud every "
@@ -606,7 +637,10 @@ CSS = """
 .bh{margin:2px 0 10px} .bh-ctl{display:flex;flex-wrap:wrap;gap:4px 18px;margin:6px 0 4px;align-items:center}
 .bh-ctl select{font:inherit;font-size:12px;padding:1px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
 table.bh-t td{vertical-align:middle} table.bh-t th{vertical-align:bottom} table.bh-t th.cg{text-align:center;color:var(--fg);border-bottom:1px solid var(--line2)}
-table.bh-t td.gs,table.bh-t th.gs{border-left:1px solid var(--line2)}
+table.bh-t td.gs,table.bh-t th.gs{border-left:1px solid var(--line2)} table.bh-t td.ms,table.bh-t th.ms{border-left:1px dotted var(--line2)}
+.bh-mp{position:relative;font-size:12px} .bh-mp summary{cursor:pointer;padding:1px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);list-style:none;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bh-mp summary::after{content:" ▾"} .bh-mpl{position:absolute;z-index:5;top:100%;left:0;margin-top:2px;padding:6px 8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.25);max-height:60vh;overflow:auto;white-space:nowrap}
+.bh-mpl label{display:block;padding:1px 0;cursor:pointer} .bh-mpl .fl{margin-top:6px}
 table.bh-t td.cm,table.bh-t th.cm{position:sticky;left:0;z-index:1;background:var(--panel);white-space:normal;min-width:180px;max-width:480px}
 .bh-cm{display:flex;gap:8px;align-items:flex-start} .bh-cm input{margin:3px 0 0}
 .bh-c{min-width:0} .bh-subj{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:min(440px,34vw)}
@@ -773,21 +807,25 @@ const BH = (() => {
       cells[c] = {};
       for (const [v, x] of Object.entries(per)) {
         if (x.state !== 'done') { cells[c][v] = x; continue; }
-        const m = {}, sh = {}, dd = {};
+        const m = {}, sh = {}, dd = {}, bb = {};
         for (const [k, p] of Object.entries((x.ps || {})[s] || {})) {
           const mm = x.m[k] || [];
           m[k] = [p[0], null, null, mm[3], mm[4], null, false];
           sh[k] = [p[1], ''];
           if (p.length > 2) dd[k] = [p[2], p[3], p[4], false, 'boot'];
         }
-        cells[c][v] = {...x, m, s: sh, d: dd, w: {}};
+        for (const [k, p] of Object.entries((x.pb || {})[s] || {})) bb[k] = [p[0], p[1], p[2], false, 'boot'];
+        cells[c][v] = {...x, m, s: sh, d: dd, b: bb, w: {}};
       }
     }
     return {...d, cells, stat: s};
   }
-  // ?b.<campaign>=form:bar;chart:0;c:<corpus>;m2:<metric>;sel:<variant>,<variant>
+  // ?b.<campaign>=form:bar;chart:0;c:<corpus>;m2:<metric>,<metric>;dv:both;sel:<variant>,<variant>
+  // m2: the metrics after the score, a column each (the chart's right axis the first's); dv: the Δ columns, against the
+  // commit before (prev), the branch's base (base) or both
+  const DEFAULT_MS = ['alloc', 'gc:pause', 'cpu:bench', 'cpu:gc'];  // wall ≈ mutator CPU + STW pauses
   function state(el) {
-    const d = data(el), st = {form: 'bar', chart: false, c: '', m2: '', sel: []};
+    const d = data(el), st = {form: 'bar', chart: false, c: '', m2: null, dv: 'both', sel: []};
     let raw = '';
     try { raw = new URLSearchParams(location.search).get(key(el.dataset.campaign)) || ''; } catch (e) {}
     for (const part of raw.split(';')) {
@@ -797,20 +835,20 @@ const BH = (() => {
       if (k === 'form') st.form = v === 'num' ? 'num' : 'bar';  // 'dot' and 'both' of older links: the bar
       else if (k === 'chart') st.chart = v === '1';
       else if (k === 'c') st.c = v;
-      else if (k === 'm2') st.m2 = v;
+      else if (k === 'm2') st.m2 = v === 'none' ? [] : v.split(',').filter(Boolean);
+      else if (k === 'dv') st.dv = ['prev', 'base', 'both'].includes(v) ? v : 'both';
       else if (k === 'sel') st.sel = v.split(',').filter(Boolean);
     }
     if (!d.corpora.includes(st.c)) st.c = d.corpora[0] || '';
-    const others = d.metrics.filter(m => m.k !== 'score');
-    if (st.m2 !== 'none' && !others.some(m => m.k === st.m2))
-      st.m2 = others.some(m => m.k === 'alloc') ? 'alloc' : others.length ? others[0].k : 'none';
+    const others = d.metrics.filter(m => m.k !== 'score'), has = k => others.some(m => m.k === k);
+    st.m2 = st.m2 ? st.m2.filter(has) : DEFAULT_MS.filter(has);
     st.sel = st.sel.filter(v => d.commits.some(c => c.v === v)).slice(-2);
     return st;
   }
   function save(el, st) {
     try {
       const q = new URLSearchParams(location.search);
-      q.set(key(el.dataset.campaign), `form:${st.form};chart:${st.chart ? 1 : 0};c:${st.c};m2:${st.m2};sel:${st.sel.join(',')}`);
+      q.set(key(el.dataset.campaign), `form:${st.form};chart:${st.chart ? 1 : 0};c:${st.c};m2:${st.m2.join(',') || 'none'};dv:${st.dv};sel:${st.sel.join(',')}`);
       history.replaceState(history.state, '', location.pathname + '?' + q.toString() + location.hash);
     } catch (e) {}
   }
@@ -846,7 +884,14 @@ const BH = (() => {
     return `<span class="d ${x[2]}" title="${t}${over}">${pct(x[0], x[1])}${x[1] != null && x[3] ? '†' : ''}</span>${warn}`;
   }
   // the Δ over forks to show beside a cell's, when its own is JMH's
-  const forkDelta = (d, x, k) => !d.stat && x && x.fd && x.j && x.j[k] ? x.fd[k] : null;
+  const forkDelta = (d, x, k, f) => !d.stat && x && x[f || 'fd'] && x.j && x.j[k] ? x[f || 'fd'][k] : null;
+  // what a cell's Δ against the base is against: the base's value
+  function vsBase(d, c, x, k) {
+    const v = x && (x.bv || {})[k], cm = v && d.commits.find(y => y.v === v), a = v && cellOf(d, c, v);
+    if (!cm) return '';
+    const s = a && a.m && a.m[k] ? shown(d, k, a.m[k], a.s[k])[0] : '';
+    return `the base, ${cm.short.slice(0, 7)} ${cm.subject}${s ? ` (${s})` : ''}`;
+  }
   // what a cell's Δ of metric k is against: the commit and its value
   function vsOf(d, c, x, k) {
     const v = x && ((x.pv || {})[k] || x.prev), cm = v && d.commits.find(y => y.v === v), a = v && cellOf(d, c, v);
@@ -1020,13 +1065,15 @@ const BH = (() => {
     return graphBadge(`${el.dataset.campaign} · ${c.short.slice(0, 7)}`, per, 'graphs', tip);
   }
   function drawTable(el, d, st) {
-    const cs = corpora(d), m2 = st.m2 !== 'none' ? metric(d, st.m2) : null, m1 = metric(d, 'score');
+    const cs = corpora(d), ms = [metric(d, 'score'), ...st.m2.map(k => metric(d, k))];
     const exts = {};
-    for (const c of cs) for (const m of [m1, m2]) if (m) exts[c + '|' + m.k] = extent(d, c, m.k, false);
-    const per = m2 ? 4 : 2, open = memOf(el).open;
+    for (const c of cs) for (const m of ms) exts[c + '|' + m.k] = extent(d, c, m.k, false);
+    const dp = st.dv !== 'base', db = st.dv !== 'prev', per = ms.length * (1 + dp + db), open = memOf(el).open;
+    const dh = (dp ? '<th title="against the commit measured before it">Δ</th>' : '')
+      + (db ? `<th title="against the branch’s base, the oldest commit measured">Δ base</th>` : '');
     let h = '<div class="scroll"><table class="t bh-t"><tr><th class="cm" rowspan="2">commit</th>'
       + cs.map(c => `<th class="cg gs" colspan="${per}">${esc(c)}</th>`).join('') + '</tr><tr>'
-      + cs.map(() => th(d, 'score', 'n gs') + '<th>Δ</th>' + (m2 ? th(d, m2.k, 'n') + '<th>Δ</th>' : '')).join('') + '</tr>';
+      + cs.map(() => ms.map((m, i) => th(d, m.k, i ? 'n ms' : 'n gs') + dh).join('')).join('') + '</tr>';
     for (const c of d.commits) {
       const sel = st.sel.includes(c.v), merged = c.merged.length, opened = merged && open.has(c.v);
       h += `<tr data-v="${esc(c.v)}" class="${sel ? 'sel' : ''}${opened ? ' has-sub' : ''}"><td class="cm"><div class="bh-cm">`
@@ -1036,9 +1083,12 @@ const BH = (() => {
         + (merged ? `<button class="bh-mg" data-bmerge="${esc(c.v)}" aria-expanded="${!!opened}" title="a merge of ${merged} commit${merged > 1 ? 's' : ''}: list them">+${merged}</button>` : '')
         + ownBadge(el, d, c) + profBadge(d, c) + '</span></span></div></td>';
       for (const cp of cs) {
-        const x = cellOf(d, cp, c.v), dd = x && x.d || {};
-        h += `<td class="n gs">${value(d, st, cp, c.v, 'score', exts)}</td><td>${delta(dd.score, vsOf(d, cp, x, 'score'), forkDelta(d, x, 'score'))}</td>`;
-        if (m2) h += `<td class="n">${x && x.state === 'done' ? value(d, st, cp, c.v, m2.k, exts) : ''}</td><td>${delta(dd[m2.k], vsOf(d, cp, x, m2.k), forkDelta(d, x, m2.k))}</td>`;
+        const x = cellOf(d, cp, c.v), dd = x && x.d || {}, bb = x && x.b || {};
+        ms.forEach((m, i) => {
+          h += `<td class="n ${i ? 'ms' : 'gs'}">${!i || x && x.state === 'done' ? value(d, st, cp, c.v, m.k, exts) : ''}</td>`;
+          if (dp) h += `<td>${delta(dd[m.k], vsOf(d, cp, x, m.k), forkDelta(d, x, m.k))}</td>`;
+          if (db) h += `<td>${delta(bb[m.k], vsBase(d, cp, x, m.k), forkDelta(d, x, m.k, 'fb'))}</td>`;
+        });
       }
       h += '</tr>';
       if (opened)
@@ -1052,7 +1102,7 @@ const BH = (() => {
     const box = el.querySelector('.bh-chart');
     if (!st.chart) { box.innerHTML = ''; return; }
     const c = st.c, cells = d.cells[c] || {}, order = [...d.commits].reverse(), N = order.length;
-    const m1 = metric(d, 'score'), m2 = st.m2 !== 'none' ? metric(d, st.m2) : null;
+    const m1 = metric(d, 'score'), m2 = st.m2.length ? metric(d, st.m2[0]) : null;
     const W = Math.max(300, Math.round(el.clientWidth || 700)), H = 250, L = 54, R = m2 ? 58 : 14, T = 8, B = 30;
     const band = (W - L - R) / Math.max(1, N), X = i => L + (i + 0.5) * band;
     const e1 = extent(d, c, 'score', true), e2 = m2 && extent(d, c, m2.k, true);
@@ -1130,10 +1180,9 @@ const BH = (() => {
     const cm = d.commits.find(c => c.v === v), x = cellOf(d, st.c, v);
     if (!cm) return '';
     const val = k => { const m = x && x.state === 'done' && x.m[k]; if (!m) return ''; const s = shown(d, k, m, x.s[k]); return `${esc(s[0])}${s[1] ? ' ± ' + esc(s[1]) + (m[6] ? '†' : '') : ''}`; };
-    const m2 = st.m2 !== 'none' ? metric(d, st.m2) : null;
     const nums = !x ? 'pending' : x.state === 'running' ? 'running' : x.state === 'interrupted' ? 'interrupted' : x.state === 'failed' ? 'run failed: ' + esc(x.why)
       : (val('score') ? `${val('score')} ${esc(heading(d, 'score'))} ${delta(x.d.score)}` : 'score pending')
-        + (m2 && val(m2.k) ? ` · ${val(m2.k)} ${esc(heading(d, m2.k))} ${delta(x.d[m2.k])}` : '');
+        + st.m2.filter(k => val(k)).map(k => ` · ${val(k)} ${esc(heading(d, k))} ${delta(x.d[k])}`).join('');
     return `${sha(cm)} ${esc(cm.subject)} · <b>${esc(st.c)}</b>: ${nums}`;
   }
   function drawCompare(el, d, st) {
@@ -1367,16 +1416,22 @@ const BH = (() => {
   });
   function drawOne(el) {
     const d = data(el), st = state(el), others = d.metrics.filter(m => m.k !== 'score');
-    const opts = ms => ms.map(m => `<option value="${esc(m.k)}"${m.k === st.m2 ? ' selected' : ''}${m.src === 'profile' ? ` title="${esc(headTip(d, m.k))}"` : ''}>${esc(heading(d, m.k))}</option>`).join('');
+    const opts = ms => ms.map(m => `<label${m.src === 'profile' ? ` title="${esc(headTip(d, m.k))}"` : ''}><input type="checkbox" data-bm2="${esc(m.k)}"${st.m2.includes(m.k) ? ' checked' : ''}> ${esc(heading(d, m.k))}</label>`).join('');
+    const picked = st.m2.map(k => heading(d, k));
     const chip = (a, v, on, label, t) => `<button class="chip" ${a}="${v}" aria-pressed="${on}"${t ? ` title="${t}"` : ''}>${label}</button>`;
     el.querySelector('.bh-ctl').innerHTML = '<span class="fg"><span class="fl">show</span>'
       + chip('data-bform', 'bar', st.form === 'bar', 'shaded', 'a bar behind each value, on a scale shared down the column; its lighter end is the CI')
       + chip('data-bform', 'num', st.form === 'num', 'numbers', 'mean ± CI only') + '</span>'
-      + `<span class="fg">${chip('data-bchart', '1', st.chart, 'chart', 'commits on x, the score left, the second metric right')}</span>`
-      + '<label class="fg"><span class="fl">second metric</span><select data-bm2><option value="none">none</option>'
+      + '<span class="fg"><span class="fl">Δ against</span>'
+      + chip('data-bdv', 'prev', st.dv === 'prev', 'previous', 'the commit measured before it')
+      + chip('data-bdv', 'base', st.dv === 'base', 'base', 'the branch’s base: the oldest commit measured')
+      + chip('data-bdv', 'both', st.dv === 'both', 'both', 'a column for each') + '</span>'
+      + `<span class="fg">${chip('data-bchart', '1', st.chart, 'chart', 'commits on x, the score left, the first other metric right')}</span>`
+      + `<span class="fg"><span class="fl">metrics</span><details class="bh-mp"${memOf(el).mp ? ' open' : ''}><summary title="${esc(picked.join(', '))}">`
+      + `${picked.length ? esc(picked.slice(0, 2).join(', ')) + (picked.length > 2 ? ` +${picked.length - 2}` : '') : 'score only'}</summary><div class="bh-mpl">`
       + opts(others.filter(m => m.src !== 'profile'))
-      + (others.some(m => m.src === 'profile') ? `<optgroup label="profile pass (${esc((d.profile || {}).campaign || '')})">${opts(others.filter(m => m.src === 'profile'))}</optgroup>` : '')
-      + '</select></label>';
+      + (others.some(m => m.src === 'profile') ? `<div class="fl">profile pass (${esc((d.profile || {}).campaign || '')})</div>${opts(others.filter(m => m.src === 'profile'))}` : '')
+      + '</div></details></span>';
     drawChart(el, d, st); drawTable(el, d, st); drawCompare(el, d, st);
     if (pop && pop.camp === el.dataset.campaign) renderPop(el);
     if (memOf(el).hover) hover(el, memOf(el).hover);
@@ -1395,10 +1450,11 @@ const BH = (() => {
   function update(el, f) { const st = state(el); f(st); save(el, st); drawOne(el); }
   const toggle = (st, v) => { st.sel = st.sel.includes(v) ? st.sel.filter(x => x !== v) : [...st.sel, v].slice(-2); };
   document.addEventListener('click', e => {
-    const el = e.target.closest && e.target.closest('.bh'), t = el && e.target.closest('[data-bform],[data-bchart],[data-bc],[data-bmerge],[data-bhv],[data-bclear],[data-bprof],[data-bcopy],[data-bcell]');
+    const el = e.target.closest && e.target.closest('.bh'), t = el && e.target.closest('[data-bform],[data-bdv],[data-bchart],[data-bc],[data-bmerge],[data-bhv],[data-bclear],[data-bprof],[data-bcopy],[data-bcell]');
     if (!t) return;
     if (t.dataset.bcell != null) { if (pop && pop.camp === el.dataset.campaign && pop.c === t.dataset.bcell && pop.v === t.dataset.bcv) closePop(false); else openPop(el, t.dataset.bcell, t.dataset.bcv, t); }
     else if (t.dataset.bform) update(el, st => { st.form = t.dataset.bform; });
+    else if (t.dataset.bdv) update(el, st => { st.dv = t.dataset.bdv; });
     else if (t.dataset.bchart) update(el, st => { st.chart = !st.chart; });
     else if (t.dataset.bc) update(el, st => { st.c = t.dataset.bc; });
     else if (t.dataset.bclear) update(el, st => { st.sel = []; });
@@ -1414,9 +1470,17 @@ const BH = (() => {
   document.addEventListener('change', e => {
     const el = e.target.closest && e.target.closest('.bh');
     if (!el) return;
-    if (e.target.matches('[data-bm2]')) update(el, st => { st.m2 = e.target.value; });
+    if (e.target.matches('[data-bm2]')) update(el, st => {
+      const k = e.target.dataset.bm2;
+      st.m2 = e.target.checked ? [...st.m2.filter(x => x !== k), k] : st.m2.filter(x => x !== k);
+    });
     else if (e.target.matches('[data-bsel]')) update(el, st => toggle(st, e.target.dataset.bsel));
   });
+  // the metric picker stays open over the redraws its checkboxes cause
+  document.addEventListener('toggle', e => {
+    const el = e.target.matches && e.target.matches('.bh-mp') && e.target.closest('.bh');
+    if (el) memOf(el).mp = e.target.open;
+  }, true);
   document.addEventListener('mouseover', e => {
     const t = e.target.closest && e.target.closest('.bh tr[data-v], .bh rect[data-bhv]');
     if (!t) return;
