@@ -109,12 +109,13 @@ class BranchViewTest(unittest.TestCase):
         os.remove(os.path.join(self.camp, "branch.json"))
         self.assertIsNone(branchview.branch_view(self.camp))
 
-    def test_commits_newest_first_with_merges(self):
+    def test_commits_base_first_with_merges(self):
         d = branchview.branch_view(self.camp)
-        self.assertEqual([c["v"] for c in d["commits"]], self.v[::-1])
-        self.assertEqual([c["index"] for c in d["commits"]], [4, 3, 2, 1, 0])
-        self.assertEqual(len(d["commits"][1]["merged"]), 2)
-        self.assertEqual(d["commits"][0]["shown"], "Sat 24 Oct 2026")
+        self.assertEqual([c["v"] for c in d["commits"]], self.v)
+        self.assertEqual([c["index"] for c in d["commits"]], [0, 1, 2, 3, 4])
+        self.assertEqual(len(d["commits"][3]["merged"]), 2)
+        self.assertEqual(d["commits"][4]["shown"], "Sat 24 Oct 2026")
+        self.assertEqual(d["commits"][4]["message"], "Commit number 4")  # no checkout to read the body from: the subject
         self.assertEqual(d["corpora"], ["a", "b"])
         self.assertEqual(d["metrics"][0]["k"], "score")
         self.assertIn("alloc", [m["k"] for m in d["metrics"]])

@@ -35,10 +35,10 @@ def git(repo, *args):
 
 def _commit(repo, sha):
     sep = "\x1f"
-    out = git(repo, "show", "-s", f"--format=%H{sep}%T{sep}%P{sep}%an{sep}%aI{sep}%s", sha).rstrip("\n")
-    h, tree, parents, author, date, subject = out.split(sep, 5)
+    out = git(repo, "show", "-s", f"--format=%H{sep}%T{sep}%P{sep}%an{sep}%aI{sep}%s{sep}%B", sha).rstrip("\n")
+    h, tree, parents, author, date, subject, message = out.split(sep, 6)
     return {"sha": h, "short": h[:SHORT], "variant": h[:SHORT], "tree": tree, "parents": parents.split(),
-            "subject": subject, "author": author, "date": date}
+            "subject": subject, "message": message.strip(), "author": author, "date": date}
 
 
 def resolve(repo, range_, first_parent=True):
@@ -56,7 +56,7 @@ def resolve(repo, range_, first_parent=True):
             for s in git(repo, "rev-list", "--reverse", f"{c['parents'][0]}..{c['sha']}").split():
                 if s != c["sha"]:
                     m = _commit(repo, s)
-                    c["merged"].append({"sha": m["sha"], "subject": m["subject"]})
+                    c["merged"].append({"sha": m["sha"], "subject": m["subject"], "message": m["message"]})
     return {"checkout": os.path.abspath(repo), "range": range_, "firstParent": first_parent,
             "base": base, "tip": tip, "commits": commits, "order": [commits[i]["variant"] for i in explore(len(commits))]}
 

@@ -472,7 +472,7 @@ def view_metric(text, mean, ci, d, half, ok, up=False):
 
 
 # the summary's views, as icons: a row per corpus and variant; corpora as columns; a chart
-HISTORY_VIEW = ("history", "History: a row per commit, newest first, a column per corpus",
+HISTORY_VIEW = ("history", "History: a row per commit, the base first, a column per corpus",
                 '<path d="M4.5 2v12"/><circle cx="4.5" cy="4.5" r="1.6" fill="currentColor"/><circle cx="4.5" cy="11.5" r="1.6" fill="currentColor"/>'
                 '<path d="M8 4.5h5.5M8 11.5h5.5M8 8h3.5"/>')
 VIEWS = (("table", "Table: a row per corpus and variant, its cells beneath (▸)",

@@ -1,4 +1,4 @@
-"""A branch campaign's history (doc/branch-explore.md, decisions 3 and 4): its commits newest first, first-parent, with
+"""A branch campaign's history (doc/branch-explore.md, decisions 3 and 4): its commits oldest (the base) first, first-parent, with
 one column per corpus, and a chart of the same data with commits on x. A campaign is a branch campaign when its
 directory has the branch.json the runner writes (doc/branch-explore-PLAN.md has the contract); its variants are the
 commits' short shas, its cells where every campaign's are, <campaign>/<corpus>/<variant>/<round>/result.json.
@@ -35,7 +35,7 @@ ratio of the between-fork sd to it says whether more forks would pay. Each measu
 from the cell's load.json (`ab.load_check`), or for an older cell from its load.tsv. Clicking a value opens the
 popover of its rounds (`rounds_of`) and voided cells (`voided`), with Void & rerun on the server (`bhVoid`).
 """
-import datetime, glob, html, json, math, os
+import datetime, glob, html, json, math, os, subprocess
 
 from . import loadgate, metrics, ui
 
@@ -280,6 +280,23 @@ def own_graphs(rs, rel_to):
     return [[f"{ev} #{n}" if len(per) > 1 else ev, k, href] for n, gs in per for ev, k, href in gs]
 
 
+def messages(repo, shas):
+    """{sha: full commit message} of `shas` in the checkout `repo`, {} when it is gone: for a branch.json from before
+    it kept them."""
+    if not shas or not repo or not os.path.isdir(repo):
+        return {}
+    try:
+        p = subprocess.run(["git", "-C", repo, "show", "-s", "--format=%H%x1f%B%x1e", *shas], capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    out = {}
+    for rec in p.stdout.split("\x1e"):
+        h, _, msg = rec.strip("\n").partition("\x1f")
+        if h:
+            out[h] = msg.strip()
+    return out
+
+
 def date_shown(iso):
     try:
         return datetime.datetime.fromisoformat(iso).strftime("%a %d %b %Y")
@@ -290,7 +307,7 @@ def date_shown(iso):
 def branch_view(campaign_dir, rel_to=None):
     """What the page draws for a branch campaign, None when `campaign_dir` has no branch.json:
 
-    {"commits": [newest first: {sha, short, v (variant), subject, author, date, shown (date), index, merged}],
+    {"commits": [oldest (the base) first: {sha, short, v (variant), subject, message (in full), author, date, shown (date), index, merged}],
      "corpora": [...], "metrics": [{k, h (heading), kind, src: "profile" for the profile pass's}], the score first,
      "cells": {corpus: {variant: {"state": "done" | "running" | "failed" (with "why" and "log"), "rounds": n,
                                   "pr": n rounds of the profile pass, "ms": the score's state when only profiled,
@@ -468,10 +485,13 @@ def branch_view(campaign_dir, rel_to=None):
         name = os.path.basename(os.path.dirname(f)).removeprefix("diff-")
         pair = [(forms[name[:i]], forms[name[i + 1:]]) for i, ch in enumerate(name) if ch == "-" and name[:i] in forms and name[i + 1:] in forms]
         diffs.append({"name": name, "href": os.path.relpath(f, rel_to), "a": pair[0][0] if pair else None, "b": pair[0][1] if pair else None})
-    return {"commits": [{"sha": c["sha"], "short": c["short"], "v": v, "subject": c.get("subject", ""), "author": c.get("author", ""),
-                         "date": c.get("date", ""), "shown": date_shown(c.get("date")), "index": c.get("index", i),
-                         "merged": c.get("merged") or []}
-                        for i, (c, v) in reversed(list(enumerate(zip(commits, variants))))],
+    missing = [x["sha"] for c in commits for x in [c, *(c.get("merged") or [])] if "message" not in x]
+    msgs = messages(branch.get("checkout"), missing)
+    msg = lambda x: x.get("message") or msgs.get(x["sha"]) or x.get("subject", "")
+    return {"commits": [{"sha": c["sha"], "short": c["short"], "v": v, "subject": c.get("subject", ""), "message": msg(c),
+                         "author": c.get("author", ""), "date": c.get("date", ""), "shown": date_shown(c.get("date")),
+                         "index": c.get("index", i), "merged": [{**m, "message": msg(m)} for m in c.get("merged") or []]}
+                        for i, (c, v) in enumerate(zip(commits, variants))],
             "corpora": corpora, "metrics": [{"k": k, "h": label, "kind": kind, "up": metrics.higher_is_better(k, label)} for k, label, kind in cols.values()]
                                           + [{"k": k, "h": label, "kind": kind, "up": metrics.higher_is_better(k, label), "src": "profile"}
                                              for k, label, kind in pcols.values()],
@@ -595,7 +615,7 @@ def parts(campaign_dir, rel_to, corpus_param="corpus"):
     blob = json.dumps(data, separators=(",", ":")).replace("</", "<\\/")
     n = len(data["commits"])
     measured = len({v for cs in data["cells"].values() for v, c in cs.items() if "score" in c.get("m", {})})
-    note = (f"{n} first-parent commits of <code>{esc(data['range'])}</code>, newest first; {measured} measured. "
+    note = (f"{n} first-parent commits of <code>{esc(data['range'])}</code>, the base first; {measured} measured. "
             "Each value as JMH reports its forks, every iteration pooled; Δ against the previous measured commit and the base")
     help_ = ui.help_popover(
         "<p style='margin-top:0'>A row per first-parent commit; a merge's <b>+n</b> lists the commits it brought in. Per corpus, the "
@@ -643,7 +663,7 @@ table.bh-t td.gs,table.bh-t th.gs{border-left:1px solid var(--line2)} table.bh-t
 .bh-mpl label{display:block;padding:1px 0;cursor:pointer} .bh-mpl .fl{margin-top:6px}
 table.bh-t td.cm,table.bh-t th.cm{position:sticky;left:0;z-index:1;background:var(--panel);white-space:normal;min-width:180px;max-width:480px}
 .bh-cm{display:flex;gap:8px;align-items:flex-start} .bh-cm input{margin:3px 0 0}
-.bh-c{min-width:0} .bh-subj{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:min(440px,34vw)}
+.bh-c{min-width:0} .bh-subj{display:block;white-space:normal;overflow-wrap:anywhere;max-width:min(440px,34vw)}
 .bh-who{display:block;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(440px,34vw)}
 .bh-mg{font:11px/15px inherit;border:1px solid var(--line);background:var(--panel);color:var(--link);border-radius:999px;padding:0 6px;margin-left:4px;cursor:pointer;vertical-align:1px}
 table.bh-t tr.hl td{background:var(--line2)} table.bh-t tr.sel td{background:var(--link-bg)}
@@ -1078,7 +1098,7 @@ const BH = (() => {
       const sel = st.sel.includes(c.v), merged = c.merged.length, opened = merged && open.has(c.v);
       h += `<tr data-v="${esc(c.v)}" class="${sel ? 'sel' : ''}${opened ? ' has-sub' : ''}"><td class="cm"><div class="bh-cm">`
         + `<input type="checkbox" data-bsel="${esc(c.v)}"${sel ? ' checked' : ''} aria-label="compare ${esc(c.short)}">`
-        + `<span class="bh-c"><span class="bh-subj" title="${esc(c.subject)}">${sha(c, 7)} ${esc(c.subject)}</span>`
+        + `<span class="bh-c"><span class="bh-subj" title="${esc(c.message || c.subject)}">${sha(c, 7)} ${esc(c.subject)}</span>`
         + `<span class="bh-who" title="${esc(c.date)}">${esc(c.author)} · ${esc(c.shown)}`
         + (merged ? `<button class="bh-mg" data-bmerge="${esc(c.v)}" aria-expanded="${!!opened}" title="a merge of ${merged} commit${merged > 1 ? 's' : ''}: list them">+${merged}</button>` : '')
         + ownBadge(el, d, c) + profBadge(d, c) + '</span></span></div></td>';
@@ -1093,7 +1113,7 @@ const BH = (() => {
       h += '</tr>';
       if (opened)
         h += `<tr class="bh-sub${sel ? ' sel' : ''}" data-v="${esc(c.v)}"><td class="cm"><ul>`
-          + c.merged.map(m => `<li title="${esc(m.subject)}">${sha({sha: m.sha, short: m.sha}, 7)} ${esc(m.subject)}</li>`).join('')
+          + c.merged.map(m => `<li title="${esc(m.message || m.subject)}">${sha({sha: m.sha, short: m.sha}, 7)} ${esc(m.subject)}</li>`).join('')
           + `</ul></td><td colspan="${cs.length * per}"></td></tr>`;
     }
     el.querySelector('.bh-table').innerHTML = h + '</table></div>';
@@ -1101,7 +1121,7 @@ const BH = (() => {
   function drawChart(el, d, st) {
     const box = el.querySelector('.bh-chart');
     if (!st.chart) { box.innerHTML = ''; return; }
-    const c = st.c, cells = d.cells[c] || {}, order = [...d.commits].reverse(), N = order.length;
+    const c = st.c, cells = d.cells[c] || {}, order = d.commits, N = order.length;
     const m1 = metric(d, 'score'), m2 = st.m2.length ? metric(d, st.m2[0]) : null;
     const W = Math.max(300, Math.round(el.clientWidth || 700)), H = 250, L = 54, R = m2 ? 58 : 14, T = 8, B = 30;
     const band = (W - L - R) / Math.max(1, N), X = i => L + (i + 0.5) * band;
