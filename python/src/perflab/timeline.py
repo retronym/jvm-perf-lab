@@ -61,12 +61,15 @@ def write(d, out=None):
     files = {"iterations": read("iterations.tsv"), "timeline": series, "gc": gc, "load": read("load.tsv")}
     files["profile"] = read("profile.txt")
     files["jvm"] = read("jvm-events.tsv")
+    files["os"] = read("os.jsonl")
     name, facts = describe(d)
     help_html = ui.help_popover(
         "Startup is JVM boot and benchmark setup; exit runs from the last iteration to the JVM's exit (with xctrace, it "
         "includes saving the trace). GC pauses come from the fork's GC log. With async-profiler, VM operations at a safepoint "
         "and JIT compilations (C1, C2) and deoptimizations come from the JDK's events in its recording, which covers the last "
-        "fork's measurement iterations; bars closer than a pixel merge. With xctrace, counter lanes cover the measurement "
+        "fork's measurement iterations; without one, they come from the safepoint log and JitProfiler's events, which cover "
+        "every fork. Bars closer than a pixel merge. Fork CPU (OS) is osprobe's view of the fork every half second: the cores "
+        "each thread group used, and (dashed) how many of its threads were waiting for a core. With xctrace, counter lanes cover the measurement "
         "iterations, which is what xctrace records; cycles are per second, so one busy performance core is about 4–4.5 G. "
         "Each counter lane has its own scale. Wheel or pinch to zoom, drag or swipe sideways to pan, double-click to reset; <b>now ⇥</b> scrolls to the newest data and keeps following it (as does panning to the end), <b>⇤ start</b> to the beginning.", right=True)
     page = f"""{ui.HEAD}<title>{html.escape(name)}: timeline</title>

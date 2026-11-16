@@ -76,6 +76,17 @@ def timeline_link(d):
     return link(os.path.join(d, "timeline.html"), "timeline", "timeline", "Each fork from JVM start to exit: iterations, GC pauses, counters")
 
 
+def o11y_links(d):
+    """Buttons for what every cell records besides its timeline (doc/observability.md), those it has: plain files, so
+    outside the lightbox."""
+    files = [("safepoint.log", "safepoints", "-Xlog:safepoint: each safepoint, how long threads took to reach it and how long it held them"),
+             *[(os.path.basename(f), "JIT events", "JitProfiler: every compilation and deoptimization of the fork (epoch ms, kind, tier, OSR, compile ms, method)")
+               for f in sorted(glob.glob(os.path.join(d, "jit-events-*.tsv")))],
+             ("os.json", "os", "osprobe over the measured iterations: CPU by core tier and thread group, wait for a core, clock, energy"),
+             ("os.jsonl", "os samples", "osprobe's raw samples of the fork, every half second")]
+    return "".join(link(os.path.join(d, n), label, None, title) for n, label, title in files if os.path.exists(os.path.join(d, n)))
+
+
 CELL_HEADS = [("{corpus}", False), ("variant", False), ("{unit}", True), ("cycles/op", True), ("instructions/op", True),
               ("alloc/op", True), ("flags", False), ("finished", False)]
 
@@ -123,6 +134,7 @@ def cell_row(spec, corpus, variant, cell):
     flags = " ".join([a for a in r["jvmArgs"] if pattern.search(a) and not a.startswith("-Dperflab.")] + ([scalac] if scalac else []))
     graphs = flame_graphs(cell)
     tl = timeline_link(cell) if os.path.exists(os.path.join(cell, "timeline.html")) else ""
+    tl += o11y_links(cell)
     if os.path.exists(os.path.join(cell, "asm", "index.json")):  # an asm capture's cell: its printed compilations
         from . import asm
         try:

@@ -235,7 +235,7 @@ class Spec:
         # the fork appends its iterations to <dest>/iterations.tsv as they finish (PairedProfiler)
         extra.append(f"-Dperflab.cell={dest}")
         # every safepoint, with how long threads took to reach it: cheap, and it explains a pause the GC log doesn't
-        extra.append(f"-Xlog:safepoint:file={dest}/safepoint.log:uptime:filecount={timeline.GC_LOGS}")
+        extra.append(f"-Xlog:safepoint:file={dest}/safepoint.log:time,uptime:filecount={timeline.GC_LOGS}")
         if self.jit_recording:
             extra.append(jmh.jit_recording(dest))
         if self.asm:

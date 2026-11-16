@@ -9,7 +9,9 @@
 //                   gc+heap region lines carry no "Pause" and are skipped
 //   load.tsv        the load gate's samples of other processes' CPU, in cores (each over its window: 5 s unless it says)
 //   profile.txt     the run's profile (e.g. xctrace:ipc), to name the gaps a profiler leaves between iterations
-//   jvm-events.tsv  the JDK's events in an async run's .jfr (jvmevents.py): kind (vmop, c1, c2, deopt), start_ms, end_ms, what
+//   jvm-events.tsv  the JDK's events (jvmevents.py): kind (vmop, c1, c2, deopt), start_ms, end_ms, what; from an async
+//                   run's .jfr, else from the safepoint log and JitProfiler's jit-events-<pid>.tsv
+//   os.jsonl        osprobe's samples of the fork, every 0.5 s: cumulative CPU ns per thread group, runnable time (osprobe.py)
 // Used by timeline.py (a page per cell) and index.py (a live panel in index.html).
 const BenchTimeline = (() => {
   const NS = 'http://www.w3.org/2000/svg';
@@ -41,19 +43,36 @@ const BenchTimeline = (() => {
     const load = (f.load || '').split('\n').map(l => l.split('\t')).filter(p => p.length >= 2 && p[0])
       .map(p => ({t: +p[0] * 1000, cores: +p[1], top: p[2] || '', w: (+p[3] || 5) * 1000}));
     const jvm = tsv(f.jvm).map(r => ({kind: r.kind, s: +r.start_ms, e: +r.end_ms, what: r.what}));
-    return {iters, series, pauses, load, jvm, profile: (f.profile || '').trim()};
+    return {iters, series, pauses, load, jvm, os: osSamples(f.os), profile: (f.profile || '').trim()};
+  }
+
+  // os.jsonl's cumulative samples as rates over each interval between two of the same fork: {s, e, g: {group: cores},
+  // cpu, wait} in cores; the kernel's runnable time includes time on a core, so the wait for one is what is left
+  function osSamples(text) {
+    const ss = [];
+    for (const l of (text || '').split('\n')) { try { const s = JSON.parse(l); if (s.ru) ss.push(s); } catch (e) {} }
+    const out = [];
+    for (let i = 1; i < ss.length; i++) {
+      const a = ss[i - 1], b = ss[i], dt = (b.t - a.t) * 1e9;
+      if (a.pid !== b.pid || dt <= 0) continue;
+      const cpu = (b.ru.user_time + b.ru.system_time - a.ru.user_time - a.ru.system_time) / dt;
+      const g = {};
+      for (const k of Object.keys(b.th || {})) g[k] = Math.max(0, (b.th[k][0] - ((a.th || {})[k] || [0])[0]) / dt);
+      out.push({s: a.t * 1000, e: b.t * 1000, g, cpu, wait: Math.max(0, (b.ru.runnable_time - a.ru.runnable_time) / dt - cpu)});
+    }
+    return out;
   }
 
   async function fetchCell(base) {
     const get = async n => { try { const r = await fetch(base + n, {cache: 'no-store'}); return r.ok ? await r.text() : ''; } catch (e) { return ''; } };
     // gc.log is the running fork's; the JVM moved the earlier forks' aside as gc.log.0, .1, ... (perflab.timeline.GC_LOGS)
-    const [iterations, timeline, load, profile, jvm, ...gc] = await Promise.all(
-      ['iterations.tsv', 'timeline.tsv', 'load.tsv', 'profile.txt', 'jvm-events.tsv', 'gc.log', ...Array.from({length: 10}, (_, i) => 'gc.log.' + i)].map(get));
-    return parse({iterations, timeline, gc: gc.join(''), load, profile, jvm});
+    const [iterations, timeline, load, profile, jvm, os, ...gc] = await Promise.all(
+      ['iterations.tsv', 'timeline.tsv', 'load.tsv', 'profile.txt', 'jvm-events.tsv', 'os.jsonl', 'gc.log', ...Array.from({length: 10}, (_, i) => 'gc.log.' + i)].map(get));
+    return parse({iterations, timeline, gc: gc.join(''), load, profile, jvm, os});
   }
 
   function mount(svg, legend, tip) {
-    let D = {iters: [], series: [], pauses: [], load: [], jvm: [], profile: ''}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
+    let D = {iters: [], series: [], pauses: [], load: [], jvm: [], os: [], profile: ''}, t0 = 0, t1 = 1, x0 = 0, x1 = 1, zoomed = false;
     // stuck to now: a zoomed view whose right edge is at the newest data moves with it as data arrives (the "now" button,
     // or panning or zooming to the end); panning back from the end unsticks it
     let stuck = false;
@@ -109,10 +128,15 @@ const BenchTimeline = (() => {
     const JVM = {vmop: {name: 'VM op', color: 'var(--v3)'}, c1: {name: 'C1', color: 'var(--v5)'}, c2: {name: 'C2', color: 'var(--v1)'},
                  deopt: {name: 'deopt', color: 'var(--fg)'}};
     const jvmRows = [{name: 'VM operations', h: 26, jvm: ['vmop']}, {name: 'JIT compiles', h: 50, jvm: ['c1', 'c2', 'deopt']}];
+    // osprobe: the fork's CPU by thread group, and its threads' wait for a core, as the OS saw them
+    const OS = {bench: {name: 'benchmark', color: 'var(--v0)'}, jit: {name: 'JIT', color: 'var(--v1)'}, gc: {name: 'GC', color: 'var(--v3)'},
+                other: {name: 'other', color: 'var(--life)'}};
+    const osRow = {name: 'fork CPU (OS)', h: 80, os: true, unit: 'cores'};
     let rows = counterRows, height = 0;
     const layout = () => {
       rows = D.series.length ? counterRows : plainRows.concat(D.load.length ? [{name: 'other processes', h: 60, load: true}] : []);
       if (D.iters.some(i => i.kind === 'measure' || i.kind === 'warmup')) rows = [rows[0], scoreRow, ...rows.slice(1)];
+      if (D.os.length) rows = rows.concat([osRow]);
       if (D.jvm.length) rows = rows.concat(jvmRows);
       height = rows.reduce((a, r) => a + r.h + 8, 8) + 24;
     };
@@ -241,7 +265,10 @@ const BenchTimeline = (() => {
             }
           });
           if (!D.jvm.some(ev => r.jvm.includes(ev.kind) && ev.e >= x0 && ev.s <= x1))
-            el('text', {x: L + 6, y: y + r.h / 2 + 4, class: 'lab'}).textContent = 'none in view (the recording covers the last fork\'s measurement)';
+            el('text', {x: L + 6, y: y + r.h / 2 + 4, class: 'lab'}).textContent = D.profile.startsWith('async')
+              ? 'none in view (the recording covers the last fork\'s measurement)' : 'none in view';
+        } else if (r.os) {
+          drawOs(r, y, W, X);
         } else if (!r.key && !r.ipc) {
           // pauses / load only
         } else {
@@ -300,6 +327,35 @@ const BenchTimeline = (() => {
       // shadows at the plot's edges while the view hides data beyond them
       if (x0 > t0) el('rect', {x: L, y: 0, width: 12, height: height - 22, fill: 'url(#tl-shade-l)', 'pointer-events': 'none'});
       if (x1 < t1) el('rect', {x: W - R - 12, y: 0, width: 12, height: height - 22, fill: 'url(#tl-shade-r)', 'pointer-events': 'none'});
+    }
+
+    // a line per thread group (and the wait for a core, dashed) over osprobe's intervals; a tip per interval
+    function drawOs(r, y, W, X) {
+      const vis = D.os.filter(p => p.e >= x0 && p.s <= x1);
+      const groups = Object.keys(OS).filter(k => D.os.some(p => p.g[k] > 0));
+      const max = Math.max(1, ...vis.flatMap(p => [...groups.map(k => p.g[k] || 0), p.wait]));
+      const Y = v => y + r.h - 4 - v / max * (r.h - 10);
+      el('line', {x1: L, x2: W - R, y1: Y(0), y2: Y(0), class: 'axis'});
+      el('line', {x1: L, x2: W - R, y1: Y(max / 2), y2: Y(max / 2), class: 'grid', 'stroke-dasharray': '2 4'});
+      const sx = L < 150 ? {x: L + 3, 'text-anchor': 'start', class: 'lab halo'} : {x: L - 4, 'text-anchor': 'end', class: 'lab'};
+      el('text', {...sx, y: Y(max) + 8}).textContent = max.toFixed(1);
+      el('text', {...sx, y: Y(max / 2) + 4}).textContent = (max / 2).toFixed(max / 2 < 1 ? 2 : 1);
+      if (!vis.length) { el('text', {x: L + 6, y: y + r.h / 2 + 4, class: 'lab'}).textContent = 'no samples in view'; return; }
+      const clamp = x => Math.min(Math.max(x, L), W - R);
+      const line = (get, attrs) => {
+        let d = '', prev = null;
+        // a new segment after a gap (between forks)
+        for (const p of vis) { d += (prev == null || p.s - prev > 1 ? 'M' : 'L') + clamp(X((p.s + p.e) / 2)).toFixed(1) + ',' + Y(get(p)).toFixed(1); prev = p.e; }
+        el('path', {d, fill: 'none', 'stroke-width': 1.2, 'pointer-events': 'none', ...attrs});
+      };
+      for (const k of groups) line(p => p.g[k] || 0, {stroke: OS[k].color});
+      line(p => p.wait, {stroke: 'var(--pause)', 'stroke-dasharray': '4 3'});
+      for (const p of vis) {
+        const a = clamp(X(p.s)), b = clamp(X(p.e));
+        if (b > a) el('rect', {x: a, y, width: b - a, height: r.h, fill: 'transparent'}).dataset.tip =
+          `${((p.e - p.s) / 1000).toFixed(2)} s, in cores: ` + groups.map(k => `${OS[k].name} ${(p.g[k] || 0).toFixed(2)}`).join(', ')
+          + `; all ${p.cpu.toFixed(2)}, waiting for a core ${p.wait.toFixed(2)}`;
+      }
     }
 
     // Student's t at 99.9% (two-sided), the confidence JMH reports its score error at, by degrees of freedom
@@ -381,6 +437,8 @@ const BenchTimeline = (() => {
         + (D.iters.some(i => i.kind === 'startup') ? sw('repeating-linear-gradient(45deg,var(--life) 0 2px,transparent 2px 4px)', 'JVM start / exit', ';outline:1px solid var(--life)') : '')
         + (gaps().length ? sw('transparent', xctrace() ? 'xctrace attaching' : 'between iterations', ';outline:1px dashed var(--life)') : '')
         + (D.pauses.length ? sw('var(--pause)', 'GC pause') : '')
+        + (D.os.length ? Object.keys(OS).filter(k => D.os.some(p => p.g[k] > 0)).map(k => sw(OS[k].color, OS[k].name + ' threads', ';height:2px;vertical-align:3px')).join('')
+          + sw('transparent', 'waiting for a core', ';height:0;border-top:2px dashed var(--pause);vertical-align:3px') : '')
         + Object.keys(JVM).filter(k => D.jvm.some(ev => ev.kind === k)).map(k => sw(JVM[k].color, k === 'vmop' ? 'VM operation at a safepoint' : JVM[k].name)).join('');
       draw();
     }

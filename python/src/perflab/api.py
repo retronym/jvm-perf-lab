@@ -435,7 +435,7 @@ define("Cell", "One cell in full: its result, every metric and sample, its itera
                                             "counts": M(I("events"), "How many of each added event the recording has")},
                                             optional=("added", "counts")))}),
     "logs": M(O("A log", {**FILE["properties"], "tail": null(S("Its last `tail` lines (with tail > 0)"))}),
-              "build.log (the build tool's output), jmh.log (JMH's), gc.log"),
+              "build.log (the build tool's output), jmh.log (JMH's), gc.log, safepoint.log"),
     "files": A(FILE, "Every file of the cell"),
     "specVersion": null(S("The spec version it ran under (<campaign>/specs/<version>.json)")),
     "void": null(O("Why it was voided", {"reason": S("reason"), "voided": WHEN}))}, top=True)
@@ -1307,7 +1307,7 @@ def cell(campaign, corpus, variant, round, project=None, tail=0):
         except OSError:
             profiler = "none"
         logs = {}
-        for name in ("build.log", "jmh.log", "gc.log"):
+        for name in ("build.log", "jmh.log", "gc.log", "safepoint.log"):
             f = os.path.join(c, name)
             if os.path.exists(f):
                 logs[name] = {**_file(p, f, c), "tail": srv._tail(f, int(tail)) if tail else None}
