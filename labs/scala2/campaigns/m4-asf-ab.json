@@ -1,0 +1,47 @@
+{
+  "name": "m4-asf-ab",
+  "description": [
+    "Timing A/B for a fast path in `Types.asSeenFrom`: return the type unchanged for `tp.asSeenFrom(C.this, C)` when no class on `C`'s owner chain has a self type refining it and `tp` has no annotated type or type variable (`PROPOSAL-asseenfrom.md`, branch `claude/asseenfrom-fastpath-d7ef00`). Instrumented counts on the scala corpus: 46% of the calls that reach `AsSeenFromMap` (2.0M of 4.3M) are of this shape, mostly `TypeRef#baseType` -> `relativize` for cake-pattern types such as `Global.this.Symbol`; scalap: 31% of far fewer.",
+    "",
+    "Release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26, 8G heap, no profiler. Builds alternate fork by fork over 10 rounds; scala: single-shot 4+4 ops; scalap: 20+20 x 2 s. The JIT pilot `m4-asf-jit` showed no inlining shift around `asSeenFrom` beyond its A/A, so the ceiling variant (proto without the annotation / type-variable scan) was dropped."
+  ],
+  "variantDescriptions": {
+    "base": "`scala2-perf-integration` tip `00e3bbafb8`",
+    "proto": "`4cf53d18e2` (the checkout head adds only `PROPOSAL-asseenfrom.md`): skip `AsSeenFromMap` for `C.this` seen from `C` (exact guard)"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-rebase",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "proto": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/asseenfrom-fastpath-d7ef00",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "proto": ""
+  },
+  "rounds": 10,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem",
+    "scalap": "-f 1 -wi 20 -w 2 -i 20 -r 2"
+  },
+  "profile": "none"
+}

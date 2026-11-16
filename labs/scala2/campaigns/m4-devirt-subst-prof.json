@@ -1,0 +1,48 @@
+{
+  "name": "m4-devirt-subst-prof",
+  "description": [
+    "`SubstMap` step of [retronym/scala#199](https://github.com/retronym/scala/pull/199): `TypeMap.applyFast` binds `SubstSymMap.apply` and a final `SubstMap.substMapApply` statically, against the previous tip, where the call to `SubstMap.apply` stayed a vtable call. PMU profile (cycles, instructions) through the kperf helper with `jitRecording`, scala corpus, one fork per build: stub attribution plus `jit_diff`. Not a timing A/B.",
+    "",
+    "Both builds with the release optimizer settings (`SCALA_RELEASE_OPT`); same JDK, heap and iterations as `m4-devirt-type-prof`."
+  ],
+  "variantDescriptions": {
+    "types": "`d8f6f9069d`: the Type-hierarchy prototype",
+    "subst": "static `SubstSymMap` / `SubstMap` branches on top of it"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "types": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-types-d8f6f9",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "subst": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-symbol-predicates-625c33",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "types": "",
+    "subst": ""
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "jitRecording": true
+}

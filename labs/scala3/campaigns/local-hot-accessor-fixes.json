@@ -1,0 +1,58 @@
+{
+  "name": "local-hot-accessor-fixes",
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/xctrace/loads.template.xml",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/25.4.4.1+1-graal/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 1,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x=",
+    "scalaz": "-f 1 -bm ss -wi 90 -i 30 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x="
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base-su",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "so1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/combo6-sharing-off-su",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "w": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/so1-w",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "w-batchonly": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/so1-w",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "base": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true",
+    "so1": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true",
+    "w": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true",
+    "w-batchonly": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true -Ddotty.denot.batchOnly=true"
+  },
+  "variantDescriptions": {
+    "base": "merge base + stamps + strong-interner switch (`claude/bench84-base-su`)",
+    "so1": "combo6 + sharing-off step 1 + strong-interner switch (`claude/combo6-sharing-off-su`)",
+    "w": "so1 + hot accessors decided on a class test, not `denotBits`: `isCurrentLazyInfo`, `isCompleted`, `memberCache`, `baseTypeCache` (`claude/so1-w`)",
+    "w-batchonly": "w with `-Ddotty.denot.batchOnly=true`: every `concurrentDenot` test folds to false (upper bound)"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Direction check on the M5 (noisy machine: read instructions and L2 misses, not time) for the hot-accessor fixes; the careful A/B is [m4-iscurrent-workarounds](../m4-iscurrent-workarounds). Graal 25.4.4, strong uniques, typer only, xctrace loads."
+  ]
+}

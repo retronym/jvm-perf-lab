@@ -1,0 +1,50 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 5,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:pickler"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "batch-84-base-dontinline",
+  "description": [
+    "How much does losing the inlining of a few key lookups cost? JIT pilots found #84's tip refusing to inline `Symbol.denot` (608 sites), `NamedType.denot` (264) and `Period.contains` (171) as too big, where base inlined them. `base-dontinline` forbids C2 to inline them at all, an upper bound (the tip loses them only at sites C2 finds cold): if it slows base by about the tip's margin, the lost inlining is much of the gap.",
+    "dotc to `-Ystop-after:pickler`, single-shot 30+16, patched JDK 26, 5 forks per variant, interleaved."
+  ],
+  "variantDescriptions": {
+    "base": "scala/scala3 main `d168df2a76` (merge base) + library stamps",
+    "base-dontinline": "base with C2 forbidden to inline `Symbol.denot`, `NamedType.denot` and `Period.contains` anywhere (`-XX:CompileCommand=dontinline`): the methods #84's tip loses inlining of at cold sites",
+    "tip": "retronym/scala3#84 at `e3b407ec7a` + library stamps (build only)"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "base-dontinline": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-tip3",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "base-dontinline": "-XX:CompileCommand=quiet -XX:CompileCommand=dontinline,dotty.tools.dotc.core.Symbols$Symbol::denot -XX:CompileCommand=dontinline,dotty.tools.dotc.core.Types$NamedType::denot -XX:CompileCommand=dontinline,dotty.tools.dotc.core.Periods$Period$::contains$extension",
+    "tip": ""
+  }
+}

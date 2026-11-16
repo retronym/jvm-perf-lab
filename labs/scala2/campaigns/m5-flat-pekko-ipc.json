@@ -1,0 +1,35 @@
+{
+  "name": "m5-flat-pekko-ipc",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "builds": {
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/integ-next",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "tip": ""
+  },
+  "variantDescriptions": {
+    "tip": "`2ccfdf2177` plus a local prototype flattening intersections in `RefinedType.mapOver` (`63f1d8fd51`)"
+  },
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 8 -i 10 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "xctrace:ipc",
+  "description": [
+    "Effect on pekko of flattening intersections that a type map puts in a refinement's parents. Compare by eye with `m5-tip-pekko-ipc`, which is one fork of `f0b6e17bd9`."
+  ]
+}

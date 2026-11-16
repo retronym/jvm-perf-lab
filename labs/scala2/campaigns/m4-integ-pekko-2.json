@@ -1,0 +1,47 @@
+{
+  "name": "m4-integ-pekko-2",
+  "description": [
+    "The same comparison as `m4-integ-shared-vs-main`, on a corpus outside the compiler: pekko-actor and pekko-stream 1.7.1 from their published source jars, about 140k lines of Scala and generated code. No A/A, so read differences under about 2% as unresolved."
+  ],
+  "variantDescriptions": {
+    "main": "`upstream/2.13.x` at `278cab1040`, the integration branch's base",
+    "integ": "`scala2-perf-integration` at `573187e7d7`, with `-Yname-table:shared`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "builds": {
+    "main": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-shared-main-278cab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "integ": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-shared-integ-573187",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "main": "",
+    "integ": ""
+  },
+  "variantJmhArgs": {
+    "integ": "-p scalacOptions=-Yname-table:shared"
+  },
+  "rounds": 5,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 20 -i 10 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "none"
+}

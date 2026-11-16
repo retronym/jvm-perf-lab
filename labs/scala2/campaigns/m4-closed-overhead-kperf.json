@@ -1,0 +1,45 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/closed-scope-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "closed": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/closed-scope-uniques",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "closed": ""
+  },
+  "variantDescriptions": {
+    "base": "retronym/scala#212 head plus scala/scala#11381 (`claude/closed-scope-bench-base`)",
+    "closed": "retronym/scala#241 with owner-aware suspension and the implicit-search scopes, plus scala/scala#11381 (`claude/closed-scope-bench`)"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 15 -i 3 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "name": "m4-closed-overhead-kperf",
+  "profile": "async:cycles@400000+instructions@1200000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "description": [
+    "Why retronym/scala#241 (closed scopes) costs ~3% of typer time (m4-closed-scopes-typer-2, job 592): PMU profile, cycles and instructions through kperf, of `base` and `closed`, scala corpus to `-Ystop-after:typer`, one fork each, 15 warmup + 3 measured single shots. Not a timing A/B."
+  ]
+}

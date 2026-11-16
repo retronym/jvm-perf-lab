@@ -1,0 +1,21 @@
+{
+  "name": "reflect-scratch-typer",
+  "description": [
+    "Branch `claude/reflect-scratch-4f66f7` (scala/scala worktree `reflect-scratch-4f66f7`): per-thread scratch state of type operations gathered into `SymbolTable#Scratch`, reached through `def scratch` (a lazy val in the compiler universe).",
+    "Question: does batch compilation pay for the extra indirection? Typer only, paired within forks."
+  ],
+  "variantDescriptions": {
+    "base": "c803a64c44: 2.13.x 65f01dbd31 plus the plan and the reflection benchmark (no code change)",
+    "pr": "the branch tip: Scratch, ReusableInstances always enabled, per-thread collectors"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "rounds": 3,
+  "corpora": {
+    "re2s": "-wi 12 -i 12 -w 3 -r 3 -p scalacOptions=-Ystop-after:typer",
+    "scalap": "-wi 16 -i 12 -w 2 -r 2 -p scalacOptions=-Ystop-after:typer"
+  },
+  "paired": {"base": "@build=../reflect-scratch-base", "pr": "@build=."},
+  "gcLog": true,
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing"
+}

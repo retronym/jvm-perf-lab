@@ -1,0 +1,69 @@
+{
+  "name": "m5-kwu-t8-gcsweep",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "g1-24": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "g1-24-xmn12": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "g1-32": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "par-24": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "g1-24": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G",
+    "g1-24-xmn12": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G -Xmn12g",
+    "g1-32": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms32G -Xmx32G",
+    "par-24": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G -XX:+UseParallelGC"
+  },
+  "variantJmhArgs": {
+    "g1-24": "-t 8",
+    "g1-24-xmn12": "-t 8",
+    "g1-32": "-t 8",
+    "par-24": "-t 8"
+  },
+  "variantDescriptions": {
+    "g1-24": "G1, 24 GB: the setting of jobs 578 and 579",
+    "g1-24-xmn12": "G1, 24 GB, young generation fixed at 12 GB",
+    "g1-32": "G1, 32 GB",
+    "par-24": "ParallelGC, 24 GB"
+  },
+  "profile": "none",
+  "rounds": 1,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 3 -i 5 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "How much of the remaining GC cost at 8 compiles collector settings can recover: G1 at 24 GB (baseline), G1 with a fixed 12 GB young generation, G1 at 32 GB, and ParallelGC at 24 GB. Timing only, one fork each; the laptop has 48 GB.",
+    "",
+    "Build `claude/uniques-audit-2.13.x` `1e85ab8eba` (prototypes + upstream 2.13.x with scala/scala#11367), chunked-weak + uncache-all, 8 independent scala-corpus compiles at once (JMH `-t 8`, single shot), laptop."
+  ]
+}

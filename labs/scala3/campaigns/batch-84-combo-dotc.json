@@ -1,0 +1,38 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 6,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 13 -i 16 -p scalacOptions=-Ystop-after:pickler"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "batch-84-combo-dotc",
+  "description": [
+    "Quick: retronym/scala3#84's tip vs every serial-path fix so far combined (`combo`), interleaved round by round. The merge base measured about 3.1% faster than the tip, and `slots` about 2.2% ([batch-84-slots-dotc](../batch-84-slots-dotc)).",
+    "dotc to `-Ystop-after:pickler`, single-shot 13+16, patched JDK 26, 6 forks per variant."
+  ],
+  "variantDescriptions": {
+    "tip": "retronym/scala3#84 at `e3b407ec7a` + library stamps (build only)",
+    "combo": "tip + class caches as fields + Reader hot fields + StampedSlot (`ee0e1bde69`) + SimpleName hash in a field (`5b1069990f`) + findRef without allocation and selection without a closure (HEAD of `claude/ov-stampfields`)"
+  },
+  "builds": {
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-tip3",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "combo": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/ov-stampfields",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  }
+}

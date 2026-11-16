@@ -1,0 +1,47 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-rebase",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "proto": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/refchecks-proto-23115d",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "proto": ""
+  },
+  "variantDescriptions": {
+    "base": "`scala2-perf-integration` tip `00e3bbafb8`",
+    "proto": "`23115d0637` (branch `claude/refchecks-override-cost-c17b91`): Erasure's double-def check reuses RefChecks' matched pairs (`fcb0e6135a`), and RefChecks reuses the override cursor's member types"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m4-refchecks-pairs-prof",
+  "rounds": 1,
+  "description": [
+    "Profile pilot for cutting RefChecks/Erasure override-pair work (`PROPOSAL-refchecks.md` on branch `claude/refchecks-override-cost-c17b91`). Base profile: `m4-int00e3bb-kperf-l1d`, where `checkAllOverrides` is 9.5% and `checkNoDoubleDefs` 4.7% of compiler-thread cycles, mostly `memberType`/`asSeenFrom` recomputed for pairs already matched.",
+    "",
+    "Scala corpus single-shot 4+4, one fork per build, kperf cycles + instructions; patched JDK 26, `SCALA_RELEASE_OPT`."
+  ],
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock"
+}

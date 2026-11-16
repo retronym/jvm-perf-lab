@@ -1,0 +1,58 @@
+{
+  "name": "m4-names-shared-vs-base-parser",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "`m4-names-shared-vs-base`, parsing only (`-Ystop-after:parser`), where name entry is amplified: `-Yname-table:shared` at the tip of [retronym/scala#204](https://github.com/retronym/scala/pull/204) against plain upstream, with an A/A."
+  ],
+  "variantDescriptions": {
+    "base": "`upstream/2.13.x` at `c84dea8aa7`",
+    "aa": "the same as `base`, for the noise floor",
+    "shared": "`a4d67601c2`, `-Yname-table:shared`"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "shared": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-enc",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "aa": "",
+    "shared": ""
+  },
+  "variantJmhArgs": {
+    "base": "-p scalacOptions=-Ystop-after:parser",
+    "aa": "-p scalacOptions=-Ystop-after:parser",
+    "shared": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:shared'"
+  },
+  "rounds": 5,
+  "profile": "none",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 60 -i 60 -p jdkHome=25.0.4-tem"
+  }
+}

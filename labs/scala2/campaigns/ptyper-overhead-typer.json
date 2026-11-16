@@ -1,0 +1,37 @@
+{
+  "name": "ptyper-overhead-typer",
+  "description": [
+    "What the parallel typer spike costs the ordinary serial compiler, and what its one-thread parallel path costs on top: compiles stopped after the typer, every build paired within each fork. `base` against `aa` (the same build in a second class loader) is the noise floor.",
+    "",
+    "Serial overhead: `base` → `guards` → `spike`. Parallel overhead: `spike` → `par1`. xctrace counts the benchmark thread only, so `par1`'s counters miss its worker thread: compare `par1` by time."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `d32d907524`",
+    "aa": "`base` again in its own class loader: the A/A",
+    "guards": "[retronym/scala#212](https://github.com/retronym/scala/pull/212) at `fd95c5c1c1`: `Scratch` and `Frame` per thread and completion",
+    "spike": "the parallel typer spike at `b650049602`, without `-Yparallel-typer`",
+    "par1": "`spike` with `-Yparallel-typer -Yparallel-typer-threads:1`: the parallel driver on one worker"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "paired": {
+    "base": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/base",
+    "aa": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/base",
+    "guards": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/guards",
+    "spike": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/spike",
+    "par1": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/spike -Yparallel-typer -Yparallel-typer-threads:1"
+  },
+  "corpora": {
+    "re2s": "-f 1 -wi 30 -w 2 -i 50 -r 2 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer",
+    "scalap": "-f 1 -wi 30 -w 2 -i 50 -r 2 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "rounds": 4,
+  "loadgate": {
+    "maxCores": 8.0,
+    "quietSecs": 30
+  },
+  "gcLog": true
+}

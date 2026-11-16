@@ -1,0 +1,31 @@
+{
+  "name": "nogc-aa-variance",
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/xctrace/loads.template.xml",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 3,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x=",
+    "scalaz": "-f 1 -bm ss -wi 90 -i 30 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x="
+  },
+  "variants": {
+    "a": "",
+    "b": "-Dperflab.aa=b",
+    "c": "-Dperflab.aa=c"
+  },
+  "variantDescriptions": {
+    "a": "#84 tip + interner switches (off)",
+    "b": "A/A twin",
+    "c": "A/A twin"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Variance of the no-GC measurement mode, for hill climbing: three identical variants of one build (#84 tip + the interner switches, off), so every difference is noise. No GC inside an op (a full GC before each, `-Xms12G -Xmx12G`, an 8 GB young generation), so the weak interners' contents and GC timing don't vary between ops. Compare with the ordinary-GC A/A pairs in [interner-strong-spike](../interner-strong-spike).",
+    "dotc and scalaz to `-Ystop-after:typer`, single-shot, xctrace `loads`, patched JDK 26, 3 rounds: 9 forks per corpus."
+  ]
+}

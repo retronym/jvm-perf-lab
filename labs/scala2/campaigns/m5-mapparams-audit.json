@@ -1,0 +1,29 @@
+{
+  "name": "m5-mapparams-audit",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus -Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all",
+  "builds": {
+    "kwu": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "kwu": ""
+  },
+  "variantDescriptions": {
+    "kwu": "`claude/uniques-audit-2.13.x` `f5570672bd`, chunked-weak + uncache-all"
+  },
+  "profile": "audit:audit/mapparams-context.audit",
+  "rounds": 1,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 1 -i 1 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Caller audit of the uniques prototype's `mapParams` weak scope (retronym/scala#240): which type maps enter it, from which compiler code, and how often params are actually cloned. The escape check found this scope's uninterned types in pickles, infos and trees; this asks where the mapping is requested. Counts cover the whole fork (setup, warmup and measured compiles)."
+  ]
+}

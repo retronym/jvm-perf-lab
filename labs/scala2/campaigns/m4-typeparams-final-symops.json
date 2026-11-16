@@ -1,0 +1,59 @@
+{
+  "name": "m4-typeparams-final-symops",
+  "description": [
+    "[retronym/scala#208](https://github.com/retronym/scala/pull/208): `Symbol.typeParams` final, with `SynchronizedSymbols` overriding only its slow path, and `isRawIfWithoutArgs` skipping `typeParams` for initialized non-Java classes, against its base on `2.13.x`.",
+    "",
+    "`SymbolOpsBenchmark`, one workload per column, over the classes of a scala corpus compile done in setup. In the base build's kperf profiles (`m4-symops-pilot`) `Symbol.typeParams` is 2.2% (`findMember`), 2.2% (`overridingPairs`) and 3.5% (`subst`) of cycles inclusive, against 0.83% in a typer-only compile of the scala corpus (`m4-symfinal-typer-kperf`). The callers are the typer's (`NoArgsTypeRef.isHigherKinded`, `TypeRef.relativize`, `AsSeenFromMap.correspondingTypeArgument`) except `isRawIfWithoutArgs`, which these workloads barely reach, so this measures the first commit.",
+    "",
+    "Both builds with the release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26, 8G heap, no profiler. Warmup from `m4-symfinal-symops`, which plateaus by its fifth warmup iteration."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `278cab1040`, the PR's base",
+    "aa": "`base` again, an A/A",
+    "pr": "retronym/scala#208 at `23cde0c409`"
+  },
+  "benchmark": "SymbolOpsBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-base-278cab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-base-278cab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "pr": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "aa": "",
+    "pr": ""
+  },
+  "rounds": 4,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "findMember": "-f 1 -wi 5 -w 10 -i 5 -r 10 -p jdkHome=25.0.4-tem",
+    "overridingPairs": "-f 1 -wi 5 -w 10 -i 5 -r 10 -p jdkHome=25.0.4-tem",
+    "subst": "-f 1 -wi 5 -w 10 -i 5 -r 10 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "none"
+}

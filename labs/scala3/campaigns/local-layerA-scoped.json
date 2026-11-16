@@ -1,0 +1,31 @@
+{
+  "name": "local-layerA-scoped",
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/xctrace/loads.template.xml",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/25.4.4.1+1-graal/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 2,
+  "corpora": {
+    "scalaz": "-f 1 -bm ss -wi 25 -i 10"
+  },
+  "variants": {
+    "today": "-Ddotty.refchecks.memberTypes=all",
+    "layerA": "",
+    "scoped": "-Ddotty.refchecks.memberTypes=all -Ddotty.uniques.uncacheMethodParams=true -Ddotty.uniques.epochTable=8192 -Ddotty.uniques.epochClear=scoped -Ddotty.uniques.uncachedAppliedCache=4096",
+    "layerA-scoped": "-Ddotty.uniques.uncacheMethodParams=true -Ddotty.uniques.epochTable=8192 -Ddotty.uniques.epochClear=scoped -Ddotty.uniques.uncachedAppliedCache=4096"
+  },
+  "variantDescriptions": {
+    "today": "`claude/subst-override-matcher-c33e7c` `ab473e7e0e`, `-Ddotty.refchecks.memberTypes=all`: RefChecks checks every inherited alternative (today), weak interners",
+    "layerA": "Layer A: RefChecks checks member types only for joint denotations (0 on scalaz), skips names declared in fewer than two base classes",
+    "scoped": "today's checks + scoped epochs (uncached method-param types hash-consed per override check / bridges / mixin forwarder / explore, direct-mapped cache outside)",
+    "layerA-scoped": "Layer A + scoped epochs"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Direction check while m4 runs m4-uncache-scoped: Layer A of [the substitution matcher plan](local/PLAN-subst-matcher.md) (skip vacuous member type checks in RefChecks) against today, with and without scoped epochs. One build, variants by flags. scalaz, full pipeline, Graal 25.4.4, weak interners, 8G heap, xctrace loads, 2 rounds, M5 (noisy)."
+  ]
+}

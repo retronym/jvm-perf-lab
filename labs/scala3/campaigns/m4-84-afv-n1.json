@@ -1,0 +1,55 @@
+{
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/25.4.4.1+1-graal/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "testbed": "m4",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base-su",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "serial": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/84-tip-bench",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "n1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/84-tip-bench",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "base": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true",
+    "serial": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true",
+    "n1": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true -Ddotc.parallelTyper.threads=1"
+  },
+  "variantDescriptions": {
+    "base": "merge base `d168df2a76` + stamps + strong-interner switch (`claude/bench84-base-su`)",
+    "serial": "retronym/scala3#84 tip `42e59ecdae` (with the `AnyConcurrent` gate) + the strong-interner switch (`claude/84-tip-bench`), serial batch: the gate stays off",
+    "n1": "the same build with `-Yparallel-typer -Ddotc.parallelTyper.threads=1`: one worker thread, but a concurrent base, so the gate is on and the concurrent arms run"
+  },
+  "gcLog": true,
+  "name": "m4-84-afv-n1",
+  "rounds": 4,
+  "profile": "xctrace:ipc",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p gcBetweenIterations=true -p variants=x="
+  },
+  "description": [
+    "What the concurrent arms cost a single thread: retronym/scala3#84 tip with the `AnyConcurrent` almost-final gate, serial (gate off) vs `-Yparallel-typer` on one worker thread (gate on), against the merge base. Graal 25.4.4, strong uniques, dotc typer only, 4 rounds, M4."
+  ],
+  "variantJmhArgs": {
+    "base": "-p scalacOptions=-Ystop-after:typer",
+    "serial": "-p scalacOptions=-Ystop-after:typer",
+    "n1": "-p \"scalacOptions=-Ystop-after:typer -Yparallel-typer\""
+  }
+}

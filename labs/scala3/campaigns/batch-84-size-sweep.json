@@ -1,0 +1,48 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 5,
+  "corpora": {
+    "dottyUtil": "-f 1 -bm ss -wi 40 -i 30 -p scalacOptions=-Ystop-after:pickler",
+    "tastyQuery": "-f 1 -bm ss -wi 25 -i 20 -p scalacOptions=-Ystop-after:pickler",
+    "scalaz": "-f 1 -bm ss -wi 20 -i 16 -p scalacOptions=-Ystop-after:pickler",
+    "dotc": "-f 1 -bm ss -wi 13 -i 16 -p scalacOptions=-Ystop-after:pickler"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "batch-84-size-sweep",
+  "description": [
+    "Does retronym/scala3#84's serial overhead grow with the size of what is compiled? The kperf miss profiles and the GC logs point at cache pressure from a larger working set (the same lookups and cache hit rates as base, but more L1D and L2 misses, and about 40% more promotion to the old generation), which a small codebase should feel less. Four corpora from about 3k to 150k lines: `dottyUtil` (34 files, 3.1k lines), `tastyQuery` (49 files, 19k), `scalaz` (292 files, 41k), `dotc` (485 files).",
+    "To `-Ystop-after:pickler`, single-shot with warmup and measurement scaled to the corpus, patched JDK 26, 5 forks per variant and corpus."
+  ],
+  "variantDescriptions": {
+    "base": "scala/scala3 main `d168df2a76` (merge base) + library stamps",
+    "tip": "retronym/scala3#84 at `e3b407ec7a` + library stamps (build only)",
+    "caches-reader": "caches + `8592214ccc` (Reader's hot fields in its first cache line)"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-tip3",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "caches-reader": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/ov-stampfields",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  }
+}

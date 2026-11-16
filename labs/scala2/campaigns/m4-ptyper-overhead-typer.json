@@ -1,0 +1,100 @@
+{
+  "name": "m4-ptyper-overhead-typer",
+  "description": [
+    "What the parallel typer spike costs the ordinary serial compiler, and what its one-thread parallel path costs on top, on re2s stopped after the typer, each build in forks of its own. `aa` is `base` again: the fork-to-fork noise floor.",
+    "",
+    "Serial overhead: `base` \u2192 `guards` \u2192 `spike` \u2192 `fix`. Parallel overhead: `spike` \u2192 `par1`, `fix` \u2192 `par1fix`. xctrace's per-thread counters miss the worker thread of `par1` and `par1fix`: compare those by time and the all-threads counters."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `d32d907524`",
+    "aa": "`base` again: the A/A",
+    "guards": "[retronym/scala#212](https://github.com/retronym/scala/pull/212) at `fd95c5c1c1`: `Scratch` and `Frame` per thread and completion",
+    "spike": "the parallel typer spike at `3c72e64ddf`, without `-Yparallel-typer`",
+    "par1": "`spike` with `-Yparallel-typer -Yparallel-typer-threads:1`: the parallel driver on one worker",
+    "fix": "`spike` plus the overhead fixes (branch `ptyper-overhead-fixes` at `be52f84d1e`), without the flag",
+    "par1fix": "`fix` with `-Yparallel-typer -Yparallel-typer-threads:1`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "variants": {
+    "base": "",
+    "aa": "",
+    "guards": "",
+    "spike": "",
+    "par1": "",
+    "fix": "",
+    "par1fix": ""
+  },
+  "variantJmhArgs": {
+    "base": "-p scalacOptions=-Ystop-after:typer",
+    "aa": "-p scalacOptions=-Ystop-after:typer",
+    "guards": "-p scalacOptions=-Ystop-after:typer",
+    "spike": "-p scalacOptions=-Ystop-after:typer",
+    "par1": "-p 'scalacOptions=-Ystop-after:typer -Yparallel-typer -Yparallel-typer-threads:1'",
+    "fix": "-p scalacOptions=-Ystop-after:typer",
+    "par1fix": "-p 'scalacOptions=-Ystop-after:typer -Yparallel-typer -Yparallel-typer-threads:1'"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "guards": {
+      "checkout": "/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/guards",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "spike": {
+      "checkout": "/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/spike2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "par1": {
+      "checkout": "/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/spike2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "fix": {
+      "checkout": "/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/fix4",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "par1fix": {
+      "checkout": "/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/fix4",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "corpora": {
+    "re2s": "-f 1 -bm ss -wi 40 -i 40 -p jdkHome=25.0.4-tem"
+  },
+  "rounds": 8,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true
+}

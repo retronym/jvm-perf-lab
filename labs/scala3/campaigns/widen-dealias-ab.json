@@ -1,0 +1,58 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 6,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:pickler"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "widen-dealias-ab",
+  "description": [
+    "Timing A/B: do inlinable fast paths for `Type.widen` and `Type.dealias` make serial batch compilation faster? `fastpath-noinl` takes C2's compile-order race on `widen1` out of the picture.",
+    "dotc to `-Ystop-after:pickler`, single-shot 30+16, patched JDK 26, 6 forks per variant, interleaved."
+  ],
+  "variantDescriptions": {
+    "base": "scala/scala3 main `d168df2a76` + library stamps `2cd1ec8c08` (the lab does not build against current main since scala/scala3#27416)",
+    "fastpath": "`Type.widen` and `Type.dealias(keeps)` as small final fronts (class tests only) that C2 can inline at every call site, delegating to private `widen1`/`dealias1` (`a00fcb825d`, cherry-pick of `f573da67cc` from branch `claude/widen-dealias-fastpath-7da49b`)",
+    "fastpath2": "`fastpath`, plus the `dealias` front answers TypeRefs to classes (about half of all `dealias` calls) via `symbol.isClass`; 53 bytes, so inlined only at hot call sites (`6e089e940d`, cherry-pick of `2f4161fca0`)",
+    "fastpath-noinl": "`fastpath`'s build, with `-XX:CompileCommand=dontinline` on `widen1` and `dealias1`, so C2 can never inline the slow paths into the fronts' own compiles: the pilot showed that when `widen1` is inlined into `widen`, `widen`'s nmethod reaches 15 KB and callers refuse it as \"already compiled into a big method\""
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/widen-dealias-base",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "fastpath": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/widen-dealias-fastpath-bench",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "fastpath2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/widen-dealias-fastpath2-bench",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "fastpath-noinl": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/widen-dealias-fastpath-bench",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "fastpath": "",
+    "fastpath2": "",
+    "fastpath-noinl": "-XX:CompileCommand=quiet -XX:CompileCommand=dontinline,dotty.tools.dotc.core.Types$Type::widen1 -XX:CompileCommand=dontinline,dotty.tools.dotc.core.Types$Type::dealias1"
+  }
+}

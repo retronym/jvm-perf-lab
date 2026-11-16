@@ -1,0 +1,53 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-6101d2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "nodyn": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-6101d2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "hc3": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-6101d2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "nodyn": "-XX:-UseDynamicNumberOfCompilerThreads",
+    "hc3": "-XX:+UnlockExperimentalVMOptions -XX:hashCode=3"
+  },
+  "variantDescriptions": {
+    "base": "`scala2-perf-integration` `6101d220ca`, default flags",
+    "nodyn": "base with `-XX:-UseDynamicNumberOfCompilerThreads`: compiler threads all start with the VM, so the global `os::random` sequence that seeds each thread's identity-hash state is consumed in a fixed order",
+    "hc3": "base with `-XX:hashCode=3`: identity hashes from a global counter, so their order follows allocation order"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m4-forkvar-hash",
+  "rounds": 6,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 6 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Does identity-hash nondeterminism drive fork-to-fork variance in the work the compiler does? `Symbol` has no `hashCode` override, and trees and some types hash by `System.identityHashCode`, so hash set/map iteration order over symbols, and probe lengths in the type unique table, can differ from fork to fork. Compare each variant's spread of instructions/op across forks; a smaller spread in `nodyn` or `hc3` points at the compiler's hash-dependent work, not the JIT. Means are not comparable across variants (both flags change hashing or JIT throughput)."
+  ]
+}

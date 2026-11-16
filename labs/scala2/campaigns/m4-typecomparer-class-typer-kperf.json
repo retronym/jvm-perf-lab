@@ -1,0 +1,48 @@
+{
+  "name": "m4-typecomparer-class-typer-kperf",
+  "description": [
+    "Does moving `TypeComparers`' logic into a final class, `TypeComparer`, pay on a typer-only compile of the scala corpus? Its private methods were `invokespecial`s on the `TypeComparers` interface, each with a C2 receiver check against it; on a base with a 70-entry `Global` those checks were 3% of cycles in `lookup_secondary_supers_table_slow_path_stub`. On `2.13.x`, after [scala/scala#11365](https://github.com/scala/scala/pull/11365), `Global` has 52 and the check is a hashed lookup.",
+    "",
+    "One fork per build and round, kperf cycles and instructions, JIT recorded over each whole fork. Patched JDK 26, `SCALA_RELEASE_OPT`."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `1fd535a36b`",
+    "tc": "`base` + [retronym/scala#208](https://github.com/retronym/scala/pull/208) + the `isHigherKinded` prototype + `TypeComparers`' logic in a final class, `TypeComparer` (`58d0363519`)"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-base-278cab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "tc": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-tc-class",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "tc": ""
+  },
+  "rounds": 4,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 8 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "profile": "async:cycles@2000000+instructions@5000000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "jitRecording": true
+}

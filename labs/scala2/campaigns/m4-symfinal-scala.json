@@ -1,0 +1,46 @@
+{
+  "name": "m4-symfinal-scala",
+  "description": [
+    "The candidate cut from [retronym/scala#199](https://github.com/retronym/scala/pull/199), final `Symbol` predicates, `info`, `rawInfo`, `owner`, `typeOfThis`, `tpe_*`, `mapOverType` and the `decls` fast path, against `2.13.x`: a full compile of the scala corpus. The whole of #199 against the integration branch was −4.09% ±0.64 in `m4-devirt-tip-ab`, but this has a different base and fewer commits, so the two aren't directly comparable.",
+    "",
+    "Both builds with the release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26, 8G heap, single-shot 4+4 ops, no profiler."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `c84dea8aa7`",
+    "candidate": "two commits on `2.13.x`, `b7ee730be7`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "candidate": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-symbol-final",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "candidate": ""
+  },
+  "rounds": 10,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "none"
+}

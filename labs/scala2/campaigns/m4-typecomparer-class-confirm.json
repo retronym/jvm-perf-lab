@@ -1,0 +1,53 @@
+{
+  "name": "m4-typecomparer-class-confirm",
+  "description": [
+    "Confirmation of the `TypeComparer` class (one-fork spikes: \u22122.2% time, \u22124.2% instructions over 4 rounds), with `isSubType` kept out of line in every build (`-XX:CompileCommand=dontinline,*::isSubType` and `*::isSubType$`) so that callers' inlining doesn't swing with the subtype checker's size from fork to fork. This measures the receiver-check and binding saving under stable inlining, not any gain from inlining the subtype check into its callers. `aa` is a second build of `base`. No profiler; typer-only scala corpus."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `1fd535a36b`",
+    "aa": "`base` again, an A/A",
+    "tc": "`base` + retronym/scala#208 + the `isHigherKinded` prototype + the `TypeComparer` class, `58d0363519`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus -XX:CompileCommand=quiet -XX:CompileCommand=dontinline,*::isSubType -XX:CompileCommand=dontinline,*::isSubType$",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-base-278cab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-base-278cab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "tc": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-tc-class",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "aa": "",
+    "tc": ""
+  },
+  "rounds": 6,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 8 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "profile": "none"
+}

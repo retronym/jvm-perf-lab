@@ -1,0 +1,47 @@
+{
+  "name": "m5-names-best-full-prof",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Where the likely winner differs from plain upstream, full compiles of `scala`. Two rounds, so that a build against itself shows how far a profile moves."
+  ],
+  "variantDescriptions": {
+    "base": "`upstream/2.13.x` at `c84dea8aa7`",
+    "shared": "`a4d67601c2`, `-Yname-table:shared`, with the scanner tricks and the `encode` memo"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "shared": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-enc",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "shared": ""
+  },
+  "rounds": 2,
+  "profile": "async:cpu,alloc",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "variantJmhArgs": {
+    "shared": "-p scalacOptions=-Yname-table:shared"
+  }
+}

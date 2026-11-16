@@ -1,0 +1,79 @@
+{
+  "name": "m5-kwu-t8-pausegoal",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "p200": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p500": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p1000": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p2000": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p1000-new75": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "p200": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G",
+    "p500": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G -XX:MaxGCPauseMillis=500",
+    "p1000": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G -XX:MaxGCPauseMillis=1000",
+    "p2000": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G -XX:MaxGCPauseMillis=2000",
+    "p1000-new75": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G -XX:MaxGCPauseMillis=1000 -XX:+UnlockExperimentalVMOptions -XX:G1MaxNewSizePercent=75"
+  },
+  "variantJmhArgs": {
+    "p200": "-t 8",
+    "p500": "-t 8",
+    "p1000": "-t 8",
+    "p2000": "-t 8",
+    "p1000-new75": "-t 8"
+  },
+  "variantDescriptions": {
+    "p200": "G1 default pause goal, 200 ms",
+    "p500": "pause goal 500 ms",
+    "p1000": "pause goal 1000 ms",
+    "p2000": "pause goal 2000 ms",
+    "p1000-new75": "pause goal 1000 ms, and eden may grow to 75% of the heap (default 60%)"
+  },
+  "profile": "none",
+  "rounds": 2,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 3 -i 5 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "G1's pause-time goal at 8 compiles: a batch compile has no latency requirement, so a longer goal lets G1 size eden and mixed collections for throughput. Tenuring settings did not help (m5-kwu-t8-tenuring, job 584).",
+    "",
+    ""
+  ]
+}

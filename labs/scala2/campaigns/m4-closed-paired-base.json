@@ -1,0 +1,36 @@
+{
+  "name": "m4-closed-paired-base",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "paired": {
+    "off": "",
+    "on": ""
+  },
+  "variantDescriptions": {
+    "off": "closed scopes off",
+    "on": "closed scopes on"
+  },
+  "rounds": 4,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 40 -i 60 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "description": [
+    "Closed scopes off vs on, alternating by iteration within each fork of one build: `claude/typeref-bench-base` (with retronym/scala#243 and #244). A/A: the base build has no closed scopes, so `off` and `on` run the same compiler. Typer only, scala corpus, 4 forks of 40 + 60 single shots, M4."
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "ptyper-guard-typer-3c72e64ddf",
+  "description": ["What the parallel typer spike at `3c72e64ddf` costs against `fd95c5c1c1` (typer), paired within each fork. `aa` is `base` in a second class loader: the noise floor. Made by tools/parallel-typer/perf/compare.sh."],
+  "variantDescriptions": {
+    "base": "`fd95c5c1c1`",
+    "aa": "`base` again: the A/A",
+    "spike": "`3c72e64ddf` without `-Yparallel-typer`",
+    "par1": "`3c72e64ddf` with `-Yparallel-typer -Yparallel-typer-threads:1`"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "paired": {
+    "base": "@build=/private/tmp/claude-501/-Users-jzaugg-virtus-code--worktrees-scala-parallel-typechecker-scala2-port-5235a8/e53b1e8d-e952-4053-b548-576e96f8e239/scratchpad/ptp/fd95c5c1c1",
+    "aa": "@build=/private/tmp/claude-501/-Users-jzaugg-virtus-code--worktrees-scala-parallel-typechecker-scala2-port-5235a8/e53b1e8d-e952-4053-b548-576e96f8e239/scratchpad/ptp/fd95c5c1c1",
+    "spike": "@build=/private/tmp/claude-501/-Users-jzaugg-virtus-code--worktrees-scala-parallel-typechecker-scala2-port-5235a8/e53b1e8d-e952-4053-b548-576e96f8e239/scratchpad/ptp/3c72e64ddf",
+    "par1": "@build=/private/tmp/claude-501/-Users-jzaugg-virtus-code--worktrees-scala-parallel-typechecker-scala2-port-5235a8/e53b1e8d-e952-4053-b548-576e96f8e239/scratchpad/ptp/3c72e64ddf -Yparallel-typer -Yparallel-typer-threads:1"
+  },
+  "corpora": {
+    "re2s": "-f 1 -wi 32 -w 2 -i 48 -r 2 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer",
+    "scala": "-f 1 -bm ss -wi 24 -i 24 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "rounds": 4,
+  "loadgate": {"maxCores": 8.0, "quietSecs": 30},
+  "gcLog": true
+}

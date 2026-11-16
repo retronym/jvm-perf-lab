@@ -1,0 +1,31 @@
+{
+  "name": "m5-bti-shape-pekko",
+  "description": [
+    "Instrumented `baseTypeIndex` (`claude/bti-shape`, not for merge) over one compile of the pekko corpus: the hit/miss shape in a real compile. Scores are not timings."
+  ],
+  "variantDescriptions": {
+    "shape": "retronym/scala#208 + instrumentation"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "builds": {
+    "shape": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-shape",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "shape": ""
+  },
+  "rounds": 1,
+  "gcLog": true,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 0 -i 1 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "none"
+}

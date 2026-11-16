@@ -1,0 +1,28 @@
+{
+  "name": "m4-patmat-split1",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "description": [
+    "How much of [scala/scala#11307](https://github.com/scala/scala/pull/11307)'s gain on ordinary code comes from its smallest part? The review's attribution gives the type cache about two thirds of the patmat frames, from a profile of an integration build, and the branch campaign's -8% cycles rested on one high base fork (about -5.8% against two other forks). This has one fork per variant per round, on the PR's merge base, with an A/A and the same run arguments as `m4-branch-int148-scala`. Release optimizer settings; patched JDK 26."
+  ],
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": { "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/patmat-settle-base", "env": { "SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1" } },
+    "baseaa": { "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/patmat-settle-base", "env": { "SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1" } },
+    "split1": { "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/patmat-split1", "env": { "SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1" } },
+    "whole": { "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/patmat-settle-whole", "env": { "SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1" } }
+  },
+  "variants": { "base": "", "baseaa": "", "split1": "", "whole": "" },
+  "variantDescriptions": {
+    "base": "The merge base of scala/scala#11307 on `2.13.x`",
+    "baseaa": "The same build as `base`, the A/A control",
+    "split1": "The base plus three commits: cache the types of untyped substitution targets (with lrytz's follow-up), cheap conditions first in `excludes`, skip exhaustivity with an irrefutable case",
+    "whole": "The whole of scala/scala#11307 with lrytz's follow-up"
+  },
+  "rounds": 5,
+  "loadgate": { "maxCores": 1.5, "quietSecs": 30 },
+  "gcLog": true,
+  "corpora": { "scala": "-f 1 -wi 6 -w 20 -i 6 -r 20 -p jdkHome=25.0.4-tem" },
+  "profile": "xctrace:ipc"
+}

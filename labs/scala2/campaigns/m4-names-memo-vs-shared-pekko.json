@@ -1,0 +1,84 @@
+{
+  "name": "m4-names-memo-vs-shared-pekko",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Review question: is the allocation gain of `shared` really the `toString` memo? `s3` is `chars` plus a memo, on the same base as `s2`, which lacks it. `chars` and `shared` are the store code of the PR. Full compile."
+  ],
+  "variantDescriptions": {
+    "base": "`upstream/2.13.x` at `c84dea8aa7`",
+    "aa": "the same build as `base`",
+    "s2": "`s1` plus the `encode` memo (`b1e113308e`), `chars`",
+    "s3": "`s2` plus the `toString` memo and entry from a `String` (`64e6368871`), `chars`",
+    "chars": "retronym/scala#204 at `bebb49c091`, `-Yname-table:chars`",
+    "shared": "retronym/scala#204 at `bebb49c091`, `-Yname-table:shared`"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "s2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-s2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "s3": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-s3",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "chars": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-rev",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "shared": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-rev",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "aa": "",
+    "s2": "",
+    "s3": "",
+    "chars": "",
+    "shared": ""
+  },
+  "variantJmhArgs": {
+    "shared": "-p scalacOptions=-Yname-table:shared"
+  },
+  "rounds": 2,
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 8 -i 10 -p jdkHome=25.0.4-tem"
+  }
+}

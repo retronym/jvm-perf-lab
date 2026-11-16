@@ -1,0 +1,45 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop -XX:StartFlightRecording:settings=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/audits/promote.jfc,filename=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/promo-jfr/promo-%p.jfr -Xlog:gc+age=trace:file=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/promo-jfr/age-%p.log:uptime",
+  "rounds": 1,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 13 -i 16 -p scalacOptions=-Ystop-after:pickler"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "batch-84-promotion",
+  "description": [
+    "What the #84 builds promote that base does not: a JFR recording of G1's copies at young GCs (`jdk.PromoteObjectInNewPLAB`, one sample per new promotion buffer, and `jdk.PromoteObjectOutsidePLAB`, each large object) and the tenuring distribution, plus `-Xlog:gc+age=trace`. The GC logs of [batch-84-locality-dotc](../batch-84-locality-dotc) show the tip allocating as much as base but promoting about 40% more, most of it dying in the old generation.",
+    "dotc to `-Ystop-after:pickler`, single-shot 13+16, patched JDK 26, one fork per variant; the recordings are in `out/promo-jfr` by pid (the cell's `jmh.log` names its pid). Timings of this campaign are not comparable with the others: the recording runs alongside."
+  ],
+  "variantDescriptions": {
+    "base": "scala/scala3 main `d168df2a76` (merge base) + library stamps",
+    "tip": "retronym/scala3#84 at `e3b407ec7a` + library stamps (build only)",
+    "caches-reader": "caches + `8592214ccc` (Reader's hot fields in its first cache line)"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-tip3",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "caches-reader": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/ov-stampfields",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  }
+}

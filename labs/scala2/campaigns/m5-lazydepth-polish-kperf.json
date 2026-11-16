@@ -1,0 +1,45 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "current": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/lazy-lub-depth",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "polish": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/lazy-lub-depth-polish-a45778",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "current": "",
+    "polish": ""
+  },
+  "variantDescriptions": {
+    "current": "`claude/lazy-lub-depth` (retronym/scala#245): by-name `=> Depth` with hand-rolled memos in `solve` and `mergePrefixAndArgs`",
+    "polish": "`claude/lazy-lub-depth-polish`: same laziness expressed as an explicit `LazyDepth` holder (class-level `lazy val`)"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 15 -i 3 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "name": "m5-lazydepth-polish-kperf",
+  "profile": "async:cycles@400000+instructions@1200000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "description": [
+    "Spike: is the `LazyDepth` reformulation of retronym/scala#245 perf-neutral against the current by-name/memo shape? PMU profile, kperf, one fork per variant, 15 + 3 single shots, typer only, on the laptop. Not a timing A/B."
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "int": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-rebase",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "int": ""
+  },
+  "variantDescriptions": {
+    "int": "tip of `scala2-perf-integration` at `00e3bbafb8` (PERF-INTEGRATION.md: add retronym/scala#151)"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "name": "m4-int00e3bb-promo",
+  "profile": "async:cpu,alloc",
+  "description": [
+    "G1 promotion census of the perf integration tip `00e3bbafb8` on the scala corpus (M4): which classes are promoted to survivor and tenured space, to explain why 62% of GC-thread cycles in `m4-int00e3bb-prof` scan dirty cards (old-to-young pointers) and young pauses take 120-190 ms.",
+    "",
+    "Same build, JDK, heap and iterations as `m4-int00e3bb-prof` (async cpu+alloc), with the promotion and tenuring JFR events added to the lab's .jfc."
+  ],
+  "jfrsync": "+jdk.PromoteObjectInNewPLAB+jdk.PromoteObjectOutsidePLAB+jdk.TenuringDistribution"
+}

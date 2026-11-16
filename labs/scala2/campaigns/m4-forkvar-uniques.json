@@ -1,0 +1,44 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-uniques-probe",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "strong": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-uniques-probe",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "weak": "-Dscalac.uniques.stats=true",
+    "strong": "-Dscalac.uniques.stats=true -Dscalac.uniques.strong=true"
+  },
+  "variantDescriptions": {
+    "weak": "probe build `cc4d21fd8d` (`scala2-perf-integration` `6101d220ca` + counters), uniques in the usual `WeakHashSet`; per-run counters in `jmh.log` (`[uniques] ...`)",
+    "strong": "the same build with `-Dscalac.uniques.strong=true`: unique types held strongly for the run, so GC never clears them"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m4-forkvar-uniques",
+  "rounds": 8,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 6 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Does GC clearing of the weak `uniques` table make the compiler's work vary from fork to fork? Probe branch `claude/forkvar-uniques-probe`. Compare the spread of instructions/op between `weak` and `strong`, and the mean (what clearing costs). Each run prints lookups, additions and GC-cleared entries to `jmh.log`; their spread across forks says how much the table churns. Locally (typer on `Types.scala` and `tpe/`), weak runs added 0\u20131.4% more types depending on GC, strong runs were identical."
+  ]
+}

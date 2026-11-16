@@ -1,0 +1,98 @@
+{
+  "name": "m4-localopt-ab",
+  "description": [
+    "What do the method-local optimizer PRs save when the optimizer actually runs, and does retronym/scala#172 still pay on top of them? Compiles pekko with `-opt:l:inline`. Warmup comes from `m4-localopt-pilot`, which plateaus by iteration 14."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at the merge base of the PRs: every analysis built separately.",
+    "base-aa": "The same commit as `base`, built from its own checkout: the A/A noise floor.",
+    "p50": "[scala/scala#11350](https://github.com/scala/scala/pull/11350): shares one producer-consumer analysis between box-unbox, stale stores and push-pop.",
+    "p50-52": "#11350 plus [scala/scala#11352](https://github.com/scala/scala/pull/11352): checks a `NEW`'s class before its consumers in box-unbox.",
+    "p50-53": "#11350 plus [scala/scala#11353](https://github.com/scala/scala/pull/11353).",
+    "stack": "#11350, #11352 and #11353 together.",
+    "stack-172": "The stack plus [retronym/scala#172](https://github.com/retronym/scala/pull/172): identity fast path in `InitialProducerSourceInterpreter.merge`."
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/localopt-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "base-aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/localopt-base-aa",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p50": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/localopt-p50",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p50-52": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/localopt-p50-52",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "p50-53": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/localopt-p50-53",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "stack": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/localopt-stack",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "stack-172": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/localopt-stack-172",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "base-aa": "",
+    "p50": "",
+    "p50-52": "",
+    "p50-53": "",
+    "stack": "",
+    "stack-172": ""
+  },
+  "variantJmhArgs": {
+    "base": "-p 'scalacOptions=-opt:l:inline -opt-inline-from:org.apache.pekko.**'",
+    "base-aa": "-p 'scalacOptions=-opt:l:inline -opt-inline-from:org.apache.pekko.**'",
+    "p50": "-p 'scalacOptions=-opt:l:inline -opt-inline-from:org.apache.pekko.**'",
+    "p50-52": "-p 'scalacOptions=-opt:l:inline -opt-inline-from:org.apache.pekko.**'",
+    "p50-53": "-p 'scalacOptions=-opt:l:inline -opt-inline-from:org.apache.pekko.**'",
+    "stack": "-p 'scalacOptions=-opt:l:inline -opt-inline-from:org.apache.pekko.**'",
+    "stack-172": "-p 'scalacOptions=-opt:l:inline -opt-inline-from:org.apache.pekko.**'"
+  },
+  "rounds": 5,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 20 -i 10 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "none"
+}

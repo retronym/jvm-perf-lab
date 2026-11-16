@@ -1,0 +1,31 @@
+{
+  "name": "m4-branch-integ-pekko",
+  "description": [
+    "Per first-parent commit of the rebuilt integration branch (2.13.x `278cab1040` .. `f0b6e17bd9`): which merged PR moves a compile of pekko-actor and pekko-stream 1.7.1, a corpus outside the compiler. Commits before the default change use the `chars` name table, later ones `shared`.",
+    "",
+    "On the M4, 1 round, xctrace ipc; compiler built with release optimizer settings (`SCALA_RELEASE_OPT`); the corpus is compiled plainly, without pekko's own `-opt`. Patched JDK 26, `jdkHome=25.0.4-tem`, 8G heap, single-shot 8 warmup and 10 measured, warmup from the plateau in `m4-integ-pekko-2`. The test-only and PERF-INTEGRATION.md commits change no compiler code, so they are A/A controls for their neighbours."
+  ],
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "branch": {
+    "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-rebase",
+    "range": "278cab1040..f0b6e17bd9",
+    "firstParent": true,
+    "env": {
+      "SCALA_CHECKOUT": "{checkout}",
+      "SCALA_RELEASE_OPT": "1"
+    }
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 8 -i 10 -p jdkHome=25.0.4-tem"
+  },
+  "testbed": "m4"
+}

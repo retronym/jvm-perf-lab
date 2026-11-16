@@ -1,0 +1,59 @@
+{
+  "name": "m4-main-optmodes",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/25.4.4.1+1-graal/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "testbed": "m4",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/optmode-base",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "no-inline": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/optmode-no-inline",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "no-opt-no-inline": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/optmode-no-opt-no-inline",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "fixes-no-opt-no-inline": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/optmode-fixes-no-opt-no-inline",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "no-inline": "",
+    "no-opt-no-inline": "",
+    "fixes-no-opt-no-inline": ""
+  },
+  "variantDescriptions": {
+    "base": "scala/scala3 main `3213b8832b`, unchanged: the compiler built with `-opt -opt-inline:dotty.**`",
+    "no-inline": "main + `78edc826a8`: the compiler built with `-opt` only",
+    "no-opt-no-inline": "main + `98086deeb4`: the compiler built without `-opt` or `-opt-inline`",
+    "fixes-no-opt-no-inline": "no-opt-no-inline + retronym/scala3#113 (`BetaReduce` through impure blocks) + `b23480a3ec` (closures removed in source: `CyclicReference.trace`, `isInFeatureScope`, `foreachBinding`, `TermRefSet.foreach`); `claude/optmode-fixes-no-opt-no-inline` `0e085458f3`"
+  },
+  "rounds": 2,
+  "profile": "xctrace:ipc",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p gcBetweenIterations=true -p variants=x="
+  },
+  "description": [
+    "Direction check: what the Scala 2 optimizer's flags on `scala3-compiler-bootstrapped` (`project/Build.scala`) buy dotc. Three builds of main `3213b8832b` differing only in those flags; the library's flags are unchanged. dotc corpus, full pipeline, Graal 25.4.4, xctrace ipc, 2 rounds, M4.",
+    "Added later: `fixes-no-opt-no-inline`, whether the closure fixes in dotc and in source recover what `-opt-inline` buys."
+  ]
+}

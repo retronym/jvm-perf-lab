@@ -1,0 +1,43 @@
+{
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/25.4.4.1+1-graal/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "testbed": "m4",
+  "builds": {
+    "so1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/combo6-sharing-off-su",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "so1-afv2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/so1-afv2",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "so1": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true",
+    "so1-afv2": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true"
+  },
+  "variantDescriptions": {
+    "so1": "combo6 + sharing-off step 1 + strong-interner switch (`claude/combo6-sharing-off-su`)",
+    "so1-afv2": "so1-afv + `ContextBase.concurrent`/`parallel` behind the same almost-final value (`claude/so1-afv2`)"
+  },
+  "gcLog": true,
+  "name": "m4-afv2-vs-so1",
+  "rounds": 2,
+  "profile": "xctrace:ipc",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x=",
+    "scalaz": "-f 1 -bm ss -wi 90 -i 30 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x="
+  },
+  "description": [
+    "Head-to-head: so1 against so1-afv2 (`concurrentDenot`, `ContextBase.concurrent`/`parallel` behind an almost-final value), same harness as [m4-loop-timing](../m4-loop-timing), where so1-afv2 was +1.0% (dotc) and +1.7% (scalaz) over base. Confirms the gain over so1 in one run."
+  ]
+}

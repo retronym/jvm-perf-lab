@@ -1,0 +1,3 @@
+# A live class histogram and heap dump at the end of the typer of one compile (HeapDumpHook): what each build keeps
+# reachable at the same point (perflab batch-84-heapdump).
+hook heapdump at=dotty.tools.dotc.typer.TyperPhase#runOn call=dotty.tools.compilerlab.HeapDumpHook#typerEnter exit=dotty.tools.compilerlab.HeapDumpHook#typerExit

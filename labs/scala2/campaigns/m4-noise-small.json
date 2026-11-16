@@ -1,0 +1,33 @@
+{
+  "name": "m4-noise-small",
+  "description": [
+    "Calibration, no code change: one build, `c84dea8aa7`, over 6 forks. Fork-to-fork spread on the smaller corpora, with the same arguments the queued campaigns use, to compare with `m4-noise-scala`."
+  ],
+  "variants": {
+    "base": ""
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "corpora": {
+    "scalap": "-f 1 -wi 20 -w 2 -i 20 -r 2 -p jdkHome=25.0.4-tem",
+    "re2s": "-f 1 -bm ss -wi 40 -i 40 -p jdkHome=25.0.4-tem"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 6,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "testbed": "m4"
+}

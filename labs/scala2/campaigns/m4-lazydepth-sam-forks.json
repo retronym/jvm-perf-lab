@@ -1,0 +1,43 @@
+{
+  "name": "m4-lazydepth-sam-forks",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "current": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/lazy-lub-depth",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "polish": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/lazy-lub-depth-polish-a45778",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "current": "",
+    "polish": ""
+  },
+  "variantDescriptions": {
+    "current": "`claude/lazy-lub-depth` (retronym/scala#245): by-name `=> Depth`, memoized with local vars in `solve` and `mergePrefixAndArgs`",
+    "polish": "`claude/lazy-lub-depth-polish` (retronym/scala#246): `LazyDepth` abstract class, call sites SAM-convert `() => lubDepth(...)`"
+  },
+  "rounds": 6,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 40 -i 30 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "description": [
+    "Is #246's SAM `LazyDepth` perf-neutral against #245's by-name memo? The two builds emit byte-identical class files. One-fork kperf spikes on the laptop disagreed (flat, then +3% cycles and +2.5% alloc for #246), and a paired run on the laptop never got a quiet fork, so: separate forks per build, 6 rounds alternating, typer only, scala corpus, 40 + 30 single shots, M4."
+  ]
+}

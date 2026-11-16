@@ -1,0 +1,53 @@
+{
+  "name": "m5-uniques-gcdebug",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus -Xlog:gc*=debug:file=/private/tmp/claude-501/-Users-jzaugg-virtus-code--worktrees-scala-chunked-uniques/1a22b753-8dbe-4dc6-b252-38e33f05fcc0/scratchpad/gcdebug/gcdebug-%p.log:uptime",
+  "builds": {
+    "weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "chunked-weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "uncache-all": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "weak": "-Dscala.uniques.layout=weak",
+    "chunked-weak": "-Dscala.uniques.layout=chunked-weak",
+    "uncache-all": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all"
+  },
+  "variantDescriptions": {
+    "weak": "`claude/uniques-audit` `dfba9ad593` (retronym/scala#212 + #239 + census probe, census off) with today's `WeakHashSet` table",
+    "chunked-weak": "the same build, `ChunkedInterner(weak = true)`",
+    "uncache-four": "chunked-weak, and new types made inside boolean type queries (`isSubType`, `isSameType`, `matchesType`, `specializesSym`), `adapt`'s polymorphic instantiation, `narrowForFindMember` and `stableTypeFor` are not interned: shared only if already in the table or in a 4096-slot direct-mapped cache",
+    "uncache-all": "as uncache-four, plus type maps that clone params, existential packing, `Mixin.cloneBeforeErasure` and `instantiateTypeParams`"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 3,
+    "quietSecs": 20
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 2 -i 3 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Pilot, not a timing: one fork per variant with `-Xlog:gc*=debug` to see humongous regions and card scanning in scalac's young collections (as measured for dotc in retronym/scala3#117)."
+  ],
+  "profile": "none"
+}

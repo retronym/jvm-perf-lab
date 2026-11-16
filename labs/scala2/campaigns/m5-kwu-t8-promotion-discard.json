@@ -1,0 +1,40 @@
+{
+  "name": "m5-kwu-t8-promotion-discard",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms24G -Xmx24G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "kwu": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "kwu": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Dcompilerlab.output=discard"
+  },
+  "variantJmhArgs": {
+    "kwu": "-t 8"
+  },
+  "variantDescriptions": {
+    "kwu": "24 GB G1; JFR with G1 promotion events, cpu sampled once a second only to carry the recording; class files written to streams that keep no bytes (`-Dcompilerlab.output=discard`)"
+  },
+  "profile": "async:cpu@1000000000",
+  "rounds": 1,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 3 -i 2 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "m5-kwu-t8-promotion (job 581) again with the compiled output discarded, as with an output directory on /dev/null: how much of the promoted `byte[]` (9% of promoted bytes in job 581) was the in-memory output.",
+    "",
+    "Build `claude/uniques-audit-2.13.x` `1e85ab8eba` (prototypes + upstream 2.13.x with scala/scala#11367), chunked-weak + uncache-all, 8 independent scala-corpus compiles at once (JMH `-t 8`, single shot), laptop."
+  ],
+  "jfrsync": "+jdk.PromoteObjectInNewPLAB+jdk.PromoteObjectOutsidePLAB+jdk.TenuringDistribution"
+}

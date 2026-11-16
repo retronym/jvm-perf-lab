@@ -1,0 +1,46 @@
+{
+  "name": "m4-types-hot-to-class-spike",
+  "description": [
+    "Spike: `computeBaseClasses`, `matchesType` and the comparer forwarders defined in class `SymbolTable` rather than in traits, on top of `depth`, so that no call in them is an `invokespecial` issued from an interface. Target: no `lookup_secondary_supers_table_slow_path_stub` samples in that code. One round, kperf, typer-only scala corpus."
+  ],
+  "variantDescriptions": {
+    "tc": "the `TypeComparer` class, `58d0363519`",
+    "hot": "`tc` + `TypeApiImpl` as a trait + hot `Types` code and comparer forwarders in `SymbolTable`, `7fd6c38c5e`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "tc": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-tc-class",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "hot": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-hot",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "tc": "",
+    "hot": ""
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 8 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "profile": "async:cycles@2000000+instructions@5000000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "jitRecording": true
+}

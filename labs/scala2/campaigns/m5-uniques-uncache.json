@@ -1,0 +1,65 @@
+{
+  "name": "m5-uniques-uncache",
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "chunked-weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "uncache-four": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "uncache-all": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "weak": "-Dscala.uniques.layout=weak",
+    "chunked-weak": "-Dscala.uniques.layout=chunked-weak",
+    "uncache-four": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=query,adaptPoly,narrow,stableType",
+    "uncache-all": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all"
+  },
+  "variantDescriptions": {
+    "weak": "`claude/uniques-audit` `dfba9ad593` (retronym/scala#212 + #239 + census probe, census off) with today's `WeakHashSet` table",
+    "chunked-weak": "the same build, `ChunkedInterner(weak = true)`",
+    "uncache-four": "chunked-weak, and new types made inside boolean type queries (`isSubType`, `isSameType`, `matchesType`, `specializesSym`), `adapt`'s polymorphic instantiation, `narrowForFindMember` and `stableTypeFor` are not interned: shared only if already in the table or in a 4096-slot direct-mapped cache",
+    "uncache-all": "as uncache-four, plus type maps that clone params, existential packing, `Mixin.cloneBeforeErasure` and `instantiateTypeParams`"
+  },
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 3,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 6 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Does not interning the types made in weak scopes pay? From the census of [retronym/scala#239](https://github.com/retronym/scala/pull/239) on retronym/scala#212's completion frames: 80\u201399% of the types those scopes intern are collected within the run. Locally (scalap, re2s), output is byte-identical, and the table's inserts fall by 16\u201327% (four scopes) and 47\u201364% (all). The risk is lost sharing of per-instance caches (`baseTypeSeqCache`, ...) on rebuilt types; the direct-mapped cache catches most repeats (lost sharing: 200 of 8.5K new instances on scalap with four scopes, 2.5K of 31K with all).",
+    "",
+    "Same setup as `m4-chunked-uniques` (job 539). The weak scopes are only tracked in the uncache variants, so their bookkeeping counts against them.",
+    "",
+    "Laptop copy of `m4-uniques-uncache` while the M4 is held by a paused job: read instructions/op and `cyc%:gc` before time (endpoint security moves cycles at equal instructions here). 3 rounds, load gate at 3 cores."
+  ]
+}

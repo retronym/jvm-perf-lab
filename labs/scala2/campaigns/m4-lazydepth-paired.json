@@ -1,0 +1,36 @@
+{
+  "name": "m4-lazydepth-paired",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "lazydepth": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-lazydepth-flag",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "paired": {
+    "eager": "-Ylazy-depth:false",
+    "lazy": "-Ylazy-depth:true"
+  },
+  "variantDescriptions": {
+    "eager": "lubDepth computed before solving and merging, as in base",
+    "lazy": "lubDepth computed only when solve lubs/glbs two or more bounds, or mergePrefixAndArgs merges prefixes or arguments that differ"
+  },
+  "rounds": 4,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 40 -i 60 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "description": [
+    "Lazy lub depth (`claude/typeref-bench-lazydepth`, with a bench-only `-Ylazy-depth` flag: `claude/typeref-bench-lazydepth-flag`) off vs on, alternating by iteration within each fork. Eager `lubDepth` in `solvedTypes`' callers was 369M cycles/op inclusive in base's typer profile; the laptop spike (m5-lazydepth-kperf) measured -2.9% cycles. Typer only, scala corpus, 4 forks of 40 + 60 single shots, M4."
+  ]
+}

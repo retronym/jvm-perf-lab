@@ -1,0 +1,40 @@
+{
+  "name": "m5-kwu-t8-bimodal-jit",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "kwu": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "kwu": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G"
+  },
+  "variantJmhArgs": {
+    "kwu": "-t 8"
+  },
+  "variantDescriptions": {
+    "kwu": "8 independent compiles at once, chunked-weak + uncache-all, G1 defaults, 24 GB"
+  },
+  "profile": "none",
+  "rounds": 6,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 3 -i 3 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Forks of the same setting at 8 compiles fall into two groups, ~11.7 s or ~13.3-14.9 s per compile (m5-kwu-t8-pausegoal, job 585; also m5-kwu-t8-tenuring), not explained by load or thermal state. Six forks of one setting with the JIT recorded over each whole fork (`jit-<pid>.jitrec`), so `perflab api jit` and `jit_diff` can compare a fast fork with a slow one.",
+    "",
+    ""
+  ],
+  "jitRecording": true
+}

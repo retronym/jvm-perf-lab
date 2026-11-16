@@ -1,0 +1,69 @@
+{
+  "name": "m4-names-series-parser",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Review question: what do the scanner buffer and the `encode` memo give alone under `chars`, with no store indirection? Parsing only on `scala`."
+  ],
+  "variantDescriptions": {
+    "base": "`upstream/2.13.x` at `c84dea8aa7`",
+    "aa": "the same build as `base`",
+    "s1": "`base` plus the scanner buffer and `newTermNameHashed` (`a2350ef38f`), `chars`",
+    "s2": "`s1` plus the `encode` memo (`b1e113308e`), `chars`"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "s1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-s1",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "s2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-s2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "aa": "",
+    "s1": "",
+    "s2": ""
+  },
+  "variantJmhArgs": {
+    "base": "-p scalacOptions=-Ystop-after:parser",
+    "aa": "-p scalacOptions=-Ystop-after:parser",
+    "s1": "-p scalacOptions=-Ystop-after:parser",
+    "s2": "-p scalacOptions=-Ystop-after:parser"
+  },
+  "rounds": 3,
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 60 -i 60 -p jdkHome=25.0.4-tem"
+  }
+}

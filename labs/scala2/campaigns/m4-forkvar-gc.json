@@ -1,0 +1,62 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-6101d2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "fixyoung": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-6101d2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "xbatch": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-6101d2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "xbatchfix": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-6101d2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "fixyoung": "-Xmn3g -XX:-G1UseAdaptiveIHOP",
+    "xbatch": "-Xbatch",
+    "xbatchfix": "-Xbatch -Xmn3g -XX:-G1UseAdaptiveIHOP"
+  },
+  "variantDescriptions": {
+    "base": "`scala2-perf-integration` `6101d220ca`, default G1 (adaptive young sizing)",
+    "fixyoung": "base with `-Xmn3g -XX:-G1UseAdaptiveIHOP`: young gen fixed at 3G (G1 picks about 2.8G here), so young GCs fall at allocation points rather than where the pause-time feedback puts them",
+    "xbatch": "base with `-Xbatch`: compiles block the requesting thread, so allocation (escape analysis) is nearly deterministic (`m4-noise-scala`: alloc CV 0.04%)",
+    "xbatchfix": "both: deterministic allocation and fixed GC points, so weak references in `uniques` are cleared at the same points in every fork"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m4-forkvar-gc",
+  "rounds": 6,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 6 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Is fork-to-fork variance in instructions/op GC-coupled through the type uniques table? `Types.uniques` is a `WeakHashSet`: a young GC clears entries for types no longer reachable, and a later `unique` of an equal type then rebuilds it and its per-instance caches. G1's adaptive young sizing follows measured pause times, so GC points move between forks even with deterministic allocation. 2x2 of `-Xbatch` (deterministic allocation) and a fixed young gen (GC points by allocation). Read each variant's spread of instructions/op; means are not comparable between variants."
+  ]
+}

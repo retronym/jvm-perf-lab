@@ -1,0 +1,56 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem",
+    "scalap": "-f 1 -wi 20 -w 2 -i 20 -r 2"
+  },
+  "name": "m5-unreachable-ab",
+  "profile": "none",
+  "rounds": 5,
+  "description": [
+    "Timing A/B of retronym/scala#200 against its base, with an A/A as the noise floor: `aa` is a second build of the same commit as `base`. The expected effect is well under 1%, and this machine has endpoint-security noise the load gate cannot see, so a difference counts only if it clearly exceeds `aa` vs `base`.",
+    "",
+    "Both builds with the release optimizer settings (`SCALA_RELEASE_OPT`); corpora compiled plainly, where unreachable-code removal is the only optimiser pass on. Patched JDK 26 (`jdk26-integration-branch-e9e67e`), 8G heap. scala: single-shot 4+4 ops; scalap: 20+20 x 2 s. Builds alternate fork by fork over 5 rounds."
+  ],
+  "variantDescriptions": {
+    "base": "upstream `2.13.x` at `c84dea8aa7`, the PR's base",
+    "aa": "the same commit as `base`, for the noise floor",
+    "pr": "[retronym/scala#200](https://github.com/retronym/scala/pull/200): don't emit code codegen can tell is unreached, and skip unreachable-code analysis for methods with nothing to remove"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unreachable-codegen-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unreachable-codegen-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "pr": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unreachable-codegen",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "aa": "",
+    "pr": ""
+  }
+}

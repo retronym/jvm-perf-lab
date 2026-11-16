@@ -1,0 +1,76 @@
+{
+  "name": "m5-scaling-pilot",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms24G -Xmx24G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus -Dscala.uniques.layout=weak",
+  "builds": {
+    "t1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "t2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "t4": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "t8": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "t12": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "t1": "",
+    "t2": "",
+    "t4": "",
+    "t8": "",
+    "t12": ""
+  },
+  "variantDescriptions": {
+    "t1": "1 concurrent compiles, each its own `Global`",
+    "t2": "2 concurrent compiles, each its own `Global`",
+    "t4": "4 concurrent compiles, each its own `Global`",
+    "t8": "8 concurrent compiles, each its own `Global`",
+    "t12": "12 concurrent compiles, each its own `Global`"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 2.0,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm avgt -wi 4 -w 30 -i 4 -r 30 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Pilot of thread scaling: N independent full compiles of the scala corpus at once in one JVM (JMH `-t N`, each thread a new `Global` per op), today's `WeakHashSet` uniques, a 24 GB heap so heap pressure is not the limit. Score is ms per compile per thread; perfect scaling keeps it flat. Laptop (M5 Pro), one fork each, to check the harness and see the curve before an M4 campaign across layouts."
+  ],
+  "variantJmhArgs": {
+    "t1": "-t 1",
+    "t2": "-t 2",
+    "t4": "-t 4",
+    "t8": "-t 8",
+    "t12": "-t 12"
+  }
+}

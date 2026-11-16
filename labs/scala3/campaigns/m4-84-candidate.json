@@ -1,0 +1,43 @@
+{
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/25.4.4.1+1-graal/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "testbed": "m4",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base-su",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "candidate": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/84-perf-candidate-bench",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "base": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true",
+    "candidate": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true"
+  },
+  "variantDescriptions": {
+    "base": "merge base `d168df2a76` + stamps + strong-interner switch (`claude/bench84-base-su`)",
+    "candidate": "retronym/scala3#84's tip `f06dc23f02` + the best-guess serial fixes (`claude/84-perf-candidate`), + the strong-interner switch for this harness (`claude/84-perf-candidate-bench`)"
+  },
+  "gcLog": true,
+  "name": "m4-84-candidate",
+  "rounds": 2,
+  "profile": "xctrace:ipc",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x=",
+    "scalaz": "-f 1 -bm ss -wi 90 -i 30 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x="
+  },
+  "description": [
+    "The best-guess branch for retronym/scala3#84's serial overhead against its merge base: the reader's hot fields, `findRef` without allocation, `SimpleName`'s cached content hash, the class and `Types` caches, the `MaxInlineSize` splits, batch scopes, and the almost-final `AnyConcurrent` gating `concurrentDenot`, `ContextBase.concurrent`/`parallel` and `Published`'s ordering. Graal 25.4.4, strong uniques, typer only, 2 rounds, M4."
+  ]
+}

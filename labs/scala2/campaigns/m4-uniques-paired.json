@@ -1,0 +1,43 @@
+{
+  "name": "m4-uniques-paired",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "uniques": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "paired": {
+    "weak": "-Yuniques-layout:weak",
+    "chunked-weak": "-Yuniques-layout:chunked-weak",
+    "chunked": "-Yuniques-layout:chunked",
+    "uncache-all": "-Yuniques-layout:chunked-weak -Yuniques-uncache all"
+  },
+  "variantDescriptions": {
+    "weak": "today's `WeakHashSet` table",
+    "chunked-weak": "`ChunkedInterner(weak = true)` ([retronym/scala#239](https://github.com/retronym/scala/pull/239))",
+    "chunked": "`ChunkedInterner(weak = false)`: types held strongly until the run ends",
+    "uncache-all": "chunked-weak, and new types made in any weak scope (boolean type queries, param-cloning type maps, `adapt`'s polymorphic instantiation, `narrowForFindMember`, existentials, `Mixin.cloneBeforeErasure`, `instantiateTypeParams`, `stableTypeFor`) are not interned; a 4096-slot direct-mapped cache shares repeats"
+  },
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 16 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Paired rerun of [m4-uniques-uncache](#c-m4-uniques-uncache) (job 546), whose forks varied by \u00b114% in time, far more than any difference between the variants. Here the four table layouts alternate iteration by iteration within each fork (Williams order, 4 cycles measured), switched by `-Yuniques-layout` and `-Yuniques-uncache`, so JIT differences between forks cancel. Build `claude/uniques-audit` `bd33c027bb` (retronym/scala#212 + #239 + probes; census off). Read `paired.<v>.delta%` and the xctrace per-variant counters.",
+    "",
+    "Caveat: variants share one heap, so the old generation one variant leaves behind is collected during the next's iterations."
+  ]
+}

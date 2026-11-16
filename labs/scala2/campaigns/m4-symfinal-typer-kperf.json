@@ -1,0 +1,54 @@
+{
+  "name": "m4-symfinal-typer-kperf",
+  "description": "Where does [retronym/scala#201](https://github.com/retronym/scala/pull/201)'s gain land when compiling the scala corpus through typer only? Cycles and instructions by method from kperf, on the same builds as `m4-symfinal-typer-ipc`, whose scores should be read for timing because this profiles every fork. `aa` is a second build of `base`, for the noise in the profile diff.",
+  "variantDescriptions": {
+    "base": "`2.13.x` at `c84dea8aa7`",
+    "aa": "`base` again, an A/A",
+    "symfinal": "retronym/scala#201 at `4636892ff7`: the three source commits, with the `val`, plus MiMa filters and tests",
+    "typeparam": "`symfinal` plus final `isTypeParameter` (`15a9e452b6`)",
+    "stranded": "`typeparam` plus the `typeParams` `rawInfo` fast path, `applyFast`, `mapConserveTypes` and the static `SubstMap` branches, all that #201 left out of #199's source (`a9f86b326b`)"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "symfinal": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-symbol-final-measure",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "aa": "",
+    "symfinal": ""
+  },
+  "rounds": 2,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 8 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "profile": "async:cycles@2000000+instructions@5000000",
+  "kperf": "/tmp/asprof-kperf.sock"
+}

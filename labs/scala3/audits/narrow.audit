@@ -1,0 +1,7 @@
+# How often NarrowCached.narrow runs and misses its cache (the super call, Type.narrow), and who calls it:
+# plain7b-kperf-cycles had MethodType.narrow at 4x base's cycles.
+count cached.narrow     at=dotty.tools.dotc.core.Types$NarrowCached#narrow
+count type.narrow       at=dotty.tools.dotc.core.Types$Type#narrow
+count newSkolem         at=dotty.tools.dotc.core.Symbols$#newSkolem
+sites narrow.callers    at=dotty.tools.dotc.core.Types$Type#narrow  depth=4  sample=20  qualify=class
+sites cached.callers    at=dotty.tools.dotc.core.Types$NarrowCached#narrow  depth=3  sample=50

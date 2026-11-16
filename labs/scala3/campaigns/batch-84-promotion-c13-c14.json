@@ -1,0 +1,39 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "async:cpu",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop  ",
+  "rounds": 1,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 8 -p scalacOptions=-Ystop-after:typer"
+  },
+  "loadgate": {
+    "maxCores": 16,
+    "quietSecs": 0
+  },
+  "gcLog": true,
+  "name": "batch-84-promotion-c13-c14",
+  "description": [
+    "Does commit 14 of #84 promote more interned types to the old generation? At the end of typer, c14's interners hold 406k stale entries (types collected only by the histogram's full GC) against c13's 8.6k ([batch-84-histo-c13-c14](../batch-84-histo-c13-c14)): types that died in the old generation. G1's promotion census by class (PLAB promotion events), c13 vs c14.",
+    "dotc to `-Ystop-after:typer`, one fork each, async cpu + jfrsync, patched JDK 26. Loadgate relaxed: promotion counts, not timing, so other load on the machine doesn't matter."
+  ],
+  "variantDescriptions": {
+    "c13": "#84 commit 13, `8899fc4dbb` + library stamps",
+    "c14": "#84 commit 14, `73c59487a3` + library stamps"
+  },
+  "builds": {
+    "c13": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bis84-c13",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "c14": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bis84-c14",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "jfrsync": "+jdk.PromoteObjectInNewPLAB,+jdk.PromoteObjectOutsidePLAB"
+}

@@ -1,0 +1,48 @@
+{
+  "name": "m5-names-ea-parser-prof",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Parsing only on `scala` under `-Yname-table:shared`: does escape analysis remove a probe allocated per lookup, at `a1882821e0`, and is that better than the per-thread probe of `018ee1874f`? Allocation per op answers the first."
+  ],
+  "variantDescriptions": {
+    "pooled": "`018ee1874f`, one mutable probe per thread",
+    "alloc": "`a1882821e0`, a probe allocated per lookup"
+  },
+  "builds": {
+    "pooled": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-arr",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "alloc": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-ea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "pooled": "",
+    "alloc": ""
+  },
+  "rounds": 3,
+  "profile": "async:cpu,alloc",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 80 -i 120 -p jdkHome=25.0.4-tem"
+  },
+  "variantJmhArgs": {
+    "pooled": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:shared'",
+    "alloc": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:shared'"
+  }
+}

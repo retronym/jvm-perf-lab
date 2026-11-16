@@ -1,0 +1,26 @@
+{
+  "name": "perfint",
+  "description": [
+    "retronym/scala3 `scala3-perf-integration` tip vs its base on scala/scala3 main.",
+    "The branch merges retronym/scala3#15, #33, #35, #45, #55, #56, #57, #59, #61 and #64, plus scala/scala3#27343 and #27359. Each variant built once by a batch sbt and run from its snapshot."
+  ],
+  "variantDescriptions": {
+    "base": "scala/scala3 main @ `74dd858` (merge base)",
+    "tip": "`scala3-perf-integration` @ `708df25`"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M",
+  "rounds": 3,
+  "corpora": {
+    "scalaz": "-f 1 -wi 12 -i 8 -w 3 -r 3",
+    "tastyQuery": "-f 1 -wi 12 -i 8 -w 3 -r 3"
+  },
+  "builds": {
+    "base": {"checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/perfint-base", "env": {"SCALA3_CHECKOUT": "{checkout}"}},
+    "tip": {"checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/perfint-tip", "env": {"SCALA3_CHECKOUT": "{checkout}"}}
+  },
+  "loadgate": {"maxCores": 1.5, "quietSecs": 30},
+  "gcLog": true
+}

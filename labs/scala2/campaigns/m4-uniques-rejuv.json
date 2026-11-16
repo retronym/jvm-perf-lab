@@ -1,0 +1,72 @@
+{
+  "name": "m4-uniques-rejuv",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "chunked-weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "rejuv": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "uncache-all": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "rejuv-uncache": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "weak": "-Dscala.uniques.layout=weak",
+    "chunked-weak": "-Dscala.uniques.layout=chunked-weak",
+    "rejuv": "-Dscala.uniques.layout=chunked-weak-rejuv",
+    "uncache-all": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all",
+    "rejuv-uncache": "-Dscala.uniques.layout=chunked-weak-rejuv -Dscala.uniques.uncache=all"
+  },
+  "variantDescriptions": {
+    "weak": "`claude/uniques-audit` `41986b33ea` (retronym/scala#212 + #239 + census probe, census off) with today's `WeakHashSet` table",
+    "chunked-weak": "the same build, `ChunkedInterner(weak = true)`",
+    "rejuv": "chunked-weak, and after each GC (a cleared `WeakReference` canary) every chunk written 256+ times since the previous GC is copied, so it is young again and inserts into it dirty no cards (from retronym/interner-gc-bench)",
+    "uncache-all": "chunked-weak, and types made in the weak scopes are not interned (shared only if already in the table or a 4096-slot direct-mapped cache)",
+    "rejuv-uncache": "rejuv + uncache-all"
+  },
+  "rounds": 4,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 6 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Does copying written chunks young after each GC (chunk rejuvenation) cut scalac's GC pauses? A debug GC log of one scala-corpus compile per variant (laptop, job 552) showed the chunked layout removes humongous regions (43 to 12) but cuts scanned cards only 9%, because the chunks tenure within a compile; not interning weak-scope types cut cards 57% and pauses 33%. A laptop pilot of rejuvenation (job 555, one fork each) was inconclusive: pauses rejuv -9%, rejuv-uncache -15% vs weak, scanned cards no lower, and 38-40 young GCs per fork instead of 34.",
+    "",
+    "Separate forks (paired forks distort the mutator through a shared call site), same setup as `m4-uniques-uncache` (job 546). Read GC pause sums from `gc.log` as well as the score."
+  ]
+}

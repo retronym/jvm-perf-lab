@@ -1,0 +1,27 @@
+{
+  "name": "ptyper3-jit",
+  "description": [
+    "JIT recordings of `2.13.x`, the parallel typer spike at `3c72e64ddf` (no flag) and the fix branch's tip (no flag), one fork each, re2s stopped after the typer: which hot methods C2 compiled or inlined differently, for the serial overhead that `ptyper2-serial-typer` measures."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `d32d907524`",
+    "spike": "the parallel typer spike at `3c72e64ddf`, without `-Yparallel-typer`",
+    "fix": "branch `ptyper-overhead-fixes` at `6c4eeb44f0`, without the flag"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jitRecording": true,
+  "rounds": 1,
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "corpora": {
+    "re2s": "-f 1 -wi 30 -w 2 -i 10 -r 2 -p scalacOptions=-Ystop-after:typer"
+  },
+  "variants": {"base": "", "spike": "", "fix": ""},
+  "variantJmhArgs": {
+    "base": "-p variants=base=@build=.",
+    "spike": "-p variants=spike=@build=s2",
+    "fix": "-p variants=fix=@build=f3"
+  },
+  "gcLog": true
+}

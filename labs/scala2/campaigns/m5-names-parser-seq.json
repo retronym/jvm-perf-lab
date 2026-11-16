@@ -1,0 +1,98 @@
+{
+  "name": "m5-names-parser-seq",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Parsing only on the `scala` corpus: what `newTermNameFromSequence` does against `cbuf.toCharArray` (`before` against `chars`), and every store with it."
+  ],
+  "variantDescriptions": {
+    "before": "`-Yname-table:chars` at `e8ebc00ace`, copying the scanner's buffer",
+    "chars": "`-Yname-table:chars` at `8aaca82cc4`, taking the buffer as a `CharSequence`",
+    "aa": "the same as `chars`, for the noise floor",
+    "cached": "`-Yname-table:cached`",
+    "string": "`-Yname-table:string`",
+    "bytes": "`-Yname-table:bytes`",
+    "shared": "`-Yname-table:shared`"
+  },
+  "builds": {
+    "before": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-probe",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "chars": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-seq",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-seq",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "cached": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-seq",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "string": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-seq",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "bytes": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-seq",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "shared": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-seq",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "before": "",
+    "chars": "",
+    "aa": "",
+    "cached": "",
+    "string": "",
+    "bytes": "",
+    "shared": ""
+  },
+  "variantJmhArgs": {
+    "before": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:chars'",
+    "chars": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:chars'",
+    "aa": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:chars'",
+    "cached": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:cached'",
+    "string": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:string'",
+    "bytes": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:bytes'",
+    "shared": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:shared'"
+  },
+  "rounds": 3,
+  "profile": "none",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 60 -i 60 -p jdkHome=25.0.4-tem"
+  }
+}

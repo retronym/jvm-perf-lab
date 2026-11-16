@@ -1,0 +1,59 @@
+{
+  "name": "c2-combos",
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/xctrace/loads.template.xml",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 3,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x=",
+    "scalaz": "-f 1 -bm ss -wi 90 -i 30 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x="
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/si-bench",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "combo5": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/ov-combo5-pin",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "combo6": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/ov-combo5",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "base": "-Dcompilerlab.cores=true",
+    "tip": "-Dcompilerlab.cores=true",
+    "combo5": "-Dcompilerlab.cores=true",
+    "combo6": "-Dcompilerlab.cores=true"
+  },
+  "variantDescriptions": {
+    "base": "scala/scala3 main `d168df2a76` (merge base) + library stamps",
+    "tip": "retronym/scala3#84 tip `f06dc23f02` + library stamps (+ the interner switches, off) + library stamps",
+    "combo5": "serial-path fixes `ca0bbcab59` (`claude/ov-combo5`~1), on #84 at `4d672aa35c` + library stamps",
+    "combo6": "combo5 + one-field caches, denotation layouts as base's `5256b14aaf` + library stamps"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "#84's serial overhead and the combo fixes on C2 (the patched JDK 26 of every earlier #84 measurement), in the low-variance harness: a forced GC before each op, a large heap, core sampling, loadgate 1.5 cores, overnight (C2 A/A spread 0.6% in the quiet state, [harness-aa-hotspot25](../harness-aa-hotspot25)). Paired with [graal-combos](../graal-combos).",
+    "dotc and scalaz to `-Ystop-after:typer`, xctrace `loads`, 3 rounds."
+  ]
+}

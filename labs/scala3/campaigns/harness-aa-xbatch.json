@@ -1,0 +1,30 @@
+{
+  "name": "harness-aa-xbatch",
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 2,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 8 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x="
+  },
+  "variants": {
+    "a": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true -Xbatch",
+    "b": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true -Dperflab.aa=b -Xbatch",
+    "c": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true -Dperflab.aa=c -Xbatch"
+  },
+  "variantDescriptions": {
+    "a": "harness: forced GC, large heap, strong interner; core sampling",
+    "b": "A/A twin",
+    "c": "A/A twin"
+  },
+  "loadgate": {
+    "maxCores": 1.0,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Does `-Xbatch` (foreground compilation, so compiles happen at the same point in every fork) cut the fork-to-fork spread of the harness? Without it, six A/A forks of [harness-aa-jit](../harness-aa-jit) spread 1.2% (2927\u20133040 ms/op on dotc) and compiled 1,603 methods differently between the fastest and the slowest.",
+    "dotc to `-Ystop-after:typer`, forced GC, large heap, strong interner, core sampling, `-Xbatch`, patched JDK 26, 2 rounds of 3."
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "benchmark": "SymbolOpsBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "subtype": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "jitRecording": false,
+  "name": "m4-bti-cfp",
+  "description": [
+    "Spikes from the `baseTypeIndex` review on `SymbolOpsBenchmark`'s `subtype` workload, against retronym/scala#208: a Bloom filter that answers most `baseTypeIndex` misses, a `firstTry` fast path that decides `<:<` against a top-level monomorphic class by base type sequence membership, and both. Three forks each, after one-fork spikes on m5-pro (`m5-bti-spikes`) put each at about 4-5%, inside that machine's noise."
+  ],
+  "variantDescriptions": {
+    "pr208": "retronym/scala#208, `a0b9fd2010`",
+    "mask": "`pr208` + a 64-bit Bloom filter of each sequence's symbol ids, checked before the scan (`claude/bti-mask`)",
+    "cfp": "`pr208` + `firstTry` answering hits against a top-level monomorphic class from `sym1`'s base type sequence, skipping `baseType`, `relativize` and the recursive `isSubType` (`claude/subtype-class-fastpath`)",
+    "maskcfp": "`cfp` + `mask` (`claude/subtype-cfp-mask`)"
+  },
+  "builds": {
+    "pr208": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "mask": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-mask",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "cfp": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/subtype-class-fastpath",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "maskcfp": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/subtype-cfp-mask",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "pr208": "",
+    "mask": "",
+    "cfp": "",
+    "maskcfp": ""
+  }
+}

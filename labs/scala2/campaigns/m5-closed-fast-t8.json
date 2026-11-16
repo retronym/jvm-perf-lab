@@ -1,0 +1,67 @@
+{
+  "name": "m5-closed-fast-t8",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms24G -Xmx24G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/closed-scope-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "chunked": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/closed-scope-base-chunked",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "fast": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/closed-scope-fastpath-bench",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "fast-chunked": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/closed-scope-fastpath-chunked",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "chunked": "-Dscala.uniques.layout=chunked-weak",
+    "fast": "",
+    "fast-chunked": "-Dscala.uniques.layout=chunked-weak"
+  },
+  "variantDescriptions": {
+    "base": "retronym/scala#212 head plus scala/scala#11381 (`claude/closed-scope-bench-base`)",
+    "chunked": "`base` plus the chunked weak table of retronym/scala#239, no closed scopes",
+    "fast": "#241 with the closed-scope state kept in the `Uniques` object and nested scope entries skipped (`claude/closed-scope-fastpath`), plus scala/scala#11381 (`claude/closed-scope-fastpath-bench`)",
+    "fast-chunked": "`fast` plus the chunked weak table (`claude/closed-scope-fastpath-bench-chunked`)"
+  },
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "As m4-closed-fast-full at 8 concurrent scala-corpus compiles (JMH `-t 8`, single shot), 24 GB G1, patched JDK 26, laptop: allocation pressure high enough that the table's old chunks and card marks matter, if they ever do."
+  ],
+  "variantJmhArgs": {
+    "base": "-t 8",
+    "chunked": "-t 8",
+    "fast": "-t 8",
+    "fast-chunked": "-t 8"
+  }
+}

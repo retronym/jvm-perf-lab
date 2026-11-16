@@ -1,0 +1,54 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "async:alloc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 2,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 13 -i 16 -p scalacOptions=-Ystop-after:pickler"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "batch-84-alloc-locality",
+  "description": [
+    "Allocation per op by class and stack, merge base vs `caches-reader`: which objects the #84 build allocates that base does not. The kperf miss profiles and the call audit ([batch-84-audit-denot](../batch-84-audit-denot)) show the same lookups with the same cache hit rates missing more in the tip, so something else in its working set evicts them.",
+    "The 3.10.0 tag's `compiler/src/dotty/tools/dotc` to `-Ystop-after:pickler`, single-shot 13+16, patched JDK 26, 2 forks per variant."
+  ],
+  "variantDescriptions": {
+    "base": "scala/scala3 main `d168df2a76` (merge base) + library stamps",
+    "caches-reader": "#84 `e3b407ec7a` + `4d672aa35c` + `0dffb94615` (class caches as fields) + `8592214ccc` (Reader hot fields) + library stamps"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "caches-reader": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/ov-stampfields",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "diff": {
+    "owner": "dotty/tools/dotc/",
+    "ownerSkip": [
+      "dotty/tools/dotc/core/Contexts$Context.",
+      "dotty/tools/dotc/core/Contexts$ContextState.",
+      "dotty/tools/dotc/Reader."
+    ],
+    "groups": {
+      "denotation info/flag reads": "SymDenotations\\$SymDenotation\\.(isCurrent|isAbsent|is|isCompleted|isCompleting)$|Denotations\\$Denotation\\.(myInfo|info)$|SymDenotations\\$NoDenotation\\$\\.exists$",
+      "denot/symbol": "Types\\$NamedType\\.(denot|symbol|stableInRunSymbol)$|Symbols\\$Symbol\\.(denot|latestDenot|latestDenotIn)$|Types\\$Type\\.widenSingleton$|Periods\\$Period\\$\\.\\$eq\\$eq\\$extension$|Types\\$TermRef\\.underlying$",
+      "class caches": "SymDenotations\\$ClassDenotation\\.(memberCache|myMemberCache|memberCacheShared|memberCacheIfAny|baseTypeCache|baseData)$",
+      "findRef/imports": "Typer\\.(findRef|findRefRecur\\$1|loop\\$1|wildImportRef\\$1|selection\\$1)$|typer/ImportInfo\\.",
+      "recursion guard": "Contexts\\$Context\\.inline\\$recursive|Reader\\.recursive",
+      "names": "Names\\$(SimpleName|TypeName|DerivedName)\\.hashCode$|Names\\$\\.enterIfNew$"
+    }
+  }
+}

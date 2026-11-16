@@ -1,0 +1,50 @@
+{
+  "name": "m5-kwu-scaling-kperf2",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms24G -Xmx24G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus -Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all",
+  "builds": {
+    "t1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "t8": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "t1": "",
+    "t8": ""
+  },
+  "variantJmhArgs": {
+    "t1": "-t 1 -wi 15",
+    "t8": "-t 8 -wi 3"
+  },
+  "variantDescriptions": {
+    "t1": "one compile at a time, 15 warmup compiles (6 left C2 still compiling in the measurement, job 569)",
+    "t8": "8 independent compiles at once, each its own `Global`; 3 warmup iterations = 24 compiles"
+  },
+  "profile": "async:cycles@30000000+instructions@100000000+PL2_CACHE_MISS_LD@100000",
+  "rounds": 1,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -i 3 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Where the 8-compile run spends extra cycles, by method: async-profiler on kperf PMU events (cycles, instructions, L2 load misses), at 1 and at 8 concurrent compiles, to profdiff per op. Rerun of m5-kwu-scaling-kperf (job 570) with periods sized for ~100k samples per event per fork (570 took 1.3-2M) and 40 warmup compiles for the 1-compile cell (570 had 6, with C2 still compiling during measurement).",
+    "",
+    "Build `claude/uniques-audit` `41986b33ea` with `-Yuniques-layout:chunked-weak` and `-Yuniques-uncache all` (ChunkedInterner(weak = true), types made in the weak scopes not interned). Scala corpus, 24 GB G1 heap, laptop, one fork per variant."
+  ],
+  "kperf": "/tmp/asprof-kperf.sock"
+}

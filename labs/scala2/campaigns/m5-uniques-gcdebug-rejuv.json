@@ -1,0 +1,52 @@
+{
+  "name": "m5-uniques-gcdebug-rejuv",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus -Xlog:gc*=debug:file=/private/tmp/claude-501/-Users-jzaugg-virtus-code--worktrees-scala-chunked-uniques/1a22b753-8dbe-4dc6-b252-38e33f05fcc0/scratchpad/gcdebug2/gcdebug-%p.log:uptime",
+  "builds": {
+    "weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "rejuv": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "rejuv-uncache": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "weak": "-Dscala.uniques.layout=weak",
+    "rejuv": "-Dscala.uniques.layout=chunked-weak-rejuv",
+    "rejuv-uncache": "-Dscala.uniques.layout=chunked-weak-rejuv -Dscala.uniques.uncache=all"
+  },
+  "variantDescriptions": {
+    "weak": "`claude/uniques-audit` `41986b33ea`, today's table",
+    "rejuv": "`chunked-weak-rejuv`: chunks written since the last GC are copied young after it",
+    "rejuv-uncache": "rejuv, and weak-scope types not interned"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 3,
+    "quietSecs": 20
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 2 -i 3 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Debug-GC pilot of the rejuvenating layout ported from retronym/interner-gc-bench: do the scanned cards fall, unlike chunked-weak's \u22129% in [m5-uniques-gcdebug](#c-m5-uniques-gcdebug)?"
+  ],
+  "profile": "none"
+}

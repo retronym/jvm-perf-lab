@@ -1,0 +1,55 @@
+{
+  "name": "m4-whs-hash-pekko",
+  "description": [
+    "Does comparing `Entry.hash` before `equals` in `WeakHashSet`'s chain walks help? Without it every chain entry loads its referent and runs `elem.equals`. Instrumented compiles (one full compile): pekko 2.34M lookups visit 2.14M entries, of which 573k (26.7%) would be rejected by the hash; see the session's report for scala.",
+    "",
+    "`base` and `baseaa` are the same build of `upstream/2.13.x`, the A/A control. Release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26, 8G heap; xctrace ipc for cycles and instructions."
+  ],
+  "variantDescriptions": {
+    "base": "`upstream/2.13.x` `d32d907524`",
+    "baseaa": "The same build as `base`",
+    "proto": "`base` plus the hash check in `findEntry`, `findEntryOrUpdate`, `addOne` and `subtractOne`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/weakhashset-hash-check-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "baseaa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/weakhashset-hash-check-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "proto": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/weakhashset-hash-check",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "baseaa": "",
+    "proto": ""
+  },
+  "rounds": 5,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 8 -i 10 -p jdkHome=25.0.4-tem"
+  }
+}

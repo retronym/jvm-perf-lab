@@ -1,0 +1,47 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "rel": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/v2.13.18",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "int": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-6101d2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "rel": "",
+    "int": ""
+  },
+  "variantDescriptions": {
+    "rel": "`v2.13.18` (`98f40d00dd`)",
+    "int": "`scala2-perf-integration` `6101d220ca` (2026-11-10; JIT-friendly patches, see its `PERF-INTEGRATION.md`)"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m4-forkvar-baseline",
+  "rounds": 10,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 6 -p jdkHome=25.0.4-tem",
+    "re2s": "-f 1 -bm ss -wi 40 -i 30 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Fork-to-fork variance, 2.13.18 vs `scala2-perf-integration`: 10 forks per build and corpus, interleaved. Read each variant's spread across forks (CV of score, cycles, instructions, alloc), not only \u0394.",
+    "",
+    "Warmup from `m4-forkvar-pilot`: scala time flattens by about iteration 7 (compilations still ~150/iteration, never zero), re2s by about 40. No JIT recording, so these are the undisturbed spreads; `m4-forkvar-jit` repeats scala with it. Patched JDK 26, 8G heap, `SCALA_RELEASE_OPT`, `xctrace:ipc`."
+  ]
+}

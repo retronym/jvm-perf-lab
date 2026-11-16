@@ -1,0 +1,13 @@
+{
+  "name": "glb-collectors-typer-aa",
+  "description": "A/A control for glb-collectors-typer: the PR build paired against itself in two class loaders, scalap, typer only",
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "rounds": 3,
+  "corpora": {
+    "scalap": "-wi 16 -i 12 -w 2 -r 2 -p scalacOptions=-Ystop-after:typer"
+  },
+  "paired": {"a": "@build=.", "b": "@build=."},
+  "gcLog": true,
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing"
+}

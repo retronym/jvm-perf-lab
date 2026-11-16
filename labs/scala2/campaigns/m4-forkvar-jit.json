@@ -1,0 +1,45 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "rel": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/v2.13.18",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "int": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-6101d2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "rel": "",
+    "int": ""
+  },
+  "variantDescriptions": {
+    "rel": "`v2.13.18` (`98f40d00dd`)",
+    "int": "`scala2-perf-integration` `6101d220ca` (2026-11-10; JIT-friendly patches, see its `PERF-INTEGRATION.md`)"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m4-forkvar-jit",
+  "rounds": 10,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 6 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Same as `m4-forkvar-baseline` on scala, with `jitRecording` on every fork, so each fork's instructions/op can be joined to its C2 compilations, inlining decisions and deopts (`forkvar/forks.py` in the jit-fork-variance worktree). Comparing its spread with the baseline's says whether the recording itself perturbs the JIT."
+  ],
+  "jitRecording": true
+}

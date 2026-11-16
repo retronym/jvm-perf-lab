@@ -1,0 +1,98 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/xctrace/loads.template.xml",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 1,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x="
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "batch-84-l2-split14-r2",
+  "description": [
+    "Second round of the bisect of #84's commit 14 by L2 load misses. [Round 1](../batch-84-l2-split14-r1) found two steps: about +3.3% by part 2 and about +4.8% between parts 7 and 12. Here: part 1 against part 2, and every part from 7 to 12, with c13 as the base.",
+    "dotc to `-Ystop-after:typer`, no GC inside an op, single-shot 30+16, xctrace `loads`, patched JDK 26, one fork each."
+  ],
+  "variantDescriptions": {
+    "c13": "#84 commit 13, `8899fc4dbb` + library stamps",
+    "s1": "after part 1 of 18: `cd3c4f2b7c` Sharing infrastructure: the Sharing mode of a ContextBase, its givens, completion lock and roots, Reader hooks + library stamps",
+    "s2": "after part 2 of 18: `8f6f56510d` Stamped caches in Types and in ClassDenotation's member and base-type caches + library stamps",
+    "s7": "after part 7 of 18: `524fc12e42` LazyRef and lazy annotations as Once fields + library stamps",
+    "s8": "after part 8 of 18: `ddca36b15d` Types on a concurrent base: per-reader cycle breakers, rec-type openings and match-type reductions + library stamps",
+    "s9": "after part 9 of 18: `2734247f5c` Denotations on a concurrent base: one-value asSeenFrom cache, ring fences, goForward in a fresh context + library stamps",
+    "s10": "after part 10 of 18: `a446cb1845` Contexts and implicits: read-once implicits and related contexts with fences, per-thread search root, thread-safe implicit-scope lazies + library stamps",
+    "s11": "after part 11 of 18: `d7f1306b0b` Read-once and immutable publication of lazily computed fields (ImportInfo, PerRun, FunType, SourceFile, nestedTyper, ...) + library stamps",
+    "s12": "after part 12 of 18: `da8407f3d4` Completion with several readers: InProgress and ownView, root claims or the completion lock, UnwoundCompletion, inherited caches under claims + library stamps"
+  },
+  "builds": {
+    "c13": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bis84-c13",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "s1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-1",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "s2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-2",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "s7": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-7",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "s8": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-8",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "s9": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-9",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "s10": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-10",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "s11": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-11",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "s12": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-12",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "c13": "",
+    "s1": "",
+    "s2": "",
+    "s7": "",
+    "s8": "",
+    "s9": "",
+    "s10": "",
+    "s11": "",
+    "s12": ""
+  }
+}

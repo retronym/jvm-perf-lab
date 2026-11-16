@@ -1,0 +1,45 @@
+{
+  "name": "m4-pr212-guards-typer",
+  "description": [
+    "Does [retronym/scala#212](https://github.com/retronym/scala/pull/212) cost the batch typer anything? It gathers the scratch state of type operations into `SymbolTable#Scratch`, runs each completion in its own `Frame` of recursion guards, encodes the lub/glb tables as `MemoGuard`, and (last commit) encodes the subtype, base type and volatile guards as `RecursionGuard` / `SubTypeGuard`. The PR's TODO: drop the last commit if it costs anything on `isSubType`.",
+    "",
+    "`memo` vs `tip` isolates that last commit; `aa` is a second build of `base`, the noise floor. re2s and scalap stopped after the typer, so the change is not diluted by the backend. Release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26, 8G heap. Builds alternate fork by fork over 5 rounds. Compare within this campaign only."
+  ],
+  "variantDescriptions": {
+    "base": "upstream `2.13.x` at `a235e697e5`, the PR's base",
+    "aa": "the same commit as `base`, for the noise floor",
+    "memo": "the PR's first two commits, at `22c84f86cf`: `Scratch`, frames per completion, `MemoGuard`",
+    "tip": "the PR at `98d4e37bad`: adds `RecursionGuard` and `SubTypeGuard`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/pr212-perf-base",
+      "env": {"SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1"}
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/pr212-perf-base",
+      "env": {"SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1"}
+    },
+    "memo": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/pr212-perf-memo",
+      "env": {"SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1"}
+    },
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/scala-pr-212-review-1b9804",
+      "env": {"SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1"}
+    }
+  },
+  "variants": {"base": "", "aa": "", "memo": "", "tip": ""},
+  "rounds": 5,
+  "loadgate": {"maxCores": 1.5, "quietSecs": 30},
+  "gcLog": true,
+  "corpora": {
+    "re2s": "-f 1 -wi 15 -w 2 -i 15 -r 2 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer",
+    "scalap": "-f 1 -wi 20 -w 2 -i 20 -r 2 -p scalacOptions=-Ystop-after:typer"
+  }
+}

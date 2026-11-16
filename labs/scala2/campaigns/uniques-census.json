@@ -1,0 +1,33 @@
+{
+  "name": "uniques-census",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "census": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "census": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.census=true"
+  },
+  "variantDescriptions": {
+    "census": "`claude/uniques-audit` `9d4de2f228`: retronym/scala#212 + retronym/scala#239 (squashed) + the census probe. Counters in `audit-<pid>.json`, read with `perflab api audit`"
+  },
+  "rounds": 1,
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 3 -i 3 -p jdkHome=25.0.4-tem",
+    "scalap": "-f 1 -bm ss -wi 3 -i 3 -p jdkHome=25.0.4-tem",
+    "re2s": "-f 1 -bm ss -wi 3 -i 3 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Audit, not a timing: what becomes of each type the `uniques` table interns, to judge which types could be held strongly (no `WeakReference`) and which need not be interned at all. Each type is tagged at intern time with its class, phase, whether it was made inside a completion ([retronym/scala#212](https://github.com/retronym/scala/pull/212)'s `CompletionFrame`) and whether it refers to a method's params (as in retronym/scala3#112) or to skolems/existentials. Its fate is one of: `anchoredSame` (reachable from a symbol's info or type cache, set in the same frame entry that made it: a mark at construction could catch it), `anchoredLater`, `anchoredCleared` (anchored through a symbol that then died, so anchoring at that `setInfo` would have leaked it), `clearedFree`, `liveFree` (never anchored, alive at the end of the run).",
+    "",
+    "Counters are over the whole fork (all runs, warmup included); `perflab api audit` divides by ops. Local pilot on scalap (one run, 41K types): anchoredSame 25%, anchoredCleared 25% (mostly via type caches and params of cloned symbols), clearedFree 31%, liveFree 19%; 36% of types refer to a method's params."
+  ]
+}

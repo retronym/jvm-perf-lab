@@ -1,0 +1,46 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "name": "m5-unreachable-ipc",
+  "profile": "xctrace:ipc",
+  "rounds": 2,
+  "description": [
+    "Counted instructions and cycles per op for retronym/scala#200 against its base, on the scala corpus. Instructions are less exposed than time to this machine's noise.",
+    "",
+    "Both builds with the release optimizer settings (`SCALA_RELEASE_OPT`); corpora compiled plainly, where unreachable-code removal is the only optimiser pass on. Patched JDK 26 (`jdk26-integration-branch-e9e67e`), 8G heap. scala: single-shot 4+4 ops; scalap: 20+20 x 2 s."
+  ],
+  "variantDescriptions": {
+    "base": "upstream `2.13.x` at `c84dea8aa7`, the PR's base",
+    "pr": "[retronym/scala#200](https://github.com/retronym/scala/pull/200): don't emit code codegen can tell is unreached, and skip unreachable-code analysis for methods with nothing to remove"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unreachable-codegen-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "pr": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unreachable-codegen",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "pr": ""
+  }
+}

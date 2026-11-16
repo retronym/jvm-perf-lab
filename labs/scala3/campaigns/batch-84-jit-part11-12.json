@@ -1,0 +1,43 @@
+{
+  "name": "batch-84-jit-part11-12",
+  "benchmark": "CompileBenchmark",
+  "profile": "async:cpu",
+  "jitRecording": true,
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 1,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 2 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x="
+  },
+  "builds": {
+    "p11": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-11",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "p12": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-12",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "p11": "",
+    "p12": ""
+  },
+  "variantDescriptions": {
+    "p11": "commit 14 split, part 11 `d7f1306b0b` (read-once publication of lazy fields) + library stamps",
+    "p12": "part 12 `da8407f3d4` (completion with several readers: `InProgress`, `ownView`, claims, non-inline `lockAndComplete`) + library stamps"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "JIT pilot of part 12 of #84's commit 14 against its parent: which call sites became virtual or megamorphic, and which methods' inlining or code size changed. Part 12 is the one clear L2-miss step in the [branch campaign](../batch-84-split14-branch) (+3.6M, L1D flat), and its kperf diff showed `vtable stub` +0.44M and `itable stub` +0.16M.",
+    "dotc to `-Ystop-after:typer`, no GC inside an op, full warmup and 2 measured ops, whole-fork JIT recording, patched JDK 26, one fork each."
+  ]
+}

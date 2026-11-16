@@ -1,0 +1,58 @@
+{
+  "name": "m5-names-parser-prof",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Parsing only (`-Ystop-after:parser`) on the `scala` corpus, to amplify name entry through the scanner, profiled for `-Yname-table:shared` with `string` and `chars` to diff against. Two rounds, so that a store against itself shows how far one fork's profile moves on its own."
+  ],
+  "variantDescriptions": {
+    "chars": "[retronym/scala#204](https://github.com/retronym/scala/pull/204) at `e8ebc00ace`, `-Yname-table:chars`",
+    "string": "`-Yname-table:string`",
+    "shared": "`-Yname-table:shared`, with the per-thread probe"
+  },
+  "builds": {
+    "chars": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-probe",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "string": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-probe",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "shared": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-probe",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "chars": "",
+    "string": "",
+    "shared": ""
+  },
+  "variantJmhArgs": {
+    "chars": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:chars'",
+    "string": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:string'",
+    "shared": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:shared'"
+  },
+  "rounds": 2,
+  "profile": "async:cpu,alloc",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 60 -i 60 -p jdkHome=25.0.4-tem"
+  }
+}

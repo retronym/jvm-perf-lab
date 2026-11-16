@@ -1,0 +1,32 @@
+{
+  "name": "m5-names-scanner-entry",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "How the scanner should enter a name, under `-Yname-table:chars`, parsing only on the `scala` corpus, interleaved in one JVM with a class loader per variant. Effects near 1% on time are the question."
+  ],
+  "variantDescriptions": {
+    "before": "`cbuf.toCharArray` per identifier, at `e8ebc00ace`",
+    "aa": "`before` in another class loader, for the noise floor",
+    "seq": "`newTermNameFromSequence(cbuf)`, at `8aaca82cc4`",
+    "buf": "`cbuf.getChars` into one reused array per scanner, at `253c7afa82`"
+  },
+  "paired": {
+    "before": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-probe -Ystop-after:parser",
+    "aa": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-probe -Ystop-after:parser",
+    "seq": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-seq -Ystop-after:parser",
+    "buf": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-buf -Ystop-after:parser"
+  },
+  "rounds": 2,
+  "profile": "none",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 80 -i 400 -p jdkHome=25.0.4-tem -p gcBetweenIterations=true"
+  }
+}

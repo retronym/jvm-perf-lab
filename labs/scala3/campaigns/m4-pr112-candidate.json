@@ -1,0 +1,59 @@
+{
+  "name": "m4-pr112-candidate",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/25.4.4.1+1-graal/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "testbed": "m4",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/uncache-on-pr45",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "layerA": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/uncache-on-pr45",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "layerA-udm": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/uncache-on-pr45",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "layerA-c0": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/uncache-on-pr45",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "base": "-Ddotty.refchecks.memberTypes=all -Ddotty.uniques.uncacheMethodParams=false",
+    "layerA": "-Ddotty.uniques.uncacheMethodParams=false",
+    "layerA-udm": "",
+    "layerA-c0": "-Ddotty.uniques.uncachedAppliedCache=0"
+  },
+  "variantDescriptions": {
+    "base": "retronym/scala3#112 (`claude/uncache-udm-on-45` `153b39f0e5`, on retronym/scala3#45) with both changes off: `-Ddotty.refchecks.memberTypes=all`, method-param types interned as before. Equivalent to #45",
+    "layerA": "Layer A only: `checkMemberTypesOK` checks joint denotations only (retronym/scala3#107); interning as before",
+    "layerA-udm": "the candidate as shipped: Layer A + types over method/poly params not hash-consed + 4096-slot direct-mapped cache",
+    "layerA-c0": "Layer A + uncached, no cache (`-Ddotty.uniques.uncachedAppliedCache=0`)"
+  },
+  "rounds": 3,
+  "profile": "xctrace:ipc",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scalaz": "-f 1 -bm ss -wi 25 -i 10",
+    "dotc": "-f 1 -bm ss -wi 10 -i 6"
+  },
+  "description": [
+    "Candidate retronym/scala3#112 (stacked on retronym/scala3#45), one build, four variants by `-D` (read once per JVM, cross-fork). Asks: what Layer A gives over #45, and what uncaching + UDM adds on top of Layer A, with and without the cache. **Full pipeline**, ordinary GC, 8 GB heap, weak interners. Graal 25.4.4, xctrace ipc, 3 rounds, M4."
+  ]
+}

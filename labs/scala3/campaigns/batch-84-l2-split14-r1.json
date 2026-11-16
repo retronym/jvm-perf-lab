@@ -1,0 +1,74 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/xctrace/loads.template.xml",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 1,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x="
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "batch-84-l2-split14-r1",
+  "description": [
+    "First round of a bisect of #84's commit 14 by L2 load misses, over its split into 18 building commits (branch `split-c14-73c59487`): c13 and c14 as the ends (c14 +8.7% L2, [batch-84-l2-nogc-c13-c14](../batch-84-l2-nogc-c13-c14)), and four points between.",
+    "dotc to `-Ystop-after:typer`, no GC inside an op (`gcBetweenIterations`, 8 GB young gen), single-shot 30+16, xctrace `loads`, patched JDK 26, one fork each."
+  ],
+  "variantDescriptions": {
+    "c13": "#84 commit 13, `8899fc4dbb` + library stamps",
+    "s2": "commit 14 split, after part 2 of 18: `Stamped` caches in Types and ClassDenotation + library stamps",
+    "s5": "after part 5: `Symbol.denot`/`NamedType` published with release/acquire + library stamps",
+    "s7": "after part 7: `LazyRef` and lazy annotations as `Once` fields + library stamps",
+    "s12": "after part 12: completion with several readers (`InProgress`, `ownView`, claims) + library stamps",
+    "c14": "#84 commit 14, `73c59487a3` (= split part 18) + library stamps"
+  },
+  "builds": {
+    "c13": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bis84-c13",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "s2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-2",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "s5": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-5",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "s7": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-7",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "s12": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/s14-12",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "c14": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bis84-c14",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "c13": "",
+    "s2": "",
+    "s5": "",
+    "s7": "",
+    "s12": "",
+    "c14": ""
+  }
+}

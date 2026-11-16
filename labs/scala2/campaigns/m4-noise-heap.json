@@ -1,0 +1,54 @@
+{
+  "name": "m4-noise-heap",
+  "description": [
+    "Calibration, no code change: every variant is the same build, `c84dea8aa7`. Does an oversized heap, with or without a forced GC between iterations, shrink the spread between forks? Read each variant's spread across forks, on each corpus.",
+    "",
+    "`heap8` is the current setup. `heap24` has a 24G heap. `heap24gc` adds JMH's `-gc true`."
+  ],
+  "jvmArgs": "-Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 6,
+  "variants": {
+    "heap8": "-Xms8G -Xmx8G",
+    "heap24": "-Xms24G -Xmx24G",
+    "heap24gc": "-Xms24G -Xmx24G"
+  },
+  "variantJmhArgs": {
+    "heap24gc": "-gc true"
+  },
+  "builds": {
+    "heap8": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "heap24": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "heap24gc": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "corpora": {
+    "re2s": "-f 1 -bm ss -wi 40 -i 40 -p jdkHome=25.0.4-tem",
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "testbed": "m4"
+}

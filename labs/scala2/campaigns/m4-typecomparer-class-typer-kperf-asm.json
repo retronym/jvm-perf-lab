@@ -1,0 +1,58 @@
+{
+  "name": "m4-typecomparer-class-typer-kperf-asm",
+  "variantDescriptions": {
+    "base": "`2.13.x` at `1fd535a36b`",
+    "tc": "`base` + [retronym/scala#208](https://github.com/retronym/scala/pull/208) + the `isHigherKinded` prototype + `TypeComparers`' logic in a final class, `TypeComparer` (`58d0363519`)",
+    "hk": "`base` + [retronym/scala#208](https://github.com/retronym/scala/pull/208) + the `isHigherKinded` prototype (`65fe452a34`): `tc`'s parent, to isolate the `TypeComparer` class"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-base-278cab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "hk": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-hk-fastpath",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "tc": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-tc-class",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "hk": "",
+    "tc": ""
+  },
+  "gcLog": true,
+  "jitRecording": true,
+  "asmOf": "m4-typecomparer-class-typer-kperf",
+  "asm": [
+    "scala.reflect.internal.tpe.TypeComparers::sameTypeAndSameCaseClass$1",
+    "scala.reflect.internal.tpe.TypeComparers::isSubType1",
+    "scala.reflect.internal.tpe.TypeComparers::retry$1",
+    "scala.reflect.internal.tpe.TypeComparer::sameTypeAndSameCaseClass$1",
+    "scala.reflect.internal.tpe.TypeComparer::isSubType1",
+    "scala.reflect.internal.tpe.TypeComparer::retry$1"
+  ],
+  "rounds": 1,
+  "corpora": {
+    "scala": "-f 1 -i 2 -bm ss -wi 8 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "description": [
+    "Machine code of `scala.reflect.internal.tpe.TypeComparers::sameTypeAndSameCaseClass$1`, `scala.reflect.internal.tpe.TypeComparers::isSubType1`, `scala.reflect.internal.tpe.TypeComparers::retry$1`, `scala.reflect.internal.tpe.TypeComparer::sameTypeAndSameCaseClass$1`, `scala.reflect.internal.tpe.TypeComparer::isSubType1`, `scala.reflect.internal.tpe.TypeComparer::retry$1` in [m4-typecomparer-class-typer-kperf](../m4-typecomparer-class-typer-kperf) (hsdis, `CompileCommand=print`): one fork per variant, not for timing."
+  ]
+}

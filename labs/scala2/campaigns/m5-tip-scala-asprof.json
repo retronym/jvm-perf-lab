@@ -1,0 +1,35 @@
+{
+  "name": "m5-tip-scala-asprof",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/integ-next",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "tip": ""
+  },
+  "variantDescriptions": {
+    "tip": "`scala2-perf-integration` tip `f0b6e17bd9`, default `-Yname-table:shared`"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 6 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cpu,alloc",
+  "description": [
+    "CPU and allocation profile of the integration tip compiling the scala corpus, jfrsync lanes on. One fork, 4 warmup single-shots as in `m4-branch-int148-scala`, 6 measured. Patched JDK 26, 8G heap, compiler built with `SCALA_RELEASE_OPT`."
+  ]
+}

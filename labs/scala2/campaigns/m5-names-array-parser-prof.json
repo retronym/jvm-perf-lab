@@ -1,0 +1,68 @@
+{
+  "name": "m5-names-array-parser-prof",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Parsing only on `scala`: the scanner's buffer as a plain array with its hash, at `018ee1874f`, against the `StringBuilder` and `contentEquals` of `a4d67601c2` and plain upstream."
+  ],
+  "variantDescriptions": {
+    "base": "`upstream/2.13.x` at `c84dea8aa7`",
+    "prev": "`a4d67601c2`, `-Yname-table:shared`, `StringBuilder` and `contentEquals`",
+    "shared": "`018ee1874f`, `-Yname-table:shared`, plain array",
+    "string": "`018ee1874f`, `-Yname-table:string`, plain array"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "prev": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-enc",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "shared": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-arr",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "string": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-arr",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "prev": "",
+    "shared": "",
+    "string": ""
+  },
+  "rounds": 2,
+  "profile": "async:cpu,alloc",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 80 -i 120 -p jdkHome=25.0.4-tem"
+  },
+  "variantJmhArgs": {
+    "base": "-p scalacOptions=-Ystop-after:parser",
+    "prev": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:shared'",
+    "shared": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:shared'",
+    "string": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:string'"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "name": "m4-refchecks-flip-prof",
+  "description": [
+    "Profile pilot for the no-cross-phase-state option in `PROPOSAL-refchecks.md`: Erasure's `isErasureDoubleDef` compares erased types before computing the refchecks-phase match. No cache, and none of the RefChecks member-type reuse. The expected effect is about 1 point of compiler-thread cycles, so `baseaa` gives the A/A floor for frames and counters.",
+    "",
+    "Scala corpus single-shot 4+4, one fork per variant, kperf cycles + instructions; patched JDK 26, `SCALA_RELEASE_OPT`."
+  ],
+  "variantDescriptions": {
+    "base": "`scala2-perf-integration` tip `00e3bbafb8`",
+    "flip": "`40feebb545` (branch `claude/refchecks-flip-only`): base + the order flip only",
+    "baseaa": "base again (A/A)"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-rebase",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "flip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/refchecks-flip-only",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "baseaa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-rebase",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "flip": "",
+    "baseaa": ""
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock"
+}

@@ -1,0 +1,45 @@
+{
+  "name": "m4-analyzer-11367-scala-stub",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "description": [
+    "One-fork profile of [scala/scala#11367](https://github.com/scala/scala/pull/11367) (head `28026a8e6b`) against its merge base `c84dea8aa7`, full compile of the scala corpus (library, reflect, compiler; `@specialized` present, so three analyzer classes). Read the `itable stub` frames and cycles, not the score. Release optimizer settings; patched JDK 26."
+  ],
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "pr": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/scala-pr-11367-review-a82cbf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "pr": ""
+  },
+  "variantDescriptions": {
+    "base": "Merge base of #11367 on `2.13.x`",
+    "pr": "#11367 head `28026a8e6b`"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock"
+}

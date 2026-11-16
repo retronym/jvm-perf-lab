@@ -1,0 +1,34 @@
+{
+  "name": "m4-forkvar-hash-uniques",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus -Xmn3g -XX:-G1UseAdaptiveIHOP",
+  "builds": {
+    "chunkedhc3": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-int-f2a6cea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "chunkedhc3": "-Dscala.uniques.layout=chunked -XX:+UnlockExperimentalVMOptions -XX:hashCode=3"
+  },
+  "variantDescriptions": {
+    "chunkedhc3": "`scala2-perf-integration` `f2a6cea787` (with retronym/scala#239), `-Dscala.uniques.layout=chunked` (strong: GC never clears a type) and `-XX:hashCode=3` (identity hashes in allocation order), fixed young generation"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "rounds": 6,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 6 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "The far corner of a 2x2 of `-XX:hashCode=3` and strong chunked uniques, alone: 6 forks, judged on fork-to-fork CV of instructions/op against prior runs (`m4-forkvar-hash` hc3 0.17%, base 0.52%; `m4-forkvar-gc` fixyoung 0.24%, Xbatch+fixyoung 0.02% over 3 forks). Run the other corners only if this beats them. Its build is newer than theirs (`f2a6cea787` vs `6101d220ca`), so compare spreads, not means."
+  ]
+}

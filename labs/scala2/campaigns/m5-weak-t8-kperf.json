@@ -1,0 +1,38 @@
+{
+  "name": "m5-weak-t8-kperf",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms24G -Xmx24G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus -Dscala.uniques.layout=weak",
+  "builds": {
+    "t8": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "t8": ""
+  },
+  "variantJmhArgs": {
+    "t8": "-t 8 -wi 3"
+  },
+  "variantDescriptions": {
+    "t8": "8 independent compiles at once with today's `WeakHashSet` uniques table, no uncache; 3 warmup iterations = 24 compiles"
+  },
+  "profile": "async:cycles@30000000+instructions@100000000+PL2_CACHE_MISS_LD@100000",
+  "rounds": 1,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -i 3 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "The baseline for m5-kwu-scaling-kperf2's 8-compile cell: the same build, profile and settings with today's weak uniques table and every type interned, to contrast with chunked-weak + uncache-all at 8 compiles."
+  ],
+  "kperf": "/tmp/asprof-kperf.sock"
+}

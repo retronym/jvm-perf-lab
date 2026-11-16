@@ -1,0 +1,40 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m5-unapplyseq",
+  "description": [
+    "Allocation of a full compile of the scala corpus, with `case x :: Nil` in place of `case List(x)` at the sites that materialise `SeqFactory$UnapplySeqWrapper`, with an A/A. Expected effect is 14 to 23 MB/op of about 6300 MB/op, and earlier fork-to-fork spread was about 18 MB, hence ten forks each. Allocation is the metric; time noise on full compiles is too large to resolve this."
+  ],
+  "variantDescriptions": {
+    "base": "`upstream/2.13.x` at `c84dea8aa7`",
+    "aa": "the same commit as `base`, for the noise floor",
+    "cons": "`c84dea8aa7` plus the pattern change at `11fccb08d8`, branch `avoid-unapplyseq-wrapper`"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unapplyseq-ab-base",
+      "env": { "SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1" }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unapplyseq-ab-base",
+      "env": { "SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1" }
+    },
+    "cons": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unapplyseq-ab-tip",
+      "env": { "SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1" }
+    }
+  },
+  "variants": { "base": "", "aa": "", "cons": "" },
+  "rounds": 10,
+  "profile": "none",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  }
+}

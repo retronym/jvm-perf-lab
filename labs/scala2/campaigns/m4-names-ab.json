@@ -1,0 +1,96 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m4-names-ab",
+  "description": [
+    "Full compiles of `scala` under each `-Yname-table` store, one store per fork, with an A/A and a plain upstream build. The quieter second opinion beside `m5-names-paired`; numbers on another testbed are not comparable, only the ranking."
+  ],
+  "variantDescriptions": {
+    "base": "`upstream/2.13.x` at `c84dea8aa7`",
+    "aa": "the same commit as `base`, for the noise floor",
+    "chars": "[retronym/scala#204](https://github.com/retronym/scala/pull/204) at `b43cf4e985`, `-Yname-table:chars`: today's table behind `NameStore`, so against `base` this is the cost of the indirection",
+    "cached": "`-Yname-table:cached`: `char[]`, `toString` cached, `String` entry without a temporary",
+    "string": "`-Yname-table:string`: a `String` per name",
+    "bytes": "`-Yname-table:bytes`: ASCII names in a byte table, the rest in a char table",
+    "shared": "`-Yname-table:shared`: a `ConcurrentHashMap` per `Global` over a weak shared string table, surviving between the fork's compiles"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "chars": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-tip",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "cached": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-tip",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "string": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-tip",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "bytes": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-tip",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "shared": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-tip",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "aa": "",
+    "chars": "",
+    "cached": "",
+    "string": "",
+    "bytes": "",
+    "shared": ""
+  },
+  "variantJmhArgs": {
+    "chars": "-p scalacOptions=-Yname-table:chars",
+    "cached": "-p scalacOptions=-Yname-table:cached",
+    "string": "-p scalacOptions=-Yname-table:string",
+    "bytes": "-p scalacOptions=-Yname-table:bytes",
+    "shared": "-p scalacOptions=-Yname-table:shared"
+  },
+  "rounds": 3,
+  "profile": "none",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  }
+}

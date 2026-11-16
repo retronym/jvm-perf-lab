@@ -1,0 +1,60 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "builds": {
+    "integ": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-shared-integ-573187",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "guard": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/raw-check-guard",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "tests": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/singleton-type-tests",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "integ": "",
+    "guard": "",
+    "tests": ""
+  },
+  "variantJmhArgs": {
+    "integ": "-p scalacOptions=-Yname-table:shared",
+    "guard": "-p scalacOptions=-Yname-table:shared",
+    "tests": "-p scalacOptions=-Yname-table:shared"
+  },
+  "variantDescriptions": {
+    "integ": "`scala2-perf-integration` tip `573187e7d7`",
+    "guard": "the tip plus `Symbol.typeParams` with one implementation (`0ea5738f0b`) and the `isRawIfWithoutArgs` guard (`bd56935a39`)",
+    "tests": "`guard` plus class tests for `NoType`, `NoPrefix`, `WildcardType` and `ErrorType` at `eq` and `ne` sites (`03c34cd4f1`)"
+  },
+  "gcLog": true,
+  "name": "m5-singleton-tests-asm",
+  "asmOf": "m4-singleton-tests-ab",
+  "asm": [
+    "scala.reflect.internal.tpe.TypeComparers::isSubType*",
+    "scala.reflect.internal.tpe.TypeComparers::typeRelationPreCheck",
+    "scala.reflect.internal.Types::isErrorOrWildcard",
+    "scala.reflect.internal.Types$TypeRef::normalize"
+  ],
+  "rounds": 1,
+  "corpora": {
+    "pekko": "-f 1 -i 2 -bm ss -wi 8 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Machine code of `scala.reflect.internal.tpe.TypeComparers::isSubType*`, `scala.reflect.internal.tpe.TypeComparers::typeRelationPreCheck`, `scala.reflect.internal.Types::isErrorOrWildcard`, `scala.reflect.internal.Types$TypeRef::normalize` in [m4-singleton-tests-ab](../m4-singleton-tests-ab) (hsdis, `CompileCommand=print`): one fork per variant, not for timing."
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "name": "m5-unit-major-t8",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java",
+  "jvmArgs": "-Xms24G -Xmx24G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "phase": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unit-major-backend",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "flatten": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unit-major-backend",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "posterasure": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unit-major-backend",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "phase": "",
+    "flatten": "",
+    "posterasure": ""
+  },
+  "variantJmhArgs": {
+    "phase": "-t 8",
+    "flatten": "-t 8 -p scalacOptions=-Yunit-major-from:flatten",
+    "posterasure": "-t 8 -p scalacOptions=-Yunit-major-from:posterasure"
+  },
+  "variantDescriptions": {
+    "phase": "`claude/unit-major-backend`, phase-major as today",
+    "flatten": "`-Yunit-major-from:flatten`: flatten through jvm unit by unit, trees dropped once a unit's classes are written",
+    "posterasure": "`-Yunit-major-from:posterasure`: posterasure, lambdalift and constructors unit by unit too"
+  },
+  "profile": "none",
+  "rounds": 3,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 3 -i 3 -p jdkHome=21.0.12+1.1-tem"
+  },
+  "description": [
+    "The same at 8 independent scala-corpus compiles at once (JMH `-t 8`, single shot), 24 GB G1, Temurin 21, laptop: time per op, GC pause share and heap after young collections, phase-major against the late phases run unit by unit.",
+    "",
+    "Build: retronym/scala `claude/unit-major-backend`, retronym/scala#242."
+  ]
+}

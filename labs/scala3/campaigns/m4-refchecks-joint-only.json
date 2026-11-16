@@ -1,0 +1,45 @@
+{
+  "name": "m4-refchecks-joint-only",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/25.4.4.1+1-graal/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "testbed": "m4",
+  "builds": {
+    "all": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/refchecks-joint-only",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "joint": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/refchecks-joint-only",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "all": "-Ddotty.refchecks.memberTypes=all",
+    "joint": ""
+  },
+  "variantDescriptions": {
+    "all": "`203750f926` + layer A (`claude/refchecks-joint-only` `dbbb062e75`) with `-Ddotty.refchecks.memberTypes=all`: every alternative of every inherited name checked, as on main",
+    "joint": "layer A on (the default): `checkMemberTypesOK` checks only joint denotations and skips `self.member(name)` for names declared in fewer than two base classes"
+  },
+  "rounds": 6,
+  "profile": "xctrace:ipc",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scalaz": "-f 1 -bm ss -wi 25 -i 10",
+    "dotc": "-f 1 -bm ss -wi 10 -i 6",
+    "tastyQuery": "-f 1 -bm ss -wi 60 -i 20"
+  },
+  "description": [
+    "Layer A of `local/PLAN-subst-matcher.md` (subst-override-matcher worktree): `RefChecks.checkMemberTypesOK` compared each inherited member's seen-from signature with a fresh copy of itself unless the member is a `JointRefDenotation`. On scalaz, dotc, tastyQuery, parallelCollections and dottyUtil there are no joint denotations; the epoch trace shows 51% fewer types over method/poly params on scalaz (12% dotc, 25% tastyQuery), output identical.",
+    "One build, two variants by `-D` (read once per JVM, so cross-fork, not paired). Plain `203750f926` with weak interners, no uncache switches. **Full pipeline** (RefChecks is after typer), ordinary GC, 8 GB heap. Graal 25.4.4, xctrace ipc, 6 rounds, M4."
+  ]
+}

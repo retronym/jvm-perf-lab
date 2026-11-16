@@ -1,0 +1,31 @@
+{
+  "name": "local-uncache-scoped",
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/xctrace/loads.template.xml",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/25.4.4.1+1-graal/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 2,
+  "corpora": {
+    "scalaz": "-f 1 -bm ss -wi 25 -i 10"
+  },
+  "variants": {
+    "weak": "",
+    "weak-UDM": "-Ddotty.uniques.uncacheMethodParams=true -Ddotty.uniques.uncachedAppliedCache=4096",
+    "epoch-full": "-Ddotty.uniques.uncacheMethodParams=true -Ddotty.uniques.epochTable=8192",
+    "epoch-scoped": "-Ddotty.uniques.uncacheMethodParams=true -Ddotty.uniques.epochTable=8192 -Ddotty.uniques.epochClear=scoped -Ddotty.uniques.uncachedAppliedCache=4096"
+  },
+  "variantDescriptions": {
+    "weak": "`203750f926` + interner switches (`claude/uncache-revive-7ab73d`), all off",
+    "weak-UDM": "U + 4K-slot direct-mapped cache (lossy, last writer wins)",
+    "epoch-full": "U + exact hash-consing in an 8K-slot strong epoch table, cleared when 3/4 full",
+    "epoch-scoped": "U + epoch table only inside scopes (a class's override checks, its bridges, a mixin forwarder, an explore), dropped at scope end; direct-mapped cache outside scopes"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Scoped epochs: lifetime of types over method/poly params limited to the override check, bridge or mixin forwarder that made them. scalaz, full pipeline, Graal 25.4.4, weak interners, xctrace loads, 2 rounds. M5 direction check."
+  ]
+}

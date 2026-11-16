@@ -1,0 +1,36 @@
+{
+  "name": "m5-lazydepth-sam-paired",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "polish": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/lazy-lub-depth-polish-a45778",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "paired": {
+    "current": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/lazy-lub-depth",
+    "polish": "@build=."
+  },
+  "variantDescriptions": {
+    "current": "`claude/lazy-lub-depth` (retronym/scala#245): by-name `=> Depth`, memoized with local vars in `solve` and `mergePrefixAndArgs`",
+    "polish": "`claude/lazy-lub-depth-polish` (retronym/scala#246): `LazyDepth` abstract class, call sites SAM-convert `() => lubDepth(...)`"
+  },
+  "rounds": 4,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 40 -i 60 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "description": [
+    "Is #246's SAM `LazyDepth` perf-neutral against #245's by-name memo? The two builds emit byte-identical class files. Single-fork kperf spikes disagreed (m5-lazydepth-polish-kperf flat; m5-lazydepth-sam-kperf +3% cycles, +2.5% alloc, with #245's own alloc moving 2% between them), so: both builds' quick classes paired by iteration within each fork, typer only, scala corpus, 4 forks of 40 + 60 single shots, laptop."
+  ]
+}

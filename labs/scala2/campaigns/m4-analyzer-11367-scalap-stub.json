@@ -1,0 +1,29 @@
+{
+  "name": "m4-analyzer-11367-scalap-stub",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "description": [
+    "One-round spike: does [scala/scala#11367](https://github.com/scala/scala/pull/11367) (head `28026a8e6b`, with lrytz's `Global.analyzer` typing) cut the itable stub share when compiling scalap? Read the `itable stub` frames and cycles, not the score. Merge base `c84dea8aa7`, A/A beside it. Release optimizer settings; patched JDK 26."
+  ],
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {"checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base", "env": {"SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1"}},
+    "baseaa": {"checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base", "env": {"SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1"}},
+    "pr": {"checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/scala-pr-11367-review-a82cbf", "env": {"SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1"}}
+  },
+  "variants": {"base": "", "baseaa": "", "pr": ""},
+  "variantDescriptions": {
+    "base": "Merge base of #11367 on `2.13.x`",
+    "baseaa": "The same build as `base`, the A/A control",
+    "pr": "#11367 head `28026a8e6b`"
+  },
+  "rounds": 1,
+  "loadgate": {"maxCores": 1.5, "quietSecs": 30},
+  "gcLog": true,
+  "corpora": {
+    "scalap": "-f 1 -bm ss -wi 6 -i 6 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock"
+}

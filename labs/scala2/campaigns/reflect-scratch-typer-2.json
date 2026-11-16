@@ -1,0 +1,24 @@
+{
+  "name": "reflect-scratch-typer-2",
+  "description": [
+    "Branch `claude/reflect-scratch-4f66f7` after `findMember` was taken off the `using` closure and kind D (ids, names, uniques) moved to implementations chosen at construction from `isConcurrentUniverse`.",
+    "Question: does batch compilation pay for any of it? Typer only, paired within forks."
+  ],
+  "variantDescriptions": {
+    "base": "2.13.x plus the plan and the reflection benchmark (no code change)",
+    "pr": "the branch tip"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "rounds": 3,
+  "corpora": {
+    "re2s": "-wi 12 -i 12 -w 3 -r 3 -p scalacOptions=-Ystop-after:typer",
+    "scalap": "-wi 16 -i 12 -w 2 -r 2 -p scalacOptions=-Ystop-after:typer"
+  },
+  "paired": {
+    "base": "@build=../reflect-scratch-base",
+    "pr": "@build=."
+  },
+  "gcLog": true,
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing"
+}

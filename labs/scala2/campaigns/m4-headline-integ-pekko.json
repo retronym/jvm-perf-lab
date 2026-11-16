@@ -1,0 +1,53 @@
+{
+  "name": "m4-headline-integ-pekko",
+  "description": [
+    "What does the whole integration branch give? The −24% in `m4-branch-int148-scala` rests on one fork per commit. This repeats base against tip, with an A/A beside it, and shows whether the integration build's forks spread less than `2.13.x`'s. Pekko-actor and pekko-stream."
+  ],
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "rounds": 8,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 8 -i 10 -p jdkHome=25.0.4-tem"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "testbed": "m4",
+  "variants": {
+    "base": "",
+    "baseaa": "",
+    "integ": ""
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "baseaa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "integ": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/integ-tip-measure",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variantDescriptions": {
+    "base": "`2.13.x` at `c84dea8aa7`, the merge base of the integration branch",
+    "baseaa": "The same build as `base`",
+    "integ": "`scala2-perf-integration` at `2ccfdf2177`"
+  }
+}

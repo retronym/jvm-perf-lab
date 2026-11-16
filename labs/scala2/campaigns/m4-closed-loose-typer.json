@@ -1,0 +1,52 @@
+{
+  "name": "m4-closed-loose-typer",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "fast2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-fast2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "loose": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-loose",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "fast2": "",
+    "loose": ""
+  },
+  "variantDescriptions": {
+    "base": "`claude/typeref-bench-base`: retronym/scala#212 head + scala/scala#11381 + retronym/scala#243 (TypeRef fold) + retronym/scala#244 (unique types compared structurally, uniques table dropped at the end of a run)",
+    "fast2": "`claude/typeref-bench-fast2`: closed scopes with the cheap bookkeeping (state beside the table, `Made` bit), keeping every type that outlives a scope interned; + #243 + #244",
+    "loose": "`claude/typeref-bench-loose`: closed scopes that only keep their types out of the uniques table; types may outlive a scope uninterned. + #243 + #244"
+  },
+  "rounds": 5,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 30 -i 20 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "description": [
+    "Timing A/B: do closed scopes pay in the typer once their bookkeeping is gone? `loose` (option D) against `fast2` and the base, all with retronym/scala#243 and #244. One-fork kperf profiles (m4-closed-typeref-kperf, m4-closed-loose-kperf) put loose at +0.4% cycles and fast2 at +1.6..3.2%, inside one-fork noise. Typer only, scala corpus, 5 rounds of separate forks, 8 GB G1, patched JDK 26, M4."
+  ]
+}

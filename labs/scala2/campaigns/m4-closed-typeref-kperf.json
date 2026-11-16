@@ -1,0 +1,54 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "closed": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-closed",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "fast2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-fast2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "closed": "",
+    "fast2": ""
+  },
+  "variantDescriptions": {
+    "base": "retronym/scala#212 head plus scala/scala#11381 (`claude/closed-scope-bench-base`) + retronym/scala#243 (TypeRef fold: `NonClassTypeRef` an abstract class), branch `claude/typeref-bench-base`",
+    "closed": "retronym/scala#241 as pushed, plus scala/scala#11381 (`claude/closed-scope-bench`) + retronym/scala#243 (TypeRef fold: `NonClassTypeRef` an abstract class), branch `claude/typeref-bench-closed`",
+    "fast2": "`fast1` plus the `Made` bit: no table lookups for a closed scope until it has handed out a type not in the table (`claude/closed-scope-fastpath-bench`) + retronym/scala#243 (TypeRef fold: `NonClassTypeRef` an abstract class), branch `claude/typeref-bench-fast2`"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 15 -i 3 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "name": "m4-closed-typeref-kperf",
+  "profile": "async:cycles@400000+instructions@1200000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "description": [
+    "As m4-closed-fast2-kperf with retronym/scala#243 under all three builds: with `NonClassTypeRef` a class, `relativeInfo`'s cache fields are field loads, not megamorphic interface accessors. How much of the closed-scope overhead was those itable stubs? PMU profile, kperf, one fork per variant, 15 + 3 single shots, typer only. Not a timing A/B."
+  ]
+}

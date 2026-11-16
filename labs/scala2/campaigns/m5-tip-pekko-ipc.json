@@ -1,0 +1,35 @@
+{
+  "name": "m5-tip-pekko-ipc",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "builds": {
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/integ-next",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "tip": ""
+  },
+  "variantDescriptions": {
+    "tip": "`scala2-perf-integration` tip `f0b6e17bd9`, default `-Yname-table:shared`"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 8 -i 10 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "xctrace:ipc",
+  "description": [
+    "Whole-program counters for the integration tip on pekko through xctrace: cycles, instructions, IPC, branch mispredictions. The kperf helper isn't running on m5-pro, so this stands in for the attributed PMU profile."
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "name": "m4-devirt-sym-prof",
+  "description": [
+    "Prototype evidence for devirtualising `Symbol.isClass` / `isPackageClass` / `isRefinementClass` / `info` / `rawInfo` (made final; see `DEVIRT-SYMBOL-PREDICATES.md` in the `devirt-symbol-predicates-625c33` worktree). PMU profile through the kperf helper (cycles, instructions) of the scala corpus on the M4, one fork per build, to attribute `vtable stub` / `itable stub` samples to their caller frames with `--lines` in each build. Not a timing A/B.",
+    "",
+    "Both builds with the release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26 (`jdk26-integration-branch-e9e67e`), 8G heap, single-shot 4+4 ops, as `m4-int00e3bb-kperf-l1d`."
+  ],
+  "variantDescriptions": {
+    "base": "`scala2-perf-integration` tip `00e3bbafb8`",
+    "proto": "base + uncommitted prototype: final kind predicates (klass checks + raw PACKAGE bit) and final `info`/`rawInfo`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-rebase",
+      "env": {"SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1"}
+    },
+    "proto": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-symbol-predicates-625c33",
+      "env": {"SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1"}
+    }
+  },
+  "variants": {"base": "", "proto": ""},
+  "rounds": 1,
+  "loadgate": {"maxCores": 1.5, "quietSecs": 30},
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock"
+}

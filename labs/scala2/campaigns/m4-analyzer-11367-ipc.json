@@ -1,0 +1,46 @@
+{
+  "name": "m4-analyzer-11367-ipc",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "description": "Does [scala/scala#11367](https://github.com/scala/scala/pull/11367) itself give the gain measured for closed scala/scala#11306 at integration commit da0ae9b4c1 (-8.3% cycles, -6.9% instructions, one fork, on a stack)? `009f2eb4c4` against its merge base `c84dea8aa7`, full compile of the scala corpus, one `Global`, one fork per variant per round, with an A/A beside it. Release optimizer settings; patched JDK 26.",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "baseaa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "analyzer": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-head",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "baseaa": "",
+    "analyzer": ""
+  },
+  "rounds": 6,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "xctrace:ipc"
+}

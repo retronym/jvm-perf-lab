@@ -1,0 +1,52 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 5,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 30 -i 20 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "name": "m4-typeref-fold-typer",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "fold": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-fold-args-15b7b0",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "base2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "base2": "",
+    "fold": ""
+  },
+  "variantDescriptions": {
+    "base": "scala/scala 2.13.x at 762d80f17e",
+    "fold": "retronym/scala `claude/typeref-fold-args-15b7b0`: ArgsTypeRef/NoArgsTypeRef folded into TypeRef; NonClassTypeRef, AliasTypeRef, AbstractTypeRef are classes",
+    "base2": "The same commit as `base`: A/A noise floor"
+  },
+  "description": [
+    "Timing A/B of retronym/scala#243 (TypeRef: Args/NoArgs folded in, alias/abstract as classes) after a kperf spike (m4-typeref-fold-kperf) showed -2.4% cycles and -2.5% instructions in one fork. Typer only, scala corpus, separate forks, 8 GB G1, patched JDK 26, M4; `base2` is an A/A."
+  ]
+}

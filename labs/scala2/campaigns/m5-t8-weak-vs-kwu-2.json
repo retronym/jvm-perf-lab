@@ -1,0 +1,47 @@
+{
+  "name": "m5-t8-weak-vs-kwu-2",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms24G -Xmx24G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "kwu": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "weak": "-Dscala.uniques.layout=weak",
+    "kwu": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all"
+  },
+  "variantJmhArgs": {
+    "weak": "-t 8",
+    "kwu": "-t 8"
+  },
+  "variantDescriptions": {
+    "weak": "8 independent compiles at once, today's `WeakHashSet` uniques table, every type interned",
+    "kwu": "8 independent compiles at once, `ChunkedInterner(weak = true)` and types made in the weak scopes not interned"
+  },
+  "profile": "none",
+  "rounds": 3,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 3 -i 5 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "8 independent compiles at once (JMH `-t 8`, single shot: each iteration is 8 concurrent scala-corpus compiles, each its own `Global`), 24 GB G1 heap, laptop, separate forks, 3 per variant. Repeats the one-fork kperf contrast (jobs 576 and 574: 15,093 vs 13,208 ms per compile), where part of the gap was a JIT difference in `Typer.typed` between the two forks. Read GC pause sums from `gc.log` too. Build `claude/uniques-audit-2.13.x` `1e85ab8eba`: the prototypes merged with upstream 2.13.x, which brings scala/scala#11367 (no megamorphic interface calls to the analyzer when several `Global`s share a JVM; without it the earlier forks spent 2-4% of compile-thread cycles in itable stubs under `Typer.typed`)."
+  ]
+}

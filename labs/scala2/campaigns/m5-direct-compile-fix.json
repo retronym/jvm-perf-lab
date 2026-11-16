@@ -1,0 +1,53 @@
+{
+  "name": "m5-direct-compile-fix",
+  "benchmark": "CompileBenchmark",
+  "description": [
+    "Time benefit of direct emission on a full compile, which the m5 campaigns left unresolved (about 1% estimated from profiles; a review expects 0.5 to 0.8%). One fork per variant per round, with an A/A beside it. Instructions from xctrace as well as time. Release optimizer settings; patched JDK 26."
+  ],
+  "rounds": 6,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "testbed": "m5-pro",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-asm-emit-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "baseaa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-asm-emit-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "direct": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-asm-emit-fix",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "baseaa": "",
+    "direct": ""
+  },
+  "variantDescriptions": {
+    "base": "[retronym/scala#200](https://github.com/retronym/scala/pull/200) at `b8c499db39`, the base of #203",
+    "baseaa": "The same build as `base`, the A/A control",
+    "direct": "[retronym/scala#203](https://github.com/retronym/scala/pull/203) at `27b2342cf9`: classes written directly from codegen, with the fixes for the two load-time failures"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true
+}

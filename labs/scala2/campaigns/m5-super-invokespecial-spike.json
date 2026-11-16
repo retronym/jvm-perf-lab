@@ -1,0 +1,46 @@
+{
+  "name": "m5-super-invokespecial-spike",
+  "description": [
+    "Spike on m5-pro (profile, not timing): do mixin forwarders that `invokespecial` a directly extended trait's method, instead of calling its static `m$`, remove the remaining `lookup_secondary_supers_table_slow_path_stub` samples? Each build is compiled by a local STARR from its own source: `hot2` by `666cbbf` (no codegen change), `codegen` by `d30c2e9` (with it). One round, kperf, typer-only scala corpus."
+  ],
+  "variantDescriptions": {
+    "hot2": "hot `Types` code in nested classes, `666cbbf3e3`, built by STARR `2.13.19-bin-666cbbf-SNAPSHOT`",
+    "codegen": "`hot2` + super calls to direct-parent traits as `invokespecial`, `d30c2e9246`, built by STARR `2.13.19-bin-d30c2e9-SNAPSHOT`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "hot2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-hot2",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "codegen": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-codegen",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "hot2": "",
+    "codegen": ""
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 3,
+    "quietSecs": 10
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 8 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "profile": "async:cycles@2000000+instructions@5000000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "jitRecording": true
+}

@@ -1,0 +1,47 @@
+{
+  "name": "m4-genbcode-alloc-ab",
+  "description": [
+    "Timing and alloc/op A/B of GenBCode allocation fixes (branch `claude/genbcode-alloc-4bb6db`) against their base, the `scala2-perf-integration` tip `00e3bbafb8`: per-symbol `MethodBType` cache with memoised descriptor, unbuffered `VirtualFileWriter`, `VirtualFile` adopting an exactly-sized buffer, allocation-free `ClassBType.isSubtypeOf` recursion. Baseline profile: `m4-int00e3bb-prof` (BType.toString 46.9 MB/op, VirtualFile write path 123 MB/op on scala).",
+    "",
+    "Both builds with the release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26 (`jdk26-integration-branch-e9e67e`), 8G heap. Builds alternate fork by fork over 3 rounds (a no-regression check: the expected time effect, ~0.1-0.3%, is below fork noise). scala: single-shot 4+4 ops; scalap: 20+20 x 2 s."
+  ],
+  "variantDescriptions": {
+    "base": "`scala2-perf-integration` tip `00e3bbafb8`",
+    "alloc": "base + GenBCode allocation commits on `claude/genbcode-alloc-4bb6db`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-rebase",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "alloc": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/genbcode-alloc-4bb6db",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "alloc": ""
+  },
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem",
+    "scalap": "-f 1 -wi 20 -w 2 -i 20 -r 2"
+  },
+  "profile": "none"
+}

@@ -1,0 +1,47 @@
+{
+  "name": "m5-t1-weak-vs-kwu-2",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms24G -Xmx24G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "kwu": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "weak": "-Dscala.uniques.layout=weak",
+    "kwu": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all"
+  },
+  "variantJmhArgs": {
+    "weak": "-t 1",
+    "kwu": "-t 1"
+  },
+  "variantDescriptions": {
+    "weak": "one compile at a time, today's `WeakHashSet` uniques table, every type interned",
+    "kwu": "one compile at a time, `ChunkedInterner(weak = true)` and types made in the weak scopes not interned"
+  },
+  "profile": "none",
+  "rounds": 3,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 20 -i 10 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "One compile at a time (JMH `-t 1`, single shot, 20 warmup compiles), the counterpart of m5-t8-weak-vs-kwu-2 (job 578), 24 GB G1 heap, laptop, separate forks, 3 per variant. Read GC pause sums from `gc.log` too. Build `claude/uniques-audit-2.13.x` `1e85ab8eba`: the prototypes merged with upstream 2.13.x, which brings scala/scala#11367 (no megamorphic interface calls to the analyzer when several `Global`s share a JVM; without it the earlier forks spent 2-4% of compile-thread cycles in itable stubs under `Typer.typed`)."
+  ]
+}

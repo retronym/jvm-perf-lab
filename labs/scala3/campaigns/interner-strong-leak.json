@@ -1,0 +1,28 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "audit:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/audits/heapdump-typer.audit",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop -Dcompilerlab.heapdump.at=20 -Dcompilerlab.heapdump.file=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/heapdumps/%p",
+  "rounds": 1,
+  "corpora": {
+    "scalaz": "-f 1 -bm ss -wi 13 -i 8 -p scalacOptions=-Ystop-after:typer"
+  },
+  "loadgate": {
+    "maxCores": 16,
+    "quietSecs": 0
+  },
+  "gcLog": true,
+  "name": "interner-strong-leak",
+  "description": [
+    "Which references keep earlier compilations alive across ops? In [interner-strong-spike](../interner-strong-spike), strong interning left about 3 GB live after GC on scalaz, more than three ops' allocation, although each op builds a fresh `ContextBase`. A class histogram and heap dump at the end of the typer of compile 20, weak and strong, for `heap-paths`.",
+    "scalaz to `-Ystop-after:typer`, one fork each, patched JDK 26."
+  ],
+  "variantDescriptions": {
+    "weak": "#84 tip + interner switches, switches off",
+    "strong": "`-Ddotty.uniques.strong=true`"
+  },
+  "variants": {
+    "weak": "",
+    "strong": "-Ddotty.uniques.strong=true"
+  }
+}

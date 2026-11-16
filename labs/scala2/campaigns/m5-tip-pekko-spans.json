@@ -1,0 +1,38 @@
+{
+  "name": "m5-tip-pekko-spans",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1 -javaagent:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/perflab-agent/target/perflab-agent-0.1.0-SNAPSHOT.jar=spec=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala2/def-costs.hooks",
+  "builds": {
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/integ-next",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "tip": ""
+  },
+  "variantDescriptions": {
+    "tip": "`scala2-perf-integration` at `2ccfdf2177`, with cost frames as async-profiler spans"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 8 -i 10 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cpu",
+  "description": [
+    "CPU profile of pekko with each cost frame (phase, unit, definition, implicit search) as an async-profiler span, for flame graphs split by definition. Timings carry the agent's overhead."
+  ],
+  "variantJmhArgs": {
+    "tip": "-p scalacOptions=--defs-listener:io.github.retronym.perflab.costs.SpanCostListener"
+  }
+}

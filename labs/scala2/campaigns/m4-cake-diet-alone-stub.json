@@ -1,0 +1,54 @@
+{
+  "name": "m4-cake-diet-alone-stub",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "description": [
+    "Share of cycles and instructions in `lookup_secondary_supers_table_slow_path_stub` on the same builds as `m4-cake-diet-alone-ipc`. Read the stub frame, not the score."
+  ],
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/cake-11365-m-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "baseaa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/cake-11365-m-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "cake": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/cake-11365-m-head",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "baseaa": "",
+    "cake": ""
+  },
+  "variantDescriptions": {
+    "base": "[scala/scala#11365](https://github.com/scala/scala/pull/11365)'s merge base on `2.13.x`",
+    "baseaa": "The same build as `base`, the A/A control",
+    "cake": "The approved head of [scala/scala#11365](https://github.com/scala/scala/pull/11365), nothing else"
+  },
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock"
+}

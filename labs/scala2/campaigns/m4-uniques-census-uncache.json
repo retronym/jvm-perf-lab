@@ -1,0 +1,39 @@
+{
+  "name": "m4-uniques-census-uncache",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "kw": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "kwu": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "kw": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.census=true",
+    "kwu": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Dscala.uniques.census=true"
+  },
+  "variantDescriptions": {
+    "kw": "`claude/uniques-audit` `41986b33ea`, chunked-weak, census on (weak scopes tagged, everything interned)",
+    "kwu": "the same, with `-Dscala.uniques.uncache=all`: types made in the weak scopes are not added to the table"
+  },
+  "rounds": 1,
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 2 -i 1 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Top-line uniques counts for one scala-corpus compile before and after uncache: types added to the table, their fates, and in the uncache variant how many lookups in the weak scopes were served by the table, by the direct-mapped cache, or returned uninterned. Counters are over every compile of the fork; divide by runs."
+  ],
+  "testbed": "m4"
+}

@@ -1,0 +1,58 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/xctrace/loads.template.xml",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 1,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:typer"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "batch-84-l2-c13-c14",
+  "description": [
+    "Is commit 14 of #84 (several readers over one symbol table) where the extra L2 load misses come in? [batch-84-l2-reader-namehash](../batch-84-l2-reader-namehash) put the whole +8\u20139% between commits 12 and 27. c12 and c27 again as the ends, from their existing snapshots' checkouts.",
+    "dotc to `-Ystop-after:typer`, single-shot 30+16, xctrace `loads` template, patched JDK 26, one fork each."
+  ],
+  "variantDescriptions": {
+    "c12": "#84 commit 12, `901a82daa8` (L2 at base's level in [batch-84-l2-reader-namehash](../batch-84-l2-reader-namehash)) + library stamps",
+    "c13": "#84 commit 13, `8899fc4dbb` \"Cyclic reference messages do not re-run the cycle they report\" + library stamps",
+    "c14": "#84 commit 14, `73c59487a3` \"Interactive: several readers over one symbol table, serialised and parallel\" + library stamps",
+    "c27": "#84 commit 27, `290df95295` (L2 +8.4% over base) + library stamps"
+  },
+  "builds": {
+    "c12": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bis84-c12",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "c13": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bis84-c13",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "c14": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bis84-c14",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "c27": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bis84-c27",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "c12": "",
+    "c13": "",
+    "c14": "",
+    "c27": ""
+  }
+}

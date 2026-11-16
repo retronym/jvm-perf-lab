@@ -1,0 +1,14 @@
+{
+  "name": "glb-collectors-typer",
+  "description": "scala/scala#11314: type collectors behind ReusableInstance (pr) against the merge base (base), paired within forks, typer only",
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "rounds": 3,
+  "corpora": {
+    "re2s": "-wi 12 -i 12 -w 3 -r 3 -p scalacOptions=-Ystop-after:typer",
+    "scalap": "-wi 16 -i 12 -w 2 -r 2 -p scalacOptions=-Ystop-after:typer"
+  },
+  "paired": {"base": "@build=../glb-base", "pr": "@build=."},
+  "gcLog": true,
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing"
+}

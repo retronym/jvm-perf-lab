@@ -1,0 +1,37 @@
+{
+  "name": "m5-names-paired",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "description": [
+    "A quick look at the `-Yname-table` stores, interleaved in one JVM with a class loader per variant, so each store's call sites stay monomorphic. Twelve cycles of six variants, with a balanced order. One fork per corpus: this ranks the stores and is not a precise measure."
+  ],
+  "variantDescriptions": {
+    "aa": "`chars` again in another class loader, for the noise floor",
+    "chars": "[retronym/scala#204](https://github.com/retronym/scala/pull/204) at `b43cf4e985`, `-Yname-table:chars`, the baseline here. The cost of `NameStore` against plain upstream is in `m4-names-ab`.",
+    "cached": "`-Yname-table:cached`",
+    "string": "`-Yname-table:string`",
+    "bytes": "`-Yname-table:bytes`",
+    "shared": "`-Yname-table:shared`. A full GC between iterations clears its weak table, so this shows no reuse across compiles"
+  },
+  "profile": "none",
+  "rounds": 1,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "re2s": "-f 1 -bm ss -wi 60 -i 72 -p jdkHome=25.0.4-tem -p gcBetweenIterations=true",
+    "scala": "-f 1 -bm ss -wi 36 -i 72 -p jdkHome=25.0.4-tem -p gcBetweenIterations=true"
+  },
+  "paired": {
+    "chars": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-tip -Yname-table:chars",
+    "aa": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-tip -Yname-table:chars",
+    "cached": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-tip -Yname-table:cached",
+    "string": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-tip -Yname-table:string",
+    "bytes": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-tip -Yname-table:bytes",
+    "shared": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-tip -Yname-table:shared"
+  },
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus"
+}

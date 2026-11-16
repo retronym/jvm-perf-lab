@@ -1,0 +1,58 @@
+{
+  "name": "m4-localopt-narrow",
+  "description": [
+    "Does analyzing a method only when a pass has a question for it save compile time? Answers lrytz's [review comment](https://github.com/scala/scala/pull/11350#pullrequestreview-5754772227). Compiles pekko with `-opt:l:inline`; warmup from `m4-localopt-pilot`."
+  ],
+  "variantDescriptions": {
+    "stack": "[scala/scala#11350](https://github.com/scala/scala/pull/11350), [#11352](https://github.com/scala/scala/pull/11352) and [#11353](https://github.com/scala/scala/pull/11353) together: box-unbox and stale stores force the shared analysis on every method with an instruction or a call.",
+    "stack-aa": "The same commit as `stack`, built from its own checkout: the A/A noise floor.",
+    "narrow": "The stack plus the narrowing: box-unbox and the `ClassTag` check ask for the analysis only once an instruction matches. Output is byte-identical; analyses fall 61% and instructions analysed 27% on pekko."
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "builds": {
+    "stack": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/localopt-stack",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "stack-aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/localopt-stack-aa",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "narrow": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/localopt-narrow",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "stack": "",
+    "stack-aa": "",
+    "narrow": ""
+  },
+  "variantJmhArgs": {
+    "stack": "-p 'scalacOptions=-opt:l:inline -opt-inline-from:org.apache.pekko.**'",
+    "stack-aa": "-p 'scalacOptions=-opt:l:inline -opt-inline-from:org.apache.pekko.**'",
+    "narrow": "-p 'scalacOptions=-opt:l:inline -opt-inline-from:org.apache.pekko.**'"
+  },
+  "rounds": 8,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 20 -i 10 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "none"
+}

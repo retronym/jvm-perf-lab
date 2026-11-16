@@ -1,0 +1,48 @@
+{
+  "name": "m4-re2s-patmat",
+  "description": [
+    "[scala/scala#11307](https://github.com/scala/scala/pull/11307) on re2s, to resolve what `m4-patmat-split1` could not: the smallest split and the whole PR against their merge base."
+  ],
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 12,
+  "variants": {
+    "base": "",
+    "split1": "",
+    "whole": ""
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/patmat-settle-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "split1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/patmat-split1-measure",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "whole": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/patmat-settle-whole",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "corpora": {
+    "re2s": "-f 1 -bm ss -wi 40 -i 40 -p jdkHome=25.0.4-tem"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "testbed": "m4"
+}

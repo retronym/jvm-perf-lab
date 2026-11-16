@@ -1,0 +1,33 @@
+{
+  "name": "local-uncache-epoch",
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/xctrace/loads.template.xml",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/25.4.4.1+1-graal/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 1,
+  "corpora": {
+    "scalaz": "-f 1 -bm ss -wi 25 -i 10"
+  },
+  "variants": {
+    "weak": "",
+    "weak-UDM": "-Ddotty.uniques.uncacheMethodParams=true -Ddotty.uniques.uncachedAppliedCache=4096",
+    "epoch-full": "-Ddotty.uniques.uncacheMethodParams=true -Ddotty.uniques.epochTable=8192",
+    "epoch-unit": "-Ddotty.uniques.uncacheMethodParams=true -Ddotty.uniques.epochTable=8192 -Ddotty.uniques.epochClear=unit",
+    "epoch-explore": "-Ddotty.uniques.uncacheMethodParams=true -Ddotty.uniques.epochTable=8192 -Ddotty.uniques.epochClear=explore"
+  },
+  "variantDescriptions": {
+    "weak": "`203750f926` + interner switches (`claude/uncache-revive-7ab73d` `b2c54e92ee`), all off",
+    "weak-UDM": "U + 4K-slot direct-mapped cache (lossy, last writer wins)",
+    "epoch-full": "U + exact hash-consing of those types in an 8K-slot strong table, dropped wholesale when 3/4 full",
+    "epoch-unit": "epoch table, also dropped after each unit of each phase",
+    "epoch-explore": "epoch table; entries made inside an `explore` rolled back when it ends (drop-context)"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Drop-context idea: types over method/poly params hash-consed exactly in a strong epoch table dropped at a boundary, against the lossy direct-mapped cache and the baseline. scalaz, full pipeline, Graal 25.4.4, weak interners, xctrace loads, 1 round. M5 direction check."
+  ]
+}

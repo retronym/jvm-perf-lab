@@ -1,0 +1,39 @@
+{
+  "name": "m5-kwu-scaling-xctrace-warm",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms24G -Xmx24G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus -Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all",
+  "builds": {
+    "t1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "t1": ""
+  },
+  "variantJmhArgs": {
+    "t1": "-t 1 -wi 15"
+  },
+  "variantDescriptions": {
+    "t1": "one compile at a time, 15 warmup compiles (6 left C2 still compiling in the measurement, job 569)"
+  },
+  "profile": "xctrace:ipc",
+  "rounds": 1,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -i 3 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Job 569 again for one compile at a time, warmed up: in job 569 the 1-compile cell had only 6 warmup compiles and C2 was still compiling during measurement (4.5G JIT instructions per op, benchmark-thread instructions falling 165G -> 157G), while the 8-compile cell had 48 and had settled at ~139G. Compare with job 569 t8.",
+    "",
+    "Build `claude/uniques-audit` `41986b33ea` with `-Yuniques-layout:chunked-weak` and `-Yuniques-uncache all` (ChunkedInterner(weak = true), types made in the weak scopes not interned). Scala corpus, 24 GB G1 heap, laptop, one fork per variant."
+  ]
+}

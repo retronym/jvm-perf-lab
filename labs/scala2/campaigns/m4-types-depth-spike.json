@@ -1,0 +1,46 @@
+{
+  "name": "m4-types-depth-spike",
+  "description": [
+    "Spike: does keeping the `Type` hierarchy within HotSpot's 8-entry primary supers display pay, on top of the `TypeComparer` class? `TypeApiImpl` becomes a trait, so `FoldableConstantType`, `LiteralType`, `UniqueSingleType` and `UniqueThisType` go from depth 8 to 7 and type tests against them stop consulting the secondary supers table. One round, kperf, typer-only scala corpus."
+  ],
+  "variantDescriptions": {
+    "tc": "the `TypeComparer` class, `58d0363519`",
+    "depth": "`tc` plus `TypeApiImpl` as a trait, `20a13f846d`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "tc": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-tc-class",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "depth": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-depth",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "tc": "",
+    "depth": ""
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 8 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "profile": "async:cycles@2000000+instructions@5000000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "jitRecording": true
+}

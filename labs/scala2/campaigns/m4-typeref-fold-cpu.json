@@ -1,0 +1,45 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "fold": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-fold-args-15b7b0",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "fold": ""
+  },
+  "variantDescriptions": {
+    "base": "scala/scala 2.13.x at 762d80f17e",
+    "fold": "retronym/scala `claude/typeref-fold-args-15b7b0`: ArgsTypeRef/NoArgsTypeRef folded into TypeRef; NonClassTypeRef, AliasTypeRef, AbstractTypeRef are classes"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 15 -i 3 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "name": "m4-typeref-fold-cpu",
+  "profile": "async:cpu",
+  "jitRecording": true,
+  "description": [
+    "Spike companion: async cpu profile with the JIT recorded over each fork, for `jit_diff` of the TypeRef fold against base. Not a timing A/B."
+  ]
+}

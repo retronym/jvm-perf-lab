@@ -1,0 +1,44 @@
+{
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Xmn3g -XX:-G1UseAdaptiveIHOP -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-mapped-uniques-a6f59c",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "direct": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-mapped-uniques-a6f59c",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "weak": "-Dscalac.uniques=weak",
+    "direct": "-Dscalac.uniques=direct"
+  },
+  "variantDescriptions": {
+    "weak": "today's `WeakHashSet` uniques table, cleared at the end of each run (retronym/scala#244)",
+    "direct": "lossy direct-mapped `Array[Type]` of 16k slots indexed by `hashCode & mask`; a miss overwrites the slot; a fresh array every 64k inserts",
+    "off": "no interning: `unique(tp)` returns `tp`"
+  },
+  "gcLog": true,
+  "name": "uniques-direct-spike-prof",
+  "description": [
+    "Far-corner spike: is a tiny, lossy, young direct-mapped interner for Scala 2 types competitive with today's weak uniques table, or with no interning at all? One build (branch `claude/direct-mapped-uniques-a6f59c`, on retronym/scala#251), the interner picked per fork by `-Dscalac.uniques`.",
+    "",
+    "Full compile of the `scala` corpus, single-shot, 8 warmup + 6 measured ops; patched JDK 26, 8G heap, fixed 3G young generation.",
+    "",
+    "CPU profile, one fork per variant, for `profdiff` of direct vs weak."
+  ],
+  "rounds": 1,
+  "profile": "async:cpu",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 3 -p jdkHome=25.0.4-tem"
+  }
+}

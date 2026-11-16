@@ -1,0 +1,70 @@
+{
+  "name": "m4-analyzer-11367-why",
+  "description": [
+    "What does [scala/scala#11367](https://github.com/scala/scala/pull/11367) gain with one `Global`? The review's hypothesis is that a plain compile has two analyzer classes (`Global`'s, `Erasure`'s), `Duplicators` makes a third when the sources use `@specialized`, and three receivers put shared `Typer` and `Context` sites past `TypeProfileWidth=2`, into itable stubs. A local class-load log confirms `Duplicators` loads on the scala corpus and not under `-no-specialization`.",
+    "",
+    "If it holds: `analyzer` beats `base` on scala, the gain goes away between `base-nospec` and `analyzer-nospec`, and scalap (no `@specialized`) is flat. On scalap the two nospec variants are extra A/As, since the flag has nothing to do there. Flame graphs: compare itable stub share. Release optimizer settings; patched JDK 26, `m4-analyzer-11367-ipc` asks the same base-against-head question with xctrace."
+  ],
+  "variantDescriptions": {
+    "base": "`c84dea8aa7`, the merge base",
+    "analyzer": "#11367 at `009f2eb4c4`",
+    "base-nospec": "`base` compiling with `-no-specialization`",
+    "analyzer-nospec": "`analyzer` compiling with `-no-specialization`"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "analyzer": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-head",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "base-nospec": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "analyzer-nospec": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-head",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "analyzer": "",
+    "base-nospec": "",
+    "analyzer-nospec": ""
+  },
+  "variantJmhArgs": {
+    "base-nospec": "-p scalacOptions=-no-specialization",
+    "analyzer-nospec": "-p scalacOptions=-no-specialization"
+  },
+  "rounds": 5,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem",
+    "scalap": "-f 1 -wi 20 -w 2 -i 20 -r 2 -p jdkHome=25.0.4-tem"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock"
+}

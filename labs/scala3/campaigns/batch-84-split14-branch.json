@@ -1,0 +1,38 @@
+{
+  "name": "batch-84-split14-branch",
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/xctrace/loads.template.xml",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 3,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x="
+  },
+  "branch": {
+    "checkout": "/Users/jzaugg-virtus/code/scala/scala3",
+    "range": "d80dff8594..split-c14-73c59487-stamps",
+    "env": {
+      "SCALA3_CHECKOUT": "{checkout}"
+    }
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "#84's commit 14 (`73c59487a3`, \"several readers over one symbol table\"), split into 18 building commits (`split-c14-73c59487`, here rebased onto commit 13 + the library-stamps fix as `split-c14-73c59487-stamps`), measured commit by commit by **L2 load misses** (`PL2_CACHE_MISS_LD`), the metric that carries commit 14's +8\u201310% step and varies only about \u00b11.3% between forks.",
+    "Earlier ab rounds ([r1](../batch-84-l2-split14-r1)) put the step in two places: about +3.3% by part 2, about +4.8% in parts 8\u201312.",
+    "dotc to `-Ystop-after:typer`, no GC inside an op (`gcBetweenIterations`, 8 GB young gen), single-shot 30+16, xctrace `loads`, patched JDK 26, one fork per commit.",
+    "Rounds 2\u20133 added: one fork per commit can't resolve the 2\u20134M steps between parts (forks of one build differ by up to 2.7M, [batch-84-l2-part12-fix](../batch-84-l2-part12-fix))."
+  ],
+  "profiles": {
+    "profile": "async:cycles@5000000+PL2_CACHE_MISS_LD@100000",
+    "kperf": "/tmp/asprof-kperf.sock",
+    "corpora": [
+      "dotc"
+    ],
+    "jmhArgs": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x=",
+    "rounds": 1
+  }
+}

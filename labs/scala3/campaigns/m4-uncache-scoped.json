@@ -1,0 +1,75 @@
+{
+  "name": "m4-uncache-scoped",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/25.4.4.1+1-graal/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "testbed": "m4",
+  "builds": {
+    "weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/uncache-revive-7ab73d",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "weak-UDM": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/uncache-revive-7ab73d",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "weak-scoped": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/uncache-revive-7ab73d",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "strong": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/uncache-revive-7ab73d",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "strong-UDM": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/uncache-revive-7ab73d",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "strong-scoped": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/uncache-revive-7ab73d",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "weak": "",
+    "weak-UDM": "-Ddotty.uniques.uncacheMethodParams=true -Ddotty.uniques.uncachedAppliedCache=4096",
+    "weak-scoped": "-Ddotty.uniques.uncacheMethodParams=true -Ddotty.uniques.epochTable=8192 -Ddotty.uniques.epochClear=scoped -Ddotty.uniques.uncachedAppliedCache=4096",
+    "strong": "-Ddotty.uniques.strong=true",
+    "strong-UDM": "-Ddotty.uniques.strong=true -Ddotty.uniques.uncacheMethodParams=true -Ddotty.uniques.uncachedAppliedCache=4096",
+    "strong-scoped": "-Ddotty.uniques.strong=true -Ddotty.uniques.uncacheMethodParams=true -Ddotty.uniques.epochTable=8192 -Ddotty.uniques.epochClear=scoped -Ddotty.uniques.uncachedAppliedCache=4096"
+  },
+  "variantDescriptions": {
+    "weak": "`203750f926` + interner switches (`claude/uncache-revive-7ab73d` `edf70a403d`), all off: today's weak interners",
+    "weak-UDM": "types over method/poly params not hash-consed (retronym/scala3#21) + a 4K-slot direct-mapped cache of them",
+    "weak-scoped": "those types hash-consed in an epoch table only inside scopes (a class's override checks, its bridges, a mixin forwarder, an explore), dropped at scope end; direct-mapped cache outside",
+    "strong": "`-Ddotty.uniques.strong=true`: interner entries held strongly until the run's reset",
+    "strong-UDM": "strong + UDM",
+    "strong-scoped": "strong + scoped epochs"
+  },
+  "rounds": 3,
+  "profile": "xctrace:ipc",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scalaz": "-f 1 -bm ss -wi 25 -i 10",
+    "dotc": "-f 1 -bm ss -wi 10 -i 6"
+  },
+  "description": [
+    "Uncache revival, careful A/B: today's interning against uncaching with a direct-mapped cache (UDM) and scoped epoch tables, under weak and strong interners. **Full pipeline** (the churn is in override checks and mixin forwarders after typer), ordinary GC, 8 GB heap (the GC cost is the point). Graal 25.4.4, xctrace ipc, 3 rounds, M4. Plan: `local/PLAN-uncache.md`; explainer: https://claude.ai/artifact/GxRAGZYhBeHfZJvKbsD9Uv"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "int": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-rebase",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "int": ""
+  },
+  "variantDescriptions": {
+    "int": "tip of `scala2-perf-integration` at `00e3bbafb8` (PERF-INTEGRATION.md: add retronym/scala#151)"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem",
+    "scalap": "-f 1 -wi 20 -w 2 -i 20 -r 2"
+  },
+  "name": "m4-int00e3bb-kperf-l1d",
+  "profile": "async:cycles@2000000+instructions@7000000+L1D_CACHE_MISS_LD_NONSPEC@50000+LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS@500000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "description": [
+    "PMU profile of the perf integration tip `00e3bbafb8` on the M4 through the kperf helper: cycles and instructions (IPC), L1D load misses (`L1D_CACHE_MISS_LD_NONSPEC`, precise PC) and cycles the load/store unit waits on an L1D miss (`LDST_UNIT_WAITING_OLD_L1D_CACHE_MISS`), scala and scalap corpora. The M4's PMU (kpep `as6`) has no L2 or memory-sourced load events (`PL2_CACHE_MISS_LD`, `LD_SRC_MEMSYS_NONSPEC` are M5 only), and the helper takes at most 4 events. Periods sized from `m4-main-int148-jdk26-scala` (~40G cycles, ~170G instructions per scala op) for ~100k samples per fork.",
+    "",
+    "Compiler built with the release optimizer settings (`SCALA_RELEASE_OPT`); corpora compiled plainly (no `-opt`). Patched JDK 26 (`jdk26-integration-branch-e9e67e`), 8G heap, one fork per corpus, about 40 s warmup and 40 s measured (scala: single-shot 4+4 ops, `jdkHome=25.0.4-tem`; scalap: 20+20 \u00d7 2 s)."
+  ]
+}

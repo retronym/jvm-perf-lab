@@ -1,0 +1,46 @@
+{
+  "name": "m4-refchecks-flip-ab",
+  "description": [
+    "Timing A/B of the order flip alone in Erasure's `isErasureDoubleDef` (`PROPOSAL-refchecks.md`). The pilot `m4-refchecks-flip-prof` showed the frame down 1.10 points of compiler-thread cycles against an A/A of 0.02, but single forks can't resolve the whole-op effect of about 1%.",
+    "",
+    "Patched JDK 26, `SCALA_RELEASE_OPT`, no profiler. Builds alternate fork by fork over 8 rounds; scala single-shot 4+4."
+  ],
+  "variantDescriptions": {
+    "base": "`scala2-perf-integration` tip `00e3bbafb8`",
+    "flip": "`40feebb545` (branch `claude/refchecks-flip-only`): base + the order flip only"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-rebase",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "flip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/refchecks-flip-only",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "flip": ""
+  },
+  "rounds": 8,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "none"
+}

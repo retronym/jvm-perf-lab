@@ -1,0 +1,18 @@
+{
+  "name": "reflect-scratch-typer-alloc",
+  "description": "Allocation profiles of each build in its own fork, typer only, for profdiff: where does the +6% alloc/op of `reflect-scratch-typer` (re2s) come from?",
+  "variantDescriptions": {
+    "base": "c803a64c44 (2.13.x, no code change)",
+    "pr": "branch `claude/reflect-scratch-4f66f7` tip"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "async:alloc",
+  "rounds": 1,
+  "corpora": {
+    "re2s": "-wi 10 -i 10 -w 3 -r 3 -p scalacOptions=-Ystop-after:typer"
+  },
+  "variants": {"base": "", "pr": ""},
+  "variantJmhArgs": {"base": "-p variants=base=@build=../reflect-scratch-base", "pr": "-p variants=pr=@build=."},
+  "gcLog": true,
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing"
+}

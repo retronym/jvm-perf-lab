@@ -1,0 +1,55 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "async:cycles@2000000+PL2_CACHE_MISS_LD@20000",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 1,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:pickler"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "batch-84-kperf-l2-combo5",
+  "description": [
+    "Which loads miss L2 more in `combo5` than in base: kperf samples of `PL2_CACHE_MISS_LD` (one per 20k misses) attributed to stacks, curated by owner and group. The PMU pass ([batch-84-hw-combo5](../batch-84-hw-combo5)) has combo5 at +7% L2 misses per load and +1.8% loads, with GC time equal over 6 rounds.",
+    "dotc to `-Ystop-after:pickler`, single-shot 30+16, patched JDK 26, one fork per variant."
+  ],
+  "variantDescriptions": {
+    "base": "scala/scala3 main `d168df2a76` (merge base) + library stamps",
+    "combo5": "combo4 + `completeOnce` within MaxInlineSize, `ca0bbcab59` (`claude/ov-combo5`)"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "combo5": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/ov-combo5",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "kperf": "/tmp/asprof-kperf.sock",
+  "diff": {
+    "owner": "dotty/tools/dotc/",
+    "ownerSkip": [
+      "dotty/tools/dotc/core/Contexts$Context.",
+      "dotty/tools/dotc/core/Contexts$ContextState.",
+      "dotty/tools/dotc/Reader."
+    ],
+    "groups": {
+      "denotation info/flag reads": "SymDenotations\\$SymDenotation\\.(isCurrent|isAbsent|is|isCompleted|isCompleting)$|Denotations\\$Denotation\\.(myInfo|info)$|SymDenotations\\$NoDenotation\\$\\.exists$",
+      "denot/symbol": "Types\\$NamedType\\.(denot|symbol|stableInRunSymbol)$|Symbols\\$Symbol\\.(denot|latestDenot|latestDenotIn)$|Types\\$Type\\.widenSingleton$|Periods\\$Period\\$\\.\\$eq\\$eq\\$extension$|Types\\$TermRef\\.underlying$",
+      "class caches": "SymDenotations\\$ClassDenotation\\.(memberCache|myMemberCache|memberCacheShared|memberCacheIfAny|baseTypeCache|baseData)$",
+      "findRef/imports": "Typer\\.(findRef|findRefRecur\\$1|loop\\$1|wildImportRef\\$1|selection\\$1)$|typer/ImportInfo\\.",
+      "recursion guard": "Contexts\\$Context\\.inline\\$recursive|Reader\\.recursive",
+      "names": "Names\\$(SimpleName|TypeName|DerivedName)\\.hashCode$|Names\\$\\.enterIfNew$"
+    }
+  }
+}

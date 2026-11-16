@@ -1,0 +1,49 @@
+{
+  "name": "m4-t4-weak-vs-direct",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms16G -Xmx16G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "weak-t4": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-mapped-uniques-chunked",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "direct-t4": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-mapped-uniques-chunked",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "weak-t4": "-Dscalac.uniques=weak",
+    "direct-t4": "-Dscalac.uniques=direct"
+  },
+  "variantJmhArgs": {
+    "weak-t4": "-t 4",
+    "direct-t4": "-t 4"
+  },
+  "variantDescriptions": {
+    "weak-t4": "today's `WeakHashSet` uniques table (cleared per run, retronym/scala#244); 4 concurrent compiles, each thread a new `Global` per op",
+    "direct-t4": "retronym/scala#252's lossy direct-mapped `Array[Type]` (16K slots, fresh array every 64K inserts); 4 concurrent compiles"
+  },
+  "description": [
+    "Quick check: does the lossy direct-mapped table's GC advantage over today's weak table (job 690, one compile at a time, m5-pro: \u221217% pause, \u22125% wall) grow when 4 compiles share one heap, as in sbt building modules in parallel? JMH `-t 4`, scala corpus, 16 GB default-sized G1 heap, M4. Score is ms per compile per thread.",
+    "",
+    "Build `claude/direct-mapped-uniques-chunked` `630ab4c95e`, interner picked per fork by `-Dscalac.uniques`."
+  ],
+  "rounds": 2,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 2.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm avgt -wi 3 -w 30 -i 3 -r 30 -p jdkHome=25.0.4-tem"
+  }
+}

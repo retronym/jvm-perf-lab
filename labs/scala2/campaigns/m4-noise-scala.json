@@ -1,0 +1,64 @@
+{
+  "name": "m4-noise-scala",
+  "description": [
+    "Calibration, no code change: every variant is the same build, `c84dea8aa7`. How much of the fork-to-fork spread on the scala corpus comes from short warmup and from background JIT timing? Read each variant's spread across forks, not the difference in their means.",
+    "",
+    "`wi4` is the setup most current campaigns use. `wi12` warms for 12 compiles. `xbatch` adds `-Xbatch`, so compilation blocks the thread that asked for it and changes timing, so only its spread is meaningful, not its time. `jit8` sets `-XX:CICompilerCount=8` to warm up faster at the same 4 warmup compiles; compare both its spread and whether its iterations plateau sooner."
+  ],
+  "variants": {
+    "wi4": "",
+    "wi12": "",
+    "xbatch": "-Xbatch",
+    "jit8": "-XX:CICompilerCount=8"
+  },
+  "variantJmhArgs": {
+    "wi4": "-wi 4",
+    "wi12": "-wi 12",
+    "xbatch": "-wi 4",
+    "jit8": "-wi 4"
+  },
+  "builds": {
+    "wi4": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "wi12": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "xbatch": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "jit8": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/analyzer-11367-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 6,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "testbed": "m4"
+}

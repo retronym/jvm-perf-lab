@@ -1,0 +1,28 @@
+{
+  "name": "ptyper3-prof",
+  "description": [
+    "CPU profiles for attributing the one-worker overhead of the parallel typer: the spike at `3c72e64ddf` without the flag and on one worker, the same on one worker without forcing the lazy vals of `definitions` first (`-Dscalac.parallelTyper.noForceLazyVals`), and the fix branch's tip on one worker. One fork each, re2s stopped after the typer. Read the per-op profiles over all threads: profdiff's graphs show the benchmark thread only, and a worker types on a thread of its own."
+  ],
+  "variantDescriptions": {
+    "spike": "the parallel typer spike at `3c72e64ddf`, without `-Yparallel-typer`",
+    "par1": "`spike` with `-Yparallel-typer -Yparallel-typer-threads:1`",
+    "par1nolazy": "`par1` with `-Dscalac.parallelTyper.noForceLazyVals`",
+    "par1fix": "branch `ptyper-overhead-fixes` at `6c4eeb44f0` with `-Yparallel-typer -Yparallel-typer-threads:1`"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "async:cpu",
+  "rounds": 1,
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "corpora": {
+    "re2s": "-f 1 -wi 30 -w 2 -i 20 -r 2 -p scalacOptions=-Ystop-after:typer"
+  },
+  "variants": {"spike": "", "par1": "", "par1nolazy": "-Dscalac.parallelTyper.noForceLazyVals=true", "par1fix": ""},
+  "variantJmhArgs": {
+    "spike": "-p variants=spike=@build=s2",
+    "par1": "-p 'variants=par1=@build=s2 -Yparallel-typer -Yparallel-typer-threads:1'",
+    "par1nolazy": "-p 'variants=par1n=@build=s2 -Yparallel-typer -Yparallel-typer-threads:1'",
+    "par1fix": "-p 'variants=par1fix=@build=f3 -Yparallel-typer -Yparallel-typer-threads:1'"
+  },
+  "gcLog": true
+}

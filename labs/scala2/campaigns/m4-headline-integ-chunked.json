@@ -1,0 +1,53 @@
+{
+  "name": "m4-headline-integ-chunked",
+  "description": [
+    "Base against tip of `scala2-perf-integration` after adding retronym/scala#243, #239, #244 and #245, with tip using the chunked weak uniques table (`-Dscala.uniques.layout=chunked-weak`), and the released 2.13.18 compiler for reference. Full compiles, separate forks per build, 8 GB G1, patched JDK 26, M4. Scala and re2s."
+  ],
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 8,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 10 -p jdkHome=25.0.4-tem",
+    "re2s": "-f 1 -bm ss -wi 40 -i 40 -p jdkHome=25.0.4-tem"
+  },
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "testbed": "m4",
+  "variants": {
+    "base": "",
+    "tip": "-Dscala.uniques.layout=chunked-weak",
+    "v2.13.18": ""
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala-2.13.x-opt-762d80f",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-integration-rebase-be0ca4",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "v2.13.18": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/v2.13.18",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variantDescriptions": {
+    "base": "`2.13.x` at `762d80f17e`, the upstream commit the integration tip is based on",
+    "tip": "`scala2-perf-integration` with #243, #239, #244 and #245 added, chunked weak uniques table",
+    "v2.13.18": "The released 2.13.18 compiler (tag `v2.13.18`), built from source with the release optimizer settings"
+  }
+}

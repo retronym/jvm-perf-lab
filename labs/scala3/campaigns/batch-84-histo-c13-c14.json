@@ -1,0 +1,38 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "audit:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/audits/heapdump-typer.audit",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop -Dcompilerlab.heapdump.at=20 -Dcompilerlab.heapdump.file=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/heapdumps/%p",
+  "rounds": 1,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 13 -i 8 -p scalacOptions=-Ystop-after:typer"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "batch-84-histo-c13-c14",
+  "description": [
+    "What commit 14 of #84 adds to the heap the typer walks: a live class histogram (and heap dump) at the end of the typer of compile 20, c13 vs c14. c14 has +8% L2 load misses over c13 with allocation unchanged and the lookup objects' layouts the same ([batch-84-l2-c13-c14](../batch-84-l2-c13-c14)).",
+    "dotc to `-Ystop-after:typer`, one fork each, patched JDK 26."
+  ],
+  "variantDescriptions": {
+    "c13": "#84 commit 13, `8899fc4dbb` + library stamps",
+    "c14": "#84 commit 14, `73c59487a3` + library stamps"
+  },
+  "builds": {
+    "c13": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bis84-c13",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "c14": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bis84-c14",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  }
+}

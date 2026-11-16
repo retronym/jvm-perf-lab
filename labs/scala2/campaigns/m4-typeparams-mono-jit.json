@@ -1,0 +1,49 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "builds": {
+    "integ": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-shared-integ-573187",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "mono": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/symbol-typeparams-mono",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "integ": "",
+    "mono": ""
+  },
+  "variantJmhArgs": {
+    "integ": "-p scalacOptions=-Yname-table:shared",
+    "mono": "-p scalacOptions=-Yname-table:shared"
+  },
+  "variantDescriptions": {
+    "integ": "`scala2-perf-integration` tip `573187e7d7`, with `-Yname-table:shared`",
+    "mono": "the tip plus `0ea5738f0b`: `TypeSkolem.typeParams` folded into `Symbol.typeParams`, with `-Yname-table:shared`"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 8 -i 10 -p jdkHome=25.0.4-tem"
+  },
+  "name": "m4-typeparams-mono-jit",
+  "rounds": 1,
+  "profile": "none",
+  "jitRecording": true,
+  "description": [
+    "JIT pilot for `m4-typeparams-mono-ab`: whether C2 binds and inlines `Symbol.typeParams` at its call sites once `TypeSkolem`'s override is gone. One fork per build and no A/A, so profile pollution alone may explain other differences."
+  ]
+}

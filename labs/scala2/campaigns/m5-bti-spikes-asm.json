@@ -1,0 +1,52 @@
+{
+  "name": "m5-bti-spikes-asm",
+  "variantDescriptions": {
+    "pr208": "retronym/scala#208, `a0b9fd2010`",
+    "mask": "`pr208` + a 64-bit Bloom filter of the sequence's symbol ids that answers most misses (`claude/bti-mask`)",
+    "hash": "`pr208` + an open-addressing byte index per sequence of 8 or more types: hits and misses in about one probe (`claude/bti-hash`)"
+  },
+  "testbed": "m5-pro",
+  "builds": {
+    "pr208": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "mask": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-mask",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "hash": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-hash",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "pr208": "",
+    "mask": "",
+    "hash": ""
+  },
+  "benchmark": "SymbolOpsBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "gcLog": true,
+  "asmOf": "m5-bti-spikes",
+  "asm": [
+    "scala.reflect.internal.Types$CompoundType::baseType"
+  ],
+  "rounds": 1,
+  "corpora": {
+    "subtype": "-f 1 -i 2 -wi 5 -w 5 -r 5 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Machine code of `scala.reflect.internal.Types$CompoundType::baseType` in [m5-bti-spikes](../m5-bti-spikes) (hsdis, `CompileCommand=print`): one fork per variant, not for timing."
+  ]
+}

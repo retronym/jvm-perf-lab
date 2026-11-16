@@ -1,0 +1,33 @@
+{
+  "name": "ptyper3-bisect-serial",
+  "description": [
+    "Which step of the parallel typer spike between `b650049602` and `3c72e64ddf` costs the serial compiler (no flag): `ptyper2-serial-typer` measured `3c72e64ddf` about 6.7% slower than `2.13.x` on re2s through the typer, where `b650049602` was within the noise of `2.13.x`. Every build paired within each fork, re2s stopped after the typer; the A/A of `ptyper2-serial-typer` (within ±2%) is this campaign's noise floor too."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `d32d907524`",
+    "b650": "the spike at `b650049602`: completion lock, per-thread phase and the parallel driver",
+    "ac63": "the spike at `ac63a36bbd`: flags updated by compare-and-set when concurrent, loaders under the lock, scope entries published with a fence and the element cache keyed by the head",
+    "c7ae": "the spike at `7ae25083a2`: lock-free type caches and local completions, scala-sharing's CoarseLock, ScratchThread, scala-sharing vendored into scala-reflect",
+    "spike": "the spike at `3c72e64ddf`: the x-ray recorder hooks",
+    "fix": "branch `ptyper-overhead-fixes` at `6c4eeb44f0` (on `3c72e64ddf`)"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "paired": {
+    "base": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/base",
+    "b650": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/spike",
+    "ac63": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/ac63",
+    "c7ae": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/bis",
+    "spike": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/spike2",
+    "fix": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/fix3"
+  },
+  "corpora": {
+    "re2s": "-f 1 -wi 30 -w 2 -i 48 -r 2 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "rounds": 4,
+  "loadgate": {"maxCores": 14.0, "quietSecs": 30},
+  "gcLog": true
+}

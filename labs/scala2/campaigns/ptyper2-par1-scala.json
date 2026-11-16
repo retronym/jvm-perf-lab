@@ -1,0 +1,34 @@
+{
+  "name": "ptyper2-par1-scala",
+  "description": [
+    "The parallel driver on one worker against the serial compile of the same build, on the `scala` corpus (library, reflect, compiler) stopped after the typer, paired within each fork: a check of the claim that one-thread parallel is at or below serial on large corpora. `aa` is `spike` again. xctrace counts the benchmark thread only, so a `-Yparallel-typer` variant's counters miss its worker thread: compare those by time."
+  ],
+  "variantDescriptions": {
+    "spike": "the parallel typer spike at `3c72e64ddf`, without `-Yparallel-typer`",
+    "aa": "the first variant's build again, in its own class loader: the A/A",
+    "par1": "`spike` with `-Yparallel-typer -Yparallel-typer-threads:1`",
+    "fix": "`spike` plus the overhead fixes (branch `ptyper-overhead-fixes` at `be52f84d1e`), without the flag",
+    "par1fix": "`fix` with `-Yparallel-typer -Yparallel-typer-threads:1`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "paired": {
+    "spike": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/spike2",
+    "aa": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/spike2",
+    "par1": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/spike2 -Yparallel-typer -Yparallel-typer-threads:1",
+    "fix": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/fix4",
+    "par1fix": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/fix4 -Yparallel-typer -Yparallel-typer-threads:1"
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 25 -i 30 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 14.0,
+    "quietSecs": 30
+  },
+  "gcLog": true
+}

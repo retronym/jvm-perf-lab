@@ -1,0 +1,47 @@
+{
+  "name": "m4-devirt-sym-prof2",
+  "description": [
+    "Prototype evidence, step 2 of [retronym/scala#199](https://github.com/retronym/scala/pull/199): final `owner` / `thisSym` / `typeOfThis` / `tpe_*`, a TypeRef fast path for `Type.mapOver` in SubstMap / AsSeenFromMap / TypeMap.mapOver, and a ClassInfoType fast path for `decls` in walkBaseClasses, against step 1 (the final kind predicates and `info`/`rawInfo`). PMU profile (cycles, instructions) through the kperf helper, scala corpus, one fork per build, for attributing `vtable stub` / `itable stub` samples to their callers. Not a timing A/B. Base `00e3bbafb8` is in `m4-devirt-sym-prof`.",
+    "",
+    "Both builds with the release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26 (`jdk26-integration-branch-e9e67e`), 8G heap, single-shot 4+4 ops, as `m4-int00e3bb-kperf-l1d`."
+  ],
+  "variantDescriptions": {
+    "step1": "`d2f3e64743`: final kind predicates and `info`/`rawInfo`",
+    "step2": "`85df493655`: step 1 + final `owner`/`thisSym`/`typeOfThis`/`tpe_*`, `mapOver` and `decls` fast paths"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "step1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-step1-d2f3e6",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "step2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-symbol-predicates-625c33",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "step1": "",
+    "step2": ""
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock"
+}

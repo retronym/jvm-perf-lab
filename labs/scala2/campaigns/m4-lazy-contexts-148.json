@@ -1,0 +1,56 @@
+{
+  "name": "m4-lazy-contexts-148",
+  "description": [
+    "What does [retronym/scala#148](https://github.com/retronym/scala/pull/148) (typing transformers' contexts made on demand) save on the current head? One full compile per op, for scala and re2s. The PR description claims 186k owners entered and 10.6k contexts needed on one compile of re2s, against 2 MB saved of 90.6 MB, which doesn't reconcile.",
+    "",
+    "`base` and `baseaa` are the same build of `upstream/2.13.x`, the A/A control. Release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26, 8G heap; xctrace ipc for cycles and instructions."
+  ],
+  "variantDescriptions": {
+    "base": "`upstream/2.13.x` `d32d907524`",
+    "baseaa": "The same build as `base`",
+    "lazy": "`base` plus #148 with `-Yeager-typing-transformer-contexts` removed (`51bd244688`)"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/lazy-contexts-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "baseaa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/lazy-contexts-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "lazy": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/lazy-contexts-measure",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "baseaa": "",
+    "lazy": ""
+  },
+  "rounds": 5,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "re2s": "-f 1 -bm ss -wi 40 -i 40 -p jdkHome=25.0.4-tem",
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  }
+}

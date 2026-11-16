@@ -1,0 +1,79 @@
+{
+  "name": "m5-kwu-t8-tenuring",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "g1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "tsr90": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "tsr90-sr4": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "itt15": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "sr4-itt15": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "g1": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G -Xlog:gc+age=debug,gc+heap=debug:file=/private/tmp/claude-501/-Users-jzaugg-virtus-code--worktrees-scala-chunked-uniques/1a22b753-8dbe-4dc6-b252-38e33f05fcc0/scratchpad/gcage/age-%p.log:uptime",
+    "tsr90": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G -XX:TargetSurvivorRatio=90 -Xlog:gc+age=debug,gc+heap=debug:file=/private/tmp/claude-501/-Users-jzaugg-virtus-code--worktrees-scala-chunked-uniques/1a22b753-8dbe-4dc6-b252-38e33f05fcc0/scratchpad/gcage/age-%p.log:uptime",
+    "tsr90-sr4": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G -XX:TargetSurvivorRatio=90 -XX:SurvivorRatio=4 -Xlog:gc+age=debug,gc+heap=debug:file=/private/tmp/claude-501/-Users-jzaugg-virtus-code--worktrees-scala-chunked-uniques/1a22b753-8dbe-4dc6-b252-38e33f05fcc0/scratchpad/gcage/age-%p.log:uptime",
+    "itt15": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G -XX:InitialTenuringThreshold=15 -XX:MaxTenuringThreshold=15 -Xlog:gc+age=debug,gc+heap=debug:file=/private/tmp/claude-501/-Users-jzaugg-virtus-code--worktrees-scala-chunked-uniques/1a22b753-8dbe-4dc6-b252-38e33f05fcc0/scratchpad/gcage/age-%p.log:uptime",
+    "sr4-itt15": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G -XX:TargetSurvivorRatio=90 -XX:SurvivorRatio=4 -XX:InitialTenuringThreshold=15 -Xlog:gc+age=debug,gc+heap=debug:file=/private/tmp/claude-501/-Users-jzaugg-virtus-code--worktrees-scala-chunked-uniques/1a22b753-8dbe-4dc6-b252-38e33f05fcc0/scratchpad/gcage/age-%p.log:uptime"
+  },
+  "variantJmhArgs": {
+    "g1": "-t 8",
+    "tsr90": "-t 8",
+    "tsr90-sr4": "-t 8",
+    "itt15": "-t 8",
+    "sr4-itt15": "-t 8"
+  },
+  "variantDescriptions": {
+    "g1": "G1 defaults (TargetSurvivorRatio=50, SurvivorRatio=8, MaxTenuringThreshold=15)",
+    "tsr90": "desired survivor size 90% of survivor space, as the scala3 lab tried (batch-84-gc-cliff)",
+    "tsr90-sr4": "as tsr90, and survivor space a quarter of eden rather than an eighth",
+    "itt15": "start the tenuring threshold at 15 rather than 7",
+    "sr4-itt15": "tsr90-sr4 and a starting threshold of 15: keep compile-lifetime data in survivor space as long as it fits"
+  },
+  "profile": "none",
+  "rounds": 2,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 3 -i 5 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "G1 tenuring settings at 8 compiles: with G1 defaults, survivor and promoted bytes are about equal per compile (job 581), which suggests survivor space overflows and the tenuring threshold drops, promoting compile-lifetime data that then needs marking and mixed collections. Does keeping it in survivor space longer help? Tenuring distributions per GC under the session scratchpad (`gc+age=debug`).",
+    "",
+    "Build `claude/uniques-audit-2.13.x` `1e85ab8eba`, chunked-weak + uncache-all, 8 independent scala-corpus compiles at once (JMH `-t 8`, single shot), 24 GB G1, laptop, 2 separate forks per variant. Compiled output discarded (lab default since jvm-perf-lab `8882b29`)."
+  ]
+}

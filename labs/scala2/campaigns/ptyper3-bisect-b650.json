@@ -1,0 +1,31 @@
+{
+  "name": "ptyper3-bisect-b650",
+  "description": [
+    "Which of the first commits of the parallel typer spike costs the serial compiler (no flag): `ptyper3-bisect-serial` measured `b650049602` about 8% slower than `2.13.x` on re2s through the typer. Its source changes on top of retronym/scala#212 are three commits (and a small fourth): every build paired within each fork, re2s stopped after the typer."
+  ],
+  "variantDescriptions": {
+    "guards": "[retronym/scala#212](https://github.com/retronym/scala/pull/212) at `fd95c5c1c1`",
+    "c93ab": "`93ab666d7f` Run completions under one lock in a concurrent compiler",
+    "ce5c7": "`e5c7ce2839` Add -Yparallel-typer, typing units on several threads",
+    "c2d3c": "`2d3c8f9408` Confine or lock more state that the typer threads share",
+    "b650": "`b650049602`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "paired": {
+    "guards": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/guards",
+    "c93ab": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/c93ab",
+    "ce5c7": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/ce5c7",
+    "c2d3c": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/c2d3c",
+    "b650": "@build=/Users/jzaugg-virtus/code/scala/scala/.claude/worktrees/agent-ad4ad0a6f7301df19/.perf/spike"
+  },
+  "corpora": {
+    "re2s": "-f 1 -wi 30 -w 2 -i 50 -r 2 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "rounds": 4,
+  "loadgate": {"maxCores": 14.0, "quietSecs": 30},
+  "gcLog": true
+}

@@ -1,0 +1,9 @@
+# Why SymDenotation.isCurrent costs more in so1 (so1-kperf-instr): more calls, or more of them on a denotation whose
+# info is still a LazyType (the out-of-line path: base's knownFlags$1, so1's isCurrentLazyInfo)?
+count isCurrent        at=dotty.tools.dotc.core.SymDenotations$SymDenotation#isCurrent
+count lazy.base        at=dotty.tools.dotc.core.SymDenotations$SymDenotation#knownFlags$1  onStack=namer:dotty.tools.dotc.typer.Namer,typer:dotty.tools.dotc.typer.Typer
+count lazy.so1         at=dotty.tools.dotc.core.SymDenotations$SymDenotation#isCurrentLazyInfo  onStack=namer:dotty.tools.dotc.typer.Namer,typer:dotty.tools.dotc.typer.Typer
+count is               at=dotty.tools.dotc.core.SymDenotations$SymDenotation#is
+count completeFrom     at=dotty.tools.dotc.core.SymDenotations$SymDenotation#completeFrom
+sites lazy.base.sites  at=dotty.tools.dotc.core.SymDenotations$SymDenotation#knownFlags$1  depth=4  sample=50
+sites lazy.so1.sites   at=dotty.tools.dotc.core.SymDenotations$SymDenotation#isCurrentLazyInfo  depth=4  sample=50

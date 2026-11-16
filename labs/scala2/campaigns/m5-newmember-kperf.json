@@ -1,0 +1,54 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "newmember": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-newmember",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "lazydepth": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-lazydepth",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "newmember": "",
+    "lazydepth": ""
+  },
+  "variantDescriptions": {
+    "base": "`claude/typeref-bench-base` (#212 head + scala/scala#11381 + retronym/scala#243 + #244)",
+    "lazydepth": "base + `solve` computes `lubDepth` only when it lubs or glbs two or more bounds (`claude/typeref-bench-lazydepth`)",
+    "newmember": "base + `isNewMember` skips the member types of methods whose shapes cannot match (`claude/typeref-bench-newmember`)"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 15 -i 3 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "name": "m5-newmember-kperf",
+  "profile": "async:cycles@400000+instructions@1200000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "description": [
+    "Spike: `isNewMember` computing member types it doesn't need (2.26G cycles/op inclusive in the typer), with lazy lub depth alongside. PMU profile, kperf, one fork per variant, 15 + 3 single shots, typer only, on the laptop. Not a timing A/B."
+  ]
+}

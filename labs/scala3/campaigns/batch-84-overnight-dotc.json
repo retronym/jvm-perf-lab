@@ -1,0 +1,66 @@
+{
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 6,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 13 -i 16 -p scalacOptions=-Ystop-after:pickler"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "batch-84-overnight-dotc",
+  "description": [
+    "Serial batch compilation of the compiler's sources: candidate fixes for the serial overhead of retronym/scala3#84 (tip `e3b407ec7a`) against its merge base, chosen from the CPU profile diff in [batch-84-base-tip3-prof](../batch-84-base-tip3-prof): 2.4% on the acquire loads of `checkedPeriod` (`NamedType.denot`, `symbol`, `Symbol.denot`), 0.1% on `SimpleName.hashCode` reading its `String`.",
+    "The 3.10.0 tag's `compiler/src/dotty/tools/dotc` (485 files) to `-Ystop-after:pickler`, single-shot with 13 warmup ops and 16 measured, on the patched JDK 26, 6 forks per variant."
+  ],
+  "variantDescriptions": {
+    "base": "scala/scala3 main `d168df2a76` (merge base) + library stamps",
+    "tip": "retronym/scala3#84 at `e3b407ec7a`",
+    "opaque": "tip + `8b9fde5c28`: every `Published` acquire as an opaque load. **Unsound**, a ceiling: how much of the acquire is the barrier",
+    "acqstatic": "tip + `ea92e57f64`: `checkedPeriod` acquires in `NamedType.denot`/`symbol`/`Symbol.denot` only once the JVM has a concurrent base (`ConcurrentBases.any`, a static field)",
+    "namehash": "tip + `51895393ba`: `SimpleName.hashCode` in a field",
+    "all": "tip + namehash + acqstatic (`fdc39851bc`)"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-tip3",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "opaque": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/ov-opaque",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "acqstatic": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/ov-acqstatic",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "namehash": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/ov-namehash",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "all": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/ov-all",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  }
+}

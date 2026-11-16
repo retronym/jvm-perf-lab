@@ -1,0 +1,49 @@
+{
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/25.4.4.1+1-graal/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "testbed": "m4",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base-su",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "so1-sw": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/so1-sw",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "so1-afv": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/so1-afv",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "base": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true -XX:+UnlockDiagnosticVMOptions -XX:CompileCommand=quiet -XX:CompileCommand=print,dotty.tools.dotc.core.SourceLanguage$::apply -XX:CompileCommand=print,dotty.tools.dotc.core.SymDenotations$SymDenotation::is",
+    "so1-sw": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true -Ddotty.denot.batchOnly=true -XX:+UnlockDiagnosticVMOptions -XX:CompileCommand=quiet -XX:CompileCommand=print,dotty.tools.dotc.core.SourceLanguage$::apply -XX:CompileCommand=print,dotty.tools.dotc.core.SymDenotations$SymDenotation::is",
+    "so1-afv": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true -XX:+UnlockDiagnosticVMOptions -XX:CompileCommand=quiet -XX:CompileCommand=print,dotty.tools.dotc.core.SourceLanguage$::apply -XX:CompileCommand=print,dotty.tools.dotc.core.SymDenotations$SymDenotation::is"
+  },
+  "variantDescriptions": {
+    "base": "merge base + stamps + strong-interner switch (`claude/bench84-base-su`)",
+    "so1-sw": "so1 + `-Ddotty.denot.batchOnly=true` (`claude/so1-sw` `adf2e3f0f7`): every `concurrentDenot` folds, so `isCurrent`'s lazy branch is base's shape (no second exit)",
+    "so1-afv": "so1 + `concurrentDenot` behind an almost-final value (scalac's `AlmostFinalValue`, a `MutableCallSite`), false until a concurrent base exists: no flag (`claude/so1-afv`)"
+  },
+  "gcLog": true,
+  "name": "m4-loop-asm-afv",
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 2 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x="
+  },
+  "description": [
+    "Does Graal fold the almost-final `concurrentDenot` as it folds the static final switch? Machine code of `SourceLanguage$.apply` and `SymDenotation.is`: base, so1-sw (static final), so1-afv (`MutableCallSite`)."
+  ]
+}

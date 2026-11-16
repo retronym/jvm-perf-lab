@@ -1,0 +1,61 @@
+{
+  "name": "m4-closed-scopes-typer",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/closed-scope-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "closed": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/closed-scope-uniques",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "closed-chunked": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/closed-scope-chunked",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "closed-chunked-strong": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/closed-scope-chunked",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "closed": "",
+    "closed-chunked": "-Dscala.uniques.layout=chunked-weak",
+    "closed-chunked-strong": "-Dscala.uniques.layout=chunked"
+  },
+  "variantDescriptions": {
+    "base": "retronym/scala#212 head plus scala/scala#11381 (`claude/closed-scope-bench-base`)",
+    "closed": "retronym/scala#241 (closed scopes, no per-type flag) plus scala/scala#11381 (`claude/closed-scope-bench`)",
+    "closed-chunked": "`closed` plus the chunked weak table of retronym/scala#239 (`claude/closed-scope-bench-chunked`), `-Dscala.uniques.layout=chunked-weak`",
+    "closed-chunked-strong": "`closed` plus the chunked table of retronym/scala#239 holding its types strongly (`-Dscala.uniques.layout=chunked`): no `WeakReference` per entry, every interned type kept to the end of the run, the closed scopes keeping the throwaway ones out"
+  },
+  "rounds": 5,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 30 -i 20 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "description": [
+    "Does leaving types made in closed scopes out of the uniques table pay in the typer? retronym/scala#241 against its base (retronym/scala#212), both with scala/scala#11381 so that a run stopped after the typer does not invalidate infos and base type sequences at each phase switch. Separate forks, scala corpus to `-Ystop-after:typer`, one compile at a time, 8 GB G1, patched JDK 26, M4. Read GC pause sums from `gc.log` as well as the score."
+  ]
+}

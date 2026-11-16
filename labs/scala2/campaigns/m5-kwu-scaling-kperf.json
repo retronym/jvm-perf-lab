@@ -1,0 +1,50 @@
+{
+  "name": "m5-kwu-scaling-kperf",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms24G -Xmx24G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus -Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all",
+  "builds": {
+    "t1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "t8": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/uniques-audit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "t1": "",
+    "t8": ""
+  },
+  "variantJmhArgs": {
+    "t1": "-t 1 -wi 40",
+    "t8": "-t 8 -wi 6"
+  },
+  "variantDescriptions": {
+    "t1": "one compile at a time, 40 warmup compiles (6 left C2 still compiling in the measurement: 4.5G JIT instructions per op, job 569)",
+    "t8": "8 independent compiles at once, each its own `Global`; 6 warmup iterations = 48 compiles"
+  },
+  "profile": "async:cycles@2000000+instructions@5000000+PL2_CACHE_MISS_LD@10000",
+  "rounds": 1,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -i 6 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Where the 8-compile run spends extra cycles, by method: async-profiler on kperf PMU events (cycles, instructions, L2 load misses), at 1 and at 8 concurrent compiles, to profdiff per op.",
+    "",
+    "Build `claude/uniques-audit` `41986b33ea` with `-Yuniques-layout:chunked-weak` and `-Yuniques-uncache all` (ChunkedInterner(weak = true), types made in the weak scopes not interned). Scala corpus, 24 GB G1 heap, laptop, one fork per variant."
+  ],
+  "kperf": "/tmp/asprof-kperf.sock"
+}

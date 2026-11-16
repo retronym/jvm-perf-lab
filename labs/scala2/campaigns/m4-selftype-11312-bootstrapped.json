@@ -1,0 +1,56 @@
+{
+  "name": "m4-selftype-11312-bootstrapped",
+  "description": [
+    "Does [scala/scala#11312](https://github.com/scala/scala/pull/11312) add anything on top of the class-based analyzer ([scala/scala#11367](https://github.com/scala/scala/pull/11367)) once the compiler is built by a compiler with the change? The integration figure (-0.2%) came from a STARR without it, so it measured only `selfTypeClass` running.",
+    "",
+    "Each checkout is compiled by a STARR built from its own tree, published as 2.13.80 and 2.13.81 and copied to the worker's `~/.ivy2/local`. A local build of the two shows 1454 fewer `invokeinterface` in compiler and reflect with the change. Full compile of the scala corpus, one `Global`, release optimizer settings, patched JDK 26."
+  ],
+  "variantDescriptions": {
+    "class": "#11367 + its test fix (`c70d28b4dd`), compiled by its own STARR, 2.13.80",
+    "classaa": "`class` again, an A/A",
+    "selftype": "`class` merged with #11312 at `6d62e6927b` (`b295320942`), compiled by its own STARR, 2.13.81"
+  },
+  "builds": {
+    "class": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/a11367-boot0",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "classaa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/a11367-boot0",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "selftype": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/a11367-boot1",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "class": "",
+    "classaa": "",
+    "selftype": ""
+  },
+  "rounds": 6,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock"
+}

@@ -1,0 +1,44 @@
+{
+  "benchmark": "BackendBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m5-direct-backend-prof",
+  "description": [
+    "Where the difference in `m5-direct-backend` comes from: one profiled fork per build of `phase`, for profdiff."
+  ],
+  "variantDescriptions": {
+    "base": "[retronym/scala#200](https://github.com/retronym/scala/pull/200) at `b8c499db39`, the base of #203",
+    "direct": "[retronym/scala#203](https://github.com/retronym/scala/pull/203) at `456838f7e0`: classes written directly from codegen"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-asm-emit-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "direct": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-asm-emit-tip",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "direct": ""
+  },
+  "rounds": 1,
+  "profile": "async:cpu,alloc",
+  "corpora": {
+    "phase": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem"
+  }
+}

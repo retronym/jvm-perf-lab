@@ -1,0 +1,38 @@
+{
+  "name": "m5-tip-pekko-defs",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "builds": {
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/integ-next",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "tip": ""
+  },
+  "variantDescriptions": {
+    "tip": "`scala2-perf-integration` at `2ccfdf2177`, default `-Yname-table:shared`, with the cost-per-definition agent"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 8 -i 10 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "audit:def-costs.hooks",
+  "description": [
+    "Cost per definition on pekko through perflab-agent's `def-costs.hooks`, to find definitions that are slow for their size. Timings carry the agent's overhead, so don't compare them with other campaigns."
+  ],
+  "variantJmhArgs": {
+    "tip": "-p scalacOptions=--defs:/private/tmp/claude-501/-Users-jzaugg-virtus-code--worktrees-scala-asprof-profiling-m4-2a2326/f97dea55-18c4-45b5-8b60-d3a040228740/scratchpad/pekko-defs.tsv"
+  }
+}

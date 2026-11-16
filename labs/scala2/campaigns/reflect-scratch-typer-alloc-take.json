@@ -1,0 +1,21 @@
+{
+  "name": "reflect-scratch-typer-alloc-take",
+  "description": "As reflect-scratch-typer-alloc, after `Type.findMember` takes its `FindMember` with `ReusableInstance.take`/`release` instead of `using` (pr only; compare with that campaign's base cell).",
+  "variantDescriptions": {
+    "pr": "branch tip with findMember off the closure"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "async:alloc",
+  "rounds": 1,
+  "corpora": {
+    "re2s": "-wi 10 -i 10 -w 3 -r 3 -p scalacOptions=-Ystop-after:typer"
+  },
+  "variants": {
+    "pr": ""
+  },
+  "variantJmhArgs": {
+    "pr": "-p variants=pr=@build=."
+  },
+  "gcLog": true,
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing"
+}

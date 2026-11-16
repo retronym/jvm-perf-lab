@@ -1,0 +1,33 @@
+{
+  "name": "batch-84-branch-dotc",
+  "description": [
+    "retronym/scala3#84, commit by commit: serial batch compilation (no `-Yparallel-typer`) of the compiler's own sources. Which of the 52 commits from the merge base (`d168df2a76`) to the tip (`a084128416`) move the serial time? Base vs tip has measured between +0.2% and +7.7% in earlier campaigns at 2-4 forks, some of it a warmup artefact (`-w 4 -r 4` with ops of about 4 s gave the faster build more warmup ops).",
+    "Here each fork gets the same work: single-shot, 13 warmup ops and 16 measured (`-bm ss`), on the patched JDK 26 build (no W^X cost on VM calls such as `identityHashCode`, so `dcca16aa7a`'s content hash of names is not a free win).",
+    "Corpus `dotc`: the 3.10.0 tag's `compiler/src/dotty/tools/dotc` (485 files) against the published 3.10.0 jars, to `-Ystop-after:pickler`, with the compiler build's options but -Werror."
+  ],
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 2,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 13 -i 16 -p scalacOptions=-Ystop-after:pickler"
+  },
+  "branch": {
+    "checkout": "/Users/jzaugg-virtus/code/scala/scala3",
+    "range": "d168df2a76..a084128416",
+    "env": {
+      "SCALA3_CHECKOUT": "{checkout}"
+    }
+  },
+  "loadgate": {
+    "maxCores": 2.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "profiles": {
+    "profile": "async:cpu",
+    "jmhArgs": "-f 1 -bm ss -wi 13 -i 16 -p scalacOptions=-Ystop-after:pickler",
+    "rounds": 1
+  }
+}

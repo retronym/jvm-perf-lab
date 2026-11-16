@@ -1,0 +1,59 @@
+{
+  "name": "m5-forkvar-t8-contention",
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "t8w3": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-kwu-1e85ab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "t8w8": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-kwu-1e85ab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "t6w8": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/forkvar-kwu-1e85ab",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "t8w3": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G",
+    "t8w8": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G",
+    "t6w8": "-Dscala.uniques.layout=chunked-weak -Dscala.uniques.uncache=all -Xms24G -Xmx24G"
+  },
+  "variantJmhArgs": {
+    "t8w3": "-t 8 -wi 3",
+    "t8w8": "-t 8 -wi 8",
+    "t6w8": "-t 6 -wi 8"
+  },
+  "variantDescriptions": {
+    "t8w3": "As `m5-kwu-t8-bimodal-jit`: 8 concurrent compiles, 3 warmup iterations",
+    "t8w8": "8 concurrent compiles, 8 warmup iterations (JIT mostly settled)",
+    "t6w8": "6 concurrent compiles, one per top-tier core of the M5 Pro, 8 warmup iterations"
+  },
+  "profile": "xctrace:ipc",
+  "rounds": 6,
+  "gcLog": true,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -i 3 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Are the bimodal forks at 8 concurrent compiles (`m5-kwu-t8-bimodal-jit`: ~11.8 s vs ~13.4 s per compile) a JIT trajectory or CPU contention? The JIT recordings showed no per-method signature beyond chance (forkvar PLAN.md).",
+    "",
+    "Instructions per op from `xctrace:ipc`: if slow and fast forks retire the same instructions, the JIT is not the cause. `t8w8` checks whether a longer warmup removes it; `t6w8` whether fitting the threads on the 6 top-tier cores does. Build `1e85ab8eba` (claude/uniques-audit-2.13.x), the one the bimodal campaign measured."
+  ]
+}

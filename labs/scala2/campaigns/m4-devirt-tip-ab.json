@@ -1,0 +1,46 @@
+{
+  "name": "m4-devirt-tip-ab",
+  "description": [
+    "Timing A/B of the whole of [retronym/scala#199](https://github.com/retronym/scala/pull/199): final `Symbol` predicates, `info`, `rawInfo`, `owner`, `typeOfThis`, `tpe_*`, and the `TypeMap` / `typeParams` fast paths, against its base. The profile campaigns showed the targeted stubs gone, but their totals are within fork-to-fork noise (1.4% in cycles for identical code). The earlier 5-round A/B of step 1 was too wide (\u00b16.3%), so this runs 20 rounds on the scala corpus.",
+    "",
+    "Both builds with the release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26, 8G heap, single-shot 4+4 ops, no profiler."
+  ],
+  "variantDescriptions": {
+    "base": "`scala2-perf-integration` tip `00e3bbafb8`",
+    "tip": "retronym/scala#199 at `ef2d9f2b44`"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-base-00e3bb",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-tip-ef2d9f",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "tip": ""
+  },
+  "rounds": 20,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "none"
+}

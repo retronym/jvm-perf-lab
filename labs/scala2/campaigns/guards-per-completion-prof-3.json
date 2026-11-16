@@ -1,0 +1,16 @@
+{
+  "name": "guards-per-completion-prof-3",
+  "description": "[retronym/scala#212](https://github.com/retronym/scala/pull/212): cpu profiles of `2.13.x` (base) and the PR tip (pr), each in its own fork, typer only, for profdiff. A quick look at what per-completion frames and the recursion guards cost on `isSubType`.",
+  "variantDescriptions": {"base": "`2.13.x` at d32d907", "pr": "retronym/scala#212 at 26b73b5"},
+  "benchmark": "CompileBenchmark",
+  "profile": "async:cpu",
+  "rounds": 1,
+  "corpora": {
+    "re2s": "-wi 10 -i 10 -w 3 -r 3 -p scalacOptions=-Ystop-after:typer",
+    "scalap": "-wi 16 -i 12 -w 2 -r 2 -p scalacOptions=-Ystop-after:typer"
+  },
+  "variants": {"base": "", "pr": ""},
+  "variantJmhArgs": {"base": "-p variants=b=@build=/Users/jzaugg-virtus/code/.worktrees/scala/flatten-base", "pr": "-p variants=pr=@build=."},
+  "gcLog": true,
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing"
+}

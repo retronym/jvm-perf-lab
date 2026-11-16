@@ -1,0 +1,45 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "lazydepth": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-lazydepth",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "implicitss": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-implicitss",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "lazydepth": "",
+    "implicitss": ""
+  },
+  "variantDescriptions": {
+    "lazydepth": "`claude/typeref-bench-lazydepth`: base + lazy lub depth",
+    "implicitss": "lazydepth + `Context.implicitss` cached per context for the run (`claude/typeref-bench-implicitss`)"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 15 -i 3 -p jdkHome=25.0.4-tem -p scalacOptions=-Ystop-after:typer"
+  },
+  "name": "m5-implicitss-kperf",
+  "profile": "async:cycles@400000+instructions@1200000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "description": [
+    "Spike: `Context.implicitssImpl` walking and consing the whole context chain at every implicit search (270M cycles/op in the typer). PMU profile, kperf, one fork per variant, 15 + 3 single shots, typer only, on the laptop. Not a timing A/B."
+  ]
+}

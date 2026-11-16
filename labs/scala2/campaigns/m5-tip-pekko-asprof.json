@@ -1,0 +1,35 @@
+{
+  "name": "m5-tip-pekko-asprof",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "builds": {
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/integ-next",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "tip": ""
+  },
+  "variantDescriptions": {
+    "tip": "`scala2-perf-integration` tip `f0b6e17bd9`, default `-Yname-table:shared`"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 8 -i 10 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cpu,alloc",
+  "description": [
+    "CPU and allocation profile of the integration tip compiling pekko, jfrsync lanes on. Warmup 8 single-shots (plateau measured on m4's `m4-integ-pekko-2`), 10 measured, one fork. Patched JDK 26, 8G heap, compiler built with `SCALA_RELEASE_OPT`."
+  ]
+}

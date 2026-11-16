@@ -1,0 +1,27 @@
+{
+  "name": "batch-84-serial",
+  "description": [
+    "Serial batch compilation (no `-Yparallel-typer`): retronym/scala3#84's tip, after the parallel batch typer work up to the pickler, against its merge base on scala/scala3 main.",
+    "Both built by the lab from a checkout, with the build's defaults (the backend inliner on), each with the library-stamps commit cherry-picked. For the #84 results page's serial row; the earlier `batch-ab-84*` campaigns measured the same question on older tips."
+  ],
+  "variantDescriptions": {
+    "base": "scala/scala3 main `d168df2a76` (merge base) + library stamps",
+    "tip": "retronym/scala3#84 `a084128416` + library stamps"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M",
+  "rounds": 4,
+  "corpora": {
+    "dottyUtil": "-f 1 -wi 10 -i 8 -w 3 -r 3",
+    "scalaz": "-f 1 -wi 12 -i 8 -w 3 -r 3",
+    "tastyQuery": "-f 1 -wi 12 -i 8 -w 3 -r 3"
+  },
+  "builds": {
+    "base": {"checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base", "env": {"SCALA3_CHECKOUT": "{checkout}"}},
+    "tip": {"checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-tip", "env": {"SCALA3_CHECKOUT": "{checkout}"}}
+  },
+  "loadgate": {"maxCores": 1.5, "quietSecs": 30},
+  "gcLog": true
+}

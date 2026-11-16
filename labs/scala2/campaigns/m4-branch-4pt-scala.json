@@ -1,0 +1,33 @@
+{
+  "name": "m4-branch-4pt-scala",
+  "description": [
+    "Four points for retronym/scala#231: Scala 2.13.18 (the release current on 1 October, with its STARR bumped to 2.13.19-M1 because 2.13.17's cannot compile the library on JDK 26), upstream 2.13.x after it (at `57587f108e`), the boundary after my upstreamed PRs (scala/scala#11369, #11375, #11307, #11312, #11376, #11389, #11390), and the tip with the retronym/scala PRs (#148, #207, #210, #200, #205, #206) and the Symbol.filter commits on top. The three commits after 2.13.18 are synthetic, built from the real trees, so the campaign checks each point out in its own worktree.",
+    "",
+    "Real commit ranges, since the points after 2.13.18 are synthetic commits with the trees of the real ones: [2.13.18 to the upstream base](https://github.com/scala/scala/compare/v2.13.18...57587f108e9570c565e08f04009cbdb090cec294) (a STARR bump aside); [upstream base to the boundary](https://github.com/retronym/scala/compare/57587f108e9570c565e08f04009cbdb090cec294...4cb53491ddc1e72fe780b34148378c52dae083bc), the scala/scala PRs; [boundary to the tip](https://github.com/retronym/scala/compare/4cb53491ddc1e72fe780b34148378c52dae083bc...6101d220ca9ae3e3c92261b7a30127e14e35b072), the Symbol.filter commits and the retronym/scala PRs. The tip is the branch of [retronym/scala#231](https://github.com/retronym/scala/pull/231).",
+    "",
+    "On the M4, 3 rounds (round 1 copied from `m4-branch-3pt-scala` for three of the four points), xctrace ipc; release optimizer settings; patched JDK 26; corpus compiled against JDK 25's API; 8G heap, 6 x 20 s warmup, 6 x 20 s measured. Same settings as `m4-branch-3pt-scala`, which this replaces so that 2.13.18 is the baseline."
+  ],
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "branch": {
+    "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-4pt",
+    "range": "6157e2edf7a55aa37a15dcc003d0078111db7ed4..5e2a4abc230998f3e74e969cc7f34e64cfd7e97a",
+    "firstParent": true,
+    "env": {
+      "SCALA_CHECKOUT": "{checkout}",
+      "SCALA_RELEASE_OPT": "1"
+    }
+  },
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -wi 6 -w 20 -i 6 -r 20 -p jdkHome=25.0.4-tem"
+  },
+  "testbed": "m4"
+}

@@ -1,0 +1,56 @@
+{
+  "name": "m4-symfinal-symops-jit",
+  "description": [
+    "Why does `SymbolOpsBenchmark`'s `all` workload vary by 3.5–4.7% between forks of identical code in `m4-symfinal-symops`, when a fork's iterations stay within about ±8 ms? The hypothesis is that each fork's C2 decisions, made during the single setup compile, persist for the whole fork. `jitRecording` over each fork, with an A/A, so `jit_diff` shows which decisions differ between forks of the same code and the scores show whether they matter.",
+    "",
+    "Both builds with the release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26, 8G heap, no profiler. Recording may change the scores, so compare them only within this campaign."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `c84dea8aa7`",
+    "aa": "the same commit as `base`, for fork-to-fork differences",
+    "candidate": "two commits on `2.13.x`, `b7ee730be7`"
+  },
+  "benchmark": "SymbolOpsBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "candidate": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-symbol-final",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "aa": "",
+    "candidate": ""
+  },
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "all": "-f 1 -wi 5 -w 10 -i 5 -r 10 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "none",
+  "jitRecording": true
+}

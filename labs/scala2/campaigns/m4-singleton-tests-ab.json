@@ -1,0 +1,59 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala-lab-corpora-pekko/c1",
+  "builds": {
+    "integ": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-shared-integ-573187",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "guard": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/raw-check-guard",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "tests": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/singleton-type-tests",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "integ": "",
+    "guard": "",
+    "tests": ""
+  },
+  "variantJmhArgs": {
+    "integ": "-p scalacOptions=-Yname-table:shared",
+    "guard": "-p scalacOptions=-Yname-table:shared",
+    "tests": "-p scalacOptions=-Yname-table:shared"
+  },
+  "variantDescriptions": {
+    "integ": "`scala2-perf-integration` tip `573187e7d7`",
+    "guard": "the tip plus `Symbol.typeParams` with one implementation (`0ea5738f0b`) and the `isRawIfWithoutArgs` guard (`bd56935a39`)",
+    "tests": "`guard` plus class tests for `NoType`, `NoPrefix`, `WildcardType` and `ErrorType` at `eq` and `ne` sites (`03c34cd4f1`)"
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "pekko": "-f 1 -bm ss -wi 8 -i 10 -p jdkHome=25.0.4-tem"
+  },
+  "name": "m4-singleton-tests-ab",
+  "rounds": 3,
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "description": [
+    "Stacked A/B on pekko: read instructions per op and the accessor frames first, as 3 forks of time cannot resolve these. All with `-Yname-table:shared`. No A/A."
+  ]
+}

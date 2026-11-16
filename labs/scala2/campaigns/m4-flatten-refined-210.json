@@ -1,0 +1,55 @@
+{
+  "name": "m4-flatten-refined-210",
+  "description": [
+    "What does [retronym/scala#210](https://github.com/retronym/scala/pull/210) (flatten intersections that a type map puts in a refinement's parents) save on its `2.13.x` base? One full compile per op, for scala and pekko-actor plus pekko-stream.",
+    "",
+    "`base` and `baseaa` are the same build of `upstream/2.13.x`, the A/A control. Release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26, 8G heap; xctrace ipc for cycles and instructions. Warmup comes from the plateaus of the m4 cells of `m4-integ-pekko-kperf`, `m4-whs-hash-pekko` and `m4-devirt-subst-prof`."
+  ],
+  "variantDescriptions": {
+    "base": "`upstream/2.13.x` `d32d907524`",
+    "baseaa": "The same build as `base`",
+    "flat": "`base` plus #210 (`3de545ad84`)"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/flatten-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "baseaa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/flatten-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "flat": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/flatten-measure",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "baseaa": "",
+    "flat": ""
+  },
+  "rounds": 5,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 5 -i 5 -p jdkHome=25.0.4-tem"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "m5-bti-shape3",
+  "description": [
+    "Instrumented `BaseTypeSeq.baseTypeIndex` (branch `claude/bti-shape`, not for merge): length, hit index and miss histograms and sampled callers on the `subtype` workload, printed to the fork's stderr. Scores are not timings."
+  ],
+  "variantDescriptions": {
+    "shape": "retronym/scala#208 + instrumentation"
+  },
+  "testbed": "m5-pro",
+  "builds": {
+    "shape": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-shape",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "shape": ""
+  },
+  "rounds": 1,
+  "corpora": {
+    "subtype": "-f 1 -wi 0 -i 3 -r 5 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "none",
+  "benchmark": "SymbolOpsBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "gcLog": true
+}

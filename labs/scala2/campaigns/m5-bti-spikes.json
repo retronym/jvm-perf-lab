@@ -1,0 +1,171 @@
+{
+  "name": "m5-bti-spikes",
+  "description": [
+    "One-fork spikes of `BaseTypeSeq.baseTypeIndex` changes on the `subtype` workload, against retronym/scala#208 (`pr208`). kperf profile for the leaf cost."
+  ],
+  "variantDescriptions": {
+    "pr208": "retronym/scala#208, `a0b9fd2010`",
+    "mask": "`pr208` + a 64-bit Bloom filter of the sequence's symbol ids that answers most misses (`claude/bti-mask`)",
+    "hash": "`pr208` + an open-addressing byte index per sequence of 8 or more types: hits and misses in about one probe (`claude/bti-hash`)",
+    "maskhash": "`hash` + `mask` (`claude/bti-mask-hash`)",
+    "pr208b": "`pr208` again, in the later job with `maskhash`, against drift",
+    "local": "`pr208` + the scan over a local `typeSymbols` bounded by its own length: no peeled range check, no `elems` load (`claude/bti-local`)",
+    "pr208c": "`pr208` again, in the job with `local`",
+    "masklen": "`mask` + a backward scan bounded by the target class's cached sequence length (`claude/bti-mask-len`)",
+    "mask2": "`mask` again, in the job with `masklen`",
+    "pr208d": "`pr208` again, in the job with `masklen`",
+    "masklen2": "`masklen` reading the target's info only when it's already valid now (`infoIfCurrent`), not through `rawInfo` (`claude/bti-mask-len`)",
+    "locallen": "`local` (#233) + the same cached-length bound, no mask (`claude/bti-local-len`)",
+    "pr208e": "`pr208` again, in the job with `masklen2` and `locallen`",
+    "cfp": "`pr208` + `firstTry` deciding `<:<` against a top-level monomorphic class by base type sequence membership, skipping `baseType`, `relativize` and the recursive `isSubType` (`claude/subtype-class-fastpath`)",
+    "mask3": "`mask` again, in the job with `cfp`",
+    "pr208f": "`pr208` again, in the job with `cfp`"
+  },
+  "testbed": "m5-pro",
+  "builds": {
+    "pr208": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "mask": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-mask",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "hash": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-hash",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "maskhash": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-mask-hash",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "pr208b": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "local": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-local",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "pr208c": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "masklen": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-mask-len",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "mask2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-mask",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "pr208d": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "masklen2": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-mask-len",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "locallen": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-local-len",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "pr208e": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "cfp": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/subtype-class-fastpath",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "mask3": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/bti-mask",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "pr208f": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeparams-final-review-6240bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "pr208": "",
+    "mask": "",
+    "hash": "",
+    "maskhash": "",
+    "pr208b": "",
+    "local": "",
+    "pr208c": "",
+    "masklen": "",
+    "mask2": "",
+    "pr208d": "",
+    "masklen2": "",
+    "locallen": "",
+    "pr208e": "",
+    "cfp": "",
+    "mask3": "",
+    "pr208f": ""
+  },
+  "rounds": 1,
+  "corpora": {
+    "subtype": "-f 1 -wi 5 -w 5 -i 5 -r 5 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "benchmark": "SymbolOpsBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 3.0,
+    "quietSecs": 20
+  },
+  "gcLog": true
+}

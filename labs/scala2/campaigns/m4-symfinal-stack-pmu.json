@@ -1,0 +1,74 @@
+{
+  "name": "m4-symfinal-stack-pmu",
+  "description": [
+    "Does [retronym/scala#201](https://github.com/retronym/scala/pull/201) at its final head keep the gain measured for the whole of [retronym/scala#199](https://github.com/retronym/scala/pull/199), and do the parts it left behind earn a PR of their own? `m4-symfinal-scala` has only ms, predates the `val`, and is -1.87% ±8.97. `m4-devirt-tip-ab` (-4.09% ±0.64) is the whole of #199 on another base.",
+    "",
+    "A stack on `2.13.x`, full compile of the scala corpus, with cycles and instructions from kperf. `aa` is the base built again, as the floor for the smaller steps. Compare `symfinal` with `base` for #201, `typeparam` and `stranded` with `symfinal` for question 5. Release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26, 8G heap, single-shot 4+4 ops."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `c84dea8aa7`",
+    "aa": "`base` again, an A/A",
+    "symfinal": "retronym/scala#201 at `4636892ff7`: the three source commits, with the `val`, plus MiMa filters and tests",
+    "typeparam": "`symfinal` plus final `isTypeParameter` (`15a9e452b6`)",
+    "stranded": "`typeparam` plus the `typeParams` `rawInfo` fast path, `applyFast`, `mapConserveTypes` and the static `SubstMap` branches, all that #201 left out of #199's source (`a9f86b326b`)"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-2.13-c84dea",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "symfinal": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-symbol-final-measure",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "typeparam": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-final-tp",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "stranded": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/devirt-final-stranded",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "aa": "",
+    "symfinal": "",
+    "typeparam": "",
+    "stranded": ""
+  },
+  "rounds": 6,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cycles@2000000+instructions@7000000",
+  "kperf": "/tmp/asprof-kperf.sock"
+}

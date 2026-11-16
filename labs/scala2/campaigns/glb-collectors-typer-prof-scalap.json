@@ -1,0 +1,14 @@
+{
+  "name": "glb-collectors-typer-prof-scalap",
+  "description": "scala/scala#11314: cpu profiles of each build in its own fork, scalap, typer only, for profdiff",
+  "benchmark": "CompileBenchmark",
+  "profile": "async:cpu",
+  "rounds": 1,
+  "corpora": {
+    "scalap": "-wi 16 -i 12 -w 2 -r 2 -p scalacOptions=-Ystop-after:typer"
+  },
+  "variants": {"base": "", "pr": ""},
+  "variantJmhArgs": {"base": "-p variants=base=@build=../glb-base", "pr": "-p variants=pr=@build=."},
+  "gcLog": true,
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing"
+}

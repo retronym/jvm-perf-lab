@@ -1,0 +1,37 @@
+{
+  "name": "interner-strong-spike",
+  "benchmark": "CompileBenchmark",
+  "profile": "xctrace:/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/xctrace/loads.template.xml",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 3,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:typer",
+    "scalaz": "-f 1 -bm ss -wi 90 -i 30 -p scalacOptions=-Ystop-after:typer"
+  },
+  "variants": {
+    "weak": "",
+    "strong": "-Ddotty.uniques.strong=true",
+    "uncache": "-Ddotty.uniques.uncacheMethodParams=true",
+    "strong-uncache": "-Ddotty.uniques.strong=true -Ddotty.uniques.uncacheMethodParams=true",
+    "weak2": "-Dperflab.aa=2",
+    "strong2": "-Ddotty.uniques.strong=true -Dperflab.aa=2"
+  },
+  "variantDescriptions": {
+    "weak": "#84 tip `f06dc23f02` + the interner switches (`6c7200e37c`), switches off: today's weak interners",
+    "strong": "the same build, `-Ddotty.uniques.strong=true`: entries hold their types strongly, no weak references",
+    "uncache": "the same build, `-Ddotty.uniques.uncacheMethodParams=true`: types over method/poly params not hash-consed (retronym/scala3#21)",
+    "strong-uncache": "both switches",
+    "weak2": "A/A twin of `weak` (a marker property only)",
+    "strong2": "A/A twin of `strong` (a marker property only)"
+  },
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "The type interners as a benchmarking fixture and an architecture question: weak (today) against strong, run-scoped entries (as in rustc, clang and Swift), and against not hash-consing ephemeral types over method and poly params (retronym/scala3#21, \u221211% on scalaz against main). One build, the variants differ only in JVM flags. With A/A twins of `weak` and `strong`: does the strong interner reduce fork-to-fork variance?",
+    "dotc and scalaz to `-Ystop-after:typer`, ordinary GC (the weak references' GC cost is part of the question), xctrace `loads`, patched JDK 26, 3 rounds."
+  ]
+}

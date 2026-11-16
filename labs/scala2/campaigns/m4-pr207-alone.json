@@ -1,0 +1,34 @@
+{
+  "name": "m4-pr207-alone",
+  "description": [
+    "retronym/scala#207 alone against the commit of 2.13.x it branches from, with no other integration work underneath. The earlier evidence was on the perf integration branch: `m4-refchecks-pairs-ab` has the first two commits, and `m4-branch-int148-scala` has all three in a single fork.",
+    "",
+    "On the M4, 3 rounds, xctrace ipc; release optimizer settings (`SCALA_RELEASE_OPT`); patched JDK 26, corpus compiled against JDK 25's API; 8G heap. Settings as `m4-branch-int148-scala` and `m4-branch-integ-pekko`, so that the percentages compare."
+  ],
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/refchecks-base-c84dea8",
+      "env": { "SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1" }
+    },
+    "pr207": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/refchecks-pr207-40397c1",
+      "env": { "SCALA_CHECKOUT": "{checkout}", "SCALA_RELEASE_OPT": "1" }
+    }
+  },
+  "variants": { "base": "", "pr207": "" },
+  "variantDescriptions": {
+    "base": "2.13.x `c84dea8aa7`, the commit retronym/scala#207 branches from",
+    "pr207": "`40397c1cf4`, the three code commits of retronym/scala#207: matched-pairs cache, member-type reuse, erased types first"
+  },
+  "loadgate": { "maxCores": 1.5, "quietSecs": 30 },
+  "gcLog": true,
+  "rounds": 3,
+  "corpora": {
+    "scala": "-f 1 -wi 6 -w 20 -i 6 -r 20 -p jdkHome=25.0.4-tem"
+  }
+}

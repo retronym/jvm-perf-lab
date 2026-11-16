@@ -1,0 +1,76 @@
+{
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/25.4.4.1+1-graal/bin/java",
+  "jvmArgs": "-Xms12G -Xmx12G -XX:NewSize=8G -XX:MaxNewSize=8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "testbed": "m4",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-base-su",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "so1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/combo6-sharing-off-su",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "w1": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/so1-w1",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "so1-sw": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/so1-sw",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  },
+  "variants": {
+    "base": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true",
+    "so1": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true",
+    "w1": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true",
+    "so1-sw": "-Ddotty.uniques.strong=true -Dcompilerlab.cores=true -Ddotty.denot.batchOnly=true"
+  },
+  "variantDescriptions": {
+    "base": "merge base + stamps + strong-interner switch (`claude/bench84-base-su`)",
+    "so1": "combo6 + sharing-off step 1 + strong-interner switch (`claude/combo6-sharing-off-su`)",
+    "w1": "so1 + `isCurrentLazyInfo` testing `InProgress` instead of `denotBits`; keeps the possible call of `isCurrentLazy` (`claude/so1-w1` `2b6dea561a`)",
+    "so1-sw": "so1 + `-Ddotty.denot.batchOnly=true` (`claude/so1-sw` `adf2e3f0f7`): every `concurrentDenot` folds, so `isCurrent`'s lazy branch is base's shape (no second exit)"
+  },
+  "gcLog": true,
+  "name": "m4-loop-kperf",
+  "rounds": 1,
+  "profile": "async:cycles@2000000+instructions@5000000",
+  "kperf": "/tmp/asprof-kperf.sock",
+  "diff": {
+    "owner": "dotty/tools/dotc/",
+    "ownerSkip": [
+      "dotty/tools/dotc/core/Contexts$Context.",
+      "dotty/tools/dotc/core/Contexts$ContextState.",
+      "dotty/tools/dotc/Reader."
+    ],
+    "groups": {
+      "denotation info/flag reads": "SymDenotations\\$SymDenotation\\.(isCurrent|isAbsent|is|isCompleted|isCompleting)$|Denotations\\$Denotation\\.(myInfo|info)$|SymDenotations\\$NoDenotation\\$\\.exists$",
+      "denot/symbol": "Types\\$NamedType\\.(denot|symbol|stableInRunSymbol)$|Symbols\\$Symbol\\.(denot|latestDenot|latestDenotIn)$|Types\\$Type\\.widenSingleton$|Periods\\$Period\\$\\.\\$eq\\$eq\\$extension$|Types\\$TermRef\\.underlying$",
+      "class caches": "SymDenotations\\$ClassDenotation\\.(memberCache|myMemberCache|memberCacheShared|memberCacheIfAny|baseTypeCache|baseData)$",
+      "findRef/imports": "Typer\\.(findRef|findRefRecur\\$1|loop\\$1|wildImportRef\\$1|selection\\$1)$|typer/ImportInfo\\.",
+      "recursion guard": "Contexts\\$Context\\.inline\\$recursive|Reader\\.recursive",
+      "names": "Names\\$(SimpleName|TypeName|DerivedName)\\.hashCode$|Names\\$\\.enterIfNew$"
+    }
+  },
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 30 -i 16 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x=",
+    "scalaz": "-f 1 -bm ss -wi 90 -i 30 -p scalacOptions=-Ystop-after:typer -p gcBetweenIterations=true -p variants=x="
+  },
+  "description": [
+    "Closing the loop on the `isCurrent` per-call cost: is it the lazy branch's second exit (a possible call of `isCurrentLazy`), not the `denotBits` load? so1-sw removes the whole concurrent arm; w1 removes only the load. [m4-iscurrent-workarounds](../m4-iscurrent-workarounds) (job 194, stopped) mislabelled its batch-only variant: it was built on w1, where the switch had nothing to fold in `isCurrent`. This campaign: kperf instructions and cycles, for `isCurrent`'s self count per variant."
+  ]
+}

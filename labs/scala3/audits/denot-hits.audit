@@ -1,0 +1,13 @@
+# How often the denotation and symbol caches of NamedType and Symbol hit, and how often their slow paths run:
+# a lower hit rate in one build would touch more objects per lookup (perflab batch-84-kperf-locality).
+count namedtype.denot          at=dotty.tools.dotc.core.Types$NamedType#denot
+count namedtype.computeDenot   at=dotty.tools.dotc.core.Types$NamedType#computeDenot
+count namedtype.symbol         at=dotty.tools.dotc.core.Types$NamedType#symbol
+count namedtype.computeSymbol  at=dotty.tools.dotc.core.Types$NamedType#computeSymbol
+count symbol.denot             at=dotty.tools.dotc.core.Symbols$Symbol#denot
+count symbol.computeDenot      at=dotty.tools.dotc.core.Symbols$Symbol#computeDenot
+count symbol.recomputeDenot    at=dotty.tools.dotc.core.Symbols$Symbol#recomputeDenot
+count denot.current            at=dotty.tools.dotc.core.Denotations$SingleDenotation#current
+count denot.bringForward       at=dotty.tools.dotc.core.Denotations$SingleDenotation#bringForward
+count symdenot.isCurrent       at=dotty.tools.dotc.core.SymDenotations$SymDenotation#isCurrent
+count findMember               at=dotty.tools.dotc.core.Types$Type#findMember

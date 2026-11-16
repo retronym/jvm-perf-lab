@@ -1,0 +1,28 @@
+{
+  "name": "ptyper-overhead-prof",
+  "description": [
+    "CPU profiles for `ptyper-overhead-full`: `2.13.x`, retronym/scala#212, the parallel typer spike without the flag and with it on one worker, each in a fork of its own, full compiles of re2s, for profdiff."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `d32d907524`",
+    "guards": "[retronym/scala#212](https://github.com/retronym/scala/pull/212) at `fd95c5c1c1`",
+    "spike": "the parallel typer spike at `b650049602`, without `-Yparallel-typer`",
+    "par1": "`spike` with `-Yparallel-typer -Yparallel-typer-threads:1`"
+  },
+  "benchmark": "CompileBenchmark",
+  "profile": "async:cpu",
+  "rounds": 1,
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "corpora": {
+    "re2s": "-f 1 -wi 30 -w 2 -i 20 -r 2 -p jdkHome=25.0.4-tem"
+  },
+  "variants": {"base": "", "guards": "", "spike": "", "par1": ""},
+  "variantJmhArgs": {
+    "base": "-p variants=base=@build=.",
+    "guards": "-p variants=guards=@build=pg",
+    "spike": "-p variants=spike=@build=ps",
+    "par1": "-p 'variants=par1=@build=ps -Yparallel-typer -Yparallel-typer-threads:1'"
+  },
+  "gcLog": true
+}

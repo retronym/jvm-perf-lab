@@ -1,0 +1,44 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m5-unapplyseq-prof",
+  "description": [
+    "Allocation profiles of `base` and `cons` from `m5-unapplyseq`: is any `SeqFactory$UnapplySeqWrapper` allocation left, and from where. Four forks each, since the wrapper was absent from one of four forks before."
+  ],
+  "variantDescriptions": {
+    "base": "`upstream/2.13.x` at `c84dea8aa7`",
+    "cons": "`c84dea8aa7` plus the pattern change at `11fccb08d8`, branch `avoid-unapplyseq-wrapper`"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unapplyseq-ab-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "cons": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unapplyseq-ab-tip",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "cons": ""
+  },
+  "rounds": 4,
+  "profile": "async:cpu,alloc",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem"
+  }
+}

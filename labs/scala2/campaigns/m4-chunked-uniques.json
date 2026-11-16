@@ -1,0 +1,55 @@
+{
+  "name": "m4-chunked-uniques",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "profile": "xctrace:ipc",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/chunked-uniques",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "chunked-weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/chunked-uniques",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "chunked": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/chunked-uniques",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "weak": "-Dscala.uniques.layout=weak",
+    "chunked-weak": "-Dscala.uniques.layout=chunked-weak",
+    "chunked": "-Dscala.uniques.layout=chunked"
+  },
+  "variantDescriptions": {
+    "weak": "[retronym/scala#239](https://github.com/retronym/scala/pull/239) at `4192d5b9ca` with today's layout: `Types.uniques` in a `WeakHashSet`",
+    "chunked-weak": "the same build with `ChunkedInterner(weak = true)`: open addressing over 64K-slot chunks, a slim `WeakReference` per type, tombstones; free-slot reuse and used-slot accounting fixes; growth at 1/4",
+    "chunked": "the same build with `ChunkedInterner(weak = false)`: chunked table holding types strongly until the run discards it, no object per element"
+  },
+  "rounds": 4,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 6 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Scala 2 port of the chunked type interner ([retronym/scala#239](https://github.com/retronym/scala/pull/239), from retronym/scala3#117). Does keeping the `uniques` table out of G1's humongous regions cut young-GC card scanning for scalac as it did for dotc? Read `cyc%:gc` and time; instructions/op should be near flat. Layout chosen per variant with `-Dscala.uniques.layout` (what `-Yuniques-layout:default` reads), one build. Same setup as `m4-forkvar-uniques`: scala corpus, 8 GB heap, separate forks, no forced GC, patched JDK 26, M4.",
+    "",
+    "Scala 3 reference on the M4: [hashcons-scalaz-sized](../../scala3-2d50b0/ab/index.html#c-hashcons-scalaz-sized) (scalaz, chunked-weak −2.9% time, GC 29.1% → 9.3% of cycles) and `hashcons-scalaz-fixes` (job 538, the same fixes as this build). Explainer: https://claude.ai/artifact/NWGiMojrz2W4VDLqAKbq6B"
+  ]
+}

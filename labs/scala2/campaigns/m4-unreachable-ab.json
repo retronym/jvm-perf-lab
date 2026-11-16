@@ -1,0 +1,56 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 4 -i 4 -p jdkHome=25.0.4-tem",
+    "scalap": "-f 1 -wi 20 -w 2 -i 20 -r 2"
+  },
+  "name": "m4-unreachable-ab",
+  "profile": "none",
+  "rounds": 5,
+  "description": [
+    "Timing and allocation A/B of retronym/scala#200 at `bc2406ed31` against its base, with an A/A as the noise floor: `aa` is a second build of the same commit as `base`. Repeats `m5-unreachable-ab` on the current head, on a second machine. Compare within this campaign only. m4 has been reported running warm, so time is to be read with care; allocation should not be affected.",
+    "",
+    "Both builds with the release optimizer settings (`SCALA_RELEASE_OPT`); corpora compiled plainly, where unreachable-code removal is the only optimiser pass on. Patched JDK 26, 8G heap. scala: single-shot 4+4 ops; scalap: 20+20 x 2 s. Builds alternate fork by fork over 5 rounds."
+  ],
+  "variantDescriptions": {
+    "base": "upstream `2.13.x` at `c84dea8aa7`, the PR's base",
+    "aa": "the same commit as `base`, for the noise floor",
+    "pr": "[retronym/scala#200](https://github.com/retronym/scala/pull/200) at `bc2406ed31`"
+  },
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unreachable-codegen-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aa": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unreachable-codegen-base",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "pr": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unreachable-codegen-measure",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "base": "",
+    "aa": "",
+    "pr": ""
+  }
+}

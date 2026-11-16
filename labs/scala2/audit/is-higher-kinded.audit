@@ -1,0 +1,22 @@
+# receiver classes at TypeComparers.isSubType2's tp1/tp2.isHigherKinded and TypeRef.relativize's isHigherKinded: one sites probe per implementation
+sites isSubType2->isHigherKinded@Types$Type at=scala.reflect.internal.Types$Type#isHigherKinded() from=scala.reflect.internal.tpe.TypeComparers#isSubType2 depth=0 qualify=class
+sites relativize->isHigherKinded@Types$Type at=scala.reflect.internal.Types$Type#isHigherKinded() from=scala.reflect.internal.Types$TypeRef#relativize depth=0 qualify=class
+sites isSubType2->isHigherKinded@Types$SingletonType at=scala.reflect.internal.Types$SingletonType#isHigherKinded() from=scala.reflect.internal.tpe.TypeComparers#isSubType2 depth=0 qualify=class
+sites relativize->isHigherKinded@Types$SingletonType at=scala.reflect.internal.Types$SingletonType#isHigherKinded() from=scala.reflect.internal.Types$TypeRef#relativize depth=0 qualify=class
+sites isSubType2->isHigherKinded@Types$ThisType at=scala.reflect.internal.Types$ThisType#isHigherKinded() from=scala.reflect.internal.tpe.TypeComparers#isSubType2 depth=0 qualify=class
+sites relativize->isHigherKinded@Types$ThisType at=scala.reflect.internal.Types$ThisType#isHigherKinded() from=scala.reflect.internal.Types$TypeRef#relativize depth=0 qualify=class
+sites isSubType2->isHigherKinded@Types$RefinedType at=scala.reflect.internal.Types$RefinedType#isHigherKinded() from=scala.reflect.internal.tpe.TypeComparers#isSubType2 depth=0 qualify=class
+sites relativize->isHigherKinded@Types$RefinedType at=scala.reflect.internal.Types$RefinedType#isHigherKinded() from=scala.reflect.internal.Types$TypeRef#relativize depth=0 qualify=class
+sites isSubType2->isHigherKinded@Types$ArgsTypeRef at=scala.reflect.internal.Types$ArgsTypeRef#isHigherKinded() from=scala.reflect.internal.tpe.TypeComparers#isSubType2 depth=0 qualify=class
+sites relativize->isHigherKinded@Types$ArgsTypeRef at=scala.reflect.internal.Types$ArgsTypeRef#isHigherKinded() from=scala.reflect.internal.Types$TypeRef#relativize depth=0 qualify=class
+sites isSubType2->isHigherKinded@Types$NoArgsTypeRef at=scala.reflect.internal.Types$NoArgsTypeRef#isHigherKinded() from=scala.reflect.internal.tpe.TypeComparers#isSubType2 depth=0 qualify=class
+sites relativize->isHigherKinded@Types$NoArgsTypeRef at=scala.reflect.internal.Types$NoArgsTypeRef#isHigherKinded() from=scala.reflect.internal.Types$TypeRef#relativize depth=0 qualify=class
+sites isSubType2->isHigherKinded@Types$PolyType at=scala.reflect.internal.Types$PolyType#isHigherKinded() from=scala.reflect.internal.tpe.TypeComparers#isSubType2 depth=0 qualify=class
+sites relativize->isHigherKinded@Types$PolyType at=scala.reflect.internal.Types$PolyType#isHigherKinded() from=scala.reflect.internal.Types$TypeRef#relativize depth=0 qualify=class
+sites isSubType2->isHigherKinded@Types$ExistentialType at=scala.reflect.internal.Types$ExistentialType#isHigherKinded() from=scala.reflect.internal.tpe.TypeComparers#isSubType2 depth=0 qualify=class
+sites relativize->isHigherKinded@Types$ExistentialType at=scala.reflect.internal.Types$ExistentialType#isHigherKinded() from=scala.reflect.internal.Types$TypeRef#relativize depth=0 qualify=class
+sites isSubType2->isHigherKinded@Types$HKTypeVar at=scala.reflect.internal.Types$HKTypeVar#isHigherKinded() from=scala.reflect.internal.tpe.TypeComparers#isSubType2 depth=0 qualify=class
+sites relativize->isHigherKinded@Types$HKTypeVar at=scala.reflect.internal.Types$HKTypeVar#isHigherKinded() from=scala.reflect.internal.Types$TypeRef#relativize depth=0 qualify=class
+sites isSubType2->isHigherKinded@Types$TypeVar at=scala.reflect.internal.Types$TypeVar#isHigherKinded() from=scala.reflect.internal.tpe.TypeComparers#isSubType2 depth=0 qualify=class
+sites relativize->isHigherKinded@Types$TypeVar at=scala.reflect.internal.Types$TypeVar#isHigherKinded() from=scala.reflect.internal.Types$TypeRef#relativize depth=0 qualify=class
+sites any->isHigherKinded@Types$SimpleTypeProxy at=scala.reflect.internal.Types$SimpleTypeProxy#isHigherKinded() depth=1 skip=isHigherKinded qualify=class sample=16

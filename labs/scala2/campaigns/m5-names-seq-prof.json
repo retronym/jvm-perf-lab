@@ -1,0 +1,48 @@
+{
+  "name": "m5-names-seq-prof",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "Parsing only on the `scala` corpus at `8aaca82cc4`, with the scanner's buffer taken as a `CharSequence`: where does `-Yname-table:shared` spend what `string` doesn't? Two rounds, so that a store against itself shows how far a profile moves."
+  ],
+  "variantDescriptions": {
+    "shared": "`-Yname-table:shared`, per-thread probe",
+    "string": "`-Yname-table:string`"
+  },
+  "builds": {
+    "shared": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-seq",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "string": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/names-ab-seq",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "shared": "",
+    "string": ""
+  },
+  "variantJmhArgs": {
+    "shared": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:shared'",
+    "string": "-p 'scalacOptions=-Ystop-after:parser -Yname-table:string'"
+  },
+  "rounds": 2,
+  "profile": "async:cpu,alloc",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 80 -i 120 -p jdkHome=25.0.4-tem"
+  }
+}

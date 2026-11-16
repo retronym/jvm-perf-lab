@@ -1,0 +1,59 @@
+{
+  "name": "m4-unit-major",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/.sdkman/candidates/java/21.0.12+1.1-tem/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "phase": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unit-major-backend",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "flatten": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unit-major-backend",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "posterasure": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/unit-major-backend",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "phase": "",
+    "flatten": "",
+    "posterasure": ""
+  },
+  "variantJmhArgs": {
+    "phase": "",
+    "flatten": "-p scalacOptions=-Yunit-major-from:flatten",
+    "posterasure": "-p scalacOptions=-Yunit-major-from:posterasure"
+  },
+  "variantDescriptions": {
+    "phase": "`claude/unit-major-backend`, phase-major as today",
+    "flatten": "the same build with `-Yunit-major-from:flatten`: flatten, mixin, cleanup, delambdafy and jvm run unit by unit, and each unit's trees are dropped once its classes are written",
+    "posterasure": "`-Yunit-major-from:posterasure`: also posterasure, lambdalift and constructors run unit by unit"
+  },
+  "rounds": 5,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 20 -i 10 -p jdkHome=21.0.12+1.1-tem"
+  },
+  "description": [
+    "Does running the tail of the pipeline unit by unit shrink what G1 copies? Separate forks, one compile at a time, 8 GB G1, Temurin 21, M4, scala corpus (output discarded). Read pause sums and heap after young collections from `gc.log` beside the score.",
+    "",
+    "Build: retronym/scala `claude/unit-major-backend` (upstream 2.13.x plus `-Yunit-major-from`), retronym/scala#242."
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "benchmark": "CompileBenchmark",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Xmn3g -XX:-G1UseAdaptiveIHOP -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-mapped-uniques-chunked",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "chunked-weak": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-mapped-uniques-chunked",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "direct": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-mapped-uniques-chunked",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "off": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/direct-mapped-uniques-chunked",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "weak": "-Dscalac.uniques=weak",
+    "chunked-weak": "-Dscalac.uniques=chunked-weak",
+    "direct": "-Dscalac.uniques=direct",
+    "off": "-Dscalac.uniques=off"
+  },
+  "variantDescriptions": {
+    "weak": "today's `WeakHashSet` uniques table, cleared at the end of each run (retronym/scala#244)",
+    "direct": "lossy direct-mapped `Array[Type]` of 16k slots indexed by `hashCode & mask`; a miss overwrites the slot; a fresh array every 64k inserts",
+    "off": "no interning: `unique(tp)` returns `tp`",
+    "chunked-weak": "retronym/scala#239's `ChunkedInterner(weak = true)`: open addressing over 64K-slot chunks, a slim `WeakReference` per type, tombstones"
+  },
+  "gcLog": true,
+  "name": "uniques-direct-vs-chunked",
+  "description": [
+    "Follow-up to [uniques-direct-spike](#c-uniques-direct-spike): how do retronym/scala#239's chunked weak table, which beat today's table for dotc, and the lossy direct-mapped table compare under the same build and settings? Branch `claude/direct-mapped-uniques-chunked` (retronym/scala#252 plus `ChunkedInterner` copied from #239 at `4192d5b9ca`), interner picked per fork by `-Dscalac.uniques`.",
+    "",
+    "Full compile of the `scala` corpus, single-shot, 8 warmup + 6 measured ops; patched JDK 26, 8G heap, fixed 3G young generation."
+  ],
+  "rounds": 5,
+  "loadgate": {
+    "maxCores": 3.0,
+    "quietSecs": 30
+  },
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 8 -i 6 -p jdkHome=25.0.4-tem"
+  }
+}

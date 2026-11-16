@@ -1,0 +1,36 @@
+{
+  "name": "m4-lazydepth-paired-full",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "lazydepth": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/typeref-bench-lazydepth-flag",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "paired": {
+    "eager": "-Ylazy-depth:false",
+    "lazy": "-Ylazy-depth:true"
+  },
+  "variantDescriptions": {
+    "eager": "lubDepth computed before solving and merging, as in base",
+    "lazy": "lubDepth computed only when solve lubs/glbs two or more bounds, or mergePrefixAndArgs merges prefixes or arguments that differ"
+  },
+  "rounds": 4,
+  "loadgate": {
+    "maxCores": 1.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 20 -i 30 -p jdkHome=25.0.4-tem"
+  },
+  "description": [
+    "Lazy lub depth (retronym/scala#245) off vs on via the bench-only `-Ylazy-depth` flag (`claude/typeref-bench-lazydepth-flag`), alternating by iteration within each fork, in a full compile of the scala corpus. The typer-only paired run (m4-lazydepth-paired) measured -2.46%. 4 forks of 20 + 30 single shots, 8 GB G1, patched JDK 26, M4."
+  ]
+}

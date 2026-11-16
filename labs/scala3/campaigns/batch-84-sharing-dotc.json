@@ -1,0 +1,39 @@
+{
+  "name": "batch-84-sharing-dotc",
+  "description": [
+    "Serial batch compilation of the compiler's sources across retronym/scala3#84's `73c59487a3` (\"Interactive: several readers over one symbol table, serialised and parallel\"), the commit that wired the sharing primitives (claims, Stamped caches, SyncEqHashMap, ConcurrentWeakHashSet, Published) into the compiler, against its parent `8899fc4dbb`.",
+    "Here each fork gets the same work: single-shot, 13 warmup ops and 16 measured (`-bm ss`), on the patched JDK 26 build (no W^X cost on VM calls such as `identityHashCode`, so `dcca16aa7a`'s content hash of names is not a free win).",
+    "Corpus `dotc`: the 3.10.0 tag's `compiler/src/dotty/tools/dotc` (485 files) against the published 3.10.0 jars, to `-Ystop-after:pickler`, with the compiler build's options but -Werror."
+  ],
+  "benchmark": "CompileBenchmark",
+  "profile": "none",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Dcompilerlab.corpus.dotc=/Users/jzaugg-virtus/code/retronym/jvm-perf-lab/labs/scala3/out/corpora/dotc-3.10.0/dotc -Dcompilerlab.extraJars=/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-compiler_3/3.10.0/scala3-compiler_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala3-interfaces/3.10.0/scala3-interfaces-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/tasty-core_3/3.10.0/tasty-core_3-3.10.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.12.0/compiler-interface-1.12.0.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar:/Users/jzaugg-virtus/Library/Caches/Coursier/v1/https/repo1.maven.org/maven2/org/scala-sbt/util-interface/1.11.5/util-interface-1.11.5.jar -Dcompilerlab.jdkModules=java.base,java.logging,java.management,jdk.management,java.compiler,jdk.unsupported,java.naming,java.xml,java.desktop",
+  "rounds": 4,
+  "corpora": {
+    "dotc": "-f 1 -bm ss -wi 13 -i 16 -p scalacOptions=-Ystop-after:pickler"
+  },
+  "loadgate": {
+    "maxCores": 2.5,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "variantDescriptions": {
+    "pre": "`8899fc4dbb`, the parent",
+    "sharing": "`73c59487a3`, sharing wired in"
+  },
+  "builds": {
+    "pre": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-presharing",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    },
+    "sharing": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala3/bench84-sharing",
+      "env": {
+        "SCALA3_CHECKOUT": "{checkout}"
+      }
+    }
+  }
+}
