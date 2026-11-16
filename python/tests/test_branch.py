@@ -51,6 +51,19 @@ class ExploreTest(unittest.TestCase):
         self.assertNotEqual(branch.build_key(a, {"E": "x"}, "sbt"), branch.build_key(a, {"E": "y"}, "sbt"))
 
 
+class UnmeasuredFirstTest(unittest.TestCase):
+    def test_a_commit_without_a_round_goes_before_more_rounds(self):
+        # x and y measured in round 1, z (an extension) not at all: z's round 1 on each corpus first, then the rest
+        todo = [(r, c, None, v, "") for r, c, v in branch.cells(2, ["a", "b"], ["x", "y", "z"]) if r == 2 or v == "z"]
+        got = branch.unmeasured_first(todo, {(c, v) for c in "ab" for v in "xy"})
+        self.assertEqual([(r, c, v) for r, c, _, v, _ in got[:2]], [(1, "a", "z"), (1, "b", "z")])
+        self.assertEqual(got[2:], [x for x in todo if x[0] == 2])
+
+    def test_a_fresh_campaign_keeps_its_order(self):
+        todo = [(r, c, None, v, "") for r, c, v in branch.cells(2, ["a", "b"], ["x", "y", "z"])]
+        self.assertEqual(branch.unmeasured_first(todo, set()), todo)
+
+
 class BuildKeyTest(unittest.TestCase):
     def setUp(self):
         self.out = tempfile.mkdtemp()
@@ -276,6 +289,37 @@ class BranchCampaignTest(unittest.TestCase):
         finally:
             jmh.run_build, ab.check = orig, check
         return built
+
+    def test_a_range_extended_while_running_measures_the_new_commit_next(self):
+        spec = json.load(open(self.spec_f))
+        spec["rounds"] = 2
+        spec["branch"]["range"] = f"{self.base}..{git(self.repo, 'rev-parse', 'main~1').strip()}"
+        json.dump(spec, open(self.spec_f, "w"))
+        ran, orig = [], jmh.run_build
+
+        def stub(cmd, log, *a, **k):
+            if "build.py" in cmd:
+                return orig(cmd, log, *a, **k)
+            d = os.path.dirname(log)
+            ran.append(os.path.relpath(d, os.path.join(config.get().campaigns, "br")))
+            if len(ran) == 6:  # the range carried to main as round 1 (three commits, two corpora) ends
+                spec["branch"]["range"] = f"{self.base}..main"
+                json.dump(spec, open(self.spec_f, "w"))
+                os.utime(self.spec_f, ns=(1, os.stat(self.spec_f).st_mtime_ns + 10**9))
+            json.dump([{"primaryMetric": {"score": 1.0, "scoreError": 0.1, "scoreUnit": "ms/op"}, "secondaryMetrics": {}}],
+                      open(os.path.join(d, "result.json"), "w"))
+            return 0
+        jmh.run_build, check = stub, ab.check
+        ab.check = lambda *a, **k: None
+        try:
+            ab.run(ab.Spec(self.spec_f), False)
+        finally:
+            jmh.run_build, ab.check = orig, check
+        tip = self.tip[:branch.SHORT]
+        self.assertEqual(ran[6:8], [f"x/{tip}/1", f"y/{tip}/1"])  # before round 2 of the others
+        self.assertEqual(len(ran), 2 * 2 * 4)  # every round of every commit, the new one's too, once
+        self.assertEqual(len(set(ran)), len(ran))
+        self.assertEqual(json.load(open(os.path.join(config.get().campaigns, "br", branch.BRANCH)))["tip"], self.tip)
 
     def test_a_commit_that_does_not_build_is_skipped_and_recorded(self):
         # c1's build fails; the merge's builds a dirty checkout

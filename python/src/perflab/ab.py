@@ -461,7 +461,7 @@ def run_fork(spec, cmd, dest):
 def run(spec, dry, retry_unbuildable=False):
     if spec.historical:
         sys.exit(f"{spec.name} is historical, kept for its results; not running it: {spec.historical}")
-    cells = list(spec.cells())
+    cells, todo = plan(spec)
     # the campaign keeps its spec: the index orders variants by it, and a report can be rerun from the results alone
     os.makedirs(spec.out, exist_ok=True)
     if not is_copy(spec.path, spec.out):
@@ -475,7 +475,6 @@ def run(spec, dry, retry_unbuildable=False):
             f.write(spec.jvm_args + "\n")
     # the spec version cells are tagged with; `perflab trees` records the user's spec once and passes its id down
     version = os.environ.get(specs.ENV) or specs.record(spec.out, spec.path)
-    todo = [c for c in cells if not done(spec.cell_dir(c[1], c[3], c[0]))]
     here = testbed.name()
     if spec.testbed and spec.testbed != here and todo and not dry:
         sys.exit(f"{spec.name} runs on testbed {spec.testbed}, and this machine is {here}: queue it on `perflab server` "
@@ -529,7 +528,7 @@ def run(spec, dry, retry_unbuildable=False):
     # a branch's commits that did not build: their cells are skipped (until a run with --retry-unbuildable)
     unbuildable = branch.unbuildable(spec.build_out) if spec.branch_info and not retry_unbuildable else {}
     skipped, failed = {}, []
-    for r, corpus, iters, variant, flags in todo:
+    for r, corpus, iters, variant, flags in following(spec, todo, dry):
         dest = spec.cell_dir(corpus, variant, r)
         if variant in unbuildable:
             if variant not in skipped:
@@ -667,6 +666,68 @@ def run(spec, dry, retry_unbuildable=False):
 
 
 FAILED = "failed.txt"  # in a branch campaign's cell whose run failed: why
+
+
+def plan(spec):
+    """The campaign's cells, and those to run (no result yet) in the order to run them: a branch campaign's commits
+    with no value yet (a range extended, say) before more rounds of the others (branch.unmeasured_first)."""
+    cells = list(spec.cells())
+    measured = {c: done(spec.cell_dir(c[1], c[3], c[0])) for c in cells}
+    todo = [c for c in cells if not measured[c]]
+    if spec.branch_info:
+        todo = branch.unmeasured_first(todo, {(c[1], c[3]) for c, ok in measured.items() if ok})
+    return cells, todo
+
+
+def following(spec, todo, dry):
+    """`todo`'s cells in turn. Between cells, a branch campaign whose spec file now carries its range further along
+    the same history (branch.extended) takes the new commits, and the cells left are planned again, so that the new
+    commits' first rounds come next rather than after every round of the others. A cell this run has already tried
+    (failed, or skipped as unbuildable) is not tried again."""
+    queue, tried = list(todo), set()
+    seen = spec_mtime(spec)
+    while queue:
+        c = queue.pop(0)
+        tried.add(c)
+        yield c
+        if not spec.branch_info or spec.profile_of or dry:
+            continue
+        m = spec_mtime(spec)
+        if m == seen:
+            continue
+        seen = m
+        if extend(spec):
+            queue = [x for x in plan(spec)[1] if x not in tried]
+
+
+def spec_mtime(spec):
+    try:
+        return os.stat(spec.path).st_mtime_ns
+    except OSError:
+        return None
+
+
+def extend(spec):
+    """Takes a branch campaign's new commits from its spec file, when its range now ends further along the kept
+    history: branch.json, the builds and variants, and the campaign's copy of the spec. True when there were any."""
+    try:
+        rng = json.load(open(spec.path))["branch"]["range"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    b = branch.extended(spec.branch_info, {**spec.branch, "range": rng})
+    if b is spec.branch_info:
+        return False
+    added = [c for c in b["commits"] if c["variant"] not in spec.builds]
+    spec.branch_info = b
+    for c in added:
+        spec.builds[c["variant"]] = {"checkout": spec.branch["checkout"], "commit": c}
+        spec.variants[c["variant"]] = ""
+    branch.save(spec.out, b)
+    if not is_copy(spec.path, spec.out):
+        shutil.copy(spec.path, os.path.join(spec.out, "spec.json"))
+    log(f"{spec.name}: the range now ends at {b['tip'][:10]}: {len(added)} new commit{'s' if len(added) != 1 else ''} "
+        f"({', '.join(c['short'][:7] for c in added)}), measured next")
+    return True
 
 
 def done(dest):

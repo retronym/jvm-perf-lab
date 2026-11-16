@@ -5,7 +5,9 @@ build, explored coarse-first.
 
 The range is resolved once, oldest first with its base, into <campaign>/branch.json; a resumed campaign keeps it (a
 moved ref doesn't change what it measures). A spec whose range now ends further along the same history extends it: the
-new commits are appended, after the kept ones in the explore order, and the commits measured so far keep their cells. Every commit is checked out in turn into one detached worktree of the
+new commits are appended, after the kept ones in the explore order, and the commits measured so far keep their cells;
+a commit with no round measured has its first round before any other commit's next one (unmeasured_first). A running
+campaign takes an extension between cells (ab.following), so a range carried further while it runs is measured next. Every commit is checked out in turn into one detached worktree of the
 campaign, <campaign>/.worktree, and the user's checkout is left alone; "{checkout}" in env is that worktree. The
 explore order visits far-apart commits first, so consecutive builds are mostly not of neighbours; the build tool's
 incremental state still carries over in the worktree, and saves recompiling the modules the two commits share. A
@@ -138,6 +140,20 @@ def cells(rounds, corpora, order):
         for corpus in corpora:
             for v in (order if r % 2 else order[::-1]):
                 yield r, corpus, v
+
+
+def unmeasured_first(todo, measured):
+    """`todo`, cells as `ab.Spec.cells` yields them, with first the earliest cell of each (corpus, variant) not in
+    `measured` (those with a round measured), in `todo`'s order; the rest after, in theirs. A commit the range was
+    extended by, or any other with no value yet, gets one before the commits that have one get another round. On a
+    fresh campaign, or one still in its first round, that is the order `cells` has anyway."""
+    first, seen = [], set()
+    for i, c in enumerate(todo):
+        if (c[1], c[3]) not in measured and (c[1], c[3]) not in seen:
+            seen.add((c[1], c[3]))
+            first.append(i)
+    lead = set(first)
+    return [todo[i] for i in first] + [c for i, c in enumerate(todo) if i not in lead]
 
 
 def build_key(commit, env, template, harness=None):
