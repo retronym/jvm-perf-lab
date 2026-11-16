@@ -35,6 +35,7 @@ object Corpus {
     "patmat-exhaust-huge" -> Known(),
     "re2s" -> Known(),
     "scalap" -> Known(),
+    "pekko" -> Known(), // pekko-actor and pekko-stream from their published source jars
     // the library, reflect and the compiler from source, the library also as the sourcepath
     "scala" -> Known(withScala = false, sourcePath = true),
   )
