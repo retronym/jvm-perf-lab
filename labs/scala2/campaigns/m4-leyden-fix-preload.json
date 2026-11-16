@@ -1,0 +1,67 @@
+{
+  "name": "m4-leyden-fix-preload",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m4",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms4G -Xmx4G -Xss2M -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "rounds": 2,
+  "corpora": {
+    "scala": "-f 1 -wi 8 -i 5 -p jdkHome=25.0.4-tem"
+  },
+  "variants": {
+    "cold": "",
+    "cold-preload": "-Dcompilerlab.preload=java.io.EOFException:java.lang.invoke.BoundMethodHandle$Species_D:java.lang.invoke.BoundMethodHandle$Species_DL:java.lang.invoke.BoundMethodHandle$Species_IL:java.lang.module.ModuleDescriptor$Modifier:java.lang.ModuleLayer$Controller:java.util.AbstractMap$1:java.util.AbstractMap$KeyIterator:java.util.concurrent.ConcurrentHashMap$KeyIterator:java.util.PrimitiveIterator:java.util.PrimitiveIterator$OfDouble:java.util.PrimitiveIterator$OfInt:java.util.PrimitiveIterator$OfLong:java.util.Spliterator$OfDouble:java.util.Spliterator$OfInt:java.util.Spliterator$OfLong:java.util.Spliterator$OfPrimitive:java.util.stream.ReferencePipeline$7:java.util.stream.ReferencePipeline$7$1FlatMap:java.util.zip.DeflaterOutputStream:jdk.internal.module.Builder:jdk.internal.module.ModuleHashes$Builder:jdk.internal.module.ModuleResolution:jdk.internal.module.SystemModules:jdk.internal.module.SystemModules$default:jdk.internal.module.SystemModulesMap:jdk.nio.zipfs.ZipFileAttributes:jdk.nio.zipfs.ZipFileStore:jdk.nio.zipfs.ZipFileSystem$1:jdk.nio.zipfs.ZipFileSystem$2:jdk.nio.zipfs.ZipFileSystem$DeflatingEntryOutputStream:jdk.nio.zipfs.ZipFileSystem$Entry:jdk.nio.zipfs.ZipFileSystem$EntryInputStream:jdk.nio.zipfs.ZipFileSystem$EntryOutputStream:jdk.nio.zipfs.ZipFileSystem$EntryOutputStreamCRC32:jdk.nio.zipfs.ZipFileSystem$EntryOutputStreamDef:jdk.nio.zipfs.ZipFileSystem$FileRolloverOutputStream:jdk.nio.zipfs.ZipFileSystem$IndexNode:jdk.nio.zipfs.ZipFileSystem$PosixEntry:scala.collection.generic.BitOperations$Int:scala.collection.immutable.IntMap$Bin:scala.collection.immutable.IntMap$Tip:scala.collection.immutable.TreeSeqMap$OrderBy:scala.reflect.api.Liftables$Liftable:scala.reflect.io.FileZipArchive$LazyEntry:scala.reflect.io.FileZipArchive$LazyEntry$$anon$1:scala.reflect.io.FileZipArchive$LeakyEntry:scala.reflect.io.FileZipArchive$LeakyEntry$$anon$2:scala.reflect.io.ManifestResources$$anon$3:scala.reflect.macros.compiler.DefaultMacroCompiler$MacroImplResolutionException:scala.Specializable$SpecializedGroup:scala.tools.nsc.backend.jvm.PostProcessor$$anon$10$$anon$11:scala.tools.nsc.tasty.bridge.TreeOps$$anon$1:scala.tools.nsc.typechecker.MacroAnnotationNamers$MacroAnnotationNamer:scala.tools.nsc.typechecker.MacroAnnotationNamers$MacroAnnotationNamer$$anon$1:scala.tools.nsc.typechecker.MacroAnnotationNamers$MacroAnnotationNamer$$anon$2:scala.tools.nsc.typechecker.MacroAnnotationNamers$MacroAnnotationNamer$MaybeExpandeeCompanionCompleter:scala.tools.nsc.typechecker.MacroAnnotationNamers$MacroAnnotationNamer$MaybeExpandeeCompleter:scala.tools.nsc.typechecker.MacroAnnotationNamers$MacroAnnotationNamer$PatchedContext$1$PatchedLookupResult:scala.tools.reflect.FrontEnd:scala.tools.reflect.ToolBox:scala.tools.tasty.TastyName:scala.tools.tasty.TastyName$NameEncoder:scala.tools.tasty.TastyName$StringBuilderEncoder:scala.tools.tasty.TastyName$TypeName",
+    "aot": "{aot}",
+    "aot-noreplay": "{aot} -XX:+UnlockDiagnosticVMOptions -XX:-AOTReplayTraining"
+  },
+  "profile": "xctrace:ipc",
+  "loadgate": {
+    "maxCores": 2.0,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "description": [
+    "With retronym/scala#250 the cached forks in `m4-leyden-l2-fix` still ran +1.8% slower than cold with +3.1% instructions and +2.1% alloc. A cached run on the laptop loads 65 named classes that a cold run never loads, among them `MacroAnnotationNamers$MacroAnnotationNamer` (a `Namer` subclass) and its completers, pulled in when the training run links every loaded class before writing the cache.",
+    "",
+    "Question: does loading those 65 classes in a cold fork reproduce the cached forks' extra instructions? `cold-preload` against `aot-noreplay` separates the class set from the replayed profiles; `jit_diff` of `cold` against `cold-preload` names the call sites.",
+    "",
+    "Build: `claude/perf-integration-no-typetag` (scala2-perf-integration plus retronym/scala#250), stock JDK 26 integration build, m4."
+  ],
+  "variantDescriptions": {
+    "cold": "no cache",
+    "cold-preload": "no cache; the 65 classes only the cached run loads are loaded (not initialised) before the first compile",
+    "aot": "cache with profile replay",
+    "aot-noreplay": "cache, `-XX:-AOTReplayTraining`"
+  },
+  "builds": {
+    "cold": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-int-no-typetag",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "cold-preload": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-int-no-typetag",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aot": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-int-no-typetag",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "aot-noreplay": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-int-no-typetag",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "jitRecording": true
+}

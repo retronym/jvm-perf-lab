@@ -64,6 +64,7 @@ class CompileBenchmark {
     Announce.jvm(s"CompileBenchmark($corpus)")
     CompileBenchmark.useJdk(jdkHome)
     if (sys.props.contains("compilerlab.touchRuntimeReflection")) CompileBenchmark.touchRuntimeReflection()
+    sys.props.get("compilerlab.preload").foreach(CompileBenchmark.preload)
     val common = CompileBenchmark.split(scalacOptions)
     val src = Corpus.load(corpus)
     val resident = compiler match {
@@ -119,6 +120,18 @@ object CompileBenchmark {
     val u = scala.reflect.runtime.universe
     val n = u.rootMirror.staticClass("scala.collection.immutable.List").info.decls.size
     println(s"[compiler-lab] runtime reflection touched: List has $n decls (${u.getClass.getName})")
+  }
+
+  /** -Dcompilerlab.preload=<class>:<class>...: loads the named classes, without initialising them, before the first
+   *  compile, as an AOT cache does with the classes it links at startup. A cold fork then shows what their presence
+   *  alone does to C2's class hierarchy analysis (an override that is loaded stops the inlining of a single target). */
+  def preload(names: String): Unit = {
+    val loader = getClass.getClassLoader
+    val (found, missing) = names.split(':').filter(_.nonEmpty).partition { name =>
+      try { Class.forName(name, false, loader); true }
+      catch { case _: ClassNotFoundException | _: LinkageError => false }
+    }
+    println(s"[compiler-lab] preloaded ${found.length} classes" + (if (missing.isEmpty) "" else s"; not found: ${missing.mkString(" ")}"))
   }
 
   private final val BuildOption = "@build="
