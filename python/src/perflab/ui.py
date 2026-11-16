@@ -243,7 +243,7 @@ def nav_tabs(projects, on=None):
     storage, and each project's index; `on` is "queue", "admin" or a project id."""
     import html
     cls = lambda k: ' class="on"' if on == k else ""
-    links = "".join(f'<a href="{html.escape(p["index"])}" title="{html.escape(p["root"])}"{cls(p["id"])}>{html.escape(p["name"])}</a>'
+    links = "".join(f'<a href="{html.escape(p["index"])}" title="{html.escape(p["root"])}"{cls(p["id"])}>{html.escape(p.get("label") or p["name"])}</a>'
                     for p in projects)
     return (f'<a href="/"{cls("queue")} title="the perflab server\'s queue">Queue<span class="n" id="n-queued"></span></a>'
             f'<a href="/admin"{cls("admin")}>Storage</a>' + (f'<span class="sep"></span>{links}' if links else "")

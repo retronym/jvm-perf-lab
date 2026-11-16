@@ -67,7 +67,7 @@ async function post(path, body) {
 QUEUE_JS = r"""
 let projects = {}, jobs = [], status = null, run = null;
 const open = new Set();
-const proj = id => projects[id] ? `<a href="${esc(projects[id].index)}" title="${esc(projects[id].root)}">${esc(projects[id].name)}</a>` : esc(id);
+const proj = id => projects[id] ? `<a href="${esc(projects[id].index)}" title="${esc(projects[id].root)}">${esc(projects[id].label || projects[id].name)}</a>` : esc(id);
 // the job's campaign, on its project's index (a card there shows the jobs that ran it, linking back here)
 const camp = j => j.campaign && projects[j.project]
   ? `<a href="${esc(projects[j.project].index)}#c-${encodeURIComponent(j.campaign)}" title="the campaign on its project's index">${esc(j.campaign)}</a>` : '';
@@ -220,7 +220,7 @@ async function live() {
   if (!r) { shown = null; document.getElementById('tl-name').innerHTML = cur ? `#${cur.j.id} ${on(cur)}: between cells` : ''; document.getElementById('tl-status').innerHTML = ''; return; }
   const cell = cur.base + r.cell.replace(/\/?$/, '/');
   const name = r.run || (q => q.length >= 4 ? `${q[0]} · ${q[1]} · ${q[2]} #${q[3]}` : r.cell)(r.cell.replace(/\/$/, '').split('/'));
-  document.getElementById('tl-name').innerHTML = `<a href="${esc(cur.p.index)}">${esc(cur.p.name)}</a> · ${esc(name)} ${on(cur)}`;
+  document.getElementById('tl-name').innerHTML = `<a href="${esc(cur.p.index)}">${esc(cur.p.label || cur.p.name)}</a> · ${esc(name)} ${on(cur)}`;
   // a remote cell's own page exists once it is uploaded, at the cell's end
   document.getElementById('tl-status').innerHTML = `<span class="badge running">running since ${since(r.started)}</span>`
     + (cur.remote ? '' : ` <a class="btn" href="${esc(cell)}timeline.html" title="the cell's own timeline page">↗</a>`);
@@ -293,7 +293,7 @@ function row(e) {
   const p = projects[e.project];
   const href = p ? `/p/${encodeURIComponent(e.project)}/` + e.path.slice(p.serveRoot.length + 1).split('/').map(encodeURIComponent).join('/') + '/' : '';
   return `<tr><td class="name">${href ? `<a href="${esc(href)}">${esc(e.name)}</a>` : esc(e.name)} ${e.pinned ? '<span class="badge pinned">pinned</span>' : ''}${e.active ? `<span class="badge active" title="${esc(e.activeWhy)}">active</span>` : ''}`
-    + `<div class="k">${e.kind} · ${esc(p ? p.name : e.project)}</div></td>`
+    + `<div class="k">${e.kind} · ${esc(p ? (p.label || p.name) : e.project)}</div></td>`
     + `<td class="n"><b>${bytes(e.total)}</b></td><td class="n">${bytes(e.bytes.results)}</td><td class="n">${bytes(e.bytes.profiles)}</td><td class="n">${bytes(e.bytes.builds)}</td>`
     + `<td class="when">${ago(e.newest)}</td>`
     + `<td class="acts"><span class="btns"><button class="btn" data-pin="${e.pinned ? 0 : 1}" data-t='${esc(JSON.stringify(t))}' title="a pinned campaign is skipped by the bulk actions">${e.pinned ? 'Unpin' : 'Pin'}</button>`
@@ -305,7 +305,7 @@ const TEMP = /^(\/private)?\/(tmp|var\/folders)\//;  // a test's or a scratch pr
 function projectRow(p) {
   const mine = entries.filter(e => e.project === p.id), total = mine.reduce((a, e) => a + e.total, 0);
   const root = p.root.startsWith(HOME + '/') ? '~' + p.root.slice(HOME.length) : p.root;
-  return `<tr><td><input type="checkbox" data-pid="${esc(p.id)}"></td><td class="name"><a href="${esc(p.index)}">${esc(p.name)}</a>`
+  return `<tr><td><input type="checkbox" data-pid="${esc(p.id)}"></td><td class="name"><a href="${esc(p.index)}">${esc(p.label || p.name)}</a>`
     + `${TEMP.test(p.root) ? ' <span class="badge" title="under a temporary directory">temporary</span>' : ''}<div class="k"><code>${esc(root)}</code></div></td>`
     + `<td class="n">${mine.filter(e => e.kind === 'campaign').length}</td><td class="n">${mine.filter(e => e.kind === 'run').length}</td>`
     + `<td class="n">${bytes(total)}</td><td class="when">${ago(p.registered)}</td>`

@@ -50,6 +50,23 @@ class QueueTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.q.register(tempfile.mkdtemp())
 
+    def test_projects_of_one_name_are_labelled_by_their_checkout(self):
+        def lab(checkout):
+            repo = os.path.join(os.path.realpath(tempfile.mkdtemp()), checkout)
+            os.makedirs(os.path.join(repo, "labs", "scala2"))
+            open(os.path.join(repo, ".git"), "w").close()  # a worktree's .git is a file
+            shutil.copy(os.path.join(self.p["root"], "perflab.toml"), os.path.join(repo, "labs", "scala2"))
+            return os.path.join(repo, "labs", "scala2")
+        a, b = self.q.register(lab("jvm-perf-lab")), self.q.register(lab("perflab-o11y"))
+        a = self.q.project(a["id"])
+        self.assertEqual((a["name"], a["label"]), ("scala2", "scala2 · jvm-perf-lab"))
+        self.assertEqual(b["label"], "scala2 · perflab-o11y")
+        self.assertEqual(self.p["label"], self.p["name"])  # alone with its name
+        # two checkouts of one name: the ids tell them apart
+        c = self.q.register(lab("jvm-perf-lab"))
+        self.assertEqual(c["label"], f"scala2 · {c['id']}")
+        self.assertEqual(self.q.project(a["id"])["label"], f"scala2 · {a['id']}")
+
     def test_forget_only_a_project_with_nothing_queued_or_running(self):
         j = self.submit("x")
         with self.assertRaises(server.Conflict):

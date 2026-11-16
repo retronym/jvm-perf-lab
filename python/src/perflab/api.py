@@ -119,6 +119,7 @@ define("Error", "An error: the body of every non-2xx response, and of an MCP too
 define("Project", "A perflab project: a directory with perflab.toml, and where its campaigns and runs are", {
     "id": S("Its id on the server (the `project` parameter takes it)"),
     "name": S("Its directory's name"),
+    "label": S("Its name for tabs and lists: the name, and the git checkout it is in when another project has the same name"),
     "root": PATH,
     "campaigns": S("Its campaigns directory (`perflab ab`): <campaigns>/<campaign>/<corpus>/<variant>/<round>/ are the cells"),
     "runs": null(S("Its runs directory (`perflab run`)")),
@@ -655,7 +656,7 @@ def _registered():
         con = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=5)
         con.row_factory = sqlite3.Row
         try:
-            return [srv._project(dict(r)) for r in con.execute("SELECT * FROM projects ORDER BY name")]
+            return srv.labelled([srv._project(dict(r)) for r in con.execute("SELECT * FROM projects ORDER BY name")])
         finally:
             con.close()
     except sqlite3.Error:
@@ -721,7 +722,7 @@ def _url(p, path):
 
 
 def _public_project(p):
-    return {"id": p["id"], "name": p["name"], "root": p["root"], "campaigns": p["campaigns"], "runs": p.get("runs"),
+    return {"id": p["id"], "name": p["name"], "label": p.get("label") or p["name"], "root": p["root"], "campaigns": p["campaigns"], "runs": p.get("runs"),
             "registered": bool(p.get("registered")), "index": p.get("index") if p.get("registered") else None}
 
 

@@ -1815,7 +1815,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
     const nav = document.getElementById('srv-tabs');
     nav.innerHTML = `<a href="/" title="the perflab server's queue">Queue<span class="n">${{st.running ? '<span class="run" title="a job is running">▶</span> ' : ''}}${{st.queued}}</span></a>`
       + '<a href="/admin">Storage</a><span class="sep"></span>'
-      + projects.map(p => `<a href="${{escH(p.index)}}" title="${{escH(p.root)}}"${{p.id === SRV[1] ? ' class="cur"' : ''}}>${{escH(p.name)}}</a>`).join('')
+      + projects.map(p => `<a href="${{escH(p.index)}}" title="${{escH(p.root)}}"${{p.id === SRV[1] ? ' class="cur"' : ''}}>${{escH(p.label || p.name)}}</a>`).join('')
       + '<span class="sep"></span>';
     nav.hidden = false;
     JOBS = jobs.filter(j => j.project === SRV[1] && j.campaign).sort((a, b) => b.id - a.id);

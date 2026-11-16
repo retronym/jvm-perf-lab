@@ -1501,6 +1501,7 @@
   "project": {
    "id": "lab-3f2a1c",
    "name": "lab",
+   "label": "lab",
    "root": "/Users/me/lab",
    "campaigns": "/Users/me/lab/out/perflab/ab",
    "runs": "/Users/me/lab/out/perflab/runs",
@@ -2122,6 +2123,7 @@
   "project": {
    "id": "tmpcrevag3h-ad59ab",
    "name": "tmpcrevag3h",
+   "label": "tmpcrevag3h",
    "root": "/tmp/perflab-server",
    "campaigns": "/tmp/perflab-server/out/perflab/ab",
    "runs": "/tmp/perflab-server/out/perflab/runs",
@@ -2531,6 +2533,7 @@
    {
     "id": "lab-3f2a1c",
     "name": "lab",
+    "label": "lab",
     "root": "/Users/me/lab",
     "campaigns": "/Users/me/lab/out/perflab/ab",
     "runs": "/Users/me/lab/out/perflab/runs",

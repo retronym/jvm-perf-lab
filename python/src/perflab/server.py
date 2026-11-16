@@ -63,7 +63,7 @@ carries the token, under a CSP sandbox: its scripts run in an opaque origin, so 
 benchmark wrote cannot read the index (and its token) or call the API. An HTML page gets ui.FRAME_KEYS_JS appended, for
 the page framing it to hear Esc.
 """
-import argparse, contextlib, fcntl, functools, hashlib, json, os, re, secrets, signal, socket, sqlite3, subprocess, sys, threading, time, traceback
+import argparse, collections, contextlib, fcntl, functools, hashlib, json, os, re, secrets, signal, socket, sqlite3, subprocess, sys, threading, time, traceback
 import http.server, urllib.error, urllib.parse, urllib.request
 
 from . import config, control, httpd, mirror, storage, transcript, ui
@@ -224,11 +224,10 @@ class Queue:
         return self.project(pid)
 
     def project(self, pid):
-        rows = self._q("SELECT * FROM projects WHERE id=?", (pid,))
-        return _project(rows[0]) if rows else None
+        return next((p for p in self.projects() if p["id"] == pid), None)
 
     def projects(self):
-        return [_project(r) for r in self._q("SELECT * FROM projects ORDER BY name")]
+        return labelled([_project(r) for r in self._q("SELECT * FROM projects ORDER BY name")])
 
     def forget(self, pid):
         """Unregister a project: the server stops serving its index and listing it. Its campaigns, runs and finished
@@ -450,6 +449,31 @@ def job_testbed(argv, cwd):
 def project_id(root):
     """A project's id on the server: its directory's name and a hash of its real path."""
     return re.sub(r"[^A-Za-z0-9_.-]", "-", os.path.basename(root)) + "-" + hashlib.sha1(root.encode()).hexdigest()[:6]
+
+
+def checkout(root):
+    """The name of the git checkout (a clone or a worktree) `root` is in: the directory holding its .git; else root's parent's."""
+    d = root
+    while True:
+        if os.path.exists(os.path.join(d, ".git")):
+            return os.path.basename(d)
+        up = os.path.dirname(d)
+        if up == d:
+            return os.path.basename(os.path.dirname(root))
+        d = up
+
+
+def labelled(projects):
+    """Each project with its `label` for tabs and lists: its name, and the checkout it is in when another project has
+    the same name (a lab's directory in several worktrees of one repository registers once per worktree)."""
+    names = collections.Counter(p["name"] for p in projects)
+    for p in projects:
+        p["label"] = p["name"] if names[p["name"]] == 1 else f"{p['name']} · {checkout(p['root'])}"
+    labels = collections.Counter(p["label"] for p in projects)
+    for p in projects:
+        if labels[p["label"]] > 1:
+            p["label"] = f"{p['name']} · {p['id']}"
+    return projects
 
 
 def _job(r):
