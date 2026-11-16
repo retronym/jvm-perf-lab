@@ -1073,6 +1073,8 @@ def progress_badge(prog, name):
 
 
 CSS = """
+.sv-table .scroll{max-height:calc(100vh - var(--nav-h, 110px) - 12px);overflow:auto}
+.sv-table table.t tr:first-child th{position:sticky;top:0;z-index:2;background:var(--panel);box-shadow:inset 0 -1px var(--line)}
 #share-dlg{position:fixed;inset:0;z-index:90;background:rgba(10,14,20,.45);display:flex;align-items:flex-start;justify-content:center;padding:10vh 16px}
 #share-dlg[hidden],#share-dlg [hidden]{display:none} #share-dlg .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;
   max-width:560px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35)} #share-dlg label.opt{display:block;margin:4px 0}
@@ -1636,6 +1638,9 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
   <script>{branchview.JS}</script>
   <script>
   const TESTBED = {json.dumps(testbed.name())}, RUNNING = {json.dumps(running_json)}, LOADGATE = {json.dumps(loadgate_json)}, BUILD = {json.dumps(build_json)};
+  // the sticky nav's height, for the tables whose headers stay put (a scroller of the window's height less the nav's)
+  {{ const nav = document.querySelector('.nav'), set = () => document.documentElement.style.setProperty('--nav-h', (nav ? nav.offsetHeight : 0) + 'px');
+     set(); if (nav && window.ResizeObserver) new ResizeObserver(set).observe(nav); }}
   const chips = [...document.querySelectorAll('.filterbar .chip')];
   chips.forEach(c => c.onclick = () => {{ c.classList.toggle('on'); apply(); }});
   document.getElementById('q').oninput = apply;
@@ -1792,9 +1797,9 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
       // and where a wide table was scrolled to, by the card it is in and its place among that card's scrollers
       const scrollers = root => [...root.querySelectorAll('section.card[id]')].flatMap(c => [...c.querySelectorAll('*')]
         .filter(e => /auto|scroll/.test(getComputedStyle(e).overflowX)).map((e, n) => ({{e, key: c.id + '#' + n}})));
-      const scrolled = new Map(scrollers(document.getElementById('live')).filter(s => s.e.scrollLeft).map(s => [s.key, s.e.scrollLeft]));
+      const scrolled = new Map(scrollers(document.getElementById('live')).filter(s => s.e.scrollLeft || s.e.scrollTop).map(s => [s.key, [s.e.scrollLeft, s.e.scrollTop]]));
       document.getElementById('live').innerHTML = doc.getElementById('live').innerHTML;
-      for (const s of scrollers(document.getElementById('live'))) if (scrolled.has(s.key)) s.e.scrollLeft = scrolled.get(s.key);
+      for (const s of scrollers(document.getElementById('live'))) if (scrolled.has(s.key)) [s.e.scrollLeft, s.e.scrollTop] = scrolled.get(s.key);
       for (const [id, o] of open) {{ const d = document.getElementById(id); if (d) d.open = o; }}
       const keep = sel.value;
       sel.innerHTML = doc.getElementById('tl-cell').innerHTML;

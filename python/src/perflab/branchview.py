@@ -657,6 +657,9 @@ CSS = """
 .bh{margin:2px 0 10px} .bh-ctl{display:flex;flex-wrap:wrap;gap:4px 18px;margin:6px 0 4px;align-items:center}
 .bh-ctl select{font:inherit;font-size:12px;padding:1px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
 table.bh-t td{vertical-align:middle} table.bh-t th{vertical-align:bottom} table.bh-t th.cg{text-align:center;color:var(--fg);border-bottom:1px solid var(--line2)}
+.bh-table .scroll{max-height:calc(100vh - var(--nav-h, 110px) - 12px);overflow:auto}
+table.bh-t tr:first-child th,table.bh-t tr:nth-child(2) th{position:sticky;top:0;z-index:2;background:var(--panel);box-shadow:inset 0 -1px var(--line)}
+table.bh-t tr:nth-child(2) th{top:var(--bh-h1,24px)} table.bh-t tr:first-child th.cm{z-index:3}
 table.bh-t td.gs,table.bh-t th.gs{border-left:1px solid var(--line2)} table.bh-t td.ms,table.bh-t th.ms{border-left:1px dotted var(--line2)}
 .bh-mp{position:relative;font-size:12px} .bh-mp summary{cursor:pointer;padding:1px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);list-style:none;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bh-mp summary::after{content:" ▾"} .bh-mpl{position:absolute;z-index:5;top:100%;left:0;margin-top:2px;padding:6px 8px;background:var(--panel);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.25);max-height:60vh;overflow:auto;white-space:nowrap}
@@ -1117,6 +1120,12 @@ const BH = (() => {
           + `</ul></td><td colspan="${cs.length * per}"></td></tr>`;
     }
     el.querySelector('.bh-table').innerHTML = h + '</table></div>';
+    // the headers stay put (sticky, the second row under the first) while the rows scroll under them; the scroller
+    // keeps its place over redraws and the index's live refreshes
+    const sc = el.querySelector('.bh-table .scroll'), t = sc.querySelector('table'), m = memOf(el);
+    t.style.setProperty('--bh-h1', Math.floor((t.rows[0].cells[1] || t.rows[0].cells[0]).getBoundingClientRect().height) + 'px');
+    if (m.scroll) [sc.scrollLeft, sc.scrollTop] = m.scroll;
+    sc.addEventListener('scroll', () => { m.scroll = [sc.scrollLeft, sc.scrollTop]; }, {passive: true});
   }
   function drawChart(el, d, st) {
     const box = el.querySelector('.bh-chart');
