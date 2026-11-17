@@ -1263,6 +1263,16 @@ class MetricsTest(unittest.TestCase):
         self.assertEqual(metrics.raw_of(r, "gc:pause", 1.0), [[10.0, 10.0]])  # 4 ops, then 2
         self.assertEqual(dict((k, x) for k, *_, x in metrics.of(r))["gc:pause"], 10.0)
 
+    def test_avgt_ops_in_the_scores_unit(self):
+        r = {"mode": "avgt", "measurementTime": "1 s", "measurementIterations": 2,
+             "primaryMetric": {"score": 1250.0, "scoreUnit": "us/op", "rawData": [[1000.0, 1500.0]]},
+             "secondaryMetrics": {"nodes": {"score": 1667.0 * 7, "scoreUnit": "#", "rawData": [[1000.0 * 7, 667.0 * 7]]}}}
+        self.assertEqual(metrics.ops(r), 1000 + 667)
+        self.assertEqual(metrics.iteration_ops(r), [[1000, 667]])
+        self.assertAlmostEqual(metrics.units_per_op(r, "nodes"), 7.0)  # not 1667 * 7 / 2: an op per iteration
+        with self.assertRaises(ValueError):
+            metrics.ops({**r, "primaryMetric": {**r["primaryMetric"], "scoreUnit": "ops/s"}})
+
     def test_ops_by_iteration_time(self):
         r = self.cell(2922, 20e9, 66e9, 16.4, 7.5)[0]
         self.assertEqual(metrics.ops({**r, "measurementTime": "1 min"}), 6 * 15)

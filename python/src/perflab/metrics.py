@@ -32,15 +32,23 @@ EVENTS_FORMAT = 2  # {"format", "totals": {event: n}}; the first was {event: n p
 
 def ops(r):
     """A fork's measured ops: JMH runs whole ops until the iteration time is up, so an iteration with mean op time t has
-    ceil(time / t) ops (avgt); one op per iteration otherwise. The mean over forks."""
+    ceil(time / t) ops (avgt, t in the score's unit); one op per iteration otherwise. The mean over forks."""
     raw = r["primaryMetric"].get("rawData") or []
     if r.get("mode") != "avgt" or not raw:
         return r.get("measurementIterations", 1) * r.get("measurementBatchSize", 1)
+    iteration, _ = iteration_in_score_units(r)
+    return sum(math.ceil(iteration / t) for fork in raw for t in fork) / len(raw)
+
+
+def iteration_in_score_units(r):
+    """An avgt result's measurement iteration in the unit of its scores (us/op scores: the iteration in us)."""
     n, unit = r["measurementTime"].split()
     if unit not in JMH_TIME_MS:
         raise ValueError(f"measurementTime {r['measurementTime']!r}: unknown unit")
-    iteration_ms = float(n) * JMH_TIME_MS[unit]
-    return sum(math.ceil(iteration_ms / t) for fork in raw for t in fork) / len(raw)
+    score_unit = r["primaryMetric"].get("scoreUnit", "ms/op").split("/")[0]
+    if score_unit not in JMH_TIME_MS:
+        raise ValueError(f"scoreUnit {r['primaryMetric'].get('scoreUnit')!r}: unknown unit")
+    return float(n) * JMH_TIME_MS[unit] / JMH_TIME_MS[score_unit], score_unit
 
 
 def measured_ops(r):
@@ -361,9 +369,8 @@ def iteration_ops(r):
     raw = r["primaryMetric"].get("rawData") or []
     if r.get("mode") != "avgt":
         return [[r.get("measurementBatchSize", 1)] * len(fork) for fork in raw]
-    n, unit = r["measurementTime"].split()
-    iteration_ms = float(n) * JMH_TIME_MS[unit]
-    return [[math.ceil(iteration_ms / t) for t in fork] for fork in raw]
+    iteration, _ = iteration_in_score_units(r)
+    return [[math.ceil(iteration / t) for t in fork] for fork in raw]
 
 
 def raw_of(r, k, u):
