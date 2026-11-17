@@ -1,0 +1,40 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "builds": {
+    "spike": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/eraser-single-visit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m5-fused-erasure-spike",
+  "description": [
+    "Spike, [retronym/scala#254](https://github.com/retronym/scala/pull/254) at `79987409fc` (`claude/eraser-single-visit`: fused, single-visit retyper): erasure's retype without a `Typer` (`-Ynew-erasure`), and the same with `preErase` fused into its traversal (`-Yfused-erasure`). One build, flags toggled per variant, alternating by iteration within each fork; `aa` is `base` again. Whole compile of the scala corpus (`jdkHome=25.0.4-tem`). m5-pro, patched JDK 26, 8G heap with a fixed 3G young generation, release optimizer settings. All three paths emit identical classfiles for library, reflect and compiler."
+  ],
+  "variantDescriptions": {
+    "base": "`Eraser` (a `Typer`) retypes after `preErase`",
+    "new": "`-Ynew-erasure`: `ErasureRetyper` after `preErase`",
+    "fused": "`-Yfused-erasure`: one traversal, `preErase` per node on entry",
+    "aa": "`base` again"
+  },
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Xmn3g -XX:-G1UseAdaptiveIHOP -XX:+UnlockExperimentalVMOptions -XX:hashCode=3 -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "paired": {
+    "base": "",
+    "new": "-Ynew-erasure",
+    "fused": "-Yfused-erasure",
+    "aa": ""
+  },
+  "rounds": 1,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 15 -i 30 -p jdkHome=25.0.4-tem"
+  }
+}

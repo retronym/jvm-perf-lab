@@ -1,0 +1,38 @@
+{
+  "name": "m5-erasure-one-pass",
+  "description": [
+    "Does [retronym/scala#256](https://github.com/retronym/scala/pull/256) (`5d9a21f594`, erasure in one traversal without retyping with a `Typer`) make compiles faster? The PR and its parent `632df4153c` are loaded with `@build=` in class loaders of their own and alternate iteration by iteration in each fork; `aa` is the parent again, an A/A for the pairing's noise. Whole compile of the scala corpus (`jdkHome=25.0.4-tem`), 3 forks. m5-pro, patched JDK 26, 8G heap with a fixed 3G young generation and `-XX:hashCode=3`, a 1G code cache without flushing. Both builds compiled with the release optimizer settings (`-opt:l:inline -opt-inline-from:scala/**`)."
+  ],
+  "variantDescriptions": {
+    "base": "`2.13.x` at `632df4153c`, the PR's parent",
+    "pr": "retronym/scala#256 at `5d9a21f594`",
+    "aa": "`base` again, in a third class loader"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Xmn3g -XX:-G1UseAdaptiveIHOP -XX:+UnlockExperimentalVMOptions -XX:hashCode=3 -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "pr": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/erasure-one-pass",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "paired": {
+    "base": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/erasure-one-pass-base",
+    "pr": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/erasure-one-pass",
+    "aa": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/erasure-one-pass-base"
+  },
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 15 -i 30 -p jdkHome=25.0.4-tem"
+  }
+}

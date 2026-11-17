@@ -1,0 +1,48 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/eraser-typing-transformer-9ce2bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "new": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/eraser-typing-transformer-9ce2bf",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m5-new-erasure-spike-asprof",
+  "description": [
+    "CPU and allocation profiles for [retronym/scala#254](https://github.com/retronym/scala/pull/254): the same build compiling the scala corpus with and without `-Ynew-erasure`, one fork each, for erasure's share of CPU and allocation. Settings as `m5-new-erasure-spike`."
+  ],
+  "variantDescriptions": {
+    "base": "`Eraser` retype",
+    "new": "`-Ynew-erasure`"
+  },
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Xmn3g -XX:-G1UseAdaptiveIHOP -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "variants": {
+    "base": "",
+    "new": ""
+  },
+  "variantJmhArgs": {
+    "base": "-p variants=base=",
+    "new": "-p variants=new=-Ynew-erasure"
+  },
+  "rounds": 1,
+  "profile": "async:cpu,alloc",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 6 -i 4 -p jdkHome=25.0.4-tem"
+  }
+}

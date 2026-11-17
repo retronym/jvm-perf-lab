@@ -1,0 +1,48 @@
+{
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "builds": {
+    "base": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/eraser-single-visit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    },
+    "fused": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/eraser-single-visit",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "name": "m5-fused-erasure-spike-asprof",
+  "description": [
+    "CPU and allocation profiles of the single-visit build (`79987409fc`) compiling the scala corpus with and without `-Yfused-erasure`, one fork each, for erasure's share of CPU and allocation. Settings as `m5-fused-erasure-spike`."
+  ],
+  "variantDescriptions": {
+    "base": "`Eraser` retype after `preErase`",
+    "fused": "`-Yfused-erasure`"
+  },
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Xmn3g -XX:-G1UseAdaptiveIHOP -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "variants": {
+    "base": "",
+    "fused": ""
+  },
+  "variantJmhArgs": {
+    "base": "-p variants=base=",
+    "fused": "-p variants=fused=-Yfused-erasure"
+  },
+  "rounds": 1,
+  "profile": "async:cpu,alloc",
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 6 -i 4 -p jdkHome=25.0.4-tem"
+  }
+}
