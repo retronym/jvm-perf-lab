@@ -1,0 +1,38 @@
+{
+  "name": "m5-type-assigner",
+  "description": [
+    "Does [retronym/scala#259](https://github.com/retronym/scala/pull/259) (`6229a89344`: fields, mixin and the pattern matcher's stable references typed with `TypeAssigner` instead of a `Typer`) make compiles faster than its base, retronym/scala#256 at `104f789082`? Both builds are loaded with `@build=` in class loaders of their own and alternate iteration by iteration in each fork; `aa` is the base again, an A/A for the pairing's noise. Whole compile of the scala corpus (`jdkHome=25.0.4-tem`), 3 forks. m5-pro, patched JDK 26, 8G heap with a fixed 3G young generation and `-XX:hashCode=3`, a 1G code cache without flushing. Both builds compiled with the release optimizer settings."
+  ],
+  "variantDescriptions": {
+    "base": "retronym/scala#256 at `104f789082`",
+    "pr": "retronym/scala#259 at `6229a89344`",
+    "aa": "`base` again, in a third class loader"
+  },
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Xmn3g -XX:-G1UseAdaptiveIHOP -XX:+UnlockExperimentalVMOptions -XX:hashCode=3 -XX:ReservedCodeCacheSize=1g -XX:-UseCodeCacheFlushing -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "pr": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/type-assigner",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "paired": {
+    "base": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/erasure-one-pass-dedup",
+    "pr": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/type-assigner",
+    "aa": "@build=/Users/jzaugg-virtus/code/.worktrees/scala/erasure-one-pass-dedup"
+  },
+  "rounds": 3,
+  "loadgate": {
+    "maxCores": 4.0,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scala": "-f 1 -bm ss -wi 15 -i 30 -p jdkHome=25.0.4-tem"
+  }
+}
