@@ -1,0 +1,35 @@
+{
+  "name": "m5-tip-1ff1314-scalap-asprof",
+  "benchmark": "CompileBenchmark",
+  "testbed": "m5-pro",
+  "jvm": "/Users/jzaugg-virtus/code/.worktrees/jdk/jdk26-integration-branch-e9e67e/build/release/images/jdk/bin/java",
+  "jvmArgs": "-Xms8G -Xmx8G -Xss2M -Xmn3g -XX:-G1UseAdaptiveIHOP -Dcompilerlab.corpora=/Users/jzaugg-virtus/code/scala/compiler-benchmark/corpus",
+  "builds": {
+    "tip": {
+      "checkout": "/Users/jzaugg-virtus/code/.worktrees/scala/perf-int-pekko-synth",
+      "env": {
+        "SCALA_CHECKOUT": "{checkout}",
+        "SCALA_RELEASE_OPT": "1"
+      }
+    }
+  },
+  "variants": {
+    "tip": ""
+  },
+  "variantDescriptions": {
+    "tip": "tip of `m4-branch-synth-pekko` / `m4-branch-synth-scalap`: `1ff1314aaf` Apply retronym/scala#259 (synthesised trees typed with `TypeAssigner`)"
+  },
+  "rounds": 1,
+  "loadgate": {
+    "maxCores": 4,
+    "quietSecs": 30
+  },
+  "gcLog": true,
+  "corpora": {
+    "scalap": "-f 1 -wi 20 -w 2 -i 6 -r 2 -p jdkHome=25.0.4-tem"
+  },
+  "profile": "async:cpu,alloc",
+  "description": [
+    "CPU and allocation profile of the synth branch tip `1ff1314aaf` (the tip of `m4-branch-synth-pekko` and `m4-branch-synth-scalap`, after retronym/scala#256, #258 and #259) compiling scalap, jfrsync lanes on. One fork; warmup as in `m4-branch-synth-scalap` (20 \u00d7 2 s), 6 measured iterations of 2 s. Patched JDK 26, 8G heap with a fixed 3g young generation, compiler built with `SCALA_RELEASE_OPT`."
+  ]
+}
