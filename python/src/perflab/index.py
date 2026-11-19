@@ -7,7 +7,7 @@ each cell, `perflab run` at its start and end, and the page refreshes itself.
 
   perflab index [<campaigns-dir> [<runs-dir>]]
 """
-import collections, glob, html, json, math, os, re, subprocess, sys, time
+import collections, glob, hashlib, html, json, math, os, re, subprocess, sys, time
 
 from . import ab, branchview, config, jmh, kperf, loadgate, metrics, regraph, runinfo, specs, testbed, timeline, ui
 
@@ -583,6 +583,17 @@ RUN_NAMES = set()  # every run's name, for runs to link their siblings
 STALE_SECS = 600  # a run without run.json (an older perflab) counts as running while its logs grow
 
 
+def corpus_keys(v):
+    """A corpus parameter's filter keys: a run may name several corpora (comma-separated), and as paths; each by its last
+    segment, as campaigns name theirs."""
+    return [os.path.basename(c.strip().rstrip("/")) or c.strip() for c in str(v).split(",") if c.strip()]
+
+
+def hashed(section):
+    """A card with its content's hash (data-h): the page's refresh keeps the cards whose hash is unchanged."""
+    return section.replace("<section ", f'<section data-h="{hashlib.sha1(section.encode()).hexdigest()[:12]}" ', 1)
+
+
 def run_args(run):
     """A run's jmh.args as (benchmarks, {param: value}, [(option, value)], JVM, JVM arguments)."""
     try:
@@ -744,7 +755,7 @@ def run_section(run):
             rp = r.get("params", {})
             err = f" ± {num(p['scoreError'], p['score'])}" if isinstance(p.get("scoreError"), (int, float)) else ""
             ps = " ".join(f"{k}={rp.get(k)}" for k in varying)
-            out.append((f' data-corpus="{esc(str(rp.get(corpus_param, corpus)))}" data-profiled="{1 if graphs else 0}"',
+            out.append((f' data-corpus="{esc(" ".join(corpus_keys(rp.get(corpus_param, corpus))))}" data-profiled="{1 if graphs else 0}"',
                         [esc(r["benchmark"].rsplit(".", 1)[-1]) + (f" <code>{esc(ps)}</code>" if ps else ""),
                          f"{num(p['score'])}{err}" + ("" if one_unit else f" {esc(unit(p.get('scoreUnit', '')))}"),
                          si(cyc) if cyc else "", si(ins) if ins else "", size(alloc)]))
@@ -762,7 +773,7 @@ def run_section(run):
     badge = f'<span class="badge {status}"{f" title={chr(34)}{esc(detail)}{chr(34)}" if detail else ""}>{status}</span>'
     bench, tool = runinfo.facets(run)
     return last, (f'<section class="card run" id="{esc(name)}" data-last="{last:.0f}" data-notes="0" data-lb-group="{esc(name)}" '
-                  f'data-benchmark="{esc(bench)}" data-tool="{esc(tool)}" data-corpus="{esc(corpus)}" data-profiled="{1 if graphs else 0}">'
+                  f'data-benchmark="{esc(bench)}" data-tool="{esc(tool)}" data-corpus="{esc(" ".join(corpus_keys(corpus)))}" data-profiled="{1 if graphs else 0}">'
                   f'{card_head("run", name, badge, when, "".join(links))}'
                   f'<p class="facts">{" · ".join(facts)}{f"<br>{esc(progress)}" if progress else ""}</p>'
                   f'{runinfo.about(name, profile, RUN_NAMES)}{rows}{graphs}</section>')
@@ -1565,19 +1576,18 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
           b, t = runinfo.facets(run)
           facet["benchmark"] |= set(b.split()); facet["tool"].add(t)
           corpus = run_args(run)[1].get(config.get().get("benchmark", "corpus"), "")
-          if corpus:
-              facet["corpus"].add(corpus)
+          facet["corpus"].update(corpus_keys(corpus))
           tsv = os.path.join(run, "iterations.tsv")
           if os.path.exists(tsv):
               timeline_cells.append((os.path.getmtime(tsv), os.path.relpath(run, root).rstrip("/") + "/",
                                      os.path.basename(run.rstrip('/')), "runs"))
-  newest = lambda secs: "".join(h for _, h in sorted(secs, key=lambda x: -x[0]))
+  newest = lambda secs: "".join(hashed(h) for _, h in sorted(secs, key=lambda x: -x[0]))
   n_counters, counters_html = runinfo.counters(run_dirs)
   options = "".join(f'<optgroup label="{g}">' + "".join(f'<option value="{esc(v)}">{esc(l)}</option>'
                                                         for _, v, l, gg in sorted(timeline_cells, reverse=True) if gg == g) + "</optgroup>"
                     for g in ("runs", "campaign cells") if any(c[3] == g for c in timeline_cells))
   groups = "".join(f'<span class="fg"><span class="fl">{esc(config.get().corpus_param) if f == "corpus" else f}</span>' + "".join(f'<button class="chip" data-f="{f}" data-v="{esc(v)}">{esc(v)}</button>'
-                                                                           for v in sorted(vs)) + "</span>"
+                                                                           for v in sorted(vs, key=lambda v: [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", v)])) + "</span>"
                    for f, vs in facet.items() if len(vs) > 1)
   kinds = "".join(f"<li><b>{esc(k)}</b>: {esc(regraph.KIND_HELP[k])}</li>" for k in regraph.kinds() if k in regraph.KIND_HELP)
   help_html = ui.help_popover(
@@ -1604,10 +1614,21 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
                             "every 5 s; the dashed line is the limit, the green band the quiet time so far. Below the chart: the top processes "
                             "of the last sample and the machine's state (thermal, power, memory).", right=True)
   counters_sec = (f'<h2 class="sec" id="counters">PMU counters <span class="k">by run, benchmark thread only (xctrace)</span></h2>'
-                  f'<section class="card" id="counters-card"><p class="k">Misses per 1,000 instructions; top-down shares of issue slots when a run used the '
-                  f'CPU Counters template. Each run name links to its card.</p>{counters_html}</section>') if counters_html else ""
+                  + hashed(f'<section class="card" id="counters-card"><p class="k">Misses per 1,000 instructions; top-down shares of issue slots when a run used the '
+                           f'CPU Counters template. Each run name links to its card.</p>{counters_html}</section>')) if counters_html else ""
 
-  page = f"""{ui.HEAD}<meta name="perflab-code" content="{code_version()}"><title>{esc(title)} · {ui.NAME}</title>
+  live_html = f"""  <h2 class="sec" id="campaigns">Campaigns <span class="k">variants compared over rounds, newest first</span></h2>
+  {notes(os.path.join(campaigns, "FINDINGS.md")).replace('class="notes"', 'class="notes" id="findings"', 1)}
+  {newest(camp_sections) or '<p class="k">No campaigns yet: <code>perflab ab run &lt;spec&gt;</code>.</p>'}
+  {counters_sec}
+  {'' if not live and not run_sections else f'<h2 class="sec" id="runs">Runs <span class="k">one benchmark under one profile, newest first</span></h2>'}
+  {newest(run_sections) or ('<p class="k">No runs yet: <code>perflab run</code>.</p>' if live else '')}
+"""
+  # the page's refresh fetches this small file and the page only when it changes (a page of many campaigns runs to tens of MB)
+  stamp_name = os.path.splitext(os.path.basename(out))[0] + ".stamp"
+  gen = hashlib.sha1((live_html + options).encode()).hexdigest()[:16]
+
+  page = f"""{ui.HEAD}<meta name="perflab-gen" content="{gen}"><meta name="perflab-code" content="{code_version()}"><title>{esc(title)} · {ui.NAME}</title>
   {ui.style(ui.BASE, ui.LIGHTBOX_CSS, ui.NAV_CSS, CSS, INTRO_CSS, timeline.CSS, branchview.CSS)}
   {ui.masthead(title)}
   <div class="nav"><div class="tabsrow"><div class="in"><nav class="tabs">{tabs}</nav>{help_html}</div></div>
@@ -1626,18 +1647,13 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
   <section class="card" id="lg" hidden><div class="card-h"><h2>Waiting for a quiet machine</h2><span class="badge" id="lg-on">on {esc(testbed.name())}</span><span id="lg-status"></span>{lg_help}</div>
   <p class="k" id="lg-top"></p><div class="bar" id="lg-bar"><i></i></div><svg id="lg-chart"></svg></section>
   <div id="live">
-  <h2 class="sec" id="campaigns">Campaigns <span class="k">variants compared over rounds, newest first</span></h2>
-  {notes(os.path.join(campaigns, "FINDINGS.md")).replace('class="notes"', 'class="notes" id="findings"', 1)}
-  {newest(camp_sections) or '<p class="k">No campaigns yet: <code>perflab ab run &lt;spec&gt;</code>.</p>'}
-  {counters_sec}
-  {'' if not live and not run_sections else f'<h2 class="sec" id="runs">Runs <span class="k">one benchmark under one profile, newest first</span></h2>'}
-  {newest(run_sections) or ('<p class="k">No runs yet: <code>perflab run</code>.</p>' if live else '')}
+  {live_html}
   </div></main>{f'<footer>{footer}</footer>' if footer else ''}<div id="srv-foot" hidden>{ui.footer()}</div>
   <script>{timeline.script()}</script>{ui.lightbox_script()}{ui.hold_view_script()}{ui.shortcuts('card', 'lightbox', 'void', 'timeline')}
   <script>{SUMMARY_JS}</script>
   <script>{branchview.JS}</script>
   <script>
-  const TESTBED = {json.dumps(testbed.name())}, RUNNING = {json.dumps(running_json)}, LOADGATE = {json.dumps(loadgate_json)}, BUILD = {json.dumps(build_json)};
+  const STAMP = {json.dumps(stamp_name)}, TESTBED = {json.dumps(testbed.name())}, RUNNING = {json.dumps(running_json)}, LOADGATE = {json.dumps(loadgate_json)}, BUILD = {json.dumps(build_json)};
   // the sticky nav's height, for the tables whose headers stay put (a scroller of the window's height less the nav's)
   {{ const nav = document.querySelector('.nav'), set = () => document.documentElement.style.setProperty('--nav-h', (nav ? nav.offsetHeight : 0) + 'px');
      set(); if (nav && window.ResizeObserver) new ResizeObserver(set).observe(nav); }}
@@ -1657,7 +1673,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
       if (ages.length) ok = ok && now - Number(card.dataset.last) < Math.max(...ages);
       if (q) ok = ok && card.textContent.toLowerCase().includes(q);
       card.classList.toggle('hidden', !ok);
-      for (const tr of card.querySelectorAll('tr[data-corpus]')) tr.classList.toggle('hidden', sel.corpus.size > 0 && !sel.corpus.has(tr.dataset.corpus));
+      for (const tr of card.querySelectorAll('tr[data-corpus]')) tr.classList.toggle('hidden', sel.corpus.size > 0 && !tr.dataset.corpus.split(' ').some(c => sel.corpus.has(c)));
     }}
     for (const tr of document.querySelectorAll('#counters-card tr[data-tool]')) tr.classList.toggle('hidden', !match(tr));
     drawSummaries(sel.corpus); BH.draw(sel.corpus);
@@ -1784,30 +1800,52 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
     if (sel.value !== shown) {{ tl.reset(); shown = sel.value; }}
     tl.set(await BenchTimeline.fetchCell(sel.value));
   }}
+  // the page is rebuilt around every cell; its .stamp names the build. Only a new one fetches the page (tens of MB with many
+  // campaigns), and only the cards whose hash (data-h) changed are swapped in: the rest keep their DOM, open rows and scroll
+  let GEN = (document.querySelector('meta[name=perflab-gen]') || {{}}).content, busy = false;
   async function refresh() {{
+    if (busy || document.hidden) return;
+    busy = true;
     try {{
+      const st = await fetch(STAMP, {{cache: 'no-store'}});
+      const gen = st.ok ? (await st.text()).trim() : null;
+      if (gen && gen === GEN) return;
       const r = await fetch(location.pathname.endsWith('/') ? 'index.html' : location.pathname, {{cache: 'no-store'}});
       if (!r.ok) return;
       const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
       // re-rendered by a newer perflab: its scripts and styles may have changed too
       const code = d => (d.querySelector('meta[name=perflab-code]') || {{}}).content;
       if (code(doc) && code(doc) !== code(document)) {{ location.reload(); return; }}
-      // keep what the reader opened
-      const open = new Map([...document.querySelectorAll('#live details[id]')].map(d => [d.id, d.open]));
-      // and where a wide table was scrolled to, by the card it is in and its place among that card's scrollers
-      const scrollers = root => [...root.querySelectorAll('section.card[id]')].flatMap(c => [...c.querySelectorAll('*')]
-        .filter(e => /auto|scroll/.test(getComputedStyle(e).overflowX)).map((e, n) => ({{e, key: c.id + '#' + n}})));
-      const scrolled = new Map(scrollers(document.getElementById('live')).filter(s => s.e.scrollLeft || s.e.scrollTop).map(s => [s.key, [s.e.scrollLeft, s.e.scrollTop]]));
-      document.getElementById('live').innerHTML = doc.getElementById('live').innerHTML;
-      for (const s of scrollers(document.getElementById('live'))) if (scrolled.has(s.key)) [s.e.scrollLeft, s.e.scrollTop] = scrolled.get(s.key);
-      for (const [id, o] of open) {{ const d = document.getElementById(id); if (d) d.open = o; }}
-      const keep = sel.value;
+      GEN = (doc.querySelector('meta[name=perflab-gen]') || {{}}).content;
+      const live = document.getElementById('live');
+      const old = new Map([...live.children].filter(e => e.dataset.h).map(e => [e.id, e]));
+      const kids = [...doc.getElementById('live').children].map(n => {{
+        const o = n.id && old.get(n.id);
+        return o && o.dataset.h === n.dataset.h ? o : document.adoptNode(n);
+      }});
+      // in the cards swapped in, keep what the reader opened and where a wide table was scrolled to
+      const fresh = kids.filter(n => !old.has(n.id) || old.get(n.id) !== n);
+      const was = new Map(fresh.map(n => [n.id, old.get(n.id)]).filter(([, o]) => o));
+      const scrolled = o => [...o.querySelectorAll('*')].filter(e => e.scrollLeft || e.scrollTop);
+      const path = (root, e) => {{ const p = []; for (; e !== root; e = e.parentElement) p.unshift([...e.parentElement.children].indexOf(e)); return p; }};
+      const at = (root, p) => p.reduce((e, i) => e && e.children[i], root);
+      const keep = [...was].map(([id, o]) => [id, [...o.querySelectorAll('details[id]')].map(d => [d.id, d.open]),
+                                               scrolled(o).map(e => [path(o, e), e.scrollLeft, e.scrollTop])]);
+      live.replaceChildren(...kids);
+      for (const [id, open, scr] of keep) {{
+        const n = document.getElementById(id);
+        for (const [d, o] of open) {{ const e = document.getElementById(d); if (e) e.open = o; }}
+        for (const [p, x, y] of scr) {{ const e = at(n, p); if (e) {{ e.scrollLeft = x; e.scrollTop = y; }} }}
+      }}
+      const cur = sel.value;
       sel.innerHTML = doc.getElementById('tl-cell').innerHTML;
-      if (keep && ![...sel.options].some(o => o.value === keep)) sel.add(new Option((runs.find(r => r.dir === keep) || {{name: keep}}).name, keep), 0);
-      sel.value = keep;
+      if (cur && ![...sel.options].some(o => o.value === cur)) sel.add(new Option((runs.find(r => r.dir === cur) || {{name: cur}}).name, cur), 0);
+      sel.value = cur;
       apply(); jobsOnCards(); shareButtons(); holdView();
     }} catch (e) {{}}
+    finally {{ busy = false; }}
   }}
+  document.addEventListener('visibilitychange', () => {{ if (!document.hidden) refresh(); }});
   // served by `perflab server` (under /p/<project>/): its tabs before this page's, and each campaign's jobs, #<id> linking
   // to the job on the queue page; a campaign queued but not yet started has a card of its own until its first cell
   const SRV = location.protocol.startsWith('http') && /^\\/p\\/([^/]+)\\//.exec(location.pathname);
@@ -1932,6 +1970,9 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
   </script>"""
   with open(out, "w") as f:
       f.write(page)
+  if live:
+      with open(os.path.join(root, stamp_name), "w") as f:
+          f.write(gen)
   return out
 
 
