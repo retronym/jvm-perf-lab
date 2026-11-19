@@ -1457,6 +1457,16 @@ def title_of():
 
 
 def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=True):
+  """See _build. The live index keeps the summaries' bootstraps between builds (<campaigns>/.cache/boot.json)."""
+  if live:
+      metrics.boot_cache(os.path.join(campaigns, ".cache", "boot.json"))
+  try:
+      return _build(campaigns, runs, out, title, intro, footer, live)
+  finally:
+      metrics.boot_cache_save()
+
+
+def _build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=True):
   """One page over the project's campaigns (<campaigns>) and runs of `perflab run` (<runs>, default [paths] runs): an
   intro when one is given, the campaigns, the runs' PMU counters side by side, and the runs. `perflab serve` and the
   campaigns' tools write it to <campaigns>/index.html (`out` by default); `perflab site` and `perflab share` to the site's

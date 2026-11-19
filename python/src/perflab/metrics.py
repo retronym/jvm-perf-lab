@@ -11,7 +11,7 @@ With a spec's "perUnit" (an aux counter of the benchmark, e.g. "files"), counts,
 by that counter's units per op (its sum over the measurement iterations over their ops), so variants that do different
 amounts of work per op compare: cycles/file, not cycles/op. Ratios (IPC, /kinst, % of cycles) stay as they are.
 """
-import functools, glob, json, math, os, plistlib, random, re, statistics
+import functools, glob, hashlib, json, math, os, plistlib, random, re, statistics
 from typing import NamedTuple
 
 # events counting cycles are shown as % of cycles, the others per 1,000 instructions: by the event's description in
@@ -622,14 +622,49 @@ def pooled_delta(base, forks, stat, kind="score", per_unit=None, seed=0):
         return x, 0.0, 0.0, delta_ok(b, kind, per_unit)
     if min(sum(map(len, base)), sum(map(len, forks))) < 2:  # one sample a side: a bootstrap of it has no spread
         return x, d, None, delta_ok(b, kind, per_unit)
-    rng = random.Random(seed)
-    ds = []
-    for _ in range(BOOT):
-        bb = pooled(resample(base, rng), stat)
-        if bb:
-            ds.append(100 * (pooled(resample(forks, rng), stat) / bb - 1))
-    half = t999(math.inf) * statistics.stdev(ds) if len(ds) > 1 else None
+    key = _BOOT_CACHE is not None and hashlib.sha1(repr((base, forks, stat, seed, BOOT)).encode()).hexdigest()[:24]
+    if key and key in _BOOT_CACHE:
+        half = _BOOT_CACHE[key]
+    else:
+        rng = random.Random(seed)
+        ds = []
+        for _ in range(BOOT):
+            bb = pooled(resample(base, rng), stat)
+            if bb:
+                ds.append(100 * (pooled(resample(forks, rng), stat) / bb - 1))
+        half = t999(math.inf) * statistics.stdev(ds) if len(ds) > 1 else None
+    if key:
+        _BOOT_USED[key] = half
     return x, d, half, delta_ok(b, kind, per_unit)
+
+
+# `pooled_delta`'s bootstrap is seeded, so its half-width is a function of the samples: the index, which renders every
+# campaign's card again whenever one cell ends, keeps them between builds (most of a build's time, else)
+_BOOT_CACHE, _BOOT_USED, _BOOT_PATH = None, {}, None
+
+
+def boot_cache(path):
+    """Keep `pooled_delta`'s bootstraps in `path` (JSON) from here to `boot_cache_save()`."""
+    global _BOOT_CACHE, _BOOT_USED, _BOOT_PATH
+    try:
+        _BOOT_CACHE = json.load(open(path))
+    except (OSError, ValueError):
+        _BOOT_CACHE = {}
+    _BOOT_USED, _BOOT_PATH = {}, path
+
+
+def boot_cache_save():
+    """Writes the bootstraps used since `boot_cache` (those no longer asked for go) and stops keeping them."""
+    global _BOOT_CACHE, _BOOT_USED
+    if _BOOT_CACHE is None:
+        return
+    if _BOOT_USED.keys() != _BOOT_CACHE.keys():
+        os.makedirs(os.path.dirname(_BOOT_PATH), exist_ok=True)
+        tmp = f"{_BOOT_PATH}.{os.getpid()}"
+        with open(tmp, "w") as f:
+            json.dump(_BOOT_USED, f)
+        os.replace(tmp, _BOOT_PATH)
+    _BOOT_CACHE, _BOOT_USED = None, {}
 
 
 def describe(xs):
