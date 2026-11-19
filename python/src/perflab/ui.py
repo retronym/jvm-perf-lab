@@ -39,10 +39,14 @@ code{font:11.5px ui-monospace,SFMono-Regular,Menlo,monospace}
 .badge.failed,.badge.interrupted{background:var(--bad-bg);color:var(--bad)}
 .facts{color:var(--muted);margin:0 0 8px;overflow-wrap:anywhere} .facts b{color:var(--fg);font-weight:600} .facts code{color:var(--fg)}
 .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%;
-  /* edge shadows while there is more to scroll to */
+  /* edge shadows while there is more to scroll to: covers that move with the content (local) over shadows that stay at
+     the edges (scroll); a sticky header hides the top one, so it casts its own (.sy, while scrolled down) */
   background:linear-gradient(to right,var(--panel) 30%,transparent),linear-gradient(to left,var(--panel) 30%,transparent) right,
-    radial-gradient(farthest-side at 0 50%,rgba(0,0,0,.2),transparent),radial-gradient(farthest-side at 100% 50%,rgba(0,0,0,.2),transparent) right;
-  background-repeat:no-repeat;background-size:40px 100%,40px 100%,12px 100%,12px 100%;background-attachment:local,local,scroll,scroll;background-color:var(--panel)}
+    linear-gradient(to bottom,var(--panel) 30%,transparent),linear-gradient(to top,var(--panel) 30%,transparent) bottom,
+    radial-gradient(farthest-side at 0 50%,rgba(0,0,0,.2),transparent),radial-gradient(farthest-side at 100% 50%,rgba(0,0,0,.2),transparent) right,
+    radial-gradient(farthest-side at 50% 0,rgba(0,0,0,.2),transparent),radial-gradient(farthest-side at 50% 100%,rgba(0,0,0,.2),transparent) bottom;
+  background-repeat:no-repeat;background-size:40px 100%,40px 100%,100% 40px,100% 40px,12px 100%,12px 100%,100% 12px,100% 12px;
+  background-attachment:local,local,local,local,scroll,scroll,scroll,scroll;background-color:var(--panel)}
 table.t{border-collapse:collapse;font-variant-numeric:tabular-nums;margin:4px 0 8px}
 table.t th{font-weight:600;font-size:12px;color:var(--muted);text-align:left;border-bottom:1px solid var(--line);padding:4px 10px;white-space:nowrap}
 table.t td{border-bottom:1px solid var(--line2);padding:4px 10px;text-align:left;vertical-align:top}

@@ -1086,6 +1086,7 @@ def progress_badge(prog, name):
 CSS = """
 .sv-table .scroll{max-height:calc(100vh - var(--nav-h, 110px) - 12px);overflow:auto}
 .sv-table table.t tr:first-child th{position:sticky;top:0;z-index:2;background:var(--panel);box-shadow:inset 0 -1px var(--line)}
+.sv-table .scroll.sy table.t tr:first-child th::after{content:'';position:absolute;left:0;right:0;top:100%;height:10px;background:linear-gradient(rgba(0,0,0,.16),transparent);pointer-events:none}
 #share-dlg{position:fixed;inset:0;z-index:90;background:rgba(10,14,20,.45);display:flex;align-items:flex-start;justify-content:center;padding:10vh 16px}
 #share-dlg[hidden],#share-dlg [hidden]{display:none} #share-dlg .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;
   max-width:560px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35)} #share-dlg label.opt{display:block;margin:4px 0}
@@ -1657,6 +1658,8 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
   // the sticky nav's height, for the tables whose headers stay put (a scroller of the window's height less the nav's)
   {{ const nav = document.querySelector('.nav'), set = () => document.documentElement.style.setProperty('--nav-h', (nav ? nav.offsetHeight : 0) + 'px');
      set(); if (nav && window.ResizeObserver) new ResizeObserver(set).observe(nav); }}
+  // a scroller with a sticky header, scrolled down: the header casts the top edge's shadow
+  document.addEventListener('scroll', e => {{ const t = e.target; if (t.classList && t.classList.contains('scroll')) t.classList.toggle('sy', t.scrollTop > 0); }}, {{capture: true, passive: true}});
   const chips = [...document.querySelectorAll('.filterbar .chip')];
   chips.forEach(c => c.onclick = () => {{ c.classList.toggle('on'); apply(); }});
   document.getElementById('q').oninput = apply;
