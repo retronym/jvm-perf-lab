@@ -443,13 +443,17 @@ const BenchTimeline = (() => {
       draw();
     }
 
-    svg.addEventListener('wheel', e => { e.preventDefault(); const W = svg.clientWidth, f = Math.exp(e.deltaY * 0.002);
+    svg.addEventListener('wheel', e => {
+      // only over the plot: over the row labels (or the right margin) the wheel scrolls the page
+      const W = svg.clientWidth, px = e.clientX - svg.getBoundingClientRect().left;
+      if (px < L || px > W - R) return;
+      e.preventDefault(); const f = Math.exp(e.deltaY * 0.002);
       // a sideways swipe (a trackpad's two fingers, a tilted wheel) pans; vertical scrolling and pinching zoom
       if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
         const w = x1 - x0, dt = e.deltaX / (W - L - R) * w;
         x0 = Math.min(Math.max(t0, x0 + dt), t1 - w); x1 = x0 + w; return moved();
       }
-      const at = x0 + (e.offsetX - L) / (W - L - R) * (x1 - x0); x0 = Math.max(t0, at - (at - x0) * f); x1 = Math.min(t1, at + (x1 - at) * f); moved(); }, {passive: false});
+      const at = x0 + (px - L) / (W - L - R) * (x1 - x0); x0 = Math.max(t0, at - (at - x0) * f); x1 = Math.min(t1, at + (x1 - at) * f); moved(); }, {passive: false});
     let drag = null;
     svg.addEventListener('pointerdown', e => { drag = {x: e.clientX, x0, x1}; svg.setPointerCapture(e.pointerId); svg.classList.add('dragging'); });
     svg.addEventListener('pointermove', e => {
