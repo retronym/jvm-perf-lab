@@ -1119,6 +1119,7 @@ details.specs ul{margin:2px 0 6px;padding-left:20px}
 .diffs{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin:4px 0 8px}
 table.summary td:nth-child(n+3),table.summary th:nth-child(n+3){text-align:right}
 .warn{color:var(--warn)} table.card-t th.ex{text-decoration:underline dotted;text-underline-offset:3px;cursor:help} table.card-t .fk{color:var(--muted);font-size:12px;padding-left:4px} table.card-t th.fk{font-weight:normal}
+tr.flash td{animation:rowflash 2s ease-out} @keyframes rowflash{from{background:var(--warn-bg)}}
 tr[data-running] td{color:var(--muted)} tr.sr.live td:first-child{box-shadow:inset 3px 0 var(--warn)} .single-ver .ver{display:none} p.specs{margin:0 0 4px}
 details.cells{margin:10px 0 0} details.cells>summary,details.metrics>summary{cursor:pointer;font-size:12.5px} .pv{display:block;white-space:nowrap} .pv b{font-weight:normal}
 details.metrics{margin:2px 0 6px} details.metrics>summary{color:var(--muted)} table.m th{font-weight:normal;color:var(--fg);border:0;padding:2px 14px 2px 0} table.m td{border:0;padding:2px 10px}
@@ -1128,7 +1129,7 @@ table.t tr.has-sub td{border-bottom:0} table.t tr.sub td{padding-top:0} .cellg{d
 .cellg .graphs{margin:0} h3.sub{font-size:12.5px;margin:12px 0 0;font-weight:600} .btn .k{font-size:11px} .btn.empty{color:var(--muted)}
 .hidden{display:none!important} section.card{scroll-margin-top:100px}
 section.card.campaign.running-now{border-color:color-mix(in srgb,var(--warn) 55%,var(--line));box-shadow:inset 4px 0 var(--warn),var(--shadow)}
-section.card.campaign.running-now>.card-h{background:color-mix(in srgb,var(--warn-bg) 70%,transparent);margin:-12px -16px 8px;padding:10px 16px 8px;border-radius:10px 10px 0 0}
+section.card.campaign.running-now>.card-h{background:color-mix(in srgb,var(--warn-bg) 70%,var(--panel));margin:-12px -16px 8px;padding:10px 16px 8px;border-radius:10px 10px 0 0}
 section.card.campaign.running-now>.card-h h2::before{content:'';display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--warn);margin-right:7px;vertical-align:1px;animation:runpulse 1.6s ease-in-out infinite}
 @keyframes runpulse{50%{opacity:.25}} @media (prefers-reduced-motion:reduce){section.card.campaign.running-now>.card-h h2::before{animation:none}}
 .prov{display:block;font-style:italic;font-weight:normal;color:var(--warn);font-size:11.5px;white-space:nowrap;text-align:right} .prov .k{font-style:normal} .prov .pd{font-style:normal;color:var(--muted)}
@@ -1672,7 +1673,7 @@ def _build(campaigns, runs=None, out=None, title=None, intro="", footer="", live
   <input id="q" type="search" placeholder="filter: name, flags, notes…"></div></div></div>
   <main>
   {f'<section class="intro" id="overview">{intro}</section>' if intro else ''}
-  <section class="card" id="tl" hidden><div class="card-h"><h2>Fork timeline</h2><select id="tl-cell">{options}</select>
+  <section class="card" id="tl" hidden><div class="card-h"><h2>Fork timeline</h2><select id="tl-cell">{options}</select><a href="#" class="btn" id="tl-camp" hidden title="Its campaign's card, maximized, at this cell's row">campaign ⤢</a>
   <label class="k"><input type="checkbox" id="tl-follow" checked> follow the running fork</label><span id="tl-status"></span>{tl_help}</div>
   <div class="tl-legend" id="tl-legend"></div><svg class="timeline" id="tl-chart"></svg></section>
   <div class="tl-tip" id="tl-tip"></div>
@@ -1843,6 +1844,31 @@ def _build(campaigns, runs=None, out=None, title=None, intro="", footer="", live
     pre.textContent = b.tail.join('\\n');
     if (end) pre.scrollTop = pre.scrollHeight;
   }}
+  // the cell the timeline shows, as [campaign, corpus, variant] when it is a campaign's: its path is <campaign>/<corpus>/<variant>/<round>/,
+  // under a worker's live mirror (.live/<worker>/) when it runs there
+  const cellOf = dir => {{
+    const p = String(dir || '').replace(/^(\\.\\/)?\\.live\\/[^/]+\\//, '').replace(/\\/$/, '').split('/');
+    return p.length >= 4 && document.getElementById('c-' + p[p.length - 4]) ? p.slice(-4, -1) : null;
+  }};
+  const campLink = document.getElementById('tl-camp');
+  function showCampLink() {{
+    const c = cellOf(sel.value);
+    campLink.hidden = !c;
+    if (c) campLink.href = '#c-' + encodeURIComponent(c[0]);
+  }}
+  // a campaign's card maximized, scrolled to a row of its corpus and variant: the branch history's or the summary's, whichever shows
+  function openAtRow(name, corpus, variant) {{
+    const card = document.getElementById('c-' + name);
+    if (!card) return;
+    if (!card.classList.contains('max')) {{ history.pushState(history.state, '', '#' + encodeURIComponent(card.id)); maxPushed = true; maxFromHash(); }}
+    const shown = t => t.offsetParent !== null;
+    const row = [...card.querySelectorAll('.bh-table tr[data-v]')].find(t => t.dataset.v === variant && shown(t))
+      || [...card.querySelectorAll('tr.sr')].find(t => t.dataset.key === corpus + '|' + variant && shown(t));
+    if (!row) return;
+    row.scrollIntoView({{block: 'center'}});
+    row.classList.remove('flash'); void row.offsetWidth; row.classList.add('flash');
+  }}
+  campLink.onclick = e => {{ const c = cellOf(sel.value); if (!c) return; e.preventDefault(); openAtRow(...c); }};
   async function tick() {{
     srcs = await BenchTimeline.sources(base, TESTBED);
     gate(); building();
@@ -1866,6 +1892,7 @@ def _build(campaigns, runs=None, out=None, title=None, intro="", footer="", live
     status.innerHTML = !runs.length ? '<span class="k">nothing running</span>' : runs.map(r => r.dir === sel.value
         ? `<span class="badge running" title="${{escT(where(r))}}">running on ${{escT(r.src.who)}} since ${{since(r)}}</span>`
         : `<a href="#" class="badge running" data-dir="${{escT(r.dir)}}" title="Show it (${{escT(where(r))}})">${{escT(r.name)}} running</a>`).join(' ');
+    showCampLink();
     if (!sel.value) return;
     if (sel.value !== shown) {{ tl.reset(); shown = sel.value; }}
     tl.set(await BenchTimeline.fetchCell(sel.value));
