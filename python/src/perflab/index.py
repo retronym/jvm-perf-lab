@@ -594,6 +594,17 @@ def hashed(section):
     return section.replace("<section ", f'<section data-h="{hashlib.sha1(section.encode()).hexdigest()[:12]}" ', 1)
 
 
+def planned_iters(spec_json):
+    """Per corpus, [forks, measurement iterations per fork] of a cell, from the spec's JMH arguments (-f, -i): the page
+    tells a running cell's provisional value from how far it has got."""
+    out = {}
+    for c, a in (spec_json.get("corpora") or {}).items() if isinstance(spec_json.get("corpora"), dict) else ():
+        m = {k: re.search(rf"(?:^|\s){k}\s+(\d+)", a or "") for k in ("-f", "-i")}
+        if m["-i"]:
+            out[c] = [int(m["-f"].group(1)) if m["-f"] else 1, int(m["-i"].group(1))]
+    return out
+
+
 def run_args(run):
     """A run's jmh.args as (benchmarks, {param: value}, [(option, value)], JVM, JVM arguments)."""
     try:
@@ -1116,6 +1127,11 @@ table.t td{white-space:nowrap} p.about{color:var(--muted);margin:0 0 6px}
 table.t tr.has-sub td{border-bottom:0} table.t tr.sub td{padding-top:0} .cellg{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:baseline}
 .cellg .graphs{margin:0} h3.sub{font-size:12.5px;margin:12px 0 0;font-weight:600} .btn .k{font-size:11px} .btn.empty{color:var(--muted)}
 .hidden{display:none!important} section.card{scroll-margin-top:100px}
+section.card.campaign.running-now{border-color:color-mix(in srgb,var(--warn) 55%,var(--line));box-shadow:inset 4px 0 var(--warn),var(--shadow)}
+section.card.campaign.running-now>.card-h{background:color-mix(in srgb,var(--warn-bg) 70%,transparent);margin:-12px -16px 8px;padding:10px 16px 8px;border-radius:10px 10px 0 0}
+section.card.campaign.running-now>.card-h h2::before{content:'';display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--warn);margin-right:7px;vertical-align:1px;animation:runpulse 1.6s ease-in-out infinite}
+@keyframes runpulse{50%{opacity:.25}} @media (prefers-reduced-motion:reduce){section.card.campaign.running-now>.card-h h2::before{animation:none}}
+.prov{display:block;font-style:italic;font-weight:normal;color:var(--warn);font-size:11.5px;white-space:nowrap;text-align:right} .prov .k{font-style:normal} .prov .pd{font-style:normal;color:var(--muted)}
 html.cardmax{overflow:hidden} html.cardmax body::before{content:'';position:fixed;inset:0;z-index:89;background:rgba(10,14,20,.55)} button.max-btn{font:inherit;font-size:13px;line-height:1;cursor:pointer}
 section.card.max{position:fixed;inset:16px;z-index:90;margin:0;overflow:auto;overscroll-behavior:contain;box-shadow:0 10px 40px rgba(0,0,0,.35)}
 section.card.max>.card-h{position:sticky;top:-12px;z-index:5;background:var(--panel);margin:-12px -16px 8px;padding:12px 16px 8px;border-bottom:1px solid var(--line2)}
@@ -1577,7 +1593,9 @@ def _build(campaigns, runs=None, out=None, title=None, intro="", footer="", live
       single = " single-ver" if len(counts) <= 1 else ""
       facet["benchmark"] |= benches; facet["tool"] |= tools; facet["corpus"] |= corpora
       profiled = any(' data-profiled="1"' in r[0] for r in rows)
-      camp_sections.append((last, f'<section class="card campaign{single}" id="{sid}" data-last="{last:.0f}" data-notes="{1 if has_notes else 0}" '
+      now_running = " running-now" if campaign_active(name) else ""
+      camp_sections.append((last, f'<section class="card campaign{single}{now_running}" id="{sid}" data-last="{last:.0f}" data-notes="{1 if has_notes else 0}" '
+                                  f"data-iters='{esc(json.dumps(planned_iters(spec_json), separators=(',', ':')))}' "
                                   f'data-benchmark="{esc(" ".join(sorted(benches)))}" data-tool="{esc(" ".join(sorted(tools)))}" '
                                   f'data-corpus="{esc(" ".join(sorted(corpora)))}" data-profiled="{1 if profiled else 0}">'
                                   f'{card_head("campaign", name, progress_badge(prog, name) + testbed_badge(spec_dir), when, buttons)}'
@@ -1835,6 +1853,7 @@ def _build(campaigns, runs=None, out=None, title=None, intro="", footer="", live
       catch (e) {{ return null; }}
     }}))).filter(Boolean);
     running = runs.length ? runs[0].run : null;
+    liveCells();
     panel.hidden = !running && !picked;
     if (panel.hidden) return;
     if (follow.checked && running) {{
@@ -1854,6 +1873,70 @@ def _build(campaigns, runs=None, out=None, title=None, intro="", footer="", live
   // the page is rebuilt around every cell; its .stamp names the build. Only a new one fetches the page (tens of MB with many
   // campaigns), and only the cards whose hash (data-h) changed are swapped in: the rest keep their DOM, open rows and scroll
   let GEN = (document.querySelector('meta[name=perflab-gen]') || {{}}).content, busy = false;
+  // provisional results: each running cell's measurement iterations so far (its iterations.tsv, this machine's or a
+  // worker's live mirror), as a mean in its campaign's tables, until the cell ends and the index has its result
+  let LIVE = new Map();
+  const nf = new Intl.NumberFormat(undefined, {{maximumSignificantDigits: 4}});
+  async function liveCells() {{
+    const next = new Map();
+    await Promise.all(runs.map(async r => {{
+      const parts = String(r.run.cell || '').replace(/\\/$/, '').split('/'), [c, v, rnd] = parts.slice(-3);
+      const name = r.run.campaign || parts[parts.length - 4];
+      if (!name || !c) return;
+      let txt = '';
+      try {{ const x = await fetch(r.dir + 'iterations.tsv', {{cache: 'no-store'}}); txt = x.ok ? await x.text() : ''; }} catch (e) {{}}
+      const [head, ...lines] = txt.trim().split('\\n'), hd = (head || '').split('\\t'), col = k => hd.indexOf(k);
+      const rows = lines.map(l => l.split('\\t'));
+      const ms = rows.filter(f => f[col('kind')] === 'measure' && f[col('score')] !== '' && isFinite(+f[col('score')]));
+      next.set(name, {{c, v, r: rnd, who: r.src.who, remote: r.src.remote, n: ms.length, warm: rows.filter(f => f[col('kind')] === 'warmup').length,
+                      mean: ms.length ? ms.reduce((a, f) => a + +f[col('score')], 0) / ms.length : null, unit: ms.length ? ms[0][col('unit')] : ''}});
+    }}));
+    LIVE = next; liveDecorate();
+  }}
+  function liveDecorate() {{
+    document.querySelectorAll('#live .prov').forEach(e => e.remove());
+    // running: a cell of it is (LIVE), or, served by the server, a job of it is, between cells too (building, waiting for quiet);
+    // a page of `perflab serve` keeps what its build said between cells
+    if (SRV) {{
+      const act = new Set([...LIVE.keys(), ...JOBS.filter(j => j.state === 'running').map(j => j.campaign)]);
+      document.querySelectorAll('#live section.card.campaign:not(.queued)').forEach(c => c.classList.toggle('running-now', act.has(c.id.slice(2))));
+    }}
+    for (const [name, x] of LIVE) {{
+      const card = document.getElementById('c-' + name);
+      if (!card || card.classList.contains('queued')) continue;
+      card.classList.add('running-now');
+      let plan = null;
+      try {{ plan = JSON.parse(card.dataset.iters || '{{}}')[x.c]; }} catch (e) {{}}
+      const total = plan ? plan[0] * plan[1] : null, of = `${{x.n}}${{total ? ' of ' + total : ''}} measured`;
+      // a Δ, untested, against the summary's means: the variant before it (a branch campaign's previous commit) or the base
+      let prev = null, base = null;
+      try {{
+        const j = JSON.parse(card.querySelector('.card-s script[type="application/json"]').textContent);
+        const mi = j.metrics.findIndex(m => m.k === 'score'), mean = r => r.m && r.m.mean && r.m.mean[mi] && r.m.mean[mi][1];
+        const rs = j.rows.filter(r => r.c === x.c), at = rs.findIndex(r => r.v === x.v);
+        base = (rs.find(r => r.v !== x.v && mean(r) != null) || {{}});
+        base = mean(base) != null ? mean(base) : null;
+        for (let i = (at < 0 ? rs.length : at) - 1; i >= 0 && prev == null; i--) prev = mean(rs[i]) != null ? mean(rs[i]) : null;
+      }} catch (e) {{}}
+      const dl = (ref, what) => x.n && ref ? ` <span class="pd" title="against ${{what}}'s mean; untested, on ${{x.n}} iteration${{x.n > 1 ? 's' : ''}}">${{(x.mean / ref - 1) * 100 >= 0 ? '+' : ''}}${{((x.mean / ref - 1) * 100).toFixed(1)}}%</span>` : '';
+      const prov = d => `<span class="prov" title="Provisional: round #${{escT(x.r)}} running on ${{escT(x.who)}}, the mean of its measurement iterations so far (${{of}}); its result replaces it when the cell ends">`
+        + (x.n ? `~${{nf.format(x.mean)}} <span class="k">${{escT(x.unit)}}</span>${{d}} <span class="k">· ${{of}}</span>` : `<span class="k">${{x.warm ? 'warming up (' + x.warm + ')' : 'starting'}}</span>`) + '</span>';
+      const key = `${{x.c}}|${{x.v}}`;
+      // the summary's row of the corpus and variant, and the branch history's cell of the commit (its first column, the score)
+      const sr = [...card.querySelectorAll('tr.sr')].find(t => t.dataset.key === key);
+      const sc = sr && sr.querySelector('td[data-k="score"]');
+      if (sc) sc.insertAdjacentHTML('beforeend', prov(dl(base, 'the first variant')));
+      // (a worker's cell is "pending" there, not "running": the build knows only this machine's running cells)
+      const bt = card.querySelector('.bh-table table');
+      const tr = bt && [...bt.querySelectorAll('tr[data-v]')].find(t => t.dataset.v === x.v);
+      if (tr) {{
+        const groups = [...bt.querySelectorAll('tr:first-child th.cg')].map(t => t.textContent.trim());
+        const td = tr.querySelectorAll('td.gs')[Math.max(0, groups.indexOf(x.c))];
+        if (td) {{ td.querySelectorAll(':scope > .bh-pend').forEach(e => e.hidden = true); td.insertAdjacentHTML('beforeend', prov(dl(prev, 'the commit before it'))); }}
+      }}
+    }}
+  }}
+  window.afterBhDraw = el => {{ if (LIVE.size && el.closest('section.card.running-now')) liveDecorate(); }};
   async function refresh() {{
     if (busy || document.hidden) return;
     busy = true;
@@ -1892,7 +1975,7 @@ def _build(campaigns, runs=None, out=None, title=None, intro="", footer="", live
       sel.innerHTML = doc.getElementById('tl-cell').innerHTML;
       if (cur && ![...sel.options].some(o => o.value === cur)) sel.add(new Option((runs.find(r => r.dir === cur) || {{name: cur}}).name, cur), 0);
       sel.value = cur;
-      apply(); jobsOnCards(); shareButtons(); holdView(); maxFromHash();
+      apply(); jobsOnCards(); shareButtons(); liveDecorate(); holdView(); maxFromHash();
     }} catch (e) {{}}
     finally {{ busy = false; }}
   }}
@@ -1915,7 +1998,7 @@ def _build(campaigns, runs=None, out=None, title=None, intro="", footer="", live
     nav.hidden = false;
     JOBS = jobs.filter(j => j.project === SRV[1] && j.campaign).sort((a, b) => b.id - a.id);
     WORKERS = Array.isArray(st.workers) ? st.workers : [];
-    jobsOnCards(); shareButtons(); maxFromHash();
+    jobsOnCards(); shareButtons(); liveDecorate(); maxFromHash();
   }}
   const CARDS = new Map();  // job id -> its spec's card body (/api/jobs/<id>/card)
   let WORKERS = [];  // /api/status's workers: where a remote job runs, and its cell

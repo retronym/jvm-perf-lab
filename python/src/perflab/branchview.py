@@ -1465,6 +1465,7 @@ const BH = (() => {
     drawChart(el, d, st); drawTable(el, d, st); drawCompare(el, d, st);
     if (pop && pop.camp === el.dataset.campaign) renderPop(el);
     if (memOf(el).hover) hover(el, memOf(el).hover);
+    if (window.afterBhDraw) window.afterBhDraw(el);  // the index's provisional values of running cells
   }
   function draw(cs) {
     if (cs) filter = cs;
