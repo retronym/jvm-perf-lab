@@ -1087,7 +1087,7 @@ CSS = """
 .sv-table .scroll{max-height:calc(100vh - var(--nav-h, 110px) - 12px);overflow:auto}
 .sv-table table.t tr:first-child th{position:sticky;top:0;z-index:2;background:var(--panel);box-shadow:inset 0 -1px var(--line)}
 .sv-table .scroll.sy table.t tr:first-child th::after{content:'';position:absolute;left:0;right:0;top:100%;height:10px;background:linear-gradient(rgba(0,0,0,.16),transparent);pointer-events:none}
-#share-dlg{position:fixed;inset:0;z-index:90;background:rgba(10,14,20,.45);display:flex;align-items:flex-start;justify-content:center;padding:10vh 16px}
+#share-dlg{position:fixed;inset:0;z-index:95;background:rgba(10,14,20,.45);display:flex;align-items:flex-start;justify-content:center;padding:10vh 16px}
 #share-dlg[hidden],#share-dlg [hidden]{display:none} #share-dlg .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;
   max-width:560px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.35)} #share-dlg label.opt{display:block;margin:4px 0}
 #share-dlg .btn.go{background:var(--link);border-color:var(--link);color:var(--panel)} #share-dlg .btn.bad{color:var(--bad)}
@@ -1115,7 +1115,11 @@ details.metrics{margin:2px 0 6px} details.metrics>summary{color:var(--muted)} ta
 table.t td{white-space:nowrap} p.about{color:var(--muted);margin:0 0 6px}
 table.t tr.has-sub td{border-bottom:0} table.t tr.sub td{padding-top:0} .cellg{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:baseline}
 .cellg .graphs{margin:0} h3.sub{font-size:12.5px;margin:12px 0 0;font-weight:600} .btn .k{font-size:11px} .btn.empty{color:var(--muted)}
-.hidden{display:none!important} section.card{scroll-margin-top:100px} #counters-card .k{margin:0 0 4px}
+.hidden{display:none!important} section.card{scroll-margin-top:100px}
+html.cardmax{overflow:hidden} html.cardmax body::before{content:'';position:fixed;inset:0;z-index:89;background:rgba(10,14,20,.55)} button.max-btn{font:inherit;font-size:13px;line-height:1;cursor:pointer}
+section.card.max{position:fixed;inset:16px;z-index:90;margin:0;overflow:auto;overscroll-behavior:contain;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+section.card.max>.card-h{position:sticky;top:-12px;z-index:5;background:var(--panel);margin:-12px -16px 8px;padding:12px 16px 8px;border-bottom:1px solid var(--line2)}
+@media (max-width:600px){section.card.max{inset:0;border-radius:0}} #counters-card .k{margin:0 0 4px}
 #tl .card-h{gap:6px 12px} #tl select{font:inherit;max-width:100%;padding:2px 4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--fg)}
 #tl label{white-space:nowrap} #tl .help{margin-left:auto} #tl[hidden]{display:none}
 #bd[hidden]{display:none} #bd .card-h{gap:6px 12px} #bd .help{margin-left:auto} #bd-cmd{margin:2px 0 6px;word-break:break-all}
@@ -1142,7 +1146,7 @@ table.card-t tr.sd .flags code{display:block;font-size:11px;color:var(--muted);w
 table.card-t td[data-k]{cursor:default} table.card-t td[data-k]:hover{background:var(--link-bg)} table.card-t td .badge{margin-left:4px}
 .sv-dist{display:grid;grid-template-columns:1fr;gap:6px}
 svg.sv-c .med{stroke:var(--fg);stroke-width:1.6} svg.sv-c .mean{fill:var(--link)} svg.sv-c .it{fill:var(--muted);opacity:.6}
-.sv-tip{position:fixed;z-index:50;width:380px;max-width:calc(100vw - 16px);background:var(--panel);border:1px solid var(--line);border-radius:8px;
+.sv-tip{position:fixed;z-index:95;width:380px;max-width:calc(100vw - 16px);background:var(--panel);border:1px solid var(--line);border-radius:8px;
   box-shadow:0 6px 24px rgba(0,0,0,.25);padding:8px 10px;font-size:12px;pointer-events:none}
 .sv-tip svg{width:100%;height:auto;display:block;margin:4px 0;overflow:visible} .sv-tip svg text{font-size:10px;fill:var(--muted)}
 .sv-tip .tmed{stroke:var(--fg);stroke-width:.8;opacity:.5} .sv-tip .tbase{stroke:var(--muted);stroke-width:.8;stroke-dasharray:3 3}
@@ -1520,8 +1524,9 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
       when = span(min(whens), last) if whens else stamp(last)
       has_notes = os.path.exists(os.path.join(spec_dir, "NOTES.md"))
       report = os.path.join(spec_dir, "report.md")
-      buttons = (link(runinfo.md_page(report, os.path.join(spec_dir, "report.html"), f"{name}: report", home=HOME), "report", "report",
-                      "The campaign's report (perflab ab report)") if os.path.exists(report) else "")
+      buttons = ('<button type="button" class="btn max-btn" title="Maximize (its link, #c-…, opens it so)">⤢</button>'
+                 + (link(runinfo.md_page(report, os.path.join(spec_dir, "report.html"), f"{name}: report", home=HOME), "report", "report",
+                         "The campaign's report (perflab ab report)") if os.path.exists(report) else ""))
       try:  # shared (perflab share): its site, as last published
         sh = json.load(open(os.path.join(spec_dir, "share.json")))
         buttons += (f'<a class="btn" href="{esc(sh["url"])}" target="_blank" rel="noopener" title="Shared {esc(sh.get("at", ""))}'
@@ -1658,6 +1663,39 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
   // the sticky nav's height, for the tables whose headers stay put (a scroller of the window's height less the nav's)
   {{ const nav = document.querySelector('.nav'), set = () => document.documentElement.style.setProperty('--nav-h', (nav ? nav.offsetHeight : 0) + 'px');
      set(); if (nav && window.ResizeObserver) new ResizeObserver(set).observe(nav); }}
+  // a campaign's card maximized over the page: by its ⤢ button, or by its link (#c-<name>, as the queue and the API give it)
+  let maxPushed = false;
+  function maxFromHash() {{
+    let id = null;
+    try {{ id = decodeURIComponent(location.hash.slice(1)); }} catch (e) {{}}
+    const card = id && id.startsWith('c-') ? document.getElementById(id) : null;
+    document.querySelectorAll('section.card.max').forEach(c => {{ if (c !== card) c.classList.remove('max'); }});
+    document.documentElement.classList.toggle('cardmax', !!card);
+    if (card && !card.classList.contains('max')) {{ card.classList.add('max'); card.scrollTop = 0; }}
+    document.querySelectorAll('.max-btn').forEach(b => {{ const on = b.closest('section.card') === card; b.textContent = on ? '✕' : '⤢'; b.title = on ? 'Back to the page (Esc)' : 'Maximize (its link, #c-…, opens it so)'; }});
+  }}
+  function maxClose() {{
+    if (maxPushed) {{ maxPushed = false; history.back(); return; }}
+    history.replaceState(history.state, '', location.pathname + location.search);
+    maxFromHash();
+  }}
+  addEventListener('hashchange', () => {{ maxPushed = false; maxFromHash(); }});
+  document.addEventListener('click', e => {{
+    // the backdrop is body's ::before: a click on it is a click on body
+    if (e.target === document.body && document.documentElement.classList.contains('cardmax')) return maxClose();
+    const b = e.target.closest('.max-btn');
+    if (!b) return;
+    const card = b.closest('section.card');
+    if (card.classList.contains('max')) return maxClose();
+    history.pushState(history.state, '', '#' + encodeURIComponent(card.id)); maxPushed = true; maxFromHash();
+  }});
+  // Esc closes it unless an overlay above it is open (that overlay's own Esc goes first)
+  addEventListener('keydown', e => {{
+    if (e.key !== 'Escape' || !document.documentElement.classList.contains('cardmax')) return;
+    const open = s => {{ const d = document.querySelector(s); return d && !d.hidden; }};
+    if (open('#lb') || open('#keys') || open('#share-dlg') || document.querySelector('#bh-pop:not([hidden])')) return;
+    maxClose();
+  }}, true);
   // a scroller with a sticky header, scrolled down: the header casts the top edge's shadow
   document.addEventListener('scroll', e => {{ const t = e.target; if (t.classList && t.classList.contains('scroll')) t.classList.toggle('sy', t.scrollTop > 0); }}, {{capture: true, passive: true}});
   const chips = [...document.querySelectorAll('.filterbar .chip')];
@@ -1844,7 +1882,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
       sel.innerHTML = doc.getElementById('tl-cell').innerHTML;
       if (cur && ![...sel.options].some(o => o.value === cur)) sel.add(new Option((runs.find(r => r.dir === cur) || {{name: cur}}).name, cur), 0);
       sel.value = cur;
-      apply(); jobsOnCards(); shareButtons(); holdView();
+      apply(); jobsOnCards(); shareButtons(); holdView(); maxFromHash();
     }} catch (e) {{}}
     finally {{ busy = false; }}
   }}
@@ -1867,7 +1905,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
     nav.hidden = false;
     JOBS = jobs.filter(j => j.project === SRV[1] && j.campaign).sort((a, b) => b.id - a.id);
     WORKERS = Array.isArray(st.workers) ? st.workers : [];
-    jobsOnCards(); shareButtons();
+    jobsOnCards(); shareButtons(); maxFromHash();
   }}
   const CARDS = new Map();  // job id -> its spec's card body (/api/jobs/<id>/card)
   let WORKERS = [];  // /api/status's workers: where a remote job runs, and its cell
@@ -1967,7 +2005,7 @@ def build(campaigns, runs=None, out=None, title=None, intro="", footer="", live=
     dry();
   }}
   if (SRV) {{ server(); setInterval(server, 10000); }}
-  apply(); tick();
+  apply(); tick(); maxFromHash();
   // served (not from a file, nor a published copy): follow what runs
   if (location.protocol.startsWith('http') && {json.dumps(live)}) {{ setInterval(tick, 5000); setInterval(refresh, 10000); }}
   </script>"""

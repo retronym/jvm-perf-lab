@@ -713,7 +713,7 @@ button.bh-v[aria-expanded=true]{box-shadow:inset 0 0 0 1.5px var(--link)}
 .bh-hot{display:inline-block;width:7px;height:7px;border-radius:50%;border:1.5px solid var(--bh-load);margin-right:5px;vertical-align:1px}
 svg.bh-g .hot{fill:none;stroke:var(--bh-load);stroke-width:1.3} svg.bh-g .w1{stroke:var(--link);stroke-width:1;opacity:.4} svg.bh-g .w2{stroke:var(--brand);stroke-width:1;opacity:.4}
 .bh-leg i.hot{background:none;border:1.5px solid var(--bh-load);width:8px;height:8px} .bh-leg i.wh{width:1.5px;height:11px;border-radius:0;opacity:.5;vertical-align:-2px}
-#bh-pop{position:absolute;z-index:50;width:min(460px,calc(100vw - 16px));max-height:min(70vh,560px);overflow:auto;background:var(--panel);color:var(--fg);
+#bh-pop{position:absolute;z-index:95;width:min(460px,calc(100vw - 16px));max-height:min(70vh,560px);overflow:auto;background:var(--panel);color:var(--fg);
   border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.22);padding:8px 12px 10px;font-size:12.5px}
 #bh-pop[hidden]{display:none} #bh-pop:focus{outline:none}
 #bh-pop .ph{display:flex;gap:8px;align-items:baseline;margin:0 0 4px} #bh-pop .ph h4{margin:0;font-size:13px;flex:1;min-width:0;overflow-wrap:anywhere}
