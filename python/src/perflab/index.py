@@ -2017,7 +2017,7 @@ def _build(campaigns, runs=None, out=None, title=None, intro="", footer="", live
   if (SRV) {{ server(); setInterval(server, 10000); }}
   apply(); tick(); maxFromHash();
   // served (not from a file, nor a published copy): follow what runs
-  if (location.protocol.startsWith('http') && {json.dumps(live)}) {{ setInterval(tick, 5000); setInterval(refresh, 10000); }}
+  if (location.protocol.startsWith('http') && {json.dumps(live)}) {{ setInterval(tick, 5000); setInterval(refresh, 3000); }}
   </script>"""
   with open(out, "w") as f:
       f.write(page)

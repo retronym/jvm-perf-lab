@@ -984,7 +984,7 @@ class Server:
                 self.indexing.discard(project["id"])
         threading.Thread(target=run, daemon=True).start()
 
-    def reindex_soon(self, project, delay=5.0):
+    def reindex_soon(self, project, delay=1.0):
         """The project's index rebuilt in `delay` s, once for every upload that comes meanwhile."""
         with self.q.lock:
             if project["id"] in self.reindexing:
