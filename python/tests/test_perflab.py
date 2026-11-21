@@ -680,7 +680,7 @@ class JitRecordingTest(unittest.TestCase):
     """A spec's "jitRecording": the JIT over a whole fork, and jfrevents' summary of it."""
 
     def test_a_spec_records_the_jit_over_each_fork(self):
-        d = tempfile.mkdtemp()
+        d = Project('[build]\njmh = "x {args}"\n').dir  # its own project: its cell is not written under the working directory
         spec = os.path.join(d, "spec.json")
         json.dump({"name": "j", "benchmark": "B", "profile": "none", "corpora": {"c": ""}, "variants": {"a": ""}, "jitRecording": True},
                   open(spec, "w"))
