@@ -36,6 +36,8 @@ The lab provides `perflabLaunch` as a small sbt task, or perflab ships it as a p
 
 perflab copies every classpath entry, and every path in a `-D` option, that lies under one of the build's `roots` (the lab and the checkout) into `<campaign>/.build/snapshot/`, and rewrites `launch.json` to point at the copies. On macOS the copy is an APFS clone, so it costs nothing until the checkout changes; a scala3 build is about 120 MB of class directories. Jars outside the roots (`~/.m2`, Coursier's cache) stay where they are, recorded with their size and modification time. A campaign then measures exactly the build it took, whatever happens to the checkout afterwards. Rerunning or resuming the campaign reuses the snapshot, and its card shows each build's commit and whether it was dirty.
 
+A snapshot of a build with a checkout (a spec's `builds`) is reused only while that checkout is as it was built: the same tree, with the same uncommitted changes to tracked files (recorded as `source` in the snapshot's `launch.json`, and in each cell's `source.json`). If the checkout has moved and the campaign has no finished cell of that build (it was cancelled during its builds, say), the snapshot is built again, and the log says so. If it has finished cells, `ab run` stops before building or measuring anything: more cells would put two builds' measurements under one variant. Use a campaign of another name for the new commit, put the checkout back to resume, or void the cells. On a remote worker the checkout is the commit the coordinator's had when the job was queued, and the same rule holds, also when that worker has no snapshot: the cells it resumes from say what they measured.
+
 ### Campaigns over builds
 
 A spec names builds instead of trees:

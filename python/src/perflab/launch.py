@@ -15,7 +15,7 @@ under a root is copied (cloned, where the file system can) into <dir>/snapshot, 
 copies. Jars outside the roots (the build tool's caches) stay where they are, recorded with their size and time. A run
 or campaign then measures the build it took, whatever happens to the checkout afterwards, with no build tool running.
 """
-import json, os, shlex, shutil, subprocess, sys
+import hashlib, json, os, shlex, shutil, subprocess, sys
 
 from . import config, transcript
 
@@ -115,6 +115,79 @@ def jar_dirs(dir):
     return launch
 
 
+SOURCE = "source.json"  # in a cell of a campaign with "builds": the checkout state (`source`) its build was of
+
+
+def source(checkout):
+    """What a build of `checkout` is of, as it is now: {"commit", "tree", "diff"} (diff: a hash of its uncommitted changes
+    to tracked files, None for a clean one). None when `checkout` is not a git checkout's top directory, where there is
+    nothing to tell one build's source from another's by."""
+    def git(*args, text=True):
+        p = subprocess.run(["git", "-C", checkout, *args], capture_output=True, text=text)
+        return None if p.returncode else p.stdout
+    if not checkout or not os.path.isdir(checkout):
+        return None
+    top = git("rev-parse", "--show-toplevel")
+    if top is None or os.path.realpath(top.strip()) != os.path.realpath(checkout):
+        return None
+    ids = git("rev-parse", "HEAD", "HEAD^{tree}")
+    diff = git("diff", "HEAD", "--binary", text=False)
+    if ids is None or diff is None:
+        return None
+    commit, tree = ids.split()
+    return {"commit": commit, "tree": tree, "diff": hashlib.sha1(diff).hexdigest() if diff else None}
+
+
+def snapshot_source(launch, checkout):
+    """The source the snapshot `launch` was built from: as `build` recorded it, or, for a snapshot from before it did, as
+    the build step described it (launch.json's "build": a commit, and dirty or not; "diff" is then True for a dirty one,
+    whose changes are not known). None when neither says."""
+    if launch.get("source"):
+        return launch["source"]
+    b = launch.get("build") or {}
+    if not b.get("commit"):
+        return None
+    p = subprocess.run(["git", "-C", checkout, "rev-parse", "--verify", "-q", b["commit"] + "^{tree}"], capture_output=True, text=True)
+    return {"commit": b["commit"], "tree": None if p.returncode else p.stdout.strip(), "diff": True if b.get("dirty") else None}
+
+
+def same_source(a, b):
+    """Two sources are the same build input: the same tree (a commit reworded is the same build) with the same
+    uncommitted changes. Changes that are not known (`snapshot_source`) are taken for the same as any."""
+    if a["tree"] and b["tree"]:
+        if a["tree"] != b["tree"]:
+            return False
+    elif a["commit"] != b["commit"]:
+        return False
+    if True in (a["diff"], b["diff"]):
+        return bool(a["diff"]) == bool(b["diff"])
+    return a["diff"] == b["diff"]
+
+
+def describe_source(s):
+    return s["commit"][:10] + (" with uncommitted changes" if s["diff"] else "")
+
+
+def record_source(cell, source):
+    """Records in the cell what its build is of (None: nothing known, and no record of an earlier attempt's left)."""
+    f = os.path.join(cell, SOURCE)
+    if source is None:
+        if os.path.exists(f):
+            os.unlink(f)
+        return
+    os.makedirs(cell, exist_ok=True)
+    with open(f, "w") as out:
+        json.dump(source, out)
+        out.write("\n")
+
+
+def cell_source(cell):
+    try:
+        return read(os.path.join(cell, SOURCE))
+    except (OSError, ValueError):
+        return None
+
+
 def reusable(dir):
     """`dir` holds a snapshot, which `build` reuses."""
     try:
@@ -132,11 +205,13 @@ class BuildFailed(SystemExit):
         self.reason, self.log = reason, log
 
 
-def build(dir, env=None, label=None, validate=None):
+def build(dir, env=None, label=None, validate=None, source=None):
     """Runs [build] launch into `dir`, with the variables `env` set, and snapshots it there; the snapshot's launch.json.
     `label` names the build on the index while it runs. `validate(launch.json as built)` says what is wrong with a
     build, or None; a refused build is never snapshotted (raises BuildFailed, as a failed one does).
-    An existing snapshot in `dir` is reused (a campaign that resumes measures the build it started with)."""
+    An existing snapshot in `dir` is reused (a campaign that resumes measures the build it started with); whether it
+    is still the build the campaign means is its caller's to say (ab.build_source). `source` (`source` of the checkout,
+    taken before the build) is recorded in the snapshot's launch.json, for that."""
     from . import jmh
     path = os.path.join(dir, LAUNCH)
     if reusable(dir):
@@ -161,6 +236,8 @@ def build(dir, env=None, label=None, validate=None):
     if validate and (problem := validate(built)):
         raise BuildFailed(problem, log)
     launch = snapshot(built, dir)
+    if source:
+        launch["source"] = source
     tmp = path + ".tmp"  # whole or not at all: a launch.json is what makes its snapshot reused
     with open(tmp, "w") as f:
         json.dump(launch, f, indent=2)

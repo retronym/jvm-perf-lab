@@ -11,7 +11,7 @@ cell, a voided attempt, the campaign's top-level files) in place.
 """
 import glob, io, json, os, re, shutil, subprocess, tarfile, tempfile, time
 
-from . import ab, branch, config, specs, testbed
+from . import ab, branch, config, launch, specs, testbed
 
 PAYLOAD = "remote.json"  # in the job's directory
 # the campaign's top-level files that are the coordinator's own: the worker's copies name the worker's paths
@@ -19,8 +19,9 @@ OWN = {"spec.json", ab.SOURCE, "jfrsync.jfc", "index.html", ab.RUNNING_NAME, bra
 BRANCH_SOURCE = "branch"  # the sources' key of a branch campaign's repository (its variants are short shas)
 CELL_UNIT = re.compile(r"[^./][^/]*/[^/]+/\d+")
 VOID_UNIT = re.compile(r"\.void/[^./][^/]*/[^/]+/[^/]+")
-# what a finished cell contributes to a resume: its result, and what says it is the campaign's and of which version
-RESUME_FILES = ("result.json", testbed.CELL_FILE, specs.CELL_FILE)
+# what a finished cell contributes to a resume: its result, and what says it is the campaign's, of which version and
+# of which build (ab.build_source refuses to add cells of another)
+RESUME_FILES = ("result.json", testbed.CELL_FILE, specs.CELL_FILE, launch.SOURCE)
 
 
 def git(d, *args, check=True, binary=False):

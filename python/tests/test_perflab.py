@@ -1731,5 +1731,126 @@ class LaunchTest(unittest.TestCase):
         self.assertEqual(loadgate.server_pid(), os.getpid())
 
 
+@unittest.skipUnless(shutil.which("git"), "needs git")
+class BuildSourceTest(unittest.TestCase):
+    """A campaign's build (spec "builds") is of its checkout as it is now: a snapshot of another commit is not reused."""
+    def setUp(self):
+        self.p = Project('[build]\nmode = "launch"\nlaunch = "python3 build.py {out}"\n')
+        d = self.p.dir
+        # the build step, as a lab's: the classes are the checkout's VERSION, and launch.json says what was built
+        with open(os.path.join(d, "build.py"), "w") as f:
+            f.write("import json, os, shutil, subprocess, sys\n"
+                    "co = os.environ['CO']; os.makedirs(co + '/classes', exist_ok=True)\n"
+                    "shutil.copy(co + '/VERSION', co + '/classes/VERSION')\n"
+                    "sha = subprocess.run(['git', '-C', co, 'rev-parse', 'HEAD'], capture_output=True, text=True).stdout.strip()\n"
+                    "json.dump({'mainClass': 'M', 'java': 'java', 'roots': [co + '/classes'], 'classpath': [co + '/classes'], 'javaOptions': [],"
+                    " 'build': {'checkout': co, 'commit': sha, 'dirty': False}}, open(os.path.join(sys.argv[1], 'launch.json'), 'w'))\n")
+        self.co = os.path.join(d, "base")
+        os.makedirs(self.co)
+        self.git("init", "-q", "-b", "main")
+        self.git("config", "user.email", "t@example.com")
+        self.git("config", "user.name", "t")
+        with open(os.path.join(self.co, ".gitignore"), "w") as f:
+            f.write("classes/\n")
+        self.first = self.commit("1")
+        self.spec_f = os.path.join(d, "s.json")
+        with open(self.spec_f, "w") as f:
+            json.dump({"name": "b", "benchmark": "B", "rounds": 2, "corpora": {"c": ""},
+                       "builds": {"base": {"checkout": "base", "env": {"CO": "{checkout}"}}}}, f)
+        self.addCleanup(os.environ.pop, "PERFLAB_BUILD_MODE", None)
+        self.builds = []
+        orig = jmh.run_build
+        jmh.run_build = lambda cmd, log, *a, **k: (self.builds.append(cmd), orig(cmd, log, *a, **k))[1] if "build.py" in cmd else 1
+        self.addCleanup(setattr, jmh, "run_build", orig)
+        orig_ensure, serve.ensure = serve.ensure, lambda *a, **k: "(no index in tests)"
+        self.addCleanup(setattr, serve, "ensure", orig_ensure)
+        self.said = []
+        orig_log, ab.log = ab.log, lambda msg: self.said.append(msg)
+        self.addCleanup(setattr, ab, "log", orig_log)
+
+    def git(self, *args):
+        return subprocess.run(["git", "-C", self.co, *args], check=True, capture_output=True, text=True).stdout.strip()
+
+    def commit(self, version):
+        with open(os.path.join(self.co, "VERSION"), "w") as f:
+            f.write(version)
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", version)
+        return self.git("rev-parse", "HEAD")
+
+    def run_campaign(self):
+        """The campaign's run, whose builds are real and whose cell runs fail (stubbed); what stopped it."""
+        spec = ab.Spec(self.spec_f)
+        with self.assertRaises(SystemExit) as e:
+            ab.run(spec, False)
+        return spec, str(e.exception)
+
+    def snapshot(self, spec):
+        b = launch.read(os.path.join(spec.out, launch.BUILD_DIR, "base", launch.LAUNCH))
+        return b["build"]["commit"], open(os.path.join(b["classpath"][0], "VERSION")).read()
+
+    def finish(self, spec, r, source=None):
+        """A finished cell of `base`, as a run from the snapshot left it (`source`: with its record of what it measured)."""
+        cell = spec.cell_dir("c", "base", r)
+        os.makedirs(cell, exist_ok=True)
+        with open(os.path.join(cell, "result.json"), "w") as f:
+            json.dump([{"benchmark": "B"}], f)
+        if source:
+            launch.record_source(cell, source)
+
+    def test_an_unchanged_checkout_keeps_its_snapshot(self):
+        spec, _ = self.run_campaign()
+        self.finish(spec, 1)
+        spec, why = self.run_campaign()
+        self.assertEqual(len(self.builds), 1)
+        self.assertIn("build exited with 1", why)  # it got as far as the next cell
+        self.assertEqual(self.snapshot(spec), (self.first, "1"))
+
+    def test_a_snapshot_of_another_commit_is_built_again(self):
+        # the campaign stopped before any cell finished (cancelled during its builds, say), and its checkout moved
+        spec, _ = self.run_campaign()
+        self.assertEqual(self.snapshot(spec), (self.first, "1"))
+        second = self.commit("2")
+        spec, _ = self.run_campaign()
+        self.assertEqual(self.snapshot(spec), (second, "2"))
+        self.assertEqual(len(self.builds), 2)
+        self.assertTrue(any("building it again" in m and self.first[:10] in m and second[:10] in m for m in self.said), self.said)
+
+    def test_a_snapshot_of_other_uncommitted_changes_is_built_again(self):
+        spec, _ = self.run_campaign()
+        with open(os.path.join(self.co, "VERSION"), "w") as f:
+            f.write("1b")
+        spec, _ = self.run_campaign()
+        self.assertEqual(self.snapshot(spec)[1], "1b")
+        spec, _ = self.run_campaign()  # the same changes: the same build
+        self.assertEqual(len(self.builds), 2)
+
+    def test_a_campaign_with_cells_of_another_commit_is_refused(self):
+        spec, _ = self.run_campaign()
+        self.finish(spec, 1)
+        second = self.commit("2")
+        spec, why = self.run_campaign()
+        self.assertEqual(len(self.builds), 1)  # nothing built, nothing measured
+        self.assertEqual(self.snapshot(spec), (self.first, "1"))
+        for part in ("base", self.first[:10], second[:10], "c/base/1"):
+            self.assertIn(part, why)
+
+    def test_cells_of_another_commit_are_refused_without_their_snapshot(self):
+        # another worker, or .build deleted (`perflab storage`): the cell says what it measured
+        spec = ab.Spec(self.spec_f)
+        self.finish(spec, 1, launch.source(self.co))
+        second = self.commit("2")
+        spec, why = self.run_campaign()
+        self.assertEqual(self.builds, [])
+        self.assertIn(self.first[:10], why)
+        self.assertIn(second[:10], why)
+
+    def test_a_cell_records_what_it_measured(self):
+        spec, _ = self.run_campaign()
+        src = launch.cell_source(spec.cell_dir("c", "base", 1))
+        self.assertEqual(src["commit"], self.first)
+        self.assertEqual(src, launch.source(self.co))
+
+
 if __name__ == "__main__":
     unittest.main()

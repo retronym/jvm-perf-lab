@@ -41,7 +41,8 @@ A spec:
                                                          # report divide every count by its units per op (cycles/file)
     "builds": {"base": {"checkout": "../scala3-base", "env": {"SCALA3_CHECKOUT": "{checkout}"}}, "pr": {...}},
                                                          # optional: a build per variant (launch mode: [build] launch
-                                                         # with env set, snapshotted in <campaign>/.build/<variant>);
+                                                         # with env set, snapshotted in <campaign>/.build/<variant>,
+                                                         # and kept while the checkout is as it was built: build_source);
                                                          # "variants" defaults to their names; with "paired", one build
                                                          # that the paired variants share
     "historical": "<why>",                               # optional: kept for its results; `run` refuses it
@@ -344,7 +345,7 @@ VOID_DIR = ".void"  # in a campaign: voided cells, <corpus>/<variant>/<round>-<t
 VOID_NOTE = "void.txt"  # the reason, as text
 VOID_JSON = "void.json"  # {reason, voided, from}
 # what a cell holds before its run: written by jmh.prepare (spec.command), specs.tag and testbed.record
-CELL_SETUP = {"jmh.args", "profile.txt", jmh.JFRSYNC, specs.CELL_FILE, testbed.CELL_FILE}
+CELL_SETUP = {"jmh.args", "profile.txt", jmh.JFRSYNC, specs.CELL_FILE, testbed.CELL_FILE, launch.SOURCE}
 
 
 def set_aside(spec, corpus, variant, r, reason):
@@ -495,7 +496,7 @@ def run(spec, dry, retry_unbuildable=False):
         problem = asm.check_hsdis(java)
         if problem:
             sys.exit(f"{spec.name}: {problem}")
-    built = {}
+    built, sources = {}, {}  # each variant's build, and the state of its checkout that the build is of (launch.source)
     uses_aot = aot.uses(spec)
     if uses_aot and spec.branch_info:
         sys.exit(f"{spec.name}: {aot.PLACEHOLDER} is not supported in a branch campaign")
@@ -517,8 +518,9 @@ def run(spec, dry, retry_unbuildable=False):
                     theirs = os.path.join(os.path.dirname(spec.out), spec.asm_of, launch.BUILD_DIR, v)
                     if launch.reusable(theirs):
                         bdir = theirs
+                sources[v] = build_source(spec, v, bdir, cells)
                 built[v] = launch.build(bdir, env,
-                                        label=f"{spec.name}: {v} ({b['checkout'] or ''})")
+                                        label=f"{spec.name}: {v} ({b['checkout'] or ''})", source=sources[v])
         if uses_aot:  # an AOT cache needs a class path of JARs
             jarred = {}
             for v, l in built.items():
@@ -558,6 +560,8 @@ def run(spec, dry, retry_unbuildable=False):
                 set_aside(spec, corpus, variant, r, f"ran on testbed {other}, not the campaign's {testbed.of_campaign(spec.out)}")
             specs.tag(dest, version)
             testbed.record(dest)
+            if not spec.branch_info:
+                launch.record_source(dest, sources.get(variant))
             if os.path.exists(os.path.join(dest, FAILED)):
                 os.unlink(os.path.join(dest, FAILED))
         if dry:
@@ -738,6 +742,44 @@ def done(dest):
     except (OSError, ValueError):
         return False
     return isinstance(r, list) and len(r) > 0 and not testbed.foreign(dest)
+
+
+def build_source(spec, variant, bdir, cells):
+    """The state of `variant`'s checkout now (launch.source), which its build is of, having made sure that the campaign
+    has nothing of another state: a snapshot in `bdir` of another commit, or of other uncommitted changes, is removed,
+    to be built again (the campaign was stopped before any cell of it finished, and its checkout moved); finished cells
+    of another state stop the run, since more cells would put two builds' measurements under one variant.
+    None, and nothing checked, when the checkout is not a git checkout."""
+    checkout = spec.builds[variant]["checkout"]
+    now = launch.source(checkout)
+    if now is None:
+        return None
+    had = launch.snapshot_source(launch.read(os.path.join(bdir, launch.LAUNCH)), checkout) if launch.reusable(bdir) else None
+    stale = had is not None and not launch.same_source(had, now)
+    other = {}  # finished cells of another source: by what they say they measured, else by the snapshot they ran from
+    for r, corpus, _, v, _ in cells:
+        cell = spec.cell_dir(corpus, v, r)
+        if v != variant or not done(cell):
+            continue
+        was = launch.cell_source(cell) or had
+        if was is not None and not launch.same_source(was, now):
+            other.setdefault(launch.describe_source(was), []).append(os.path.relpath(cell, spec.out))
+    if other:
+        was = "; ".join(f"{len(cs)} of {d} ({', '.join(cs[:3])}{', …' if len(cs) > 3 else ''})" for d, cs in other.items())
+        sys.exit(f"{spec.name}: build {variant}'s checkout {checkout} is at {launch.describe_source(now)}, and the campaign has "
+                 f"finished cells of another build of it: {was}. More cells would mix two builds in one variant. "
+                 f"Measure the checkout as it is now in a campaign of another name; or put it back at "
+                 f"{' or '.join(other)} to resume this one; or void those cells (`perflab api void`) to measure this one again")
+    if stale:
+        ours = os.path.dirname(bdir) == os.path.join(spec.out, launch.BUILD_DIR)
+        if not ours:  # an asm capture's parent's snapshot, which is the parent's to rebuild
+            sys.exit(f"{spec.name}: {spec.asm_of}'s build {variant} is of {launch.describe_source(had)}, and its checkout "
+                     f"{checkout} is now at {launch.describe_source(now)}: an asm capture explains its parent's build")
+        log(f"  the snapshot in {bdir} is of {launch.describe_source(had)}, and {checkout} is now at "
+            f"{launch.describe_source(now)}; building it again")
+        shutil.rmtree(bdir, ignore_errors=True)
+        shutil.rmtree(os.path.join(spec.out, aot.DIR, aot.build_key(spec, variant)), ignore_errors=True)  # caches trained on it
+    return now
 
 
 def build_commit(spec, commit):

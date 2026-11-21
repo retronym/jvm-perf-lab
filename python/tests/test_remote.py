@@ -4,7 +4,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.realpath(os.path.join(HERE, "..", "src"))
 sys.path.insert(0, SRC)
 os.environ["PERFLAB_SERVER_HOME"] = tempfile.mkdtemp()  # never a real `perflab server`
-from perflab import ab, remote, serve, server, testbed, worker  # noqa: E402
+from perflab import ab, launch, remote, serve, server, testbed, worker  # noqa: E402
 from test_server import free_port, project, wait_for  # noqa: E402
 
 
@@ -225,6 +225,9 @@ class EndToEndTest(unittest.TestCase):
             "jvmArgs": f"-Dfake.data={lab}/data.txt",
             "builds": {"base": {"checkout": "../../../base", "env": env}, "tip": {"checkout": "../../../src", "env": env},
                        "tip2": {"checkout": "../../../src", "env": env}}})
+        files["lab/campaigns/rs.json"] = json.dumps({
+            "name": "rs", "testbed": "sim", "rounds": 1, "corpora": {"c": ""}, "jvmArgs": f"-Dfake.data={lab}/data.txt",
+            "builds": {"base": {"checkout": "../../../base", "env": env}}})
         # a branch campaign over the source repository's two commits (the base pushed, the tip not), its range as shas
         files["lab/campaigns/rb.json"] = json.dumps({
             "name": "rb", "testbed": "sim", "rounds": 1, "corpora": {"c": ""}, "jvmArgs": "-Dfake.data=" + f"{lab}/data.txt",
@@ -285,6 +288,38 @@ class EndToEndTest(unittest.TestCase):
         j2 = self.srv.q.get(j2["id"])
         self.assertEqual(j2["state"], "done", r.stdout + r.stderr)
         self.assertIn("3 cells, 0 to run", open(j2["transcript"]).read())
+
+    def test_a_worker_builds_a_checkout_that_moved_again(self):
+        def job():
+            j = server.submit_local(self.srv, {"argv": ["ab", "run", "campaigns/rs.json"], "cwd": self.lab})
+            r = self.work()
+            j = self.srv.q.get(j["id"])
+            return j, r.stdout + r.stderr + open(j["transcript"]).read()
+        camp = os.path.join(self.lab, "out", "ab", "rs")
+        score = lambda r: json.load(open(os.path.join(camp, "c", "base", str(r), "result.json")))[0]["primaryMetric"]["score"]
+        j, log = job()
+        self.assertEqual(j["state"], "done", log)
+        self.assertEqual(score(1), 5 + 2)
+        # the worker has a snapshot of the pushed commit and no finished cell of it (the coordinator's was voided; or the
+        # job was cancelled after its builds); the checkout moves to another commit, and the campaign is queued again
+        shutil.rmtree(os.path.join(camp, "c", "base", "1"))
+        sh(os.path.join(self.t, "base"), "git", "checkout", "-q", "--detach", self.unpushed)
+        j, log = job()
+        self.assertEqual(j["state"], "done", log)
+        self.assertIn("building it again", log)
+        self.assertEqual(score(1), 7 + 2)  # not the first commit's snapshot
+        self.assertEqual(launch.cell_source(os.path.join(camp, "c", "base", "1"))["commit"], self.unpushed)
+        # with a finished cell of that commit, a checkout that moved is refused: a second round would be of another build
+        spec_f = os.path.join(self.lab, "campaigns", "rs.json")
+        spec = json.load(open(spec_f))
+        with open(spec_f, "w") as f:
+            json.dump({**spec, "rounds": 2}, f)
+        sh(os.path.join(self.t, "base"), "git", "checkout", "-q", "--detach", self.pushed)
+        j, log = job()
+        self.assertEqual(j["state"], "failed", log)
+        self.assertIn("finished cells of another build", log)
+        self.assertIn(self.unpushed[:10], log)
+        self.assertFalse(os.path.exists(os.path.join(camp, "c", "base", "2", "result.json")))
 
     def test_a_worker_runs_a_branch_campaign_as_this_machine_would(self):
         j = server.submit_local(self.srv, {"argv": ["ab", "run", "campaigns/rb.json"], "cwd": self.lab})
